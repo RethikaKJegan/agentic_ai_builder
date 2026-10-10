@@ -70,7 +70,7 @@ if __name__ == '__main__':
         }
         config = dict(policy=dict(workspace_id='local-workspace', agent_permissions=['workflow.read_input', 'data.read', 'data.write', 'communication.send'],
             approved_providers=list({value['provider_id'] for value in credential_references.values()}),
-            allowed_destinations=['verified_recipients', 'configured_slack_webhook', 'configured_webhook'], remaining_quota={},
+            allowed_destinations=['verified_recipients', 'configured_spreadsheet', 'configured_slack_webhook', 'configured_webhook'], remaining_quota={},
             credential_references=credential_references),
             agents=[agent], tools=[dict(definition=smtp_tool, credential_reference='cred_browser_smtp')], bindings=[],
             subject_permissions=['data.read', 'data.write', 'communication.send'], subject_scopes=['data.read', 'data.write', 'spreadsheets.readonly', 'spreadsheets', 'communication.send', 'email.send', 'slack.access', 'github.access', 'weather.access', 'books.access', 'http.access', 'drive.metadata.readonly', 'calendar.events.readonly', 'documents.readonly', 'webhook.access'],

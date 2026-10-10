@@ -8,11 +8,31 @@ COMPARE = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
            ast.In: lambda a, b: a in b, ast.NotIn: lambda a, b: a not in b}
 
 
-def evaluate(expression, inputs, outputs):
+def validate_expression(expression):
+    """Check the condition syntax without resolving workflow-specific fields."""
     try:
         tree = ast.parse(expression, mode='eval')
-        if len(list(ast.walk(tree))) > 100:
+        supported = (ast.Expression, ast.Constant, ast.Name, ast.Attribute, ast.Subscript,
+                     ast.List, ast.Tuple, ast.UnaryOp, ast.Not, ast.BoolOp, ast.And, ast.Or,
+                     ast.Compare, ast.Load, *COMPARE.keys())
+        if len(list(ast.walk(tree))) > 100 or any(not isinstance(node, supported) for node in ast.walk(tree)):
             raise ValueError()
+        if any(isinstance(node, ast.Name) and node.id not in {'input', 'inputs', 'outputs', 'nodes'}
+               for node in ast.walk(tree)):
+            raise ValueError()
+        if any(isinstance(node, ast.Constant) and not isinstance(node.value, (str, int, float, bool, type(None)))
+               for node in ast.walk(tree)):
+            raise ValueError()
+        if any(isinstance(node, ast.Attribute) and node.attr.startswith('_') for node in ast.walk(tree)):
+            raise ValueError()
+        return tree
+    except Exception as exc:
+        raise RuntimeFailure('INVALID_CONDITION', 'The condition is outside the deterministic expression language.', 400) from exc
+
+
+def evaluate(expression, inputs, outputs):
+    try:
+        tree = validate_expression(expression)
         def walk(node):
             if isinstance(node, ast.Constant) and isinstance(node.value, (str, int, float, bool, type(None))):
                 return node.value

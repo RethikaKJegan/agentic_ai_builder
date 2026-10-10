@@ -7,6 +7,7 @@ from typing import Any
 
 from .contracts import validate_instance
 from .errors import PlannerFailure
+from runtime.expressions import validate_expression
 
 SECRET_PATTERNS = (
     re.compile(r"(?:api[_-]?key|secret|password|token)\s*[:=]\s*[^\s,}]+", re.I),
@@ -96,8 +97,23 @@ def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth:
             raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Tool node references a missing tool.", field=f"nodes[{index}].tool_id")
         if node.get("kind") == "agent" and node.get("agent_id") not in agent_ids:
             raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Agent node references a missing agent.", field=f"nodes[{index}].agent_id")
-    for condition in conditions.values():
+    condition_nodes = {condition_id: [] for condition_id in conditions}
+    for node in nodes:
+        if node.get("kind") == "condition":
+            condition_nodes[node["condition_id"]].append(node)
+    for condition_id, condition in conditions.items():
+        try:
+            validate_expression(condition['expression'])
+        except Exception as exc:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Condition expression is outside the supported deterministic language.", field="conditions.expression") from exc
         declared = set(condition["outcomes"])
+        linked = [node for node in condition_nodes[condition_id]]
+        if len(linked) != 1:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Each declared condition must have exactly one graph node.", field="conditions")
+        outgoing = [edge for edge in edges if edge["source"] == linked[0]["node_id"]]
+        if ({edge.get("outcome") for edge in outgoing} != declared or
+                any(sum(edge.get("outcome") == outcome for edge in outgoing) != 1 for outcome in declared)):
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Every declared condition outcome must have exactly one graph path.", field="edges.outcome")
         for edge in edges:
             source = next((node for node in nodes if node["node_id"] == edge["source"]), None)
             if source and source.get("condition_id") == condition["condition_id"] and edge.get("outcome") not in declared:

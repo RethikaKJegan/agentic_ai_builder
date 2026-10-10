@@ -72,6 +72,7 @@ class RegistryAdapter:
         resolved = deepcopy(workflow)
         unresolved = list(resolved.get('metadata', {}).get('unresolved_requirements', []))
         unresolved_capabilities = {item.get('requirement') for item in unresolved if isinstance(item, dict)}
+        selected_tools = {}
         for agent in resolved['agents']:
             candidates = []
             for capability in agent['capabilities']:
@@ -89,6 +90,7 @@ class RegistryAdapter:
                 selected = next((item['definition'] for item in candidates if item['tool_id'] == tool['tool_id']), candidates[0]['definition'])
                 old_id = tool['tool_id']
                 tool['tool_id'] = selected['tool_id']
+                selected_tools[selected['tool_id']] = deepcopy(selected)
                 for node in resolved['nodes']:
                     if node.get('kind') == 'tool' and node.get('tool_id') == old_id:
                         node['tool_id'] = selected['tool_id']
@@ -98,26 +100,28 @@ class RegistryAdapter:
             for capability in agent['capabilities']:
                 if capability in MODEL_ONLY_CAPABILITIES:
                     unresolved_capabilities.discard(capability)
-        self._materialize_tool_nodes(resolved)
+        unresolved_mappings = self._materialize_tool_nodes(resolved, selected_tools)
         resolved['metadata']['unresolved_requirements'] = [item for item in unresolved
-            if not (isinstance(item, dict) and item.get('requirement') not in unresolved_capabilities)]
+            if not (isinstance(item, dict) and item.get('requirement') not in unresolved_capabilities)] + unresolved_mappings
         return resolved, self._review(resolved, auth)
 
     @staticmethod
-    def _materialize_tool_nodes(workflow):
+    def _materialize_tool_nodes(workflow, tool_definitions=None):
         """Add missing executable nodes to provider-generated graphs without changing graph authority."""
-        existing = {node.get('tool_id') for node in workflow['nodes'] if node.get('kind') == 'tool'}
+        tool_definitions = tool_definitions or {}
+        unresolved = []
+        workflow_inputs = {field['name'] for field in workflow['inputs']}
         output = next((node for node in workflow['nodes'] if node.get('kind') == 'output' and node['node_id'] == 'workflow_output'), None)
         if output is None:
             output = next((node for node in workflow['nodes'] if node.get('kind') == 'output'), None)
         for index, tool in enumerate(workflow['tools']):
-            if tool['tool_id'] in existing:
-                continue
+            tool_node = next((node for node in workflow['nodes']
+                              if node.get('kind') == 'tool' and node.get('tool_id') == tool['tool_id']), None)
             agent = next((item for item in workflow['agents'] if tool['capability'] in item['capabilities']), None)
             if agent is None:
                 continue
-            node_id = f"{tool['capability']}_action"
-            if any(node['node_id'] == node_id for node in workflow['nodes']):
+            node_id = tool_node['node_id'] if tool_node else f"{tool['capability']}_action"
+            if not tool_node and any(node['node_id'] == node_id for node in workflow['nodes']):
                 continue
             mapping = {}
             if tool['capability'] == 'read_spreadsheet':
@@ -130,6 +134,23 @@ class RegistryAdapter:
                 mapping = {'text': 'inputs.notification_text'} if tool['tool_id'] == 'slack_send_notification' else {'path': 'inputs.path', 'body': 'inputs.body'}
             elif tool['capability'] == 'update_spreadsheet':
                 mapping = {'spreadsheet_id': 'inputs.spreadsheet_id', 'range': 'inputs.range', 'values': 'inputs.values'}
+            definition = tool_definitions.get(tool['tool_id'], {})
+            input_schema = definition.get('input_schema', {})
+            properties = input_schema.get('properties', {})
+            for property_name in properties:
+                if property_name not in mapping and property_name in workflow_inputs:
+                    mapping[property_name] = f'inputs.{property_name}'
+            for property_name in input_schema.get('required', []):
+                source = mapping.get(property_name)
+                valid_input = isinstance(source, str) and source.startswith('inputs.') and source.split('.', 2)[1] in workflow_inputs
+                valid_output = isinstance(source, str) and source.startswith('outputs.') and source.split('.', 2)[1] in {node['node_id'] for node in workflow['nodes']}
+                if not (valid_input or valid_output):
+                    unresolved.append({'requirement': f'tool_input:{tool["tool_id"]}.{property_name}',
+                                       'reason': 'workflow_input_mapping_required'})
+            if tool_node:
+                tool_node.setdefault('configuration', {})['input_mapping'] = {
+                    **mapping, **tool_node.get('configuration', {}).get('input_mapping', {})}
+                continue
             node = {'node_id': node_id, 'kind': 'tool', 'label': tool['capability'].replace('_', ' ').title(),
                     'agent_id': agent['agent_id'], 'tool_id': tool['tool_id'], 'configuration': {'input_mapping': mapping}}
             inserted = False
@@ -148,7 +169,7 @@ class RegistryAdapter:
                     inserted = True
             if inserted:
                 workflow['nodes'].insert(workflow['nodes'].index(output), node)
-                existing.add(tool['tool_id'])
+        return unresolved
 
     def approve_pending(self, workflow, auth):
         """Install server-side evidence for a revision approver's exact assignments."""

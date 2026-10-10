@@ -65,49 +65,6 @@ class CrewAdapter:
         except Exception as exc:
             raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'The agent did not produce a safe schema-valid result.') from None
 
-    def execute_supervisor(self, master, children, inputs):
-        """Run a bounded hierarchical CrewAI crew in one process.
-
-        Only the server-selected master may delegate; children cannot delegate
-        or execute code. Child outputs are returned to the master aggregation
-        task as validated JSON.
-        """
-        validate(master, 'agent'); reject_secrets(inputs)
-        if not all(master['guardrails'].values()):
-            raise RuntimeFailure('AGENT_GUARDRAIL_REQUIRED', 'All accepted agent guardrails are required.', 403)
-        os.environ['CREWAI_TESTING'] = 'true'; os.environ['CREWAI_TRACING_ENABLED'] = 'false'; os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
-        from crewai import Agent, Task, Crew, Process
-        from .model import BoundedLLM
-        master_llm = self.llm_factory(deepcopy(master))
-        if not isinstance(master_llm, BoundedLLM):
-            raise RuntimeFailure('BOUNDED_MODEL_REQUIRED', 'The trusted model factory must return a bounded CrewAI model.', 503)
-        master_agent = Agent(role=master['role'], goal=master['goal'], backstory=master['instructions'], llm=master_llm,
-                             tools=[], allow_delegation=True, allow_code_execution=False, max_iter=1, max_retry_limit=0,
-                             max_execution_time=master['limits']['timeout_seconds'], cache=False, verbose=False, memory=False,
-                             respect_context_window=False)
-        agents, tasks = [master_agent], []
-        for child in children:
-            definition = deepcopy(child)
-            child_llm = self.llm_factory(definition)
-            if not isinstance(child_llm, BoundedLLM):
-                raise RuntimeFailure('BOUNDED_MODEL_REQUIRED', 'The trusted model factory must return a bounded CrewAI model.', 503)
-            agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'], llm=child_llm,
-                          tools=[], allow_delegation=False, allow_code_execution=False, max_iter=1, max_retry_limit=0,
-                          max_execution_time=definition['limits']['timeout_seconds'], cache=False, verbose=False, memory=False,
-                          respect_context_window=False)
-            agents.append(agent)
-            tasks.append(Task(description='Analyze this input and return JSON only: ' + json.dumps(inputs), expected_output=json.dumps(definition['output_schema']), agent=agent, tools=[]))
-        tasks.append(Task(description='Delegate to the specialists, then combine their JSON results for this input: ' + json.dumps(inputs), expected_output=json.dumps(master['output_schema']), agent=master_agent, tools=[]))
-        crew = Crew(agents=agents, tasks=tasks, manager_agent=master_agent, process=Process.hierarchical, memory=False, cache=False, verbose=False, tracing=False)
-        result = crew.kickoff()
-        try:
-            output = json.loads(result.raw); reject_secrets(output)
-            if list(Draft202012Validator(master['output_schema']).iter_errors(output)): raise ValueError()
-            return output
-        except Exception:
-            raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'The supervisor did not produce a safe schema-valid result.') from None
-
-
 class CrewExecutor:
     retry_safe = False
     external_write = False
@@ -127,9 +84,6 @@ class CrewExecutor:
             raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'Use an accepted registered agent.', 403)
         definition = deepcopy(record['definition'])
         definition['allowed_tool_ids'] = deepcopy(agent['allowed_tool_ids'])
-        if definition.get('hierarchy_role') == 'master':
-            children = [deepcopy(item['definition']) for item in self.registry_adapter.agents.values()
-                        if item.get('definition', {}).get('parent_agent_id') == definition['agent_id']]
-            if children:
-                return CrewAdapter(self.model_factory).execute_supervisor(definition, children, inputs)
+        # The persisted DAG, rather than CrewAI's internal delegation, controls
+        # the order and number of agent and tool calls for every workflow.
         return CrewAdapter(self.model_factory).execute(definition, inputs)

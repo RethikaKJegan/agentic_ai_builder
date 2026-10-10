@@ -7,6 +7,7 @@ import unittest
 
 from jsonschema import Draft202012Validator
 from runtime import RuntimeService, RuntimeFailure
+from planner.errors import PlannerFailure
 from workflow_api.service import WorkflowService
 from workflow_api.storage import WorkflowStore
 from registry.contracts import schema
@@ -184,8 +185,9 @@ class GraphTests(RuntimeFixture):
     def test_arbitrary_condition_code_is_never_executed(self):
         self.branch()
         self.workflow['conditions'][0]['expression'] = "__import__('os').system('touch .local/never-created')"
-        run_id = self.queue()
-        self.assertEqual(self.runner().advance(run_id, self.auth)['status'], 'blocked')
+        self.put()
+        with self.assertRaises(PlannerFailure):
+            self.runtime.create_run(self.request(), self.auth)
         self.assertFalse((ROOT / '.local/never-created').exists())
 
     def test_unmatched_condition_fails_closed(self):

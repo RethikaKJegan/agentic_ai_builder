@@ -130,6 +130,8 @@ class RuleBasedStructuredOutputProvider:
         graph without changing the contract or Registry boundary.
         """
         workflow = self.generate(objective, {})
+        condition_nodes = [node for node in workflow["nodes"] if node.get("kind") == "condition"]
+        condition_node = condition_nodes[0] if condition_nodes else None
         capabilities = workflow["agents"][0]["capabilities"] or ["classify_text"]
         tools_by_capability = {tool["capability"]: tool for tool in workflow["tools"]}
         base_agent = workflow["agents"][0]
@@ -142,6 +144,10 @@ class RuleBasedStructuredOutputProvider:
                  {"node_id": "master_orchestrator", "kind": "agent", "label": "Master orchestrator", "agent_id": master["agent_id"]}]
         edges = [{"edge_id": "received_to_master", "source": "objective_received", "target": "master_orchestrator"}]
         previous = "master_orchestrator"
+        if condition_node:
+            nodes.append(condition_node)
+            edges.append({"edge_id": "master_to_condition", "source": previous, "target": condition_node["node_id"]})
+            previous = condition_node["node_id"]
         for index, capability in enumerate(capabilities[:6], 1):
             agent_id = f"specialist_agent_{index}"
             agent = {**base_agent, "agent_id": agent_id, "role": capability.replace("_", " ").title() + " specialist",
@@ -151,7 +157,8 @@ class RuleBasedStructuredOutputProvider:
             agents.append(agent)
             agent_node = f"specialist_{index}"
             nodes.append({"node_id": agent_node, "kind": "agent", "label": agent["role"], "agent_id": agent_id})
-            edges.append({"edge_id": f"master_to_{agent_node}", "source": previous, "target": agent_node})
+            edges.append({"edge_id": f"{previous}_to_{agent_node}", "source": previous, "target": agent_node,
+                          **({"outcome": "yes"} if previous == "objective_condition" else {})})
             previous = agent_node
             tool = tools_by_capability.get(capability)
             if tool:
@@ -178,6 +185,8 @@ class RuleBasedStructuredOutputProvider:
                       {"node_id": "workflow_output", "kind": "output", "label": "Workflow result", "configuration": {"input_mapping": {"workflow_result": f"outputs.{previous}"}}}])
         edges.extend([{"edge_id": "last_to_combined", "source": previous, "target": "combined_result"},
                       {"edge_id": "combined_to_output", "source": "combined_result", "target": "workflow_output"}])
+        if condition_node:
+            edges.append({"edge_id": "condition_to_no_output", "source": condition_node["node_id"], "target": "workflow_output", "outcome": "no"})
         workflow["agents"], workflow["nodes"], workflow["edges"] = agents, nodes, edges
         workflow["metadata"]["generation_mode"] = "hierarchy"
         return workflow
@@ -210,7 +219,7 @@ class RuleBasedStructuredOutputProvider:
         conditions: list[dict[str, Any]] = []
         conditional = " if " in f" {objective.lower()} " or " when " in f" {objective.lower()} "
         if conditional:
-            conditions.append({"condition_id": "objective_condition", "expression": "objective_condition_is_met", "outcomes": ["yes", "no"]})
+            conditions.append({"condition_id": "objective_condition", "expression": "inputs.condition_result", "outcomes": ["yes", "no"]})
             nodes.append({"node_id": "objective_condition", "kind": "condition", "label": "Evaluate objective condition", "condition_id": "objective_condition"})
             edges.append({"edge_id": "plan_to_condition", "source": "plan_objective", "target": "objective_condition"})
         approval_node = None
@@ -223,6 +232,8 @@ class RuleBasedStructuredOutputProvider:
         tool_refs = [{"tool_id": selected, "capability": cap}
                      for cap in capabilities if (selected := self._tool_for(cap, set(words))) is not None]
         input_fields = [{"name": "objective_context", "type": "object", "required": False}]
+        if conditional:
+            input_fields.append({"name": "condition_result", "type": "boolean", "required": True})
         for cap in capabilities:
             if cap == "read_spreadsheet":
                 input_fields.extend([
@@ -300,10 +311,7 @@ class RuleBasedStructuredOutputProvider:
                           "configuration": {"input_mapping": {"workflow_result": "inputs"}}})
         if previous == "objective_condition":
             output_node["configuration"] = {"input_mapping": {"workflow_result": "inputs"}}
-            edges.extend([
-                {"edge_id": "condition_to_output_yes", "source": previous, "target": "workflow_output", "outcome": "yes"},
-                {"edge_id": "condition_to_output_no", "source": previous, "target": "workflow_output", "outcome": "no"},
-            ])
+            edges.append({"edge_id": "condition_to_output_yes", "source": previous, "target": "workflow_output", "outcome": "yes"})
         else:
             output_node["configuration"] = {"input_mapping": {"workflow_result": f"outputs.{previous}"}}
             edges.append({"edge_id": "last_to_output", "source": previous, "target": "workflow_output"})
