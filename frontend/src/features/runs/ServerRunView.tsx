@@ -64,11 +64,9 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
     let cancelled = false;
     const refresh = async () => {
       try {
-        const overview = await api.overview();
-        const candidates = overview.items.filter((item) => item.latest_run_id && (!approvalsOnly || item.pending_approval_count > 0));
-        const results = await Promise.allSettled(candidates.map((item) => api.request("get_run", { run_id: item.latest_run_id as string })));
+        const collection = await api.runs();
         if (!cancelled) {
-          setAvailableRuns(results.flatMap((result) => result.status === "fulfilled" ? [result.value.run] : []));
+          setAvailableRuns(collection.items.filter((item) => !approvalsOnly || item.approvals.some((approval) => approval.status === "pending")));
           setError(null);
         }
       } catch (caught) {
@@ -97,7 +95,7 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
       {run.approvals.map((approval) => {
         const matched = approval.workflow_id === run.workflow_id && approval.workflow_version === run.workflow_version;
         const record = matched ? approval : { ...approval, status: "unmatched" as const, allowed_decisions: [] };
-        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} onUpdated={() => void load()} />;
+        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} onUpdated={() => void loadRun(run.run_id)} />;
       })}
       {!approvalsOnly && <ol className="divide-y divide-border rounded-xl border border-border" aria-label="Run events">{events.map((event) => <li key={event.event_id} className="p-3"><p className="text-sm">{event.event_type}</p><p className="text-xs text-muted-foreground">{event.timestamp} · {event.source} · {event.event_id} · v{event.workflow_version}</p></li>)}</ol>}
     </>}

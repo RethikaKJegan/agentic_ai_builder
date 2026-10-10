@@ -77,8 +77,8 @@ class BoundedLLM(BaseLLM):
 
 class OpenAIModelFactory:
     """Server-owned provider pricing and tokenizer; credentials stay in SDK."""
-    def __init__(self, rates, client=None):
-        self.rates, self.client = rates, client
+    def __init__(self, rates, client=None, tokenizers=None):
+        self.rates, self.client, self.tokenizers = rates, client, tokenizers or {}
 
     def __call__(self, definition):
         model = definition['model']
@@ -88,7 +88,8 @@ class OpenAIModelFactory:
         from openai import OpenAI
         import tiktoken
         try:
-            encoding = tiktoken.encoding_for_model(model['model_id'])
+            encoding = (tiktoken.get_encoding(self.tokenizers[model['model_id']]) if model['model_id'] in self.tokenizers
+                        else tiktoken.encoding_for_model(model['model_id']))
         except KeyError as exc:
             raise RuntimeFailure('MODEL_TOKENIZER_REQUIRED', 'Configure a supported exact model tokenizer.', 503) from None
         client = self.client.with_options(max_retries=0) if self.client is not None else OpenAI(max_retries=0)

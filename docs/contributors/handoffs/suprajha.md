@@ -1,5 +1,11 @@
 # Handoff — Suprajha
 
+## Planner condition fix — 2026-10-10
+
+The UI reported `WORKFLOW_VALIDATION_FAILED` at `conditions.expression` while planning an incoming Slack sender-filter/email workflow. The production provider prompt omitted the deterministic runtime grammar. Added grammar/examples and unknown-identity instructions; fresh canonical yes/no proposals with unsupported expressions now retain their branches, declare a required boolean review input, and record an unresolved `condition_mapping_required` requirement instead of guessing the expression. Saved/approved workflow validation is unchanged and still rejects unsupported syntax or missing branch paths. Non-boolean mappings are not repaired. Registry review retains unresolved condition mapping as a publication blocker.
+
+Files: `planner/provider.py`, `planner/service.py`, `planner/validation.py`, `tests/test_planner.py`, and the generic-execution design note. Verification: all 115 Python tests PASS, including 22 planner tests; shared schemas/fixtures PASS; strict generic-tool-workflow-execution OpenSpec validation PASS. No live model or connector calls were made for this fix. The UI is unchanged. Restart the backend to load the updated planner. Incoming Slack automation still requires configured Slack Events authorization and exact sender/event mappings; outbound webhook delivery is not incoming-event access.
+
 - **Segment:** Natural-language planning pipeline
 - **Status:** accepted (Aravind acceptance recorded 2026-10-09)
 - **Contract versions:** workflow-schema-v1, agent-contract-v1, tool-contract-v1, api-payloads-v1, error-format-v1, auth-permissions-v1, branching-approvals-v1, run-status-versioning-v1
@@ -49,3 +55,11 @@ Aravind explicitly accepted this planner handoff in the contributor session. Loc
 Rethika accepted the delivered upstream registry/UI/API boundaries and has delivered the core runtime through existing canonical operations. Fresh verification: 94 Python tests (50 upstream, 44 runtime), 61 frontend tests, TypeScript, contract/drift checks, runtime dependencies and strict OpenSpec PASS. Runtime routes remain disabled by default and can be explicitly connected; no live model/email/trigger demonstration or final segment acceptance is claimed. See `runtime/README.md` and `docs/contributors/handoffs/rethika.md` for server adapters, approval/worker/grant boundaries and remaining publication/production limits.
 
 Joint review requested for `openspec/changes/rethika-runtime-observability/contract-review.md` and its companion draft schema before release/trigger/automation/overview implementation. Suprajha reviews executable input/expression mappings; Aravind reviews trigger scopes and restart authorization; Harihar reviews lifecycle transport, DTOs and overview streams. All extension signoffs remain pending; existing shared contracts are unchanged. This is a repository handoff notification, not an external message or fabricated owner acceptance.
+
+## Workflow-owned live planning — 2026-10-10
+
+The live launcher adds nonsecret server context for the exact runtime model, enabled tool/capability IDs, approved permissions and notification recipients. Planner guidance specifies metadata trigger templates, event inputs, node output handoffs and approval boundaries. It no longer fabricates condition_result=true for Sheets. Live planning performs at most two bounded requests, including one correction for unsupported permissions/capabilities/configuration or nonexistent node references. SDK retries and Responses storage are disabled. Business rules remain authored in the workflow.
+
+A synthetic live draft and two actual model agent steps were verified. 135 Python tests and canonical validation pass, including bounded correction tests. See `docs/sheets-gmail.md` and Rethika's accumulated handoff for evidence and live-delivery limitations. No contributor acceptance is inferred.
+
+Planner assignment fix: fresh provider proposals are checked for secrets before clearing agent allowed_tool_ids and removing tool configuration_reference. This prevents UNTRUSTED_ASSIGNMENT during UI draft saving; forged client saves still fail, and Registry review remains responsible for assignments. Verification: 144 offline Python tests, shared contract validation and strict live-workflow-providers OpenSpec validation pass. Regression tests cover generation-to-save, client forgery and secrets in discarded fields. Restart the operator-managed backend to load the change. No live email was sent or backend started/stopped for this fix.

@@ -20,9 +20,10 @@ from .lifecycle import LifecycleService, LifecycleFailure
 
 
 class ApiFailure(Exception):
-    def __init__(self, code, message, status=400, field=None, retryable=False):
+    def __init__(self, code, message, status=400, field=None, retryable=False, details=None):
         super().__init__(message)
         self.code, self.status, self.field, self.retryable = code, status, field, retryable
+        self.details = details
 
 
 PERMISSIONS = {
@@ -105,9 +106,13 @@ class WorkflowService:
     def failure(cls, request_id, failure):
         # Never reflect provider messages, validation values or user-controlled paths.
         field = failure.field if failure.field and re.fullmatch(r'[a-zA-Z0-9_.\[\]-]{1,200}', failure.field) else None
-        return cls.envelope(request_id, failure.status, {'error': dict(
+        error = dict(
             error_code=failure.code, message=str(failure), request_id=request_id,
-            retryable=failure.retryable, field=field)})
+            retryable=failure.retryable, field=field)
+        if failure.details is not None:
+            reject_secrets(failure.details)
+            error['details'] = deepcopy(failure.details)
+        return cls.envelope(request_id, failure.status, {'error': error})
 
     @staticmethod
     def authorize(auth, operation):
@@ -149,7 +154,14 @@ class WorkflowService:
                 else:
                     run = self.runtime_runner.decide(request, auth)
                     if run['status'] == 'running':
-                        run = self.runtime_runner.advance(run['run_id'], auth)
+                        with self.store.transaction() as db:
+                            execution_subject = db.execute(
+                                'SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?',
+                                (auth['subject']['workspace_id'], run['run_id'])).fetchone()
+                        # Approval authority is not execution authority. Automation
+                        # resumes through the worker's fresh identity resolver.
+                        if execution_subject and execution_subject[0] == auth['subject']['subject_id']:
+                            run = self.runtime_runner.advance(run['run_id'], auth)
                     data = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
                 return self.envelope(request_id, 200, data)
             if operation == 'list_runs':
@@ -225,9 +237,42 @@ class WorkflowService:
     def validate_document(workflow):
         validate_workflow(workflow)
         for node in workflow['nodes']:
+            configuration = node.get('configuration', {})
+            if set(configuration) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
+                raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Use the supported node input mappings.', field='nodes.configuration')
+            if node['kind'] == 'tool' and not node.get('agent_id'):
+                raise PlannerFailure('AGENT_REGISTRATION_REQUIRED', 'Tool nodes require a registered execution agent.', field='nodes.agent_id')
+            if node['kind'] == 'agent':
+                agent = next(item for item in workflow['agents'] if item['agent_id'] == node['agent_id'])
+                if agent['limits']['max_llm_calls'] < 1:
+                    raise PlannerFailure('BUDGET_EXHAUSTED', 'Model agent nodes require a model-call budget.', field='agents.limits.max_llm_calls')
+            if 'input_mapping' in configuration:
+                from runtime.expressions import validate_expression
+                for expression in configuration['input_mapping'].values():
+                    try:
+                        validate_expression(expression)
+                    except RuntimeFailure:
+                        raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Use restricted expressions in node input mappings.', field='nodes.configuration.input_mapping') from None
             ui = node.get('configuration', {}).get('ui', {})
             if isinstance(ui, dict) and any(ui.get(key) for key in ('role', 'parentNodeId', 'combine')):
                 raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Hierarchy execution mapping requires downstream review.', field='nodes.configuration.ui')
+        required_inputs = {item['name'] for item in workflow['inputs'] if item['required']}
+        for trigger in workflow.get('metadata', {}).get('trigger_templates', []):
+            from .lifecycle import LifecycleService, LifecycleFailure
+            for mapping in trigger.get('input_mapping', {}).values():
+                try:
+                    if isinstance(mapping, str):
+                        LifecycleService.event_path(mapping)
+                    elif not (isinstance(mapping, dict) and set(mapping) == {'constant'}):
+                        raise LifecycleFailure('EVENT_MAPPING_FAILED', 'Unsupported event mapping.', 400)
+                except LifecycleFailure:
+                    raise PlannerFailure('EVENT_MAPPING_FAILED', 'Use event data paths or explicit constants.', field='metadata.trigger_templates.input_mapping') from None
+            if required_inputs - set(trigger.get('input_mapping', {})):
+                raise PlannerFailure('TRIGGER_INPUT_MAPPING_REQUIRED', 'Map every required workflow input from the trigger event.', field='metadata.trigger_templates.input_mapping')
+            if trigger.get('provider_id') == 'google_sheets' and trigger.get('event_type') == 'row.created':
+                poll_input = trigger.get('poll_input', {})
+                if not poll_input.get('identity_field') or not poll_input.get('range'):
+                    raise PlannerFailure('TRIGGER_ROW_IDENTITY_REQUIRED', 'Configure the stable row identity column and Sheet range.', field='metadata.trigger_templates.poll_input')
 
     def mutate(self, db, workspace, operation, payload, auth, request_id):
         workflow_id = payload.get('workflow_id')
@@ -290,7 +335,19 @@ class WorkflowService:
             review = self.registry_adapter.review(workflow, auth)
             if not review['ready']:
                 code = 'AGENT_REGISTRATION_REQUIRED' if not workflow['tools'] and 'AGENT_REGISTRATION_REQUIRED' in review['reason_codes'] else 'TOOL_ASSIGNMENT_REQUIRED'
-                raise ApiFailure(code, 'Registry requirements must be resolved and authorized before approval or publication.', 409)
+                requirements = []
+                for item in workflow['metadata'].get('unresolved_requirements', [])[:30]:
+                    if isinstance(item, str):
+                        requirements.append(item[:500])
+                    elif isinstance(item, dict):
+                        if item.get('reason') == 'condition_mapping_required':
+                            requirements.append('Configure a reviewed condition/event mapping before publication.')
+                        elif isinstance(item.get('requirement'), str):
+                            requirements.append('Resolve requirement: ' + item['requirement'][:200])
+                if not self.registry_adapter.auto_resolve_planner and (workflow['agents'] or workflow['tools']):
+                    requirements.append('Load trusted agent/tool registrations with BUILDER_REGISTRY_CONFIG before publication.')
+                raise ApiFailure(code, 'Publication needs the setup requirements listed below.', 409,
+                    details={'requirements': list(dict.fromkeys(requirements)), 'reason_codes': review['reason_codes']})
             workflow['status'] = 'approved' if action == 'approve' else 'published'
             assignments = self.registry_adapter.execution_assignments(workflow, auth)
             for agent in workflow['agents']:

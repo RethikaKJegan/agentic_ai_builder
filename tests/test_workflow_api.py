@@ -86,6 +86,38 @@ class WorkflowApiTests(unittest.TestCase):
         self.assertEqual(read['data']['workflow']['nodes'], draft['nodes'])
         self.assertEqual(read['data']['workflow']['approval_gates'], draft['approval_gates'])
 
+    def test_model_proposed_assignments_are_removed_before_draft_save(self):
+        class AssignedProvider(RuleBasedStructuredOutputProvider):
+            def generate(self, objective, context):
+                draft = super().generate(objective, context)
+                for agent in draft['agents']:
+                    agent['allowed_tool_ids'] = ['smtp_send_email']
+                for tool in draft['tools']:
+                    tool['configuration_reference'] = 'model_proposed_config'
+                return draft
+
+        self.service.planner = PlannerService(AssignedProvider())
+        result = self.mutate('/workflows/plan', 'plan_workflow',
+                             {'objective': 'Send an email notification to the owner'})
+        self.assertEqual(result.status_code, 200, result.json())
+        draft = result.json()['data']['workflow']
+        self.assertTrue(draft['tools'])
+        self.assertTrue(all(agent['allowed_tool_ids'] == [] for agent in draft['agents']))
+        self.assertTrue(all('configuration_reference' not in tool for tool in draft['tools']))
+        self.assertEqual(self.save(draft).status_code, 200)
+
+    def test_client_proposed_assignments_still_cannot_be_saved(self):
+        for field in ('allowed_tool_ids', 'configuration_reference'):
+            with self.subTest(field=field):
+                draft = RuleBasedStructuredOutputProvider().generate('Send an email notification', {})
+                if field == 'allowed_tool_ids':
+                    draft['agents'][0][field] = ['smtp_send_email']
+                else:
+                    draft['tools'][0][field] = 'client_proposed_config'
+                result = self.save(draft, key=f'forged_{field}_12345678')
+                self.assertEqual(result.status_code, 403, result.json())
+                self.assertEqual(result.json()['data']['error']['error_code'], 'UNTRUSTED_ASSIGNMENT')
+
     def test_idempotency_survives_restart_and_revision_conflict(self):
         first = self.save()
         self.assertEqual(first.status_code, 200)
@@ -143,6 +175,26 @@ class WorkflowApiTests(unittest.TestCase):
         admin = self.session(['admin'])
         denied = self.mutate(endpoint + '/approve', 'approve_workflow', {**ref, 'action': 'approve'}, key='approve_tool_key_12345678', client=admin)
         self.assertEqual(denied.json()['data']['error']['error_code'], 'TOOL_ASSIGNMENT_REQUIRED')
+        admin.close()
+
+    def test_publication_reports_unresolved_slack_setup_without_granting_authority(self):
+        self.workflow['metadata']['unresolved_requirements'] = [
+            'Configure Slack Events for the selected channel.',
+            'Configure a Gmail sending tool.',
+            {'requirement': 'condition_mapping', 'reason': 'condition_mapping_required'}]
+        self.save()
+        endpoint = f"/workflows/{self.workflow['workflow_id']}"
+        self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_slack_setup')
+        admin = self.session(['admin'])
+        response = self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'},
+                               key='approve_slack_setup', client=admin)
+        self.assertEqual(response.status_code, 409)
+        error = response.json()['data']['error']
+        self.assertEqual(error['error_code'], 'TOOL_ASSIGNMENT_REQUIRED')
+        self.assertIn('Configure Slack Events for the selected channel.', error['details']['requirements'])
+        self.assertIn('Configure a reviewed condition/event mapping before publication.', error['details']['requirements'])
+        self.assertEqual(self.client.get(endpoint).json()['data']['workflow']['status'], 'validated')
+        self.assertNotIn('authorization_reference', response.text)
         admin.close()
 
     def test_safe_planner_errors_and_missing_runtime(self):

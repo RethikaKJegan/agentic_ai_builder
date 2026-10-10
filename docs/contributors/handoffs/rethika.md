@@ -1,5 +1,13 @@
 # Handoff — Rethika
 
+## Live delivery recovery — 2026-10-10
+
+Generic worksheet recovery: the new Tickets workflow planned_82b3260b91547770 failed because its document title Tickets was used as a tab name while the actual tab was Sheet1. On an invalid named range, the reader now checks metadata and uses the sole actual worksheet only if the requested name is absent. Multiple worksheets fail clearly with SHEETS_RANGE_INVALID. Header/identity/authorization and baseline checks remain enforced. Baseline was established and an explicit test of existing T002 completed in run_36580e6d169447a192e350531acc0b82 with two actual model calls, one tool call and confirmed SMTP submission. No worksheet writes or business-rule changes were made. All 151 Python tests, contracts and strict OpenSpec pass; tests cover sole-tab recovery, ambiguous-tab rejection and access-denial preservation. The operator must restart their existing backend for ongoing polling to load this change.
+
+The current direct-send workflow planned_8edc186ab6296f36 had source error EVENT_MAPPING_FAILED because priority used row["priority"] and the previous mapper supported dot paths only. Data-only literal bracket paths are now supported, and workflow publication validates their syntax. The retained checkpoint was retried through the published workflow without starting another backend or replacing its release. Runs run_022cc20961694b9f944a698da5acfde3 and run_6692ed838e554157b6bd1b8feff40fe8 each completed with two real model calls, one email tool call and a confirmed SMTP message ID. SMTP recipient acceptance is verified; inbox placement is not. The old disabled workflow's pending approval remains historical and was not bypassed.
+
+Monitoring aggregates workflow reservations once instead of also summing the agent copies. Its workspace-scoped response adds source/baseline/checkpoint health, reviewed agent guardrails and safe runtime audit references. Governance's default live panel consumes the same server endpoint; local draft policy controls remain separately labeled. Python tests (148), frontend tests (66), types/lint, contracts, strict OpenSpec and four isolated desktop/mobile browser checks pass. An operator restart loads these changes into the existing backend for future events.
+
 - **Segment:** Runtime and observability, including the planned published workflow lifecycle.
 - **Status:** ready-for-handoff — core runtime and the accepted lifecycle/trigger extension are implemented; final verification evidence is recorded below.
 - **Contract versions:** workflow-schema-v1, agent-contract-v1, tool-contract-v1, api-payloads-v1, error-format-v1, auth-permissions-v1, branching-approvals-v1, run-status-versioning-v1, and additive workflow-operations-v2. All four owners unanimously accepted v2 on 2026-10-10; v1 was not extended.
@@ -149,3 +157,35 @@ The controlled vertical slice plans an email workflow, resolves `smtp_send_email
 it, pauses at run approval, resumes after an `approver` decision, and completes through the
 offline connector. Real SMTP delivery and final four-owner acceptance remain explicitly
 unclaimed until operator credentials and human signoff are provided.
+
+## Slack Socket Mode / Gmail implementation — 2026-10-10
+
+The scoped `slack-gmail-socket-mode` change adds a product Socket Mode receiver, operator Gmail Registry bootstrap, real SMTP connector, release/dispatch/runtime workers, hidden app-token entry, and deterministic mapped draft setup. Existing drafts and shared contracts are preserved. Release execution now strips lifecycle-only context at canonical auth boundaries, retains exact publisher-bound grants and resumes automation approvals through fresh worker identity. Approvals/Runs use the server run collection so concurrent DM notification requests are visible.
+
+Verification: 126 Python tests (10 new Slack/Gmail scenarios), 63 frontend tests, typecheck, lint, production build, shared contracts/generated-client drift and strict OpenSpec PASS. Gmail STARTTLS/AUTH/NOOP was verified with saved credentials; no email was submitted. Live Slack event/mail acceptance remains pending the operator's app-level token and team/DM/member IDs. Setup instructions: `docs/slack-gmail.md`. Email sends retain the existing per-action approval boundary; no automatic approval or contributor acceptance is claimed.
+
+Focused browser checks: both approve and reject scenarios passed using `cd frontend && npm run test:e2e -- --config playwright.slack-gmail.config.ts`. These checks mock the API; the Python integration tests separately verify actual application lifecycle and SMTP connector logic with an offline transport.
+
+The broader legacy browser suite was also attempted on isolated ports: 1/8 passed, 7 failed against builder controls/labels such as Create draft, Save revision and Registry review. These failures are recorded in `.local/slack-gmail-browser-tests.log` and are not counted as passing integration evidence. No builder redesign or unrelated selector rewrite was included.
+
+## Workflow-owned live providers — 2026-10-10
+
+`scripts/run_live_backend.py` supplies reusable Google Sheets, bounded OpenAI/CrewAI and Gmail adapters plus durable workers. It creates no business workflow. The UI-authored canonical workflow owns source range, row identity, conditions, agent handoffs, email content and approvals. Fixed persisted binding-to-release lookup, stable row.created polling, incomplete-row handling, filtered/duplicate batch checkpoints, source health recovery and authored output mappings. Polling source grants no longer append a second Sheets read after an action. Gmail retains action approval and no automatic retry after uncertain submission.
+
+Evidence: 135 Python tests passed; the final scheduler/lifecycle focused rerun passed 18 tests. 63 frontend tests, typecheck, lint, production build, canonical contracts/client drift, dependency consistency and strict scoped OpenSpec validation passed. Both focused approval browser scenarios passed with a mocked API. Earlier broad legacy browser failures remain unclaimed.
+
+Live checks verified the selected Sheet, Gmail STARTTLS/AUTH/NOOP and model availability. A synthetic model-generated draft passed validation and Registry revision approval, then a synthetic row triggered two actual CrewAI/model steps and paused for human action approval. No email was submitted. Logs: `.local/synthetic-runtime-check.log`, `.local/live-provider-tests.log`, `.local/live-provider-browser-tests.log`. Automatic approval review rejected sending the real Sheet configuration to the live planner; synthetic data was used instead. Real delivery requires UI publication, a new row after baseline and action approval. Setup: `docs/sheets-gmail.md`. No contributor acceptance is inferred.
+
+## Live source recovery — 2026-10-10
+
+The user's published source had a full Google Sheets URL in resource_id, causing SHEETS_READ_FAILED and no baseline/jobs/runs. The provider boundary now extracts the ID from an HTTPS docs.google.com Sheet URL and rejects foreign URLs. No published workflow was rewritten or recreated. A second failure came from the existing database's legacy checkpoint key: composite ON CONFLICT failed after the initial baseline. Workspace-scoped UPDATE/INSERT checkpoint persistence now supports the legacy and current tables without resetting data.
+
+The live backend was restarted with both fixes. The actual published source reports health=ready with no error; its existing baseline contains four identities and subsequent checkpoint updates succeed. UI session/runs endpoints return 200. Rows added before the successful baseline intentionally create no runs; the user must refresh the browser and append a new unique High-priority row. No email was sent and no approval was bypassed. Verification: 138 Python tests, including URL-backed dispatch and legacy checkpoint recovery; contracts, generated-client drift and strict OpenSpec validation passed. Logs: .local/sheet-url-all-tests.log and .local/live-backend-recovery.log.
+
+## Explicit direct-send mode and wrong-service diagnosis — 2026-10-10
+
+The user's new screenshot was traced to an unrelated service on port 8000: the frontend proxy received HTTP 404 JSON with only a detail field for session/workflows/runs. The managed Builder backend was already absent; the unrelated service was left untouched. No Builder backend is left running. Updated commands use port 8002 and an explicit frontend BUILDER_API_URL; the proxy now reports canonical API_WRONG_SERVICE when upstream JSON lacks a Builder envelope.
+
+At the user's explicit request, BUILDER_EMAIL_DIRECT_SEND=1 permits the configured smtp_send_email tool to send from an approved published workflow without a per-action gate. Registry approval_required=false, the graph runner's server-owned direct tool allowlist and SMTP connector opt-in must all agree; exact grants, credentials, recipient/host restrictions, schema guardrails, budgets, dedup and uncertain-send no-retry remain enforced. Default approval behavior and workflows retaining approval nodes remain unchanged. The user will regenerate/edit and publish the workflow; no stored published revision was rewritten.
+
+Evidence: 141 Python tests and 65 frontend tests pass, along with typecheck, lint, canonical contracts/client drift, strict scoped OpenSpec and diff checks. Direct-send tests run two CrewAI agents and exactly one offline SMTP submission, skip Low rows and deny direct grants without runner/connector opt-in. No live email was submitted. Updated objective and commands: docs/sheets-gmail.md.

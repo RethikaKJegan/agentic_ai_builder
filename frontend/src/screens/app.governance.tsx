@@ -10,7 +10,7 @@ import { PageHeader } from "@/features/runs/RunTrace";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentControlTab } from "@/features/governance/AgentControlTab";
-import { UsageTab } from "@/features/governance/UsageTab";
+import { LiveRuntimePanel } from "@/screens/app.monitoring";
 
 
 
@@ -58,12 +58,12 @@ export default function Governance() {
 
   return (
     <div className="mx-auto max-w-5xl p-6 md:p-10">
-      <PageHeader title="Governance" sub="Local policy drafts. Backend review and runtime enforcement are pending." />
+      <PageHeader title="Governance" sub="Live server guardrails and audit records, alongside local policy drafts." />
       {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: only Organization Admins can change policies.</p>}
-      <Tabs defaultValue="control">
-        <TabsList className="flex-wrap"><TabsTrigger value="control">Agent Control</TabsTrigger><TabsTrigger value="usage">Usage</TabsTrigger><TabsTrigger value="policies">Policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Audit log</TabsTrigger></TabsList>
+      <Tabs defaultValue="usage">
+        <TabsList className="flex-wrap"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Live governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
         <TabsContent value="control" className="mt-4"><AgentControlTab /></TabsContent>
-        <TabsContent value="usage" className="mt-4"><UsageTab /></TabsContent>
+        <TabsContent value="usage" className="mt-4"><LiveRuntimePanel /></TabsContent>
         <TabsContent value="policies" className="mt-4 space-y-4">
           <Section scope="organization" />
           <Section scope="workspace" />

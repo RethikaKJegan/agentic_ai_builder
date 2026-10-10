@@ -182,6 +182,13 @@ export class WorkflowClient {
     return result.data as z.infer<(typeof responseSchemas)[K]>;
   }
 
+  async runs() {
+    const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
+    const result = schema.safeParse(await this.read("runs"));
+    if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");
+    return result.data;
+  }
+
   async overview(afterSequence?: number) {
     const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
     const result = overviewCollectionSchema.safeParse(await this.read(path));

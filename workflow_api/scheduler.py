@@ -45,9 +45,21 @@ class TriggerScheduler:
                         continue
                     changes, next_cursor = source(binding, cursor)
                     result = lifecycle.poll(binding_id, changes, next_cursor, auth)
+                    with lifecycle.store.transaction() as db:
+                        row = db.execute("SELECT document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+                        if row:
+                            import json
+                            trigger = json.loads(row[0])
+                            recovered = trigger.get('health') != 'ready'
+                            trigger['health'] = 'ready'
+                            trigger.pop('last_error_code', None)
+                            db.execute("UPDATE lifecycle_triggers SET document=? WHERE binding_id=?", (json.dumps(trigger), binding_id))
+                            if recovered:
+                                workflow = db.execute('SELECT workflow_id FROM lifecycle_triggers WHERE binding_id=?', (binding_id,)).fetchone()[0]
+                                lifecycle.emit(db, workspace, workflow, 'trigger.ready')
                     self.last_polled[binding_id] = now
                     polled += 1
-                    queued += len(result.get("receipts", []))
+                    queued += sum(1 for receipt in result.get('receipts', []) if receipt.get('accepted') is True and not receipt.get('duplicate'))
                 except Exception as exc:
                     # Retry on the next interval and preserve only a stable,
                     # redacted error code for operational diagnosis.
@@ -60,6 +72,8 @@ class TriggerScheduler:
                             trigger['health'] = 'error'
                             trigger['last_error_code'] = str(code)
                             db.execute("UPDATE lifecycle_triggers SET document=? WHERE binding_id=?", (json.dumps(trigger), binding_id))
+                            workflow = db.execute('SELECT workflow_id FROM lifecycle_triggers WHERE binding_id=?', (binding_id,)).fetchone()[0]
+                            lifecycle.emit(db, workspace, workflow, 'trigger.error')
                     self.last_polled[binding_id] = now
                     continue
             for job in lifecycle.lease(workspace):

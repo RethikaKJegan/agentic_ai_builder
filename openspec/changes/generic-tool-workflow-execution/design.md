@@ -12,4 +12,6 @@ After Registry assignment, tool nodes use the selected tool's accepted input sch
 
 ## Scope and limits
 
+Fresh model proposals now receive the deterministic expression grammar in the provider prompt. If an otherwise canonical yes/no condition uses unsupported syntax, the planner preserves its graph, declares a unique required boolean input and records `condition_mapping_required` as an unresolved review item. It does not infer sender identities or translate arbitrary model code. Saved/approved document validation remains strict, and missing outcome paths still fail. Non-boolean outcome expressions are not repaired. This allows draft inspection while publication remains blocked until the mapping is reviewed.
+
 The generic execution contract covers all tools that are registered, authorized, assigned a connector adapter, and configured with provider credentials and destination policy. Tool count or catalog presence alone does not establish live provider availability. Incoming triggers remain governed by the separately configured trigger adapters.

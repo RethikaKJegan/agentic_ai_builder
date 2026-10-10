@@ -40,6 +40,22 @@ class RuntimeFixture(unittest.TestCase):
         return dict(request_id='req_execute', operation='execute_workflow', idempotency_key='execution_retry_1234', payload=payload)
 
 class RuntimeTests(RuntimeFixture):
+    def test_monitoring_counts_workflow_usage_once_and_exposes_scoped_audit(self):
+        run = self.runtime.create_run(self.request(), self.auth)
+        with self.store.transaction() as db:
+            stored = json.loads(db.execute('SELECT document FROM runtime_runs WHERE run_id=?', (run['run_id'],)).fetchone()[0])
+            stored['usage'] = {'workflow': {'llm_calls': 2, 'tokens': 16000, 'estimated_cost_usd': .1},
+                               'analysis': {'llm_calls': 1, 'tokens': 8000, 'estimated_cost_usd': .05},
+                               'writing': {'llm_calls': 1, 'tokens': 8000, 'estimated_cost_usd': .05}}
+            db.execute('UPDATE runtime_runs SET document=? WHERE run_id=?', (json.dumps(stored), run['run_id']))
+        data = self.runtime.monitoring(self.auth)
+        self.assertEqual(data['usage']['llm_calls'], 2)
+        self.assertEqual(data['usage']['tokens'], 16000)
+        self.assertAlmostEqual(data['usage']['estimated_cost_usd'], .1)
+        self.assertEqual(data['audit'][0]['event_type'], 'run.queued')
+        self.assertTrue(data['policies'])
+        self.assertNotIn('inputs', str(data['audit']))
+
     def test_approved_revision_creates_canonical_events(self):
         run = self.runtime.create_run(self.request(), self.auth)
         self.assertEqual(run['status'], 'queued')

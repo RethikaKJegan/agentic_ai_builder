@@ -20,9 +20,10 @@ class RetryableInvocation(RuntimeFailure):
 
 
 class GraphRunner:
-    def __init__(self, runtime, agents=None, connectors=None):
+    def __init__(self, runtime, agents=None, connectors=None, direct_write_tools=()):
         self.runtime = runtime
         self.agents, self.connectors = agents, connectors or {}
+        self.direct_write_tools = frozenset(direct_write_tools)
 
     @staticmethod
     def outgoing(workflow, node_id):
@@ -163,7 +164,7 @@ class GraphRunner:
                         return runtime.public(run)
                     kind = node['kind']
                     config = node.get('configuration', {})
-                    if set(config) - {'ui', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
+                    if set(config) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
                         raise RuntimeFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'The node contains execution configuration requiring review.')
                     if kind == 'condition':
                         condition = next(c for c in workflow['conditions'] if c['condition_id'] == node['condition_id'])
@@ -223,12 +224,15 @@ class GraphRunner:
                             connector = self.connectors.get(grant['tool_id'])
                             if connector is None:
                                 raise RuntimeFailure('CONNECTOR_NOT_CONFIGURED', 'No authorized connector adapter is configured.', 503)
-                            if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or not passed):
+                            direct = grant['tool_id'] in self.direct_write_tools and grant.get('approval_required') is False
+                            if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or (not passed and not direct)):
                                 raise RuntimeFailure('APPROVAL_REQUIRED', 'External writes require workflow policy and run approval.', 403)
                             expected_action = run.get('approval_context', {}).get('action_digest')
                             if connector.external_write and expected_action and expected_action != self.action_digest(node, run):
                                 raise RuntimeFailure('APPROVAL_ACTION_MISMATCH', 'The approved external action no longer matches the requested action.', 403)
-                            discovery = runtime.workflows.registry.list_tools(auth)
+                            discovery_auth = {k: v for k, v in auth.items() if k not in
+                                              {'_registry_assignment_subject', '_registry_approval_auth'}}
+                            discovery = runtime.workflows.registry.list_tools(discovery_auth)
                             tools = discovery['data'].get('items', []) if discovery['status'] == 200 else []
                             record = next((t for t in tools if t['tool_id'] == grant['tool_id'] and t['version'] == grant['tool_version']), None)
                             if record is None:

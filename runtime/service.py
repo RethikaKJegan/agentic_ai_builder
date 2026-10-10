@@ -42,7 +42,10 @@ class RuntimeService:
 
     @staticmethod
     def authorize(auth, permission, roles):
-        validate(auth, 'auth')
+        # Lifecycle-only context is not part of the canonical auth contract.
+        # It remains available for exact Registry assignment reconstruction.
+        validate({k: v for k, v in auth.items() if k not in
+                  {'_registry_assignment_subject', '_registry_approval_auth'}}, 'auth')
         if (auth['decision'] != 'allow' or permission not in auth['permissions'] or
                 not set(auth['roles']) & set(roles) or not all(auth['subject'].values())):
             raise RuntimeFailure('OPERATION_NOT_AUTHORIZED', 'The current subject cannot perform this runtime operation.', 403)
@@ -72,9 +75,14 @@ class RuntimeService:
         expected = {(a['agent_id'], t) for a in document['agents'] for t in a['allowed_tool_ids']}
         if actual != expected:
             raise RuntimeFailure('ASSIGNMENT_MISMATCH', 'Approved tools do not match current exact registry grants.', 403)
+        # A release keeps grants bound to its publisher while recording the
+        # automation subject on the run. Manual runs retain exact caller binding.
+        assignment_subject = auth['subject']['subject_id']
+        if allow_superseded:
+            assignment_subject = self.workflows.registry_adapter._assignment_auth(auth)['subject']['subject_id']
         for grant in grants:
             if (grant['authorization_state'] != 'authorized' or
-                    grant['subject_id'] != auth['subject']['subject_id'] or grant['workspace_id'] != workspace or
+                    grant['subject_id'] != assignment_subject or grant['workspace_id'] != workspace or
                     grant['workflow_id'] != workflow_id or grant['workflow_version'] != version):
                 raise RuntimeFailure('ASSIGNMENT_MISMATCH', 'An assignment is outside this execution binding.', 403)
         return document, grants
@@ -198,17 +206,37 @@ class RuntimeService:
         with self.store.transaction() as db:
             runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
             event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+            audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+            sources = []
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
+                for workflow_id, state, document in db.execute('SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?', (workspace,)):
+                    trigger = json.loads(document)
+                    checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
+                    sources.append(dict(workflow_id=workflow_id, binding_id=trigger['binding_id'], provider_id=trigger['provider_id'],
+                                        state=state, health=trigger.get('health', state), error_code=trigger.get('last_error_code'),
+                                        baseline_ready=checkpoint is not None, last_successful_poll=checkpoint[0] if checkpoint else None))
+            policies = []
+            for workflow in self.store.list(db, workspace):
+                if workflow['status'] not in {'approved', 'published'}:
+                    continue
+                policies.append(dict(workflow_id=workflow['workflow_id'], version=workflow['version'],
+                                     action_approval_required=bool(workflow.get('approval_gates')),
+                                     agents=[{key: agent.get(key) for key in ('agent_id', 'guardrails', 'limits', 'approval_requirements')}
+                                             for agent in workflow['agents']]))
         usage = {'llm_calls': 0, 'tool_calls': 0, 'tokens': 0, 'retries': 0, 'estimated_cost_usd': 0}
         for run in runs:
-            for counters in run.get('usage', {}).values():
-                for key in usage:
-                    usage[key] += counters.get(key, 0)
+            # Workflow counters already include each per-agent reservation.
+            counters = run.get('usage', {}).get('workflow', {})
+            for key in usage:
+                usage[key] += counters.get(key, 0)
         by_status = {status: sum(r['status'] == status for r in runs) for status in ('queued', 'running', 'paused_for_approval', 'completed', 'failed', 'blocked', 'rejected', 'cancelled')}
         durations = [max(0, (r.get('finished_at', r.get('created_at', self.clock())) - r.get('created_at', self.clock()))) for r in runs if isinstance(r.get('finished_at'), (int, float))]
         return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
                          'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
                 'status_breakdown': by_status, 'duration_seconds': {'count': len(durations), 'avg': sum(durations) / len(durations) if durations else 0},
                 'events': event_count, 'usage': usage,
+                'sources': sources, 'policies': policies,
+                'audit': [{key: event.get(key) for key in ('event_id', 'event_type', 'run_id', 'timestamp')} for event in audit],
                 'latest': [self.public(run) for run in runs[:20]]}
 
     def export_traces(self, observer_id='default', limit=100):

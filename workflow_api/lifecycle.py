@@ -6,6 +6,7 @@ reconstructs a server-owned automation identity and refreshes Registry grants.
 from __future__ import annotations
 
 from copy import deepcopy
+import ast
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
@@ -314,8 +315,7 @@ class LifecycleService:
             if checkpoint is not None:
                 if trigger["delivery"] != "poll" or not isinstance(checkpoint, str):
                     raise LifecycleFailure("INVALID_CHECKPOINT", "Only polling adapters can advance a string checkpoint.", 400)
-                db.execute("INSERT INTO lifecycle_checkpoints VALUES (?, ?, ?, ?) ON CONFLICT(workspace, binding_id) DO UPDATE SET cursor=excluded.cursor, updated_at=excluded.updated_at",
-                           (workspace, binding_id, checkpoint, now_iso(self.clock)))
+                self._save_checkpoint(db, workspace, binding_id, checkpoint)
             self.emit(db, workspace, workflow_id, "dispatch.queued")
             return {"accepted": True, "duplicate": False, "receipt_id": receipt_id, "job": job}
 
@@ -360,13 +360,23 @@ class LifecycleService:
                 db.execute("INSERT INTO lifecycle_checkpoints VALUES (?, ?, ?, ?)", (row[0], binding_id, cursor, now_iso(self.clock)))
                 return {"baseline": True, "cursor": cursor, "receipts": []}
         receipts = []
-        for index, event in enumerate(changes):
-            receipts.append(self.ingest(binding_id, event, auth, checkpoint=cursor if index == len(changes) - 1 else None))
-        if not changes:
-            with self.store.transaction() as db:
-                db.execute("INSERT INTO lifecycle_checkpoints VALUES (?, ?, ?, ?) ON CONFLICT(workspace, binding_id) DO UPDATE SET cursor=excluded.cursor, updated_at=excluded.updated_at",
-                           (auth["subject"]["workspace_id"], binding_id, cursor, now_iso(self.clock)))
+        for event in changes:
+            receipts.append(self.ingest(binding_id, event, auth))
+        # Filtered and duplicate receipts are successful ingestion too. Advance
+        # only after the complete batch; failures replay through receipt dedup.
+        with self.store.transaction() as db:
+            self._save_checkpoint(db, auth['subject']['workspace_id'], binding_id, cursor)
         return {"baseline": False, "cursor": cursor, "receipts": receipts}
+
+    def _save_checkpoint(self, db, workspace, binding_id, cursor):
+        # Older project databases key this table by binding_id alone. Avoid
+        # naming a composite ON CONFLICT target absent from those databases.
+        updated_at = now_iso(self.clock)
+        updated = db.execute('UPDATE lifecycle_checkpoints SET cursor=?, updated_at=? WHERE workspace=? AND binding_id=?',
+                             (cursor, updated_at, workspace, binding_id))
+        if updated.rowcount == 0:
+            db.execute('INSERT INTO lifecycle_checkpoints (workspace, binding_id, cursor, updated_at) VALUES (?, ?, ?, ?)',
+                       (workspace, binding_id, cursor, updated_at))
 
     def tick_schedule(self, binding_id, event, scheduled_at, auth):
         """Create one deduplicated receipt for an aware scheduler instant."""
@@ -387,12 +397,38 @@ class LifecycleService:
         return self.ingest(binding_id, payload, auth)
 
     @staticmethod
-    def _lookup(value, path):
+    def event_path(path):
+        """Parse data access only; never evaluate a provider mapping as code."""
+        if path == '':
+            return []
+        try:
+            tree = ast.parse(path, mode='eval')
+            if len(list(ast.walk(tree))) > 100:
+                raise ValueError()
+            def parts(node):
+                if isinstance(node, ast.Name) and not node.id.startswith('_'):
+                    return [node.id]
+                if isinstance(node, ast.Attribute) and not node.attr.startswith('_'):
+                    return parts(node.value) + [node.attr]
+                if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+                    key = node.slice.value
+                    if type(key) in (str, int) and not (isinstance(key, str) and key.startswith('_')):
+                        return parts(node.value) + [key]
+                raise ValueError()
+            return parts(tree.body)
+        except (ValueError, TypeError, SyntaxError, RecursionError):
+            raise LifecycleFailure('EVENT_MAPPING_FAILED', 'Use a data path with literal field names or indexes.', 400) from None
+
+    @classmethod
+    def _lookup(cls, value, path):
         current = value
-        for part in path.split(".") if path else []:
-            if not isinstance(current, dict) or part not in current:
+        for part in cls.event_path(path):
+            try:
+                if not isinstance(current, (dict, list)) or (isinstance(current, list) and type(part) is not int):
+                    raise KeyError()
+                current = current[part]
+            except (KeyError, IndexError, TypeError):
                 raise LifecycleFailure("EVENT_MAPPING_FAILED", "A configured input path is absent.", 400)
-            current = current[part]
         return deepcopy(current)
 
     @classmethod
@@ -401,9 +437,9 @@ class LifecycleService:
             return cls._lookup(event, mapping)
         if isinstance(mapping, dict) and set(mapping) == {"constant"}:
             constant = mapping["constant"]
-            if constant == "$trigger.resource_id":
+            if isinstance(constant, str) and constant == "$trigger.resource_id":
                 return trigger["resource_id"]
-            if isinstance(constant, (str, int, float, bool)) or constant is None:
+            if isinstance(constant, (str, int, float, bool, list, dict)) or constant is None:
                 return deepcopy(constant)
         raise LifecycleFailure("EVENT_MAPPING_FAILED", "A configured input mapping is unsupported.", 400)
 

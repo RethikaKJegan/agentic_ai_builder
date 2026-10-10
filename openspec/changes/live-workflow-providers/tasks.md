@@ -1,0 +1,14 @@
+## Implementation
+- [x] 1. Add generic live provider bootstrap, launcher and credential-safe checks.
+- [x] 2. Implement configurable stable new-row polling and batch checkpoint correctness.
+- [x] 3. Preserve workflow conditions/output mappings and add live planner execution guidance.
+- [x] 4. Verify multi-agent execution, approvals, guardrails and replay with targeted tests and required checks.
+- [x] 5. Document verified provider state and exact UI/startup instructions.
+- [x] 6. Accept Google spreadsheet URLs at the polling boundary and verify recovery of a URL-bound source.
+- [x] 7. Preserve compatibility with legacy checkpoint tables and verify repeated polls against the existing database.
+- [x] 8. Add explicit operator direct-email mode, preserve restricted grants and test approval-free execution.
+- [x] 9. Return a canonical wrong-service error from the UI proxy and document separate live backend port/startup.
+- [x] 10. Remove model-proposed executable assignments at the planner boundary and verify generated drafts save while forged edits remain rejected.
+- [x] 11. Support safe bracket event paths, validate them before publication, and verify stalled row dispatch recovers without resetting its checkpoint.
+- [x] 12. Correct runtime usage aggregation and show server source health, enforced agent guardrails and audit events in Monitoring and Governance.
+- [x] 13. Recover a missing named range on a single-tab spreadsheet, report ambiguous ranges clearly, and verify generic Tickets delivery.

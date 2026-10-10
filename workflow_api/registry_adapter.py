@@ -53,6 +53,7 @@ class RegistryAdapter:
         resolved = deepcopy(auth)
         resolved['subject'] = deepcopy(origin)
         resolved.pop('_registry_assignment_subject', None)
+        resolved.pop('_registry_approval_auth', None)
         return resolved
 
     def _tool_candidates(self, capability, auth):
@@ -147,6 +148,12 @@ class RegistryAdapter:
             agent = next((item for item in workflow['agents'] if tool['capability'] in item['capabilities']), None)
             if agent is None:
                 continue
+            if (tool_node is None and tool['capability'] == 'read_spreadsheet' and
+                    any(trigger.get('provider_id') == 'google_sheets' and trigger.get('delivery') == 'poll'
+                        for trigger in workflow.get('metadata', {}).get('trigger_templates', []))):
+                # Polling already consumes this read grant. Do not append an
+                # extra read after the workflow's authored action/approval path.
+                continue
             node_id = tool_node['node_id'] if tool_node else f"{tool['capability']}_action"
             if not tool_node and any(node['node_id'] == node_id for node in workflow['nodes']):
                 continue
@@ -167,11 +174,25 @@ class RegistryAdapter:
             for property_name in properties:
                 if property_name not in mapping and property_name in workflow_inputs:
                     mapping[property_name] = f'inputs.{property_name}'
+            if tool_node:
+                configuration = tool_node.get('configuration', {})
+                if 'input' in configuration:
+                    from jsonschema import Draft202012Validator
+                    if list(Draft202012Validator(input_schema).iter_errors(configuration['input'])):
+                        unresolved.append({'requirement': f'tool_input:{tool["tool_id"]}', 'reason': 'workflow_input_mapping_required'})
+                    continue
+                mapping.update(configuration.get('input_mapping', {}))
             for property_name in input_schema.get('required', []):
                 source = mapping.get(property_name)
                 valid_input = isinstance(source, str) and source.startswith('inputs.') and source.split('.', 2)[1] in workflow_inputs
                 valid_output = isinstance(source, str) and source.startswith('outputs.') and source.split('.', 2)[1] in {node['node_id'] for node in workflow['nodes']}
-                if not (valid_input or valid_output):
+                import ast
+                try:
+                    ast.literal_eval(source)
+                    valid_literal = True
+                except (ValueError, TypeError, SyntaxError):
+                    valid_literal = False
+                if not (valid_input or valid_output or valid_literal):
                     unresolved.append({'requirement': f'tool_input:{tool["tool_id"]}.{property_name}',
                                        'reason': 'workflow_input_mapping_required'})
             if tool_node:

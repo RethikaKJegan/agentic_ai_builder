@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 
 from runtime import RuntimeService
 from runtime.graph import GraphRunner
-from workflow_api.lifecycle import LifecycleFailure, TriggerAdapter
+from workflow_api.lifecycle import LifecycleFailure, TriggerAdapter, LifecycleService
 from workflow_api.service import WorkflowService
 from workflow_api.storage import WorkflowStore
 from workflow_api.scheduler import TriggerScheduler
@@ -36,6 +36,41 @@ class RecordingAdapter(TriggerAdapter):
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_literal_event_paths_support_published_priority_mapping(self):
+        event = {'row': {'priority': 'High', 'lead name': 'Test'}, 'row_values': ['L999']}
+        self.assertEqual(LifecycleService._lookup(event, 'row["priority"]'), 'High')
+        self.assertEqual(LifecycleService._lookup(event, 'row.priority'), 'High')
+        self.assertEqual(LifecycleService._lookup(event, 'row["lead name"]'), 'Test')
+        self.assertEqual(LifecycleService._lookup(event, 'row_values[0]'), 'L999')
+        for path in ('row.get("priority")', 'row[other]', '__import__("os")', 'row.__class__', 'row[True]'):
+            with self.subTest(path=path), self.assertRaises(LifecycleFailure):
+                LifecycleService.event_path(path)
+
+    def test_failed_mapping_retains_checkpoint_and_same_row_can_recover(self):
+        trigger = self.trigger('fake_poll', 'poll', 'bracket_binding')
+        trigger['input_mapping'] = {'request_text': 'row["priority"]'}
+        trigger['event_schema']['properties']['row'] = {'type': 'object'}
+        self.activate(triggers=[trigger])
+        self.service.lifecycle.poll('bracket_binding', [], 'baseline', self.auth)
+        with self.assertRaises(LifecycleFailure) as failed:
+            self.service.lifecycle.poll('bracket_binding', [{'event_id': 'row_test', 'body': 'Test', 'row': {}}], 'next', self.auth)
+        self.assertEqual(failed.exception.code, 'EVENT_MAPPING_FAILED')
+        with self.service.store.transaction() as db:
+            self.assertEqual(db.execute("SELECT cursor FROM lifecycle_checkpoints WHERE binding_id='bracket_binding'").fetchone()[0], 'baseline')
+        recovered = self.service.lifecycle.poll('bracket_binding', [{'event_id': 'row_test', 'body': 'Test', 'row': {'priority': 'High'}}], 'next', self.auth)
+        self.assertEqual(recovered['receipts'][0]['job']['inputs'], {'request_text': 'High'})
+        with self.service.store.transaction() as db:
+            self.assertEqual(db.execute("SELECT cursor FROM lifecycle_checkpoints WHERE binding_id='bracket_binding'").fetchone()[0], 'next')
+
+    def test_monitoring_shows_source_error_before_any_run_exists(self):
+        self.activate(triggers=[self.trigger('fake_poll', 'poll', 'error_binding')])
+        with self.service.store.transaction() as db:
+            db.execute("UPDATE lifecycle_triggers SET document=json_set(document, '$.health', 'error', '$.last_error_code', 'EVENT_MAPPING_FAILED') WHERE binding_id='error_binding'")
+        data = self.runtime.monitoring(self.auth)
+        self.assertEqual(data['runs']['total'], 0)
+        self.assertEqual(data['sources'][0]['error_code'], 'EVENT_MAPPING_FAILED')
+        self.assertFalse(data['sources'][0]['baseline_ready'])
+
     def setUp(self):
         (ROOT / ".local/tests").mkdir(parents=True, exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(dir=ROOT / ".local/tests")

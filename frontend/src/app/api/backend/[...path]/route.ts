@@ -34,9 +34,20 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const response = await fetch(url, { method: request.method, headers, cache: "no-store", signal: controller.signal,
       ...(request.method === "GET" ? {} : { body: await request.text() }) });
     const responseType = response.headers.get("content-type") || "";
-    const result = responseType.includes("text/event-stream")
-      ? new NextResponse(response.body, { status: response.status, headers: { "Cache-Control": "no-store", "Content-Type": "text/event-stream", "X-Accel-Buffering": "no" } })
-      : NextResponse.json(await response.json(), { status: response.status, headers: { "Cache-Control": "no-store" } });
+    if (!responseType.includes("text/event-stream")) {
+      const body: unknown = await response.json();
+      if (!body || typeof body !== "object" || !("request_id" in body) || !("status" in body) || !("data" in body)) {
+        return NextResponse.json({ request_id: "req_proxy", status: 503, data: { error: {
+          error_code: "API_WRONG_SERVICE", message: "The configured backend is not the Builder API. Start scripts/run_live_backend.py and set BUILDER_API_URL to its port.",
+          request_id: "req_proxy", retryable: true,
+        } } }, { status: 503, headers: { "Cache-Control": "no-store" } });
+      }
+      const result = NextResponse.json(body, { status: response.status, headers: { "Cache-Control": "no-store" } });
+      const sessionCookie = response.headers.get("set-cookie");
+      if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
+      return result;
+    }
+    const result = new NextResponse(response.body, { status: response.status, headers: { "Cache-Control": "no-store", "Content-Type": "text/event-stream", "X-Accel-Buffering": "no" } });
     const sessionCookie = response.headers.get("set-cookie");
     if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
     return result;

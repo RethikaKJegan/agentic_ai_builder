@@ -41,6 +41,40 @@ def reject_sensitive(value: Any, path: str = "") -> None:
             reject_sensitive(item, f"{path}.{key}" if path else key)
 
 
+def preserve_unmapped_conditions(workflow: dict[str, Any]) -> None:
+    """Keep unsupported boolean model conditions reviewable, never guess their meaning.
+
+    Used only for fresh planner proposals, not saved/approved workflow validation.
+    Missing graph paths and non-boolean outcome mappings still fail validation.
+    """
+    reject_sensitive(workflow)
+    # Only repair otherwise canonical documents; malformed model data is rejected.
+    try:
+        validate_instance(workflow, "workflow")
+    except ValueError as exc:
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "The proposed workflow does not match the contract.", field="workflow") from exc
+    names = {field['name'] for field in workflow['inputs']}
+    for index, condition in enumerate(workflow['conditions']):
+        try:
+            validate_expression(condition['expression'])
+            continue
+        except Exception:
+            if set(condition['outcomes']) != {'yes', 'no'}:
+                continue
+        name = f'condition_review_{index + 1}'
+        while name in names:
+            name += '_result'
+        names.add(name)
+        workflow['inputs'].append(dict(name=name, type='boolean', required=True,
+            description='Explicit reviewed condition result; provider event mapping must be configured before publication.'))
+        condition['expression'] = f'inputs.{name}'
+        requirements = workflow['metadata'].setdefault('unresolved_requirements', [])
+        if not isinstance(requirements, list):
+            raise PlannerFailure('WORKFLOW_VALIDATION_FAILED', 'Unresolved requirements must be a list.', field='metadata.unresolved_requirements')
+        requirements.append(dict(requirement='condition_mapping', condition_id=condition['condition_id'],
+                                 input_name=name, reason='condition_mapping_required'))
+
+
 def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth: int = 50) -> dict[str, Any]:
     reject_sensitive(workflow)
     try:

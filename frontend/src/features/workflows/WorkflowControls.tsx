@@ -8,12 +8,13 @@ import type { Workflow } from "@/domain/types";
 import { runTotals, simulateRun, type SimResult } from "@/domain/simulator";
 import { RunTrace } from "@/features/runs/RunTrace";
 import { assertWorkflowReferences } from "@/api/control";
+import { ApiFeedback } from "./ApiFeedback";
 
 export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   const backend = useBackend();
   const agents = useMesh((s) => s.agents);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<Error>();
   const [test, setTest] = useState<SimResult>();
   const version = workflow.serverVersion;
   const activeRelease = backend.overview[workflow.id];
@@ -33,7 +34,7 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   };
   const testWorkflow = () => {
     setError(undefined);
-    if (graphError) { setError(graphError.message); return; }
+    if (graphError) { setError(graphError); return; }
     const state = useMesh.getState();
     const current = state.workflows.find((item) => item.id === workflow.id) ?? workflow;
     // This simulation is local. It cannot call a connector, send mail, or modify a provider resource.
@@ -62,7 +63,7 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
       await api.activateRelease({ workflow_id: document.workflow_id, workflow_version: document.version,
         expected_release_id: activeRelease?.activation_state === "active" ? activeRelease.release_id : null, triggers: [] });
       await backend.refreshOverview();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "The workflow could not be published."); }
+    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The workflow could not be published.")); }
     finally { setBusy(""); }
   };
   const saved = workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
@@ -71,7 +72,7 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
     <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">{dirty ? "Unsaved edits" : `Saved ${saved}`}</span>
     <button type="button" onClick={testWorkflow} className="flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 text-sm hover:border-border-accent" aria-label="Test workflow"><FlaskConical className="h-4 w-4" />Test</button>
     <button type="button" onClick={() => void publish()} disabled={!!busy || !!graphError || backend.status !== "connected" || !backend.can("workflow.publish")} className="flex h-8 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Rocket className="h-4 w-4" />{busy ? "Publishing…" : "Publish"}</button>
-    {error && <p role="alert" className="absolute right-4 top-14 z-30 max-w-md rounded-lg border border-destructive/40 bg-background px-3 py-2 text-xs text-destructive shadow-sm">{error}</p>}
+    {error && <div className="absolute right-4 top-14 z-30 max-h-[60vh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto shadow-sm"><ApiFeedback error={error} /></div>}
     {test && <div role="dialog" aria-modal="true" aria-label="Safe test run" className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4">
       <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl">
         <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h2 className="font-display text-xl font-semibold">Test run</h2><p className="mt-1 text-sm text-muted-foreground">Simulated locally. No email, Sheets update, webhook, or external connector was called.</p></div><button onClick={() => setTest(undefined)} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close test run"><X className="h-5 w-5" /></button></div>

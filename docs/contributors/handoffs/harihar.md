@@ -1,5 +1,11 @@
 # Handoff — Harihar
 
+## Slack-to-Gmail publication diagnosis — 2026-10-10
+
+Publication failures now include safe, structured setup requirements, rendered in the existing editor error panel. Unresolved requirements still prevent approval and publication; this change creates no registry grants or active automation. Regression coverage verifies the rejected revision remains validated without authorization references. Verification: 116 Python tests, 62 frontend tests, production Next.js build, TypeScript and ESLint PASS.
+
+Local inspection found Slack Events webhook implementation, but no configured Slack signing secret, active lifecycle trigger binding, or `BUILDER_REGISTRY_CONFIG`. The configured outgoing Slack webhook only posts messages. The affected draft has no executable tools or agents and explicitly requires incoming Slack configuration, Gmail sending capability, reviewed event/condition mappings and durable deduplication. Previously verified SMTP delivery does not register a Gmail runtime tool. Incoming-event setup and trusted executable registrations remain necessary before this workflow can publish or run.
+
 - **Segment:** Mesh/Next.js UI integration and workflow API
 - **Status:** in-progress — UI/API, trusted registry integration and publication delivered; live runtime/approvals and Rethika review pending
 - **Contract versions:** workflow-schema-v1, agent-contract-v1, tool-contract-v1, api-payloads-v1, error-format-v1, auth-permissions-v1, branching-approvals-v1, run-status-versioning-v1
@@ -61,3 +67,19 @@ Rethika explicitly accepted Aravind's delivered registry boundary and Harihar's 
 Rethika accepted the delivered upstream registry/UI/API boundaries and has delivered the core runtime through existing canonical operations. Fresh verification: 94 Python tests (50 upstream, 44 runtime), 61 frontend tests, TypeScript, contract/drift checks, runtime dependencies and strict OpenSpec PASS. Runtime routes remain disabled by default and can be explicitly connected; no live model/email/trigger demonstration or final segment acceptance is claimed. See `runtime/README.md` and `docs/contributors/handoffs/rethika.md` for server adapters, approval/worker/grant boundaries and remaining publication/production limits.
 
 Joint review requested for `openspec/changes/rethika-runtime-observability/contract-review.md` and its companion draft schema before release/trigger/automation/overview implementation. Suprajha reviews executable input/expression mappings; Aravind reviews trigger scopes and restart authorization; Harihar reviews lifecycle transport, DTOs and overview streams. All extension signoffs remain pending; existing shared contracts are unchanged. This is a repository handoff notification, not an external message or fabricated owner acceptance.
+
+## Slack Socket Mode / Gmail implementation — 2026-10-10
+
+The scoped `slack-gmail-socket-mode` change adds a product Socket Mode receiver, operator Gmail Registry bootstrap, real SMTP connector, release/dispatch/runtime workers, hidden app-token entry, and deterministic mapped draft setup. Existing drafts and shared contracts are preserved. Release execution now strips lifecycle-only context at canonical auth boundaries, retains exact publisher-bound grants and resumes automation approvals through fresh worker identity. Approvals/Runs use the server run collection so concurrent DM notification requests are visible.
+
+Verification: 126 Python tests (10 new Slack/Gmail scenarios), 63 frontend tests, typecheck, lint, production build, shared contracts/generated-client drift and strict OpenSpec PASS. Gmail STARTTLS/AUTH/NOOP was verified with saved credentials; no email was submitted. Live Slack event/mail acceptance remains pending the operator's app-level token and team/DM/member IDs. Setup instructions: `docs/slack-gmail.md`. Email sends retain the existing per-action approval boundary; no automatic approval or contributor acceptance is claimed.
+
+Focused browser checks: both approve and reject scenarios passed using `cd frontend && npm run test:e2e -- --config playwright.slack-gmail.config.ts`. These checks mock the API; the Python integration tests separately verify actual application lifecycle and SMTP connector logic with an offline transport.
+
+The broader legacy browser suite was also attempted on isolated ports: 1/8 passed, 7 failed against builder controls/labels such as Create draft, Save revision and Registry review. These failures are recorded in `.local/slack-gmail-browser-tests.log` and are not counted as passing integration evidence. No builder redesign or unrelated selector rewrite was included.
+
+## UI-created workflows with live providers — 2026-10-10
+
+Use `scripts/run_live_backend.py` on 8000 and launch Next with BUILDER_API_URL=http://127.0.0.1:8000. The existing Overview Sheet URL field and objective drive live planning; Publish validates, approves the revision and activates its trigger metadata. The launcher creates no workflow. Runtime email approval remains a separate human action in Runs/Approvals. Supported descriptive node configuration now survives editor saving without an unsupported-runtime error.
+
+63 frontend tests, typecheck, lint and production build passed; both focused approval browser scenarios passed with a mocked API. 135 Python tests and a synthetic live-model DAG run separately verify actual orchestration. Earlier broad browser failures remain recorded. Complete prompt/startup instructions: `docs/sheets-gmail.md`. No contributor acceptance is inferred.

@@ -23,7 +23,8 @@ class ProviderTriggerSource:
 
     def _authority(self, binding):
         with self.service.store.transaction() as db:
-            row = db.execute("SELECT document FROM lifecycle_releases WHERE release_id=?", (binding["release_id"],)).fetchone()
+            row = db.execute("SELECT r.document FROM lifecycle_releases r JOIN lifecycle_triggers t ON t.release_id=r.release_id WHERE t.binding_id=? AND t.workspace=?",
+                             (binding['binding_id'], binding['workspace_id'])).fetchone()
             if not row:
                 raise ValueError("release missing")
             release = json.loads(row[0])
@@ -53,9 +54,15 @@ class ProviderTriggerSource:
             raise ValueError("poll resource is not configured")
         inputs = dict(binding.get("poll_input") or {})
         if provider == "google_sheets":
+            from runtime.connectors import google_spreadsheet_id
+            resource_id = google_spreadsheet_id(resource_id)
             inputs = {"spreadsheet_id": resource_id, "range": inputs.get("range", "A:Z")}
         if hasattr(connector, "poll_changes"):
-            result = connector.poll_changes(grant, inputs, previous_cursor)
+            options = {}
+            if provider == 'google_sheets' and binding.get('event_type') == 'row.created':
+                options = dict(event_type='row.created', identity_field=binding['poll_input'].get('identity_field'),
+                               required_fields=binding['poll_input'].get('required_fields', []), baseline_policy=binding.get('baseline_policy', 'current_only'))
+            result = connector.poll_changes(grant, inputs, previous_cursor, **options)
             changes = [{**event, "spreadsheet_id": resource_id, "range": inputs["range"]} for event in result["changes"]]
             return changes, result["cursor"]
         output = connector.invoke(grant, inputs, "poll:" + (previous_cursor or "initial"))

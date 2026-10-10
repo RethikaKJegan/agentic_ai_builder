@@ -1,0 +1,11 @@
+# Design
+
+Use Slack's Python SDK SocketModeClient with an app-level token. Pin Slack team and conversation in operator configuration; optionally filter by sender ID. Only ordinary human message.im events enter the lifecycle. Route only ready bindings for the configured workspace, resource and opaque credential reference. Commit receipt and dispatch job before acknowledging relevant events; duplicate deliveries reuse the durable receipt. Never log message content or tokens. SDK handles reconnects; disconnect on application shutdown.
+
+Use the existing SMTPConnector with smtp.gmail.com:587, a secret resolver and exact recipient allowlist. Bootstrap Registry through its public configuration adapter. No fixture server, fake model or mock connector is used in product startup. The dedicated local launcher loads repository .env with process overrides, validates configuration before connecting, enables runtime and dispatch workers, and uses the same workflow database and UI.
+
+Setup asks for non-secret team/conversation/sender/recipient values and privately stores app token via the existing hidden prompt. Prepare a deterministic trigger -> exact-action approval -> SMTP -> output draft, with an assigned agent definition but no model node. This avoids inventing executable sender expressions from model prose. Existing drafts are preserved; the setup draft has a stable ID and never overwrites an existing revision. Validation, approval and publication remain explicit UI actions. Email sends pause for existing run approval; do not silently auto-approve. Startup reports actionable missing configuration, not raw provider errors.
+
+Integration verification exposed a pre-existing automation auth mismatch: lifecycle-only Registry context was sent to strict canonical auth validation and discovery. Strip those two server-owned context fields only at canonical validation/discovery boundaries; retain the publisher binding for grant revalidation. Other unknown auth fields still fail schema validation.
+
+The Approvals/Runs view consumes the existing server run collection so multiple pending DM notifications for the same workflow are visible, instead of only the overview's latest run. No new shared operation or contract is introduced.

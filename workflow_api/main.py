@@ -23,7 +23,7 @@ ROLE_PERMISSIONS = {
 
 
 def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
-               runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None):
+               runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True):
     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
     configured_roles = roles or os.getenv('BUILDER_DEV_ROLES', 'builder').split(',')
     if any(role not in ROLE_PERMISSIONS for role in configured_roles):
@@ -54,12 +54,12 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         auth['scopes'] = sorted(set(auth['scopes']) | set(extra_scopes))
     auth['permissions'] = sorted(set(auth['permissions']) | runtime_permissions)
     workers = []
-    if workflow_service.runtime_runner is not None and os.getenv('BUILDER_RUNTIME_WORKER') == '1':
+    if start_workers and workflow_service.runtime_runner is not None and os.getenv('BUILDER_RUNTIME_WORKER') == '1':
         from runtime.worker import RuntimeWorker
         runtime_worker = RuntimeWorker(workflow_service.runtime_runner, lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
                                        interval=float(os.getenv('BUILDER_RUNTIME_WORKER_INTERVAL', '1')))
         runtime_worker.start(); workers.append(runtime_worker)
-    if workflow_service.runtime_runner is not None and os.getenv('BUILDER_TRIGGER_WORKER') == '1':
+    if start_workers and workflow_service.runtime_runner is not None and os.getenv('BUILDER_TRIGGER_WORKER') == '1':
         from .scheduler import TriggerScheduler
         scheduler = TriggerScheduler(workflow_service, lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
                                      poll_source=getattr(workflow_service, 'trigger_poller', None),

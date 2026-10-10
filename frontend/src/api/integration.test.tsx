@@ -156,10 +156,13 @@ describe("workflow UI integration", () => {
       { agent_id: "sender_agent", capability: "send_email", tool_id: "smtp_send_email", authorization_state: "denied" as const, reason_codes: ["TOOL_UNAVAILABLE"] },
     ] };
     useBackend.setState({ session: session(["workflow.publish"]), reviews: { [original.workflow_id]: review } });
-    vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "REGISTRY_REVIEW_REQUIRED", message: "Resolve the workflow review before publishing.", request_id: "req_review", retryable: false }, "corr_review"));
+    vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "REGISTRY_REVIEW_REQUIRED", message: "Resolve the workflow review before publishing.", request_id: "req_review", retryable: false,
+      details: { requirements: ["Configure Slack Events for the selected channel.", "Configure a Gmail sending tool."] } }, "corr_review"));
     render(<WorkflowControls workflow={mapped.workflow} />);
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Resolve the workflow review before publishing."));
+    expect(screen.getByRole("list", { name: "Publication requirements" })).toHaveTextContent("Configure Slack Events for the selected channel.");
+    expect(screen.getByRole("alert")).toHaveTextContent("corr_review");
   });
   it("saves an edited canonical revision as part of publishing and excludes it from browser draft persistence", async () => {
     const original = document();
@@ -266,5 +269,20 @@ describe("approval and run consumers", () => {
     fireEvent.change(screen.getByLabelText("Run ID"), { target: { value: event.run_id } });
     fireEvent.click(screen.getByRole("button", { name: "Load run" }));
     await waitFor(() => expect(screen.getByRole("list", { name: "Run events" })).toHaveTextContent(event.event_type));
+  });
+});
+
+
+describe("Slack-triggered approval collection", () => {
+  it("shows multiple pending runs for the same workflow", async () => {
+    const record = { workflow_id: "slack-dm-gmail", workflow_version: 1, status: "paused_for_approval" as const,
+      approvals: [{ approval_id: "approval_dm", workflow_id: "slack-dm-gmail", workflow_version: 1,
+        status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] }] };
+    const spy = vi.spyOn(api, "runs").mockResolvedValue({ items: [{ ...record, run_id: "run_dm_1" }, { ...record, run_id: "run_dm_2" }], total: 2, has_more: false, next_cursor: null });
+    useBackend.setState({ session: { ...session(["workflow.approve"]), runtime_available: true, approval_service_available: true } });
+    render(<ServerRunView approvalsOnly />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /run_dm_1/ })).toBeVisible());
+    expect(screen.getByRole("button", { name: /run_dm_2/ })).toBeVisible();
+    spy.mockRestore();
   });
 });

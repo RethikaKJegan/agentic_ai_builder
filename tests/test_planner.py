@@ -20,6 +20,17 @@ def request(objective="Classify support requests and notify the owner", key="ide
 
 
 class PlannerTests(unittest.TestCase):
+    def test_secrets_in_proposed_assignments_are_rejected_before_removal(self):
+        class SecretProvider(RuleBasedStructuredOutputProvider):
+            def generate(self, objective, context):
+                workflow = super().generate(objective, context)
+                workflow['tools'][0]['configuration_reference'] = 'sk-testsecret12345678'
+                return workflow
+
+        result = PlannerService(SecretProvider()).plan(request('Send email'))
+        self.assertEqual(result['error']['error_code'], 'SENSITIVE_DATA_DETECTED')
+        self.assertIsNone(result['data'])
+
     def test_valid_generic_planning_returns_contract_workflow(self):
         result = local_service().plan(request())
         self.assertEqual(result["status"], 200)
@@ -183,6 +194,48 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(result["status"], 502)
         self.assertTrue(result["error"]["retryable"])
         self.assertNotIn("sk-secret", repr(result))
+
+    def test_unsupported_model_condition_preserves_reviewable_draft_and_branches(self):
+        original = RuleBasedStructuredOutputProvider().generate('If a Slack message arrives from Rethika K, send an email', {})
+        original['conditions'][0]['expression'] = "event.user === 'Rethika K' && event.text.includes('tested')"
+        class ModelProvider:
+            def generate(self, objective, context):
+                return deepcopy(original)
+        service = PlannerService(provider=ModelProvider())
+        result = service.plan(request('Notify me when Rethika sends a Slack message', 'slack-review-1234'))
+        self.assertEqual(result['status'], 200, result)
+        workflow = result['data']['workflow']
+        self.assertEqual(workflow['conditions'][0]['expression'], 'inputs.condition_review_1')
+        self.assertEqual(workflow['edges'], original['edges'])
+        self.assertIn({'name': 'condition_review_1', 'type': 'boolean', 'required': True,
+            'description': 'Explicit reviewed condition result; provider event mapping must be configured before publication.'}, workflow['inputs'])
+        self.assertTrue(any(item.get('reason') == 'condition_mapping_required' for item in workflow['metadata']['unresolved_requirements'] if isinstance(item, dict)))
+        validate_workflow(workflow)
+        self.assertEqual(service.plan(request('Notify me when Rethika sends a Slack message', 'slack-review-1234')), result)
+
+    def test_valid_model_condition_is_unchanged_and_saved_invalid_expression_still_rejected(self):
+        workflow = RuleBasedStructuredOutputProvider().generate('If a Slack message arrives, send an email', {})
+        workflow['conditions'][0]['expression'] = 'inputs.sender_id == inputs.expected_sender_id'
+        class ModelProvider:
+            def generate(self, objective, context):
+                return deepcopy(workflow)
+        result = PlannerService(provider=ModelProvider()).plan(request('Slack sender filter', 'valid-filter-1234'))
+        self.assertEqual(result['status'], 200)
+        self.assertEqual(result['data']['workflow']['conditions'], workflow['conditions'])
+        workflow['conditions'][0]['expression'] = '__import__("os").system("echo invalid")'
+        with self.assertRaisesRegex(Exception, 'deterministic language'):
+            validate_workflow(workflow)
+
+    def test_unmapped_condition_does_not_hide_missing_branch(self):
+        workflow = RuleBasedStructuredOutputProvider().generate('If a Slack message arrives, send an email', {})
+        workflow['conditions'][0]['expression'] = 'sender is Rethika K'
+        workflow['edges'] = [edge for edge in workflow['edges'] if edge.get('outcome') != 'no']
+        class ModelProvider:
+            def generate(self, objective, context):
+                return deepcopy(workflow)
+        result = PlannerService(provider=ModelProvider()).plan(request('Slack sender filter', 'missing-branch-1234'))
+        self.assertEqual(result['status'], 400)
+        self.assertEqual(result['error']['error_code'], 'WORKFLOW_VALIDATION_FAILED')
 
     def test_error_envelope_matches_canonical_contract(self):
         result = local_service().plan(request("", "error-1234"))

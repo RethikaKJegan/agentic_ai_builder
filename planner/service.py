@@ -11,7 +11,7 @@ from .contracts import CONTRACT_VERSIONS
 from .errors import PlannerFailure
 from .idempotency import IdempotencyRecord, IdempotencyStore
 from .provider import OpenAIStructuredOutputProvider, StructuredOutputProvider
-from .validation import reject_sensitive, validate_workflow
+from .validation import reject_sensitive, validate_workflow, preserve_unmapped_conditions
 
 
 class PlannerService:
@@ -45,9 +45,12 @@ class PlannerService:
                 return existing.response
             reject_sensitive(payload)
             workflow = self.provider.generate(objective.strip(), payload.get("context", {}))
+            reject_sensitive(workflow)
+            self._clear_proposed_assignments(workflow)
             workflow["workflow_id"] = self._workflow_id(workspace_id, objective)
             self._scope_planned_agents(workflow)
             workflow["metadata"] = {**workflow.get("metadata", {}), "contract_versions": CONTRACT_VERSIONS, "unresolved_requirements": workflow.get("metadata", {}).get("unresolved_requirements", [])}
+            preserve_unmapped_conditions(workflow)
             normalized = validate_workflow(workflow)
             response = {"request_id": request_id, "status": 200, "data": {"workflow": normalized, "correlation_id": f"corr_{uuid.uuid4().hex}", "contract_versions": CONTRACT_VERSIONS}}
             self.idempotency.put(workspace_id, idempotency_key, IdempotencyRecord(fingerprint, response))
@@ -56,6 +59,14 @@ class PlannerService:
             return {"request_id": request_id, "status": 403 if exc.code in {"AUTHENTICATION_REQUIRED", "PLANNING_NOT_AUTHORIZED"} else 400, "data": None, "error": exc.envelope(request_id)}
         except (ValueError, TypeError, RuntimeError) as exc:
             return {"request_id": request_id, "status": 502, "data": None, "error": PlannerFailure("PLANNER_PROVIDER_FAILED", "The planning provider did not return a usable draft.", retryable=True).envelope(request_id)}
+
+    @staticmethod
+    def _clear_proposed_assignments(workflow: dict[str, Any]) -> None:
+        """Model proposals describe requirements; only Registry can assign tools."""
+        for agent in workflow.get("agents", []):
+            agent["allowed_tool_ids"] = []
+        for tool in workflow.get("tools", []):
+            tool.pop("configuration_reference", None)
 
     @staticmethod
     def _workflow_id(workspace_id: str, objective: str) -> str:

@@ -4,6 +4,7 @@ from email.utils import formatdate
 import hashlib
 import json
 import os
+import re
 import smtplib
 import ssl
 import time
@@ -15,6 +16,22 @@ from urllib.request import Request, urlopen
 from jsonschema import Draft202012Validator
 from registry.safety import reject_secrets
 from .service import RuntimeFailure
+
+
+def google_spreadsheet_id(resource):
+    """Normalize an operator/workflow Sheet reference, never a request host."""
+    if not isinstance(resource, str) or not resource.strip() or any(char in resource for char in '\r\n'):
+        raise RuntimeFailure('SHEETS_INPUT_INVALID', 'Use a spreadsheet ID or HTTPS Google Sheets URL.', 400)
+    resource = resource.strip()
+    if '://' not in resource:
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', resource):
+            raise RuntimeFailure('SHEETS_INPUT_INVALID', 'Use a spreadsheet ID or HTTPS Google Sheets URL.', 400)
+        return resource
+    parsed = urlparse(resource)
+    match = re.fullmatch(r'/spreadsheets/d/([A-Za-z0-9_-]+)(?:/.*)?', parsed.path)
+    if parsed.scheme != 'https' or parsed.netloc != 'docs.google.com' or not match:
+        raise RuntimeFailure('SHEETS_INPUT_INVALID', 'Use a spreadsheet ID or HTTPS Google Sheets URL.', 400)
+    return match.group(1)
 
 
 def _google_credentials(token_file):
@@ -31,6 +48,8 @@ def _google_credentials(token_file):
     try:
         if not credentials.valid:
             credentials.refresh(GoogleRequest())
+            from scripts.integration_config import private_write
+            private_write(Path(token_file), credentials.to_json())
     except Exception:
         raise RuntimeFailure('GOOGLE_TOKEN_REFRESH_FAILED', 'Google authorization could not be refreshed. Run scripts/authorize_google.py again.', 503) from None
     if not credentials.token:
@@ -41,12 +60,13 @@ def _google_credentials(token_file):
 class SMTPConnector:
     external_write = True
 
-    def __init__(self, resolve, allowed_recipients, allowed_hosts, timeout=30, transport=smtplib.SMTP):
+    def __init__(self, resolve, allowed_recipients, allowed_hosts, timeout=30, transport=smtplib.SMTP, require_approval=True):
         # All arguments are operator/server-owned. The resolver returns secrets
         # only here; they never enter workflow documents, records, or traces.
         self.resolve = resolve
         self.allowed_recipients, self.allowed_hosts = frozenset(allowed_recipients), frozenset(allowed_hosts)
         self.timeout, self.transport = timeout, transport
+        self.require_approval = require_approval
         if not 1 <= timeout <= 120:
             raise ValueError('Configure an SMTP timeout within the runtime ceiling.')
 
@@ -58,7 +78,8 @@ class SMTPConnector:
         reject_secrets(inputs)
         if (grant.get('authorization_state') != 'authorized' or grant.get('tool_id') not in {'smtp_send_email', 'brevo_send_email'} or
                 not grant.get('authorization_reference') or not grant.get('credential_reference') or
-                grant.get('destination') != 'verified_recipients' or not grant.get('approval_reference')):
+                grant.get('destination') != 'verified_recipients' or
+                ((self.require_approval or grant.get('approval_required', True)) and not grant.get('approval_reference'))):
             raise RuntimeFailure('SMTP_NOT_AUTHORIZED', 'SMTP requires an exact authorized approved credential binding.', 403)
         if list(Draft202012Validator(grant['input_schema']).iter_errors(inputs)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
@@ -136,18 +157,34 @@ class GoogleSheetsConnector:
         if (not isinstance(spreadsheet_id, str) or not spreadsheet_id or
                 not isinstance(cell_range, str) or not cell_range or any(c in spreadsheet_id + cell_range for c in '\r\n')):
             raise RuntimeFailure('SHEETS_INPUT_INVALID', 'Use a spreadsheet ID and A1 range.', 400)
+        spreadsheet_id = google_spreadsheet_id(spreadsheet_id)
         configuration = self.resolve(grant['credential_reference'])
         if configuration.get('provider_id') != 'google_sheets':
             raise RuntimeFailure('SHEETS_NOT_CONFIGURED', 'Configure a Google Sheets credential reference.', 503)
         try:
             credentials = _google_credentials(self.token_file)
-            request = Request(
-                'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='') +
-                '/values/' + quote(cell_range, safe=''),
-                headers={'Authorization': 'Bearer ' + credentials.token, 'Accept': 'application/json'},
-            )
-            with urlopen(request, timeout=self.timeout) as response:
-                payload = json.load(response)
+            base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='')
+            headers = {'Authorization': 'Bearer ' + credentials.token, 'Accept': 'application/json'}
+            def read(url):
+                with urlopen(Request(url, headers=headers), timeout=self.timeout) as response:
+                    return json.load(response)
+            try:
+                payload = read(base + '/values/' + quote(cell_range, safe=''))
+            except HTTPError as exc:
+                if exc.code != 400:
+                    raise
+                match = re.fullmatch(r"('(?:[^']|'')+'|[^!]+)!([A-Z]+[1-9][0-9]*:[A-Z]+[1-9][0-9]*|[A-Z]+:[A-Z]+)", cell_range)
+                if not match:
+                    raise RuntimeFailure('SHEETS_RANGE_INVALID', 'Check the actual worksheet tab name and A1 range.', 400) from None
+                requested = match[1]
+                if requested.startswith("'"):
+                    requested = requested[1:-1].replace("''", "'")
+                metadata = read(base + '?fields=sheets.properties.title')
+                titles = [sheet['properties']['title'] for sheet in metadata.get('sheets', [])]
+                if len(titles) != 1 or requested in titles:
+                    raise RuntimeFailure('SHEETS_RANGE_INVALID', 'The range is invalid or the requested tab is missing. Use the actual worksheet tab name.', 400) from None
+                resolved = "'" + titles[0].replace("'", "''") + "'!" + match[2]
+                payload = read(base + '/values/' + quote(resolved, safe=''))
             output = {'rows': payload.get('values', [])}
         except RuntimeFailure:
             raise
@@ -161,7 +198,7 @@ class GoogleSheetsConnector:
             raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'The connector result does not meet the assignment schema.')
         return output
 
-    def poll_changes(self, grant, inputs, previous_cursor=None):
+    def poll_changes(self, grant, inputs, previous_cursor=None, *, event_type=None, identity_field=None, required_fields=None, baseline_policy='current_only'):
         """Read a sheet range and return replay-safe row events plus a cursor.
 
         Scheduling and durable checkpoint storage remain lifecycle concerns; this
@@ -171,6 +208,8 @@ class GoogleSheetsConnector:
         rows = output.get('rows', [])
         headers = rows[0] if rows and isinstance(rows[0], list) else []
         data_rows = rows[1:] if headers else rows
+        if event_type == 'row.created':
+            return self._created_rows(inputs, headers, data_rows, previous_cursor, identity_field, required_fields or [], baseline_policy)
         current = {str(index): hashlib.sha256(json.dumps(row, separators=(',', ':')).encode()).hexdigest()
                    for index, row in enumerate(data_rows, start=2)}
         try:
@@ -190,6 +229,43 @@ class GoogleSheetsConnector:
                             'row': record, 'row_values': values})
         cursor = json.dumps({'version': 1, 'rows': current}, sort_keys=True, separators=(',', ':'))
         return {'cursor': cursor, 'changes': changes}
+
+    @staticmethod
+    def _created_rows(inputs, headers, rows, previous_cursor, identity_field, required_fields, baseline_policy='current_only'):
+        if (not isinstance(identity_field, str) or not identity_field or not isinstance(required_fields, list) or
+                any(not isinstance(field, str) or not field for field in required_fields) or
+                any(not isinstance(header, str) or not header for header in headers) or
+                len(set(headers)) != len(headers) or identity_field not in headers or set(required_fields) - set(headers)):
+            raise RuntimeFailure('SHEETS_ROW_SCHEMA_INVALID', 'Configure unique headers, an identity field and existing required fields.', 400)
+        try:
+            prior = json.loads(previous_cursor) if previous_cursor else {'version': 2, 'seen': []}
+            if prior.get('version') != 2 or not isinstance(prior.get('seen'), list):
+                raise ValueError()
+            seen = set(prior['seen'])
+        except (TypeError, ValueError, AttributeError):
+            raise RuntimeFailure('SHEETS_CURSOR_INVALID', 'The stored row-created cursor requires review.', 409) from None
+        changes, identities = [], set()
+        for index, values in enumerate(rows, start=2):
+            if not isinstance(values, list):
+                raise RuntimeFailure('SHEETS_ROW_SCHEMA_INVALID', 'Sheet rows must contain cell lists.', 400)
+            record = {header: values[position] if position < len(values) else '' for position, header in enumerate(headers)}
+            identity = str(record[identity_field]).strip()
+            if not identity:
+                continue
+            if identity in identities:
+                raise RuntimeFailure('SHEETS_DUPLICATE_IDENTITY', 'Each nonempty row identity must be unique.', 400)
+            identities.add(identity)
+            fingerprint = hashlib.sha256(json.dumps([inputs['spreadsheet_id'], inputs['range'], identity_field, identity]).encode()).hexdigest()
+            # Baseline every existing identity, including partial rows. New partial
+            # rows stay unseen until the workflow's required fields are populated.
+            if previous_cursor is None and baseline_policy == 'current_only':
+                seen.add(fingerprint)
+                continue
+            if fingerprint in seen or any(not str(record[field]).strip() for field in required_fields):
+                continue
+            seen.add(fingerprint)
+            changes.append({'event_id': 'row.created:' + fingerprint, 'row_index': index, 'row': record, 'row_values': values})
+        return {'cursor': json.dumps({'version': 2, 'seen': sorted(seen)}, separators=(',', ':')), 'changes': changes}
 
 
 class GoogleSheetsUpdateConnector(GoogleSheetsConnector):

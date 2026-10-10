@@ -46,14 +46,75 @@ class OpenAIStructuredOutputProvider:
                 from openai import OpenAI
             except ImportError as exc:
                 raise RuntimeError("OpenAI provider is not installed; inject a provider for local planning.") from exc
-            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), max_retries=0, timeout=60)
         response = client.responses.create(
             model=self.model,
             input=[
-                {"role": "system", "content": "Return only JSON. Produce a workflow draft using exactly the canonical field names in the supplied schema. Do not use aliases such as steps, trigger, or error_handling. Include every required top-level field, use draft status, keep tool assignments empty, and put unknown requirements in metadata.unresolved_requirements. Do not include commentary."},
+                {"role": "system", "content": (
+                    "Return only JSON. Produce a workflow draft using exactly the canonical field names in the supplied schema. "
+                    "Do not use aliases such as steps, trigger, or error_handling. Include every required top-level field, "
+                    "use draft status, keep tool assignments empty, and put unknown requirements in metadata.unresolved_requirements. "
+                    "Conditions use a restricted Python expression language rooted only at inputs/input or outputs/nodes. "
+                    "Allowed: dictionary attributes/subscripts, literals, comparisons (==, !=, <, <=, >, >=, in, not in), "
+                    "and/or/not. Never use JavaScript operators (===, &&, ||), function or method calls, lambdas, "
+                    "template expressions, or natural-language expressions. Example: inputs.sender_id == inputs.expected_sender_id. "
+                    "Declare referenced input fields in workflow.inputs. Boolean conditions have yes/no outcomes and edges for both. "
+                    "If a sender identity or condition mapping is unknown, declare a required boolean input such as condition_result, "
+                    "use inputs.condition_result, and record condition_mapping_required in metadata.unresolved_requirements. "
+                    "Do not equate a person's display name with a verified provider user ID or invent provider identities. "
+                    "Every declared condition must have exactly one condition node and its declared outgoing outcomes. "
+                    "Use context.runtime_model for every model agent when supplied. Agent schemas describe the exact mapped node input/output objects. "
+                    "Agent and tool nodes use configuration.input_mapping with restricted expressions, for example row: inputs.row "
+                    "and summary: outputs.analysis.summary. String literals in mappings must be quoted Python expressions. "
+                    "Only these node configuration keys are executable: input, input_mapping, description, ui, on_timeout, timeout_outcome, error_outcome. "
+                    "Never use output_mapping. Output nodes use input_mapping and produce every required workflow output on every terminal branch. "
+                    "Trigger nodes omit configuration entirely; event mapping and provider settings belong only in metadata.trigger_templates. "
+                    "Tool references contain ONLY tool_id and capability; never generate configuration_reference. "
+                    "Every agent MUST include allowed_tool_ids=[]; executable assignments come only from Registry review. "
+                    "Each tool node MUST name both tool_id and agent_id. Agents with zero model-call budget have no agent-kind nodes; "
+                    "reference the deterministic sender directly from the tool node immediately following the approval node. "
+                    "Permissions must use only context.allowed_agent_permissions, never invented names. "
+                    "When context.available_capabilities is supplied, choose capabilities only from that list; "
+                    "use classify_text for model analysis and generate_report for writing, or an empty capabilities list. "
+                    "All outputs references use graph NODE IDs, never agent IDs unless identical. Cross-check every mapping against node_id. "
+                    "If context.validation_feedback is present, return a complete corrected draft addressing those errors. "
+                    "Do not place model calls, Python code, or side effects inside condition or transform nodes. "
+                    "For an incoming Google Sheets row use metadata.trigger_templates containing provider_id=google_sheets, delivery=poll, "
+                    "event_type=row.created, resource_id=the ID extracted from context.google_sheets_resource, "
+                    "credential_reference=cred_google_sheets, poll_interval_seconds=10, baseline_policy=current_only, "
+                    "poll_input with range, identity_field and required_fields chosen from the user's Sheet headers. "
+                    "If the stable identity field or range is unknown record an unresolved requirement rather than guessing. "
+                    "The event has row (header-keyed object), row_index, row_values, spreadsheet_id, range and event_id. "
+                    "Sheet values are formatted cell data: do not require numeric JSON types for numeric-looking row cells. "
+                    "Trigger input_mapping maps declared workflow inputs to event paths (e.g. row: row) or {constant: JSON value}. "
+                    "Every required workflow input must have a trigger mapping. Do not supply a fabricated true condition_result. "
+                    "The input_mapping field is REQUIRED on each metadata trigger template, not on the trigger node. "
+                    "Business filters are condition nodes using the mapped row fields; false outcomes terminate without email. "
+                    "Include read_spreadsheet capability in a registered source agent and google_sheets_read_rows in workflow.tools "
+                    "so polling has an authorized read grant. That tool need not also read the entire sheet in the DAG. "
+                    "For email use smtp_send_email with send_email capability and explicit to, subject and body mappings. "
+                    "Prefer mapping subject/body from the writing agent's outputs. Keep notification recipient fixed to the "
+                    "user-requested address; row.email is lead contact data, not automatically the notification recipient. "
+                    "Honor context.allowed_email_recipients; unknown destinations remain unresolved. "
+                    "If context.email_action_approval_required is false and the user requests direct sending, omit the email approval node "
+                    "and approval gate, set sender approval_requirements=[] and connect the writing node directly to the sender tool node. "
+                    "If that context flag is true or absent, retain the human email action approval. "
+                    "Use a separate deterministic sender agent (max_llm_calls=0) for the tool node after any required approval, "
+                    "so waiting for human approval does not exhaust a writing agent's timeout. "
+                    "When action approval is required, approval nodes reference approval_gates and use approved/rejected edges; gate on_reject=stop. "
+                    "Bound model agents to 1 call, 8000 total tokens, zero retries, 60 seconds and $0.05 each. "
+                    "Set sender max_tool_calls=1, zero retries and timeout_seconds=60. Workflow max_tokens and max_llm_calls "
+                    "must cover all agents, max_tool_calls must cover tools, and workflow timeout_seconds=3600 "
+                    "with approval timeout_seconds=3300 permits review. Do not exceed Registry's agent ceilings "
+                    "of 10 calls, 20 tools, 20000 tokens, 300 seconds and $10. Always require review before execution. "
+                    "Source agents that exist only to authorize polling have max_llm_calls=0 and no agent node. "
+                    "Do not include commentary."
+                )},
                 {"role": "user", "content": json.dumps({"objective": objective, "context": context, "canonical_workflow_schema": load_contracts()["workflow"]}, sort_keys=True)},
             ],
             text={"format": {"type": "json_object"}},
+            max_output_tokens=16000,
+            store=False,
         )
         raw = getattr(response, "output_text", "")
         return json.loads(raw)
@@ -219,7 +280,7 @@ class RuleBasedStructuredOutputProvider:
         if row_trigger:
             sheet_id = self._google_sheet_id(objective, context)
             trigger_resource_missing = sheet_id is None
-            trigger_template = {"provider_id": "google_sheets", "delivery": "poll", "event_type": "row.created", "resource_id": sheet_id or "resource_required", "poll_interval_seconds": 10, "baseline_policy": "current_only", "poll_input": {"range": "A:Z"}, "input_mapping": {"objective_context": "row", "spreadsheet_id": "spreadsheet_id", "range": "range", "condition_result": {"constant": True}, "email_to": "row.email", "email_subject": {"constant": "Follow-up from the workflow"}, "email_body": "row.requirements", "values": {"constant": []}}}
+            trigger_template = {"provider_id": "google_sheets", "delivery": "poll", "event_type": "row.created", "resource_id": sheet_id or "resource_required", "poll_interval_seconds": 10, "baseline_policy": "current_only", "poll_input": {"range": "A:Z"}, "input_mapping": {"objective_context": "row", "spreadsheet_id": "spreadsheet_id", "range": "range", "email_to": "row.email", "email_subject": {"constant": "Follow-up from the workflow"}, "email_body": "row.requirements", "values": {"constant": []}}}
         elif "pull request" in objective_lower or "github pr" in objective_lower:
             trigger_template = {"provider_id": "github_webhook", "delivery": "push", "event_type": "pull_request", "resource_id": "configured_default", "baseline_policy": "current_only"}
         elif "incoming email" in objective_lower or "new email" in objective_lower:
