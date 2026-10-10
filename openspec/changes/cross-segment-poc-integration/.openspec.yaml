@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-09
+goal: Verify the four implemented segments work together through one generic
+  end-to-end workflow and connector demonstration

@@ -1,0 +1,15 @@
+{
+  "policy": {
+    "workspace_id": "local-workspace",
+    "agent_permissions": ["workflow.read_input"],
+    "approved_providers": [],
+    "allowed_destinations": [],
+    "credential_references": {},
+    "remaining_quota": {}
+  },
+  "agents": [],
+  "tools": [],
+  "bindings": [],
+  "subject_permissions": [],
+  "subject_scopes": []
+}

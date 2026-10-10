@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-09
+goal: Implement Rethika's approved workflow runtime, connector controls, and
+  observability against the accepted v1 contracts

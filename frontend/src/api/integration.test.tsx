@@ -1,0 +1,245 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { webcrypto } from "node:crypto";
+import { TextEncoder } from "node:util";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api, WorkflowClient, ApiError, type Session } from "./client";
+import { CanonicalWorkflowSchema, CanonicalAgentSchema, CanonicalToolSchema, type RunEvent } from "./contracts.generated";
+import { fromCanonical, toCanonical, hasWorkflowEdits } from "./mapping";
+import { assertRunTransition, reconcileEvents } from "./control";
+import { useMesh } from "@/domain/store";
+import { useBackend } from "./state";
+import { WorkflowControls } from "@/features/workflows/WorkflowControls";
+import { ServerRunView, ApprovalControl } from "@/features/runs/ServerRunView";
+
+const fixture = (name: string) => JSON.parse(readFileSync(path.resolve(process.cwd(), "../shared/contracts/examples", name), "utf8"));
+const document = () => CanonicalWorkflowSchema.parse(fixture("workflows/invoice-review.json"));
+const envelope = (data: unknown, status = 200) => new Response(JSON.stringify({ request_id: "req_test", status, data }), { status });
+const session = (permissions: string[] = ["workflow.view", "workflow.edit", "workflow.validate"]): Session => ({
+  auth: { subject: { subject_id: "builder", workspace_id: "local-workspace" }, roles: ["builder"], permissions, scopes: [], decision: "allow" },
+  mode: "local-development", planning_available: true, runtime_available: false, approval_service_available: false,
+});
+beforeEach(() => {
+  vi.stubGlobal("crypto", webcrypto);
+  vi.stubGlobal("TextEncoder", TextEncoder);
+  localStorage.clear();
+  useMesh.setState({ workflows: [], agents: [] });
+  useBackend.setState({ status: "connected", session: session(), tools: [], error: null, reviews: {} });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe("authoritative contract mapping", () => {
+  it("validates every accepted workflow plus agent and tool fixtures", () => {
+    for (const name of ["invoice-review", "employee-onboarding", "support-triage"]) expect(() => CanonicalWorkflowSchema.parse(fixture(`workflows/${name}.json`))).not.toThrow();
+    expect(() => CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"))).not.toThrow();
+    expect(() => CanonicalToolSchema.parse(fixture("tools/google-sheets-read.json"))).not.toThrow();
+    expect(() => CanonicalAgentSchema.parse(fixture("agents/incomplete-agent.json"))).toThrow();
+  });
+  it("retains conditions, approvals, policies, schemas and unknown metadata across edits", () => {
+    const original = document();
+    original.metadata["review_reference"] = "review_123";
+    const mapped = fromCanonical(original);
+    const edited = { ...mapped.workflow, name: "Edited invoice review" };
+    const result = toCanonical(edited, mapped.agents);
+    expect(result.version).toBe(original.version + 1);
+    expect(result.conditions).toEqual(original.conditions);
+    expect(result.approval_gates).toEqual(original.approval_gates);
+    expect(result.execution_policy).toEqual(original.execution_policy);
+    expect(result.agents).toEqual(original.agents);
+    expect(result.tools).toEqual(original.tools);
+    expect(result.metadata["review_reference"]).toBe("review_123");
+    expect(hasWorkflowEdits(mapped.workflow, mapped.agents)).toBe(false);
+    expect(hasWorkflowEdits(edited, mapped.agents)).toBe(true);
+  });
+  it("isolates identical planner agent IDs across workflows", () => {
+    const first = document();
+    const agent = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
+    const { name: _name, retry_policy: _retry, guardrails: _guardrails, ...embedded } = agent;
+    first.agents = [embedded];
+    first.nodes.push({ node_id: "classification", kind: "agent", label: "Classification", agent_id: agent.agent_id });
+    const second = { ...first, workflow_id: "another_workflow" };
+    useMesh.getState().acceptWorkflow(first); useMesh.getState().acceptWorkflow(second);
+    expect(new Set(useMesh.getState().agents.map((a) => a.id)).size).toBe(first.agents.length + second.agents.length);
+    const firstView = useMesh.getState().workflows.find((w) => w.id === first.workflow_id)!;
+    expect(toCanonical(firstView, useMesh.getState().agents).agents).toEqual(first.agents);
+  });
+  it("keeps a changed model paired with its provider", () => {
+    const original = document();
+    const agent = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
+    const { name: _name, retry_policy: _retry, guardrails: _guardrails, ...embedded } = agent;
+    original.agents = [embedded];
+    original.agents[0]!.model.provider = "custom_provider";
+    const mapped = fromCanonical(original);
+    expect(toCanonical(mapped.workflow, mapped.agents).agents[0]?.model.provider).toBe("custom_provider");
+    mapped.agents[0]!.modelId = "claude-sonnet-4-5";
+    expect(toCanonical(mapped.workflow, mapped.agents).agents[0]?.model.provider).toBe("anthropic");
+  });
+});
+
+describe("API envelopes and retries", () => {
+  it("reuses mutation keys across new client instances without persisting prompts", async () => {
+    const bodies: { operation: string; idempotency_key: string; payload: unknown }[] = [];
+    const transport: typeof fetch = vi.fn(async (_url, options) => {
+      bodies.push(JSON.parse(String(options?.body)));
+      return envelope({ workflow: document(), correlation_id: "corr_plan" });
+    });
+    await new WorkflowClient(transport).request("plan_workflow", { objective: "Review invoice approval" });
+    await new WorkflowClient(transport).request("plan_workflow", { objective: "Review invoice approval" });
+    expect(bodies[0]?.idempotency_key).toBe(bodies[1]?.idempotency_key);
+    expect(bodies[0]?.payload).toEqual({ objective: "Review invoice approval" });
+    expect(JSON.stringify(localStorage)).not.toContain("Review invoice approval");
+  });
+  it("displays only contract errors and refuses credentials, HTML and malformed graphs", async () => {
+    const unsafe = new WorkflowClient(vi.fn(async () => envelope({ error: { error_code: "PROVIDER_FAILED", message: "Bearer provider_secret", request_id: "req_test", retryable: false } }, 502)));
+    await expect(unsafe.request("list_tools", {})).rejects.toMatchObject({ message: "The API returned unsafe data. Nothing was displayed." });
+    const html = new WorkflowClient(vi.fn(async () => new Response("<h1>internal provider error</h1>", { status: 500 })));
+    await expect(html.request("list_tools", {})).rejects.toMatchObject({ error: { error_code: "INVALID_API_RESPONSE" } });
+    const invalid = document(); invalid.edges[0]!.source = "missing_node";
+    const client = new WorkflowClient(vi.fn(async () => envelope({ workflow: invalid })));
+    await expect(client.request("plan_workflow", { objective: "Review" })).rejects.toMatchObject({ error: { error_code: "INVALID_WORKFLOW" } });
+  });
+  it("preserves safe error fields and correlation references", async () => {
+    const client = new WorkflowClient(vi.fn(async () => envelope({ correlation_id: "corr_denied", error: { error_code: "OPERATION_NOT_AUTHORIZED", message: "Your session cannot edit.", request_id: "req_test", retryable: false, field: "workflow.version" } }, 403)));
+    await expect(client.request("list_workflows", {})).rejects.toMatchObject({ correlationId: "corr_denied", error: { field: "workflow.version" } });
+  });
+});
+
+describe("workflow UI integration", () => {
+  it("shows exact authorized assignments and enables publication only for that revision", async () => {
+    const original = document();
+    original.status = "approved";
+    original.metadata["unresolved_requirements"] = [];
+    original.execution_policy.allow_external_writes = false;
+    const registered = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
+    const { name: _name, retry_policy: _retry, guardrails: _guardrails, ...embedded } = registered;
+    original.agents = [{ ...embedded, capabilities: [] }];
+    const mapped = fromCanonical(original);
+    useMesh.setState({ agents: mapped.agents });
+    const review = { workflow_id: original.workflow_id, workflow_version: original.version, ready: true, reason_codes: [], items: [] };
+    useBackend.setState({ session: session(["workflow.publish"]), reviews: { [original.workflow_id]: review } });
+    vi.spyOn(api, "request").mockResolvedValue({ workflow: original, registry_review: review } as never);
+    const view = render(<WorkflowControls workflow={mapped.workflow} />);
+    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByText("Registry requirements authorized for this revision")).toBeVisible());
+    act(() => useBackend.getState().acceptReview({ ...review, workflow_version: original.version + 1 }));
+    view.rerender(<WorkflowControls workflow={mapped.workflow} />);
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+  });
+  it("renders pending and denied assignment reasons and keeps approval blocked", async () => {
+    const original = document();
+    original.status = "validated";
+    const mapped = fromCanonical(original);
+    useMesh.setState({ agents: mapped.agents });
+    const review = { workflow_id: original.workflow_id, workflow_version: original.version, ready: false, reason_codes: ["APPROVAL_REQUIRED", "TOOL_UNAVAILABLE"], items: [
+      { agent_id: "reader_agent", capability: "read_spreadsheet", tool_id: "google_sheets_read_rows", authorization_state: "pending_approval" as const, reason_codes: ["APPROVAL_REQUIRED"] },
+      { agent_id: "sender_agent", capability: "send_email", tool_id: "smtp_send_email", authorization_state: "denied" as const, reason_codes: ["TOOL_UNAVAILABLE"] },
+    ] };
+    useBackend.setState({ session: session(["workflow.approve"]), reviews: { [original.workflow_id]: review } });
+    vi.spyOn(api, "request").mockResolvedValue({ workflow: original, registry_review: review } as never);
+    render(<WorkflowControls workflow={mapped.workflow} />);
+    expect(screen.getByRole("button", { name: "Approve revision" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByLabelText("Registry assignment review")).toHaveTextContent("pending_approval"));
+    expect(screen.getByLabelText("Registry assignment review")).toHaveTextContent("TOOL_UNAVAILABLE");
+  });
+  it("submits an edited canonical revision, updates its version and excludes it from browser draft persistence", async () => {
+    const original = document();
+    useMesh.getState().acceptWorkflow(original);
+    useMesh.getState().renameWorkflow(original.workflow_id, "Invoice edits");
+    const edited = useMesh.getState().workflows[0]!;
+    const save = vi.spyOn(api, "request").mockImplementation(async (_operation, payload) => ({ workflow: { ...("workflow" in payload ? payload.workflow : original), metadata: { workspace_id: "local-workspace" } }, correlation_id: "corr_saved" }) as never);
+    render(<WorkflowControls workflow={edited} />);
+    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save revision" }));
+    await waitFor(() => expect(screen.getByText("Request reference: corr_saved")).toBeVisible());
+    expect(save).toHaveBeenCalledWith("save_workflow_version", expect.objectContaining({ base_version: original.version, workflow: expect.objectContaining({ name: "Invoice edits", version: original.version + 1 }) }));
+    expect(useMesh.getState().workflows[0]?.serverVersion).toBe(original.version + 1);
+    expect(JSON.parse(localStorage.getItem("mesh-local-drafts-v1")!).state.workflows).toEqual([]);
+  });
+  it("does not grant viewers mutation controls and blocks unresolved publication", () => {
+    const mapped = fromCanonical(document());
+    useMesh.setState({ agents: mapped.agents });
+    useBackend.setState({ session: session(["workflow.view"]) });
+    const view = render(<WorkflowControls workflow={mapped.workflow} />);
+    expect(screen.queryByRole("button", { name: "Save revision" })).toBeNull();
+    act(() => useBackend.setState({ session: session(["workflow.approve", "workflow.publish"]) }));
+    view.rerender(<WorkflowControls workflow={{ ...mapped.workflow, status: "approved" }} />);
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+  });
+  it("renders safe validation failures without changing revision state", async () => {
+    const mapped = fromCanonical(document());
+    useMesh.setState({ agents: mapped.agents });
+    vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
+    render(<WorkflowControls workflow={mapped.workflow} />);
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("edges[0].source"));
+    expect(screen.getByRole("alert")).toHaveTextContent("corr_validate");
+  });
+});
+
+describe("registry review contract safety", () => {
+  it("rejects mismatched revision and inconsistent readiness responses", async () => {
+    const workflow = document();
+    const review = { workflow_id: workflow.workflow_id, workflow_version: workflow.version + 1, ready: true, reason_codes: [] as string[], items: [] };
+    const client = new WorkflowClient(vi.fn(async () => envelope({ workflow, registry_review: review })));
+    await expect(client.request("get_workflow", { workflow_id: workflow.workflow_id })).rejects.toMatchObject({ error: { error_code: "REVISION_MISMATCH" } });
+    review.workflow_version = workflow.version;
+    review.reason_codes = ["APPROVAL_REQUIRED"];
+    await expect(client.request("get_workflow", { workflow_id: workflow.workflow_id })).rejects.toMatchObject({ error: { error_code: "INVALID_REGISTRY_REVIEW" } });
+  });
+  it("drops server-issued grants when creating a new editable revision", () => {
+    const workflow = document();
+    const agent = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
+    const { name: _name, retry_policy: _retry, guardrails: _guardrails, ...embedded } = agent;
+    workflow.agents = [{ ...embedded, allowed_tool_ids: ["google_sheets_read_rows"] }];
+    workflow.tools = [{ tool_id: "google_sheets_read_rows", capability: "read_spreadsheet", configuration_reference: "authz_server_reference" }];
+    const mapped = fromCanonical(workflow);
+    const saved = toCanonical(mapped.workflow, mapped.agents);
+    expect(saved.agents[0]?.allowed_tool_ids).toEqual([]);
+    expect(saved.tools[0]).not.toHaveProperty("configuration_reference");
+    expect(workflow.agents[0]?.allowed_tool_ids).toEqual(["google_sheets_read_rows"]);
+  });
+});
+
+describe("approval and run consumers", () => {
+  it("submits only the exact trusted pending approval binding and renders the returned decision", async () => {
+    useBackend.setState({ session: { ...session(["workflow.approve"]), auth: { ...session(["workflow.approve"]).auth, roles: ["approver"] }, approval_service_available: true } });
+    const approval = { approval_id: "approval_exact", workflow_id: "invoice_review", workflow_version: 3, status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] };
+    const decision = vi.spyOn(api, "request").mockResolvedValue({ ...approval, status: "approved", allowed_decisions: [] } as never);
+    render(<ApprovalControl approval={approval} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Approve$/ }));
+    await waitFor(() => expect(screen.getByText(/approval_exact · approved/)).toBeVisible());
+    expect(decision).toHaveBeenCalledWith("decide_approval", { approval_id: "approval_exact", workflow_id: "invoice_review", workflow_version: 3, decision: "approved" });
+    expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
+  });
+  it("shows all approval outcomes and gates decisions by trusted availability/permissions", () => {
+    for (const status of ["pending", "approved", "rejected", "timed_out", "unmatched"] as const) {
+      const view = render(<ApprovalControl approval={{ approval_id: "approval_1", workflow_id: "workflow_1", workflow_version: 1, status, allowed_decisions: ["approved", "rejected"] }} />);
+      expect(screen.getByText(new RegExp(`approval_1 · ${status}`))).toBeVisible();
+      expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
+      view.unmount();
+    }
+  });
+  it("deduplicates events and rejects terminal transitions or mismatched revisions", () => {
+    const event = fixture("api-control-fixtures.json").valid_run_event as RunEvent;
+    const ref = { run_id: event.run_id, workflow_id: event.workflow_id, workflow_version: event.workflow_version };
+    expect(reconcileEvents([event], [event], ref)).toEqual([event]);
+    expect(() => reconcileEvents([], [{ ...event, workflow_version: 2 }], ref)).toThrow();
+    expect(() => assertRunTransition("completed", "running")).toThrow();
+    expect(() => assertRunTransition("running", "paused_for_approval")).not.toThrow();
+    expect(() => assertRunTransition("queued", "completed")).not.toThrow();
+    expect(() => reconcileEvents([event], [], { ...ref, workflow_version: 2 })).toThrow();
+  });
+  it("renders server run events and keeps runtime actions absent when unavailable", async () => {
+    const view = render(<ServerRunView />);
+    expect(screen.getByText(/runtime API is not connected/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Load run" })).toBeNull();
+    const event = fixture("api-control-fixtures.json").valid_run_event as RunEvent;
+    act(() => useBackend.setState({ session: { ...session(), runtime_available: true } }));
+    vi.spyOn(api, "request").mockImplementation(async (operation) => operation === "get_run" ? ({ run: { run_id: event.run_id, workflow_id: event.workflow_id, workflow_version: event.workflow_version, status: "paused_for_approval", approvals: [] } }) as never : ({ items: [event], has_more: false }) as never);
+    view.rerender(<ServerRunView />);
+    fireEvent.change(screen.getByLabelText("Run ID"), { target: { value: event.run_id } });
+    fireEvent.click(screen.getByRole("button", { name: "Load run" }));
+    await waitFor(() => expect(screen.getByRole("list", { name: "Run events" })).toHaveTextContent(event.event_type));
+  });
+});

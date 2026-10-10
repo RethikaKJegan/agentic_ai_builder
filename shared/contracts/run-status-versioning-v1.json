@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/run-status-versioning-v1.json",
+  "title": "Agentic AI Builder Run and Versioning v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workflow_revision_states", "run_states", "run_event", "idempotency_request"],
+  "properties": {
+    "workflow_revision_states": {"type": "array", "items": {"enum": ["draft", "validating", "validation_failed", "validated", "approved", "published", "archived"]}},
+    "run_states": {"type": "array", "items": {"enum": ["queued", "running", "paused_for_approval", "completed", "failed", "rejected", "cancelled", "blocked"]}},
+    "run_event": {"type": "object", "additionalProperties": false, "required": ["event_id", "run_id", "workflow_id", "workflow_version", "timestamp", "source", "event_type"], "properties": {"event_id": {"type": "string"}, "run_id": {"type": "string"}, "workflow_id": {"type": "string"}, "workflow_version": {"type": "integer", "minimum": 1}, "timestamp": {"type": "string", "format": "date-time"}, "source": {"type": "string"}, "event_type": {"type": "string"}, "details": {"type": "object"}}},
+    "idempotency_request": {"type": "object", "additionalProperties": false, "required": ["request_id", "idempotency_key", "workflow_id", "workflow_version"], "properties": {"request_id": {"type": "string"}, "idempotency_key": {"type": "string", "minLength": 8}, "workflow_id": {"type": "string"}, "workflow_version": {"type": "integer", "minimum": 1}}}
+  }
+}

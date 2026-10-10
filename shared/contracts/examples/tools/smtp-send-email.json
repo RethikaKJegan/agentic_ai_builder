@@ -1,0 +1,18 @@
+{
+  "tool_id": "smtp_send_email",
+  "provider_id": "smtp",
+  "capability": "send_email",
+  "description": "Send an email through an authorized SMTP account.",
+  "input_schema": {"type": "object", "required": ["to", "subject", "body"]},
+  "output_schema": {"type": "object", "required": ["message_id"]},
+  "authentication": {"mode": "smtp", "credential_reference_required": true, "scopes": ["email.send"]},
+  "permission_scopes": ["communication.send"],
+  "availability": "enabled",
+  "risk_level": "medium",
+  "rate_limits": {"requests_per_minute": 10, "requests_per_day": 300},
+  "estimated_cost": {"currency": "USD", "per_call": 0},
+  "retry_policy": {"max_retries": 2, "retryable_errors": ["timeout", "temporary_provider_error"]},
+  "timeout_seconds": 30,
+  "approval_required": true,
+  "allowed_destinations": ["verified_recipients"]
+}

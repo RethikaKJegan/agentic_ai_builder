@@ -1,0 +1,28 @@
+{
+  "workflow_id": "invoice-review",
+  "version": 1,
+  "name": "Invoice review",
+  "description": "Extract invoice data and route high-value invoices for approval.",
+  "status": "draft",
+  "inputs": [{"name": "invoice_file", "type": "object", "required": true}],
+  "outputs": [{"name": "decision", "type": "string", "required": true}],
+  "stakeholders": [{"stakeholder_id": "finance_approver", "name": "Finance approver", "role": "finance"}],
+  "agents": [],
+  "tools": [],
+  "nodes": [
+    {"node_id": "invoice_received", "kind": "trigger", "label": "Invoice received"},
+    {"node_id": "amount_check", "kind": "condition", "label": "Check amount", "condition_id": "amount_threshold"},
+    {"node_id": "invoice_approval", "kind": "approval", "label": "Finance approval", "approval_gate_id": "finance_approval"},
+    {"node_id": "invoice_output", "kind": "output", "label": "Invoice decision"}
+  ],
+  "edges": [
+    {"edge_id": "received_to_check", "source": "invoice_received", "target": "amount_check"},
+    {"edge_id": "check_to_approval", "source": "amount_check", "target": "invoice_approval", "outcome": "high_value"},
+    {"edge_id": "approval_to_output", "source": "invoice_approval", "target": "invoice_output", "outcome": "approved"}
+  ],
+  "conditions": [{"condition_id": "amount_threshold", "expression": "invoice.total > 1000", "outcomes": ["high_value", "standard"]}],
+  "approval_gates": [{"approval_gate_id": "finance_approval", "approver_roles": ["finance_approver"], "on_reject": "stop", "timeout_seconds": 86400}],
+  "execution_policy": {"limits": {"max_llm_calls": 3, "max_tool_calls": 4, "max_tokens": 4000, "max_retries": 2, "timeout_seconds": 300, "max_estimated_cost_usd": 0.5}, "requires_review_before_execution": true, "allow_external_writes": true},
+  "error_policy": {"on_validation_error": "reject", "on_runtime_error": "retry", "max_retries": 2},
+  "metadata": {"domain": "finance"}
+}

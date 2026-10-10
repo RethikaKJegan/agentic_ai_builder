@@ -1,0 +1,22 @@
+{
+  "workflow_id": "support-triage",
+  "version": 1,
+  "name": "Support triage",
+  "description": "Classify a support request and route it to the right team.",
+  "status": "draft",
+  "inputs": [{"name": "request_text", "type": "string", "required": true}],
+  "outputs": [{"name": "route", "type": "string", "required": true}],
+  "stakeholders": [{"stakeholder_id": "support_owner", "name": "Support owner", "role": "support"}],
+  "agents": [],
+  "tools": [],
+  "nodes": [
+    {"node_id": "request_received", "kind": "trigger", "label": "Request received", "layout": {"x": 0, "y": 0}},
+    {"node_id": "route_output", "kind": "output", "label": "Route request", "layout": {"x": 320, "y": 0}}
+  ],
+  "edges": [{"edge_id": "request_to_route", "source": "request_received", "target": "route_output"}],
+  "conditions": [],
+  "approval_gates": [],
+  "execution_policy": {"limits": {"max_llm_calls": 2, "max_tool_calls": 2, "max_tokens": 2000, "max_retries": 1, "timeout_seconds": 120, "max_estimated_cost_usd": 0.25}, "requires_review_before_execution": true, "allow_external_writes": false},
+  "error_policy": {"on_validation_error": "reject", "on_runtime_error": "stop", "max_retries": 1},
+  "metadata": {"domain": "customer-support"}
+}

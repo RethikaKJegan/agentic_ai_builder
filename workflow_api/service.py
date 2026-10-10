@@ -1,0 +1,238 @@
+"""Workflow transport/revision lifecycle and delegation to an explicit runtime."""
+from copy import deepcopy
+import hashlib
+import json
+import re
+from uuid import uuid4
+
+from jsonschema import Draft202012Validator
+from planner.service import PlannerService
+from planner.errors import PlannerFailure
+from planner.validation import validate_workflow
+from registry import RegistryService, WorkspacePolicy
+from registry.contracts import RegistryError, VERSIONS, schema, validate
+from registry.safety import reject_secrets
+from .storage import WorkflowStore
+from .registry_adapter import RegistryAdapter
+from runtime.service import RuntimeFailure
+
+
+class ApiFailure(Exception):
+    def __init__(self, code, message, status=400, field=None, retryable=False):
+        super().__init__(message)
+        self.code, self.status, self.field, self.retryable = code, status, field, retryable
+
+
+PERMISSIONS = {
+    'plan_workflow': ('workflow.plan', {'admin', 'builder'}),
+    'list_workflows': ('workflow.view', {'admin', 'builder', 'viewer', 'approver'}),
+    'get_workflow': ('workflow.view', {'admin', 'builder', 'viewer', 'approver'}),
+    'save_workflow_version': ('workflow.edit', {'admin', 'builder'}),
+    'validate_workflow': ('workflow.validate', {'admin', 'builder'}),
+    'approve_workflow': ('workflow.approve', {'admin', 'approver'}),
+    'list_tools': ('tools.read', {'admin', 'builder', 'viewer', 'approver'}),
+    'list_capabilities': ('tools.read', {'admin', 'builder', 'viewer', 'approver'}),
+    'execute_workflow': ('workflow.execute', {'admin', 'builder'}),
+    'get_run': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
+    'list_run_events': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
+    'decide_approval': ('workflow.approve', {'admin', 'approver'}),
+}
+
+
+class WorkflowService:
+    def __init__(self, store, planner=None, registry=None, registry_adapter=None, runtime_runner=None):
+        self.runtime_runner = runtime_runner
+        self.store = store
+        self.planner = planner or PlannerService()
+        self.registry = registry_adapter.service if registry_adapter else registry or RegistryService(WorkspacePolicy('local-workspace'))
+        self.registry_adapter = registry_adapter or RegistryAdapter(self.registry)
+
+    @staticmethod
+    def envelope(request_id, status, data):
+        result = dict(request_id=request_id, status=status, data={
+            'correlation_id': f'corr_{uuid4().hex}', 'contract_versions': deepcopy(VERSIONS), **data})
+        Draft202012Validator(schema('api')['properties']['response_envelope']).validate(result)
+        reject_secrets(result)
+        return result
+
+    @classmethod
+    def failure(cls, request_id, failure):
+        # Never reflect provider messages, validation values or user-controlled paths.
+        field = failure.field if failure.field and re.fullmatch(r'[a-zA-Z0-9_.\[\]-]{1,200}', failure.field) else None
+        return cls.envelope(request_id, failure.status, {'error': dict(
+            error_code=failure.code, message=str(failure), request_id=request_id,
+            retryable=failure.retryable, field=field)})
+
+    @staticmethod
+    def authorize(auth, operation):
+        validate(auth, 'auth')
+        permission, roles = PERMISSIONS[operation]
+        if (auth['decision'] != 'allow' or not auth['subject']['subject_id'] or
+                not auth['subject']['workspace_id'] or not roles.intersection(auth['roles']) or
+                permission not in auth['permissions']):
+            raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Your session cannot perform this operation.', 403)
+
+    def handle(self, request, auth):
+        request_id = f'req_{uuid4().hex}'
+        try:
+            reject_secrets(request)
+            Draft202012Validator(schema('api')['properties']['request_envelope']).validate(request)
+            candidate = request['request_id']
+            if not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', candidate):
+                raise ApiFailure('INVALID_REQUEST', 'Use a safe request identifier.', field='request_id')
+            request_id = candidate
+            operation = request['operation']
+            if operation not in PERMISSIONS:
+                raise ApiFailure('INVALID_OPERATION', 'The API operation is not supported.', field='operation')
+            self.authorize(auth, operation)
+            payload = request['payload']
+            if any(key in payload for key in ('auth_context', 'roles', 'scopes', 'permissions', 'subject', 'credential_reference', 'authorization_reference')):
+                raise ApiFailure('UNTRUSTED_AUTHORITY', 'Authority must come from the server session.')
+            if operation in {'execute_workflow', 'get_run', 'list_run_events', 'decide_approval'}:
+                if self.runtime_runner is None:
+                    raise ApiFailure('SERVICE_UNAVAILABLE', 'The runtime and approval service is not connected.', 503, retryable=True)
+                runtime = self.runtime_runner.runtime
+                if operation == 'execute_workflow':
+                    run = runtime.create_run(request, auth)
+                    run = self.runtime_runner.advance(run['run_id'], auth)
+                    data = {'run': run}
+                elif operation == 'get_run':
+                    data = {'run': runtime.get_run(payload.get('run_id'), auth)}
+                elif operation == 'list_run_events':
+                    data = runtime.events(payload.get('run_id'), auth)
+                else:
+                    run = self.runtime_runner.decide(request, auth)
+                    data = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
+                return self.envelope(request_id, 200, data)
+            if operation in {'list_tools', 'list_capabilities'}:
+                return self.registry.handle(request, auth)
+            if operation == 'plan_workflow':
+                trusted = deepcopy(request)
+                trusted['payload']['auth_context'] = {
+                    **auth['subject'], 'roles': auth['roles'], 'permissions': auth['permissions']}
+                result = self.planner.plan(trusted)
+                if result['status'] >= 400:
+                    error = result.get('error') or (result.get('data') or {}).get('error') or {}
+                    code = error.get('error_code', 'PLANNER_PROVIDER_FAILED')
+                    safe = {'VALIDATION_FAILED': 'Enter a non-empty process description.',
+                            'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
+                            'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.'}
+                    return self.failure(request_id, ApiFailure(code, safe.get(code, 'The planner could not produce a valid draft.'),
+                        result['status'], error.get('field'), bool(error.get('retryable'))))
+                validate_workflow(result['data']['workflow'])
+                reject_secrets(result)
+                return self.envelope(result['request_id'], 200, result['data'])
+            workspace = auth['subject']['workspace_id']
+            if operation in {'get_workflow', 'list_workflows'}:
+                with self.store.transaction() as db:
+                    if operation == 'list_workflows':
+                        items = self.store.list(db, workspace)
+                        return self.envelope(request_id, 200, dict(items=items, total=len(items), has_more=False, next_cursor=None))
+                    workflow = self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version'))
+                    if not workflow:
+                        raise ApiFailure('WORKFLOW_NOT_FOUND', 'This workflow revision was not found.', 404)
+                    return self.envelope(request_id, 200, self.document_data(workflow, auth))
+            key = request.get('idempotency_key', '')
+            if not isinstance(key, str) or len(key) < 8 or len(key) > 128:
+                raise ApiFailure('INVALID_IDEMPOTENCY_KEY', 'A retry key of 8–128 characters is required.', field='idempotency_key')
+            fingerprint = hashlib.sha256(json.dumps({'operation': operation, 'payload': payload}, sort_keys=True).encode()).hexdigest()
+            subject = auth['subject']['subject_id']
+            with self.store.transaction() as db:
+                old = db.execute('SELECT fingerprint, response FROM mutations WHERE workspace=? AND subject=? AND key=?', (workspace, subject, key)).fetchone()
+                if old:
+                    if old[0] != fingerprint:
+                        raise ApiFailure('IDEMPOTENCY_KEY_REUSED', 'This retry key belongs to a different mutation.', 409)
+                    return json.loads(old[1])
+                result = self.mutate(db, workspace, operation, payload, auth, request_id)
+                db.execute('INSERT INTO mutations VALUES (?, ?, ?, ?, ?)', (workspace, subject, key, fingerprint, json.dumps(result)))
+                return result
+        except RuntimeFailure as exc:
+            return self.failure(request_id, ApiFailure(exc.code, str(exc), exc.status))
+        except ApiFailure as exc:
+            return self.failure(request_id, exc)
+        except RegistryError as exc:
+            return self.failure(request_id, ApiFailure(exc.code, 'The request does not meet the authorization or data contract.', exc.status, exc.field))
+        except PlannerFailure as exc:
+            return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow fields before continuing.', 400, exc.field))
+        except Exception:
+            return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The API could not process valid, safe data.', 400))
+
+    def document_data(self, workflow, auth=None):
+        data = {'workflow': workflow, 'workflow_id': workflow['workflow_id'],
+                'workflow_version': workflow['version'], 'status': workflow['status'],
+                'validation_state': workflow.get('metadata', {}).get('validation_state', 'not_validated')}
+        if auth is not None:
+            data['registry_review'] = self.registry_adapter.review(workflow, auth)
+        return data
+
+    @staticmethod
+    def validate_document(workflow):
+        validate_workflow(workflow)
+        for node in workflow['nodes']:
+            ui = node.get('configuration', {}).get('ui', {})
+            if isinstance(ui, dict) and any(ui.get(key) for key in ('role', 'parentNodeId', 'combine')):
+                raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Hierarchy execution mapping requires downstream review.', field='nodes.configuration.ui')
+
+    def mutate(self, db, workspace, operation, payload, auth, request_id):
+        workflow_id = payload.get('workflow_id')
+        current = self.store.get(db, workspace, workflow_id)
+        if operation == 'save_workflow_version':
+            workflow = deepcopy(payload.get('workflow'))
+            validate(workflow, 'workflow')
+            # Canonical fields survive saving. Executable authority never comes from edits.
+            if workflow['workflow_id'] != workflow_id or workflow['status'] != 'draft' or payload.get('workflow_version') != workflow['version']:
+                raise ApiFailure('INVALID_REVISION', 'Save an editable draft with the matching workflow ID.', field='workflow.status')
+            base = payload.get('base_version')
+            expected = current['version'] if current else 0
+            if type(base) is not int or base != expected or workflow['version'] != expected + 1:
+                raise ApiFailure('REVISION_CONFLICT', 'A newer revision exists. Reload it before saving.', 409, 'workflow.version')
+            if any(agent['allowed_tool_ids'] for agent in workflow['agents']) or any('configuration_reference' in tool for tool in workflow['tools']):
+                raise ApiFailure('UNTRUSTED_ASSIGNMENT', 'Executable assignments must be supplied by the trusted registry.', 403)
+            workflow['metadata'].pop('validation_state', None)
+            workflow['metadata'].pop('approved_by', None)
+            workflow['metadata'].pop('registry_review', None)
+            workflow['metadata']['workspace_id'] = workspace
+            workflow['metadata']['validation_state'] = 'not_validated'
+            self.store.put(db, workspace, workflow)
+            return self.envelope(request_id, 200, self.document_data(workflow, auth))
+        if not current or payload.get('workflow_version') != current['version']:
+            raise ApiFailure('REVISION_CONFLICT', 'Use the current saved revision.', 409, 'workflow_version')
+        workflow = deepcopy(current)
+        if operation == 'validate_workflow':
+            if workflow['status'] not in {'draft', 'validated'}:
+                raise ApiFailure('INVALID_TRANSITION', 'This revision cannot be validated again.', 409)
+            try:
+                self.validate_document(workflow)
+                # A structurally valid draft may still lack executable tool assignments.
+                workflow['status'] = 'validated'
+                workflow['metadata']['validation_state'] = 'validated'
+            except PlannerFailure as exc:
+                # Lifecycle failure is metadata because workflow-schema-v1 excludes validation_failed.
+                workflow['status'] = 'draft'
+                workflow['metadata']['validation_state'] = 'validation_failed'
+                self.store.put(db, workspace, workflow)
+                return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow graph before continuing.', 400, exc.field))
+        elif operation == 'approve_workflow':
+            action = payload.get('action', 'approve')
+            if action not in {'approve', 'publish'}:
+                raise ApiFailure('INVALID_REQUEST', 'Choose approve or publish.', field='action')
+            if action == 'publish' and 'workflow.publish' not in auth['permissions']:
+                raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Your session cannot publish workflows.', 403)
+            expected = 'validated' if action == 'approve' else 'approved'
+            if workflow['status'] != expected:
+                raise ApiFailure('INVALID_TRANSITION', f'The revision must be {expected} first.', 409)
+            self.validate_document(workflow)
+            review = self.registry_adapter.review(workflow, auth)
+            if not review['ready']:
+                code = 'AGENT_REGISTRATION_REQUIRED' if not workflow['tools'] and 'AGENT_REGISTRATION_REQUIRED' in review['reason_codes'] else 'TOOL_ASSIGNMENT_REQUIRED'
+                raise ApiFailure(code, 'Registry requirements must be resolved and authorized before approval or publication.', 409)
+            if workflow['execution_policy'].get('allow_external_writes'):
+                raise ApiFailure('APPROVAL_SERVICE_REQUIRED', 'External writes require the trusted approval service.', 503)
+            workflow['status'] = 'approved' if action == 'approve' else 'published'
+            assignments = self.registry_adapter.execution_assignments(workflow, auth)
+            for agent in workflow['agents']:
+                agent['allowed_tool_ids'] = sorted({grant['tool_id'] for grant in assignments if grant['agent_id'] == agent['agent_id']})
+            if action == 'approve':
+                workflow['metadata']['approved_by'] = auth['subject']['subject_id']
+        self.store.put(db, workspace, workflow)
+        return self.envelope(request_id, 200, self.document_data(workflow, auth))

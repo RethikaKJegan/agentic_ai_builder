@@ -1,0 +1,207 @@
+"""Harihar's transport adapter for Aravind's existing registry service.
+
+Configuration is operator-owned, never a browser payload. No connector calls,
+permission inference, or credential retrieval happen here.
+"""
+from copy import deepcopy
+from dataclasses import fields
+import json
+from pathlib import Path
+from threading import RLock
+
+from registry import RegistryService, WorkspacePolicy
+from registry.contracts import RegistryError, validate_json_schema
+from registry.safety import reject_secrets
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class RegistryAdapter:
+    def __init__(self, service, agents=None, bindings=None):
+        self.service = service
+        self.agents = deepcopy(agents or {})
+        self.bindings = deepcopy(bindings or [])
+        self._grants = {}
+        self._lock = RLock()
+
+    def review(self, workflow, auth):
+        """Return a secret-free projection; keep executable references server-side."""
+        with self._lock:
+            return self._review(workflow, auth)
+
+    def _review(self, workflow, auth):
+        results, issues = [], []
+        refs = {tool['tool_id']: tool for tool in workflow['tools']}
+        covered = set()
+        if workflow['metadata'].get('unresolved_requirements'):
+            issues.append('UNRESOLVED_REQUIREMENTS')
+        for agent in workflow['agents']:
+            record = self.agents.get(agent['agent_id'])
+            if not record:
+                issues.append('AGENT_REGISTRATION_REQUIRED')
+                results.append(dict(agent_id=agent['agent_id'], capability=None, tool_id=None,
+                                    authorization_state='denied', reason_codes=['AGENT_REGISTRATION_REQUIRED']))
+                continue
+            definition = record['definition']
+            # Embedded workflow definitions must match the accepted registered definition.
+            # Only server-issued allowed_tool_ids are excluded from this comparison.
+            if record['workspace_id'] != auth['subject']['workspace_id'] or any(
+                    definition.get(key) != value for key, value in agent.items() if key != 'allowed_tool_ids'):
+                issues.append('AGENT_CONFIGURATION_MISMATCH')
+                results.append(dict(agent_id=agent['agent_id'], capability=None, tool_id=None,
+                                    authorization_state='denied', reason_codes=['AGENT_CONFIGURATION_MISMATCH']))
+                continue
+            for capability in agent['capabilities']:
+                bindings = [b for b in self.bindings if b['workflow_id'] == workflow['workflow_id']
+                            and b['workflow_version'] == workflow['version']
+                            and b['agent_id'] == agent['agent_id'] and b['capability'] == capability]
+                if not bindings:
+                    issues.append('ASSIGNMENT_CONFIGURATION_REQUIRED')
+                    results.append(dict(agent_id=agent['agent_id'], capability=capability, tool_id=None,
+                                        authorization_state='denied', reason_codes=['ASSIGNMENT_CONFIGURATION_REQUIRED']))
+                for binding in bindings:
+                    tool_id = binding['tool_id']
+                    if tool_id not in refs or refs[tool_id]['capability'] != capability:
+                        issues.append('TOOL_REFERENCE_MISMATCH')
+                        results.append(dict(agent_id=agent['agent_id'], capability=capability, tool_id=tool_id,
+                                            authorization_state='denied', reason_codes=['TOOL_REFERENCE_MISMATCH']))
+                        continue
+                    cache_key = (auth['subject']['workspace_id'], auth['subject']['subject_id'],
+                                 workflow['workflow_id'], workflow['version'], agent['agent_id'], tool_id)
+                    grant = self._grants.get(cache_key)
+                    if grant:
+                        response = self.service.revalidate_assignment(grant['authorization_reference'], agent['agent_id'],
+                            tool_id, workflow['workflow_id'], workflow['version'], auth)
+                    else:
+                        response = self.service.assign(agent['agent_id'], capability, binding['input_schema'],
+                            binding['output_schema'], auth, workflow['workflow_id'], workflow['version'],
+                            destination=binding.get('destination'), tool_id=tool_id)
+                    data = response['data']
+                    assignment = data.get('assignment')
+                    state = assignment['authorization_state'] if assignment else 'denied'
+                    reasons = []
+                    if assignment and assignment['agent_version'] != record['version']:
+                        state = 'denied'
+                        reasons.append('STALE_AGENT_REGISTRATION')
+                    if response['status'] >= 400:
+                        error = data['error']
+                        reasons.append(error['error_code'])
+                        reasons.extend(c['reason_code'] for c in error.get('details', {}).get('excluded_candidates', []))
+                    if state == 'pending_approval':
+                        reasons.append('APPROVAL_REQUIRED')
+                    if state == 'authorized':
+                        self._grants[cache_key] = deepcopy(assignment)
+                        covered.add(tool_id)
+                    else:
+                        issues.extend(reasons or ['TOOL_ASSIGNMENT_REQUIRED'])
+                    results.append(dict(agent_id=agent['agent_id'], agent_version=record['version'], capability=capability,
+                        tool_id=tool_id, authorization_state=state, reason_codes=sorted(set(reasons)),
+                        tool_version=assignment.get('tool_version') if assignment else None,
+                        policy_version=assignment.get('policy_version') if assignment else None,
+                        approval_required=assignment.get('approval_required', False) if assignment else False))
+        if set(refs) - covered:
+            issues.append('TOOL_ASSIGNMENT_REQUIRED')
+        review = dict(workflow_id=workflow['workflow_id'], workflow_version=workflow['version'],
+                      ready=not issues, items=results, reason_codes=sorted(set(issues)))
+        reject_secrets(review)
+        return review
+
+    def execution_assignments(self, workflow, auth):
+        """Trusted downstream-only boundary; never serialized into UI responses."""
+        with self._lock:
+            review = self._review(workflow, auth)
+            if not review['ready']:
+                raise RegistryError('TOOL_ASSIGNMENT_REQUIRED', 'Assignments are not currently authorized.', status=403)
+            prefix = (auth['subject']['workspace_id'], auth['subject']['subject_id'], workflow['workflow_id'], workflow['version'])
+            return [deepcopy(grant) for key, grant in self._grants.items() if key[:4] == prefix]
+
+
+def load_registry_config(path):
+    """Bootstrap through public registry methods from explicit repository-local JSON.
+
+    A malformed configuration fails startup without reflecting file contents.
+    No fixture or example is loaded by default.
+    """
+    try:
+        source = Path(path)
+        source = (source if source.is_absolute() else ROOT / source).resolve()
+        if not source.is_relative_to(ROOT):
+            raise ValueError()
+        config = json.loads(source.read_text())
+        reject_secrets(config)
+        if set(config) - {'policy', 'agents', 'tools', 'bindings', 'subject_permissions', 'subject_scopes'}:
+            raise ValueError()
+        policy_data = deepcopy(config['policy'])
+        if set(policy_data) - {f.name for f in fields(WorkspacePolicy)} or policy_data.get('workspace_id') != 'local-workspace':
+            raise ValueError()
+        # Workflow approvals belong to Rethika, never operator-created JSON grants.
+        if policy_data.get('approval_grants'):
+            raise ValueError()
+        for field in fields(WorkspacePolicy):
+            if field.name not in policy_data:
+                continue
+            value = policy_data[field.name]
+            if field.type is set and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
+                raise ValueError()
+            if field.type is dict and not isinstance(value, dict):
+                raise ValueError()
+            if field.type is int and (type(value) is not int or value < (1 if field.name in {'version', 'max_tool_timeout_seconds'} else 0)):
+                raise ValueError()
+            if field.type is float and (type(value) not in (int, float) or value < 0):
+                raise ValueError()
+            if field.type is str and not isinstance(value, str):
+                raise ValueError()
+        if policy_data.get('max_risk', 'medium') not in {'low', 'medium', 'high', 'critical'}:
+            raise ValueError()
+        if any(type(value) is not int or value < 0 for value in policy_data.get('remaining_quota', {}).values()):
+            raise ValueError()
+        for key in ('agent_permissions', 'approved_providers', 'allowed_destinations', 'approval_roles'):
+            if key in policy_data:
+                policy_data[key] = set(policy_data[key])
+        policy = WorkspacePolicy(**policy_data)
+        service = RegistryService(policy)
+        server_auth = dict(subject=dict(subject_id='registry-configuration', workspace_id=policy.workspace_id),
+                           roles=['admin'], permissions=['tools.manage'], scopes=[], decision='allow')
+        def accepted(result, name):
+            if result['status'] != 200:
+                raise ValueError()
+            return result['data'][name]
+        for entry in config.get('tools', []):
+            if set(entry) - {'definition', 'credential_reference'}:
+                raise ValueError()
+            accepted(service.register_tool(entry['definition'], server_auth, entry.get('credential_reference')), 'tool')
+        agents = {}
+        for definition in config.get('agents', []):
+            record = accepted(service.register_agent(definition, server_auth), 'agent')
+            if definition['agent_id'] in agents:
+                raise ValueError()
+            agents[definition['agent_id']] = record
+        bindings = config.get('bindings', [])
+        required = {'workflow_id', 'workflow_version', 'agent_id', 'capability', 'tool_id', 'input_schema', 'output_schema'}
+        seen = set()
+        for binding in bindings:
+            if not required <= set(binding) or set(binding) - (required | {'destination'}):
+                raise ValueError()
+            if type(binding['workflow_version']) is not int or binding['workflow_version'] < 1:
+                raise ValueError()
+            validate_json_schema(binding['input_schema'])
+            validate_json_schema(binding['output_schema'])
+            if any(not isinstance(binding[k], str) or not binding[k] for k in ('workflow_id', 'agent_id', 'capability', 'tool_id')):
+                raise ValueError()
+            if 'destination' in binding and not isinstance(binding['destination'], str):
+                raise ValueError()
+            key = tuple(binding[k] for k in ('workflow_id', 'workflow_version', 'agent_id', 'capability', 'tool_id'))
+            if key in seen:
+                raise ValueError()
+            seen.add(key)
+        permissions, scopes = config.get('subject_permissions', []), config.get('subject_scopes', [])
+        if not isinstance(permissions, list) or not isinstance(scopes, list):
+            raise ValueError()
+        if any(not isinstance(v, str) or '*' in v for v in permissions + scopes):
+            raise ValueError()
+        # Config may grant connector scopes, never arbitrary lifecycle/management powers.
+        if set(permissions) - policy.agent_permissions:
+            raise ValueError()
+        return RegistryAdapter(service, agents, bindings), permissions, scopes
+    except Exception:
+        raise ValueError('Invalid trusted registry configuration. Check its schema, workspace and registrations.') from None

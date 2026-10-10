@@ -1,0 +1,17 @@
+{
+  "tool_id": "google_sheets_read_rows",
+  "provider_id": "google_sheets",
+  "capability": "read_spreadsheet",
+  "description": "Read rows from an authorized Google Sheet.",
+  "input_schema": {"type": "object", "required": ["spreadsheet_id", "range"]},
+  "output_schema": {"type": "object", "required": ["rows"]},
+  "authentication": {"mode": "oauth", "credential_reference_required": true, "scopes": ["spreadsheets.readonly"]},
+  "permission_scopes": ["data.read"],
+  "availability": "needs_configuration",
+  "risk_level": "low",
+  "rate_limits": {"requests_per_minute": 60},
+  "estimated_cost": {"currency": "USD", "per_call": 0},
+  "retry_policy": {"max_retries": 2, "retryable_errors": ["timeout", "quota"]},
+  "timeout_seconds": 30,
+  "approval_required": false
+}

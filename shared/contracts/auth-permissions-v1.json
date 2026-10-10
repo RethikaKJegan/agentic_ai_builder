@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/auth-permissions-v1.json",
+  "title": "Agentic AI Builder Authorization v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "roles", "permissions", "scopes", "decision"],
+  "properties": {
+    "subject": {"type": "object", "additionalProperties": false, "required": ["subject_id", "workspace_id"], "properties": {"subject_id": {"type": "string"}, "workspace_id": {"type": "string"}}},
+    "roles": {"type": "array", "items": {"enum": ["admin", "builder", "approver", "viewer"]}},
+    "permissions": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}},
+    "scopes": {"type": "array", "items": {"type": "string"}},
+    "decision": {"enum": ["allow", "deny"]},
+    "reason_code": {"type": "string"}
+  }
+}

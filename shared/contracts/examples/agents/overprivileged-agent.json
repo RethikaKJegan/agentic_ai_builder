@@ -1,0 +1,17 @@
+{
+  "agent_id": "overprivileged_agent",
+  "name": "Overprivileged Agent",
+  "role": "Reviewer",
+  "goal": "Review a record.",
+  "instructions": "Review the record.",
+  "model": {"provider": "openai", "model_id": "gpt-5"},
+  "input_schema": {"type": "object"},
+  "output_schema": {"type": "object"},
+  "capabilities": ["read_records"],
+  "allowed_tool_ids": ["send_email", "delete_records"],
+  "permissions": ["admin.*"],
+  "limits": {"max_llm_calls": 1, "max_tool_calls": 2, "max_tokens": 1000, "max_retries": 0, "timeout_seconds": 60},
+  "retry_policy": {"max_retries": 0, "backoff_seconds": 0},
+  "approval_requirements": [],
+  "guardrails": {"pii_redaction": false, "prompt_injection_detection": false, "output_validation": false}
+}

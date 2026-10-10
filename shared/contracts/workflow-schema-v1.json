@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/workflow-schema-v1.json",
+  "title": "Agentic AI Builder Workflow v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workflow_id",
+    "version",
+    "name",
+    "description",
+    "status",
+    "inputs",
+    "outputs",
+    "stakeholders",
+    "agents",
+    "tools",
+    "nodes",
+    "edges",
+    "conditions",
+    "approval_gates",
+    "execution_policy",
+    "error_policy",
+    "metadata"
+  ],
+  "properties": {
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "status": { "enum": ["draft", "validated", "approved", "published", "archived"] },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "outputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "stakeholders": { "type": "array", "items": { "$ref": "#/$defs/stakeholder" } },
+    "agents": { "type": "array", "items": { "$ref": "#/$defs/agentRef" } },
+    "tools": { "type": "array", "items": { "$ref": "#/$defs/toolRef" } },
+    "nodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+    "approval_gates": { "type": "array", "items": { "$ref": "#/$defs/approval" } },
+    "execution_policy": { "$ref": "#/$defs/executionPolicy" },
+    "error_policy": { "$ref": "#/$defs/errorPolicy" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "required"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "type": { "enum": ["string", "number", "integer", "boolean", "object", "array"] },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "stakeholder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stakeholder_id", "name", "role"],
+      "properties": {
+        "stakeholder_id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "contact_reference": { "type": "string" }
+      }
+    },
+    "agentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "role", "goal", "instructions", "model", "input_schema", "output_schema", "capabilities", "allowed_tool_ids", "permissions", "limits", "approval_requirements"],
+      "properties": {
+        "agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+        "role": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "instructions": { "type": "string", "minLength": 1 },
+        "model": { "type": "object", "additionalProperties": false, "required": ["provider", "model_id"], "properties": { "provider": { "type": "string" }, "model_id": { "type": "string" }, "temperature": { "type": "number", "minimum": 0, "maximum": 2 } } },
+        "input_schema": { "type": "object" },
+        "output_schema": { "type": "object" },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "allowed_tool_ids": { "type": "array", "items": { "type": "string" } },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "limits": { "$ref": "#/$defs/limits" },
+        "approval_requirements": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "toolRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_id", "capability"],
+      "properties": { "tool_id": { "type": "string" }, "capability": { "type": "string" }, "configuration_reference": { "type": "string" } }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "kind", "label"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+        "kind": { "enum": ["trigger", "agent", "tool", "condition", "approval", "transform", "output"] },
+        "label": { "type": "string", "minLength": 1 },
+        "agent_id": { "type": "string" },
+        "tool_id": { "type": "string" },
+        "condition_id": { "type": "string" },
+        "approval_gate_id": { "type": "string" },
+        "configuration": { "type": "object", "additionalProperties": true },
+        "layout": { "type": "object", "additionalProperties": false, "properties": { "x": { "type": "number" }, "y": { "type": "number" } } }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edge_id", "source", "target"],
+      "properties": { "edge_id": { "type": "string" }, "source": { "type": "string" }, "target": { "type": "string" }, "outcome": { "type": "string" } }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition_id", "expression", "outcomes"],
+      "properties": { "condition_id": { "type": "string" }, "expression": { "type": "string", "minLength": 1 }, "outcomes": { "type": "array", "minItems": 1, "items": { "type": "string" } } }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_gate_id", "approver_roles", "on_reject"],
+      "properties": { "approval_gate_id": { "type": "string" }, "approver_roles": { "type": "array", "minItems": 1, "items": { "type": "string" } }, "on_reject": { "enum": ["stop", "branch", "retry"] }, "timeout_seconds": { "type": "integer", "minimum": 1 } }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_llm_calls", "max_tool_calls", "max_tokens", "max_retries", "timeout_seconds"],
+      "properties": { "max_llm_calls": { "type": "integer", "minimum": 0 }, "max_tool_calls": { "type": "integer", "minimum": 0 }, "max_tokens": { "type": "integer", "minimum": 1 }, "max_retries": { "type": "integer", "minimum": 0 }, "timeout_seconds": { "type": "integer", "minimum": 1 }, "max_estimated_cost_usd": { "type": "number", "minimum": 0 } }
+    },
+    "executionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limits", "requires_review_before_execution"],
+      "properties": { "limits": { "$ref": "#/$defs/limits" }, "requires_review_before_execution": { "type": "boolean" }, "allow_external_writes": { "type": "boolean" } }
+    },
+    "errorPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on_validation_error", "on_runtime_error"],
+      "properties": { "on_validation_error": { "enum": ["reject"] }, "on_runtime_error": { "enum": ["stop", "retry", "branch"] }, "max_retries": { "type": "integer", "minimum": 0 } }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/error-format-v1.json",
+  "title": "Agentic AI Builder Error v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error_code", "message", "request_id", "retryable"],
+  "properties": {
+    "error_code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,127}$"},
+    "message": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "request_id": {"type": "string", "minLength": 1},
+    "retryable": {"type": "boolean"},
+    "field": {"type": ["string", "null"]},
+    "details": {"type": "object", "additionalProperties": true},
+    "related_errors": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["error_code", "message"], "properties": {"error_code": {"type": "string"}, "message": {"type": "string"}, "field": {"type": "string"}}}}
+  }
+}

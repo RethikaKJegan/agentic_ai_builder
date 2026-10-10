@@ -1,0 +1,35 @@
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(request.nextUrl.hostname)) {
+    return NextResponse.json({ request_id: "req_proxy", status: 403, data: { error: { error_code: "DEVELOPMENT_AUTH_LOCAL_ONLY", message: "The local workflow API is restricted to loopback hosts.", request_id: "req_proxy", retryable: false } } }, { status: 403 });
+  }
+  const { path } = await context.params;
+  if (path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) {
+    return NextResponse.json({ request_id: "req_proxy", status: 400, data: { error: { error_code: "INVALID_ROUTE", message: "Use a supported API route.", request_id: "req_proxy", retryable: false } } }, { status: 400 });
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+  try {
+    const url = new URL(path.map(encodeURIComponent).join("/") + request.nextUrl.search, (process.env["BUILDER_API_URL"] || "http://127.0.0.1:8000") + "/");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const cookie = request.headers.get("cookie");
+    const origin = request.headers.get("origin");
+    if (cookie) headers["cookie"] = cookie;
+    if (origin) headers["origin"] = origin;
+    const response = await fetch(url, { method: request.method, headers, cache: "no-store", signal: controller.signal,
+      ...(request.method === "GET" ? {} : { body: await request.text() }) });
+    const result = NextResponse.json(await response.json(), { status: response.status, headers: { "Cache-Control": "no-store" } });
+    const sessionCookie = response.headers.get("set-cookie");
+    if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
+    return result;
+  } catch {
+    return NextResponse.json({ request_id: "req_proxy", status: 503, data: { error: { error_code: "API_UNAVAILABLE", message: "The workflow API is unavailable. Start the local API and retry.", request_id: "req_proxy", retryable: true } } }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+export const GET = proxy;
+export const POST = proxy;
+export const PUT = proxy;

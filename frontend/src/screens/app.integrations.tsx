@@ -1,0 +1,11 @@
+"use client";
+import { SEED_CONNECTORS } from "@/domain/catalog";
+import { useBackend } from "@/api/state";
+import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+export default function Integrations() {
+  const backend = useBackend();
+  if (backend.status === "connected") return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 text-sm text-muted-foreground">Registered tool metadata. Discovery does not authorize execution.</p><ApiFeedback error={backend.error} /><div className="mt-8 divide-y divide-border rounded-xl border border-border">{backend.tools.length ? backend.tools.map((t) => <div key={t.tool_id} className="space-y-1 px-4 py-4"><p className="font-medium">{t.definition.capability} <span className="text-xs text-muted-foreground">· {t.definition.provider_id} · v{t.version}</span></p><p className="text-xs text-muted-foreground">{t.definition.description}</p><p className="text-xs">{t.definition.availability} · {t.definition.risk_level} risk · {t.credential_configured ? "Credentials configured" : "Credentials not configured"} · {t.authorization_state}{t.definition.approval_required ? " · Approval required" : ""}</p></div>) : <p className="p-8 text-sm text-muted-foreground">No registered tools are visible to this session. Connector configuration is managed by the backend owner.</p>}</div></div>;
+  return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 max-w-xl text-sm text-muted-foreground">Connector catalog preview. Registry discovery and secure configuration are awaiting backend integration.</p>
+    <div className="mt-8 divide-y divide-border rounded-xl border border-border">{SEED_CONNECTORS.map((c) => <div key={c.id} className="flex items-center gap-4 px-4 py-4"><span className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-canvas font-display text-sm font-semibold">{c.name.slice(0, 2)}</span><div className="min-w-0 flex-1"><p className="font-medium">{c.name}</p><p className="text-xs text-muted-foreground">{c.description}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">Not configured</span></div>)}</div>
+  </div>;
+}

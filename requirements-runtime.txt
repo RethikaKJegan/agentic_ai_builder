@@ -1,0 +1,7 @@
+-r requirements.txt
+# Keep the accepted planner's OpenAI SDK constraint; avoid CrewAI 1.15's SDK v2 requirement.
+crewai==1.0.0
+opentelemetry-sdk>=1.30,<2
+opentelemetry-exporter-otlp-proto-http>=1.30,<2
+instructor>=1.3.3,<1.12
+tiktoken>=0.11,<1

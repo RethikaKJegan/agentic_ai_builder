@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workflow operations v2",
+  "$comment": "Accepted unanimously by Suprajha, Aravind, Harihar, and Rethika on 2026-10-10. Additive to all v1 contracts.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/release"
+    },
+    {
+      "$ref": "#/$defs/trigger"
+    },
+    {
+      "$ref": "#/$defs/automation_identity"
+    },
+    {
+      "$ref": "#/$defs/dispatch_job"
+    },
+    {
+      "$ref": "#/$defs/lifecycle_operation"
+    },
+    {
+      "$ref": "#/$defs/overview"
+    },
+    {
+      "$ref": "#/$defs/overview_event"
+    }
+  ],
+  "$defs": {
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "release_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workflow_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "workflow_version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "workflow_id",
+            "workflow_version"
+          ]
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "active",
+            "failed",
+            "disabled",
+            "deleting"
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "automation_identity_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "agent_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "tool_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trigger_binding_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "release_id",
+        "workspace_id",
+        "revision",
+        "state",
+        "generation",
+        "automation_identity_id",
+        "agent_versions",
+        "tool_versions",
+        "policy_version",
+        "trigger_binding_ids",
+        "created_at"
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "event_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "delivery": {
+          "enum": [
+            "push",
+            "poll",
+            "schedule"
+          ]
+        },
+        "credential_reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "event_schema": {
+          "type": "object"
+        },
+        "input_mapping": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "filters": {
+          "type": "object"
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schedule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "poll_interval_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "baseline_policy": {
+          "enum": [
+            "current_only",
+            "authorized_backfill"
+          ]
+        },
+        "health": {
+          "enum": [
+            "preparing",
+            "ready",
+            "failed",
+            "disabled",
+            "cleanup_pending"
+          ]
+        }
+      },
+      "required": [
+        "binding_id",
+        "workspace_id",
+        "provider_id",
+        "resource_id",
+        "event_type",
+        "delivery",
+        "credential_reference",
+        "event_schema",
+        "input_mapping",
+        "filters",
+        "timezone",
+        "schedule",
+        "poll_interval_seconds",
+        "baseline_policy",
+        "health"
+      ]
+    },
+    "automation_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity_id",
+        "subject_id",
+        "workspace_id",
+        "scopes",
+        "policy_version",
+        "active"
+      ]
+    },
+    "dispatch_job": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "release_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "event_receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "deduplication_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "automation_identity_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "leased",
+            "completed",
+            "failed",
+            "dead_letter",
+            "cancelled"
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lease_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "job_id",
+        "workspace_id",
+        "release_id",
+        "event_receipt_id",
+        "deduplication_key",
+        "automation_identity_id",
+        "inputs",
+        "state",
+        "attempt",
+        "lease_until",
+        "causation_id"
+      ]
+    },
+    "lifecycle_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "expected_release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "activate_release",
+            "disable_release",
+            "delete_workflow"
+          ]
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "succeeded",
+            "failed",
+            "cleanup_pending"
+          ]
+        },
+        "error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "workspace_id",
+        "workflow_id",
+        "subject_id",
+        "idempotency_key",
+        "expected_release_id",
+        "kind",
+        "state",
+        "error_code"
+      ]
+    },
+    "overview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string"
+        },
+        "draft_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "published_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "activation_state": {
+          "enum": [
+            "preparing",
+            "active",
+            "failed",
+            "disabled",
+            "deleting",
+            null
+          ]
+        },
+        "active_run_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latest_run_status": {
+          "enum": [
+            "queued",
+            "running",
+            "paused_for_approval",
+            "completed",
+            "failed",
+            "rejected",
+            "cancelled",
+            "blocked",
+            null
+          ]
+        },
+        "pending_approval_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workflow_id",
+        "name",
+        "draft_version",
+        "published_version",
+        "release_id",
+        "activation_state",
+        "active_run_count",
+        "latest_run_id",
+        "latest_run_status",
+        "pending_approval_count",
+        "updated_at"
+      ]
+    },
+    "overview_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "snapshot_required",
+            "workflow_updated",
+            "workflow_deleted"
+          ]
+        },
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "overview": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/overview"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "workspace_id",
+        "sequence",
+        "event_id",
+        "kind",
+        "workflow_id",
+        "overview"
+      ]
+    }
+  }
+}

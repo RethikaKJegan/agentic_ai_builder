@@ -1,0 +1,2 @@
+import { PageHeader } from "@/features/runs/RunTrace";
+export default function Screen() { return <div className="mx-auto max-w-5xl p-6 md:p-10"><PageHeader title="Settings" sub="This workspace currently stores draft edits in your browser." /><p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">Workspace membership and permissions are awaiting authenticated backend integration.</p></div>; }

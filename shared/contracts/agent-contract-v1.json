@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/agent-contract-v1.json",
+  "title": "Agentic AI Builder Agent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "name", "role", "goal", "instructions", "model", "input_schema", "output_schema", "capabilities", "allowed_tool_ids", "permissions", "limits", "retry_policy", "approval_requirements", "guardrails"],
+  "properties": {
+    "agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "instructions": { "type": "string", "minLength": 1 },
+    "model": { "type": "object", "additionalProperties": false, "required": ["provider", "model_id"], "properties": { "provider": { "type": "string" }, "model_id": { "type": "string" }, "temperature": { "type": "number", "minimum": 0, "maximum": 2 } } },
+    "input_schema": { "type": "object" },
+    "output_schema": { "type": "object" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "allowed_tool_ids": { "type": "array", "items": { "type": "string" } },
+    "permissions": { "type": "array", "items": { "type": "string" } },
+    "limits": { "$ref": "#/$defs/limits" },
+    "retry_policy": { "type": "object", "additionalProperties": false, "required": ["max_retries", "backoff_seconds"], "properties": { "max_retries": { "type": "integer", "minimum": 0 }, "backoff_seconds": { "type": "number", "minimum": 0 } } },
+    "approval_requirements": { "type": "array", "items": { "type": "string" } },
+    "guardrails": { "type": "object", "additionalProperties": false, "required": ["pii_redaction", "prompt_injection_detection", "output_validation"], "properties": { "pii_redaction": { "type": "boolean" }, "prompt_injection_detection": { "type": "boolean" }, "output_validation": { "type": "boolean" } } }
+  },
+  "$defs": { "limits": { "type": "object", "additionalProperties": false, "required": ["max_llm_calls", "max_tool_calls", "max_tokens", "max_retries", "timeout_seconds"], "properties": { "max_llm_calls": { "type": "integer", "minimum": 0 }, "max_tool_calls": { "type": "integer", "minimum": 0 }, "max_tokens": { "type": "integer", "minimum": 1 }, "max_retries": { "type": "integer", "minimum": 0 }, "timeout_seconds": { "type": "integer", "minimum": 1 }, "max_estimated_cost_usd": { "type": "number", "minimum": 0 } } } }
+}

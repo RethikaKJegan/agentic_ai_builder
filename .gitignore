@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env.*
+!.env.example
+credentials.json
+token.json
+.integration-*
+.venv-integrations/
+.local/
+.pip-cache/

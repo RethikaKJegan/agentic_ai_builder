@@ -1,0 +1,22 @@
+{
+  "workflow_id": "employee-onboarding",
+  "version": 1,
+  "name": "Employee onboarding",
+  "description": "Prepare onboarding tasks and request manager approval for access.",
+  "status": "draft",
+  "inputs": [{"name": "employee_record", "type": "object", "required": true}],
+  "outputs": [{"name": "onboarding_plan", "type": "object", "required": true}],
+  "stakeholders": [{"stakeholder_id": "manager", "name": "Hiring manager", "role": "manager"}],
+  "agents": [],
+  "tools": [],
+  "nodes": [
+    {"node_id": "employee_added", "kind": "trigger", "label": "Employee added"},
+    {"node_id": "plan_output", "kind": "output", "label": "Onboarding plan"}
+  ],
+  "edges": [{"edge_id": "employee_to_plan", "source": "employee_added", "target": "plan_output"}],
+  "conditions": [],
+  "approval_gates": [],
+  "execution_policy": {"limits": {"max_llm_calls": 2, "max_tool_calls": 3, "max_tokens": 3000, "max_retries": 1, "timeout_seconds": 180, "max_estimated_cost_usd": 0.3}, "requires_review_before_execution": true, "allow_external_writes": true},
+  "error_policy": {"on_validation_error": "reject", "on_runtime_error": "stop", "max_retries": 1},
+  "metadata": {"domain": "human-resources"}
+}

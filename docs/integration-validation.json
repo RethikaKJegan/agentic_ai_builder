@@ -1,0 +1,70 @@
+{
+  "checked_at_utc": "2026-10-09T12:00:52.352007+00:00",
+  "results": [
+    {
+      "integration": "Open-Meteo API",
+      "status": "verified",
+      "detail": "GET forecast returned a numeric current temperature."
+    },
+    {
+      "integration": "Open Library API",
+      "status": "verified",
+      "detail": "GET search returned matching books."
+    },
+    {
+      "integration": "Generic REST API Connector",
+      "status": "verified",
+      "detail": "JSONPlaceholder GET /posts/1 returned the expected record."
+    },
+    {
+      "integration": "GitHub REST API",
+      "status": "verified",
+      "detail": "Authenticated GET /user verified; private repository permissions not tested."
+    },
+    {
+      "integration": "Slack Incoming Webhooks",
+      "status": "requires_approval",
+      "detail": "No message posted. An authenticated webhook test requires approval to post."
+    },
+    {
+      "integration": "Gmail SMTP",
+      "status": "verified",
+      "detail": "STARTTLS, AUTH, and NOOP verified. No email sent; delivery untested."
+    },
+    {
+      "integration": "Brevo SMTP",
+      "status": "requires_setup",
+      "detail": "SMTP username and app password/SMTP key are missing."
+    },
+    {
+      "integration": "Google Sheets API",
+      "status": "verified",
+      "detail": "Authenticated read of the configured resource succeeded; writes untested."
+    },
+    {
+      "integration": "Google Docs API",
+      "status": "verified",
+      "detail": "Authenticated read of the configured resource succeeded; writes untested."
+    },
+    {
+      "integration": "Google Drive API",
+      "status": "verified",
+      "detail": "Authenticated files.list succeeded; writes untested."
+    },
+    {
+      "integration": "Google Calendar API",
+      "status": "verified",
+      "detail": "Authenticated events.list succeeded; no event created."
+    },
+    {
+      "integration": "Webhook Connector",
+      "status": "verified",
+      "detail": "Local loopback POST accepted a valid HMAC and rejected invalid/tampered payloads. No external registration."
+    }
+  ],
+  "limitations": [
+    "Configuration and smoke checks only; registry/runtime wiring is not implemented.",
+    "No emails, Slack messages, calendar events, billing, or external webhook registration.",
+    "Local webhook is a POC receiver without replay protection; not exposed publicly."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "agent_id": "request_classifier",
+  "name": "Request Classifier",
+  "role": "Classifier",
+  "goal": "Classify an incoming business request.",
+  "instructions": "Return a structured category and confidence for the request.",
+  "model": {"provider": "openai", "model_id": "gpt-5", "temperature": 0.1},
+  "input_schema": {"type": "object", "required": ["request_text"]},
+  "output_schema": {"type": "object", "required": ["category", "confidence"]},
+  "capabilities": ["classify_text"],
+  "allowed_tool_ids": [],
+  "permissions": ["workflow.read_input"],
+  "limits": {"max_llm_calls": 1, "max_tool_calls": 0, "max_tokens": 1200, "max_retries": 1, "timeout_seconds": 60, "max_estimated_cost_usd": 0.05},
+  "retry_policy": {"max_retries": 1, "backoff_seconds": 1},
+  "approval_requirements": [],
+  "guardrails": {"pii_redaction": true, "prompt_injection_detection": true, "output_validation": true}
+}

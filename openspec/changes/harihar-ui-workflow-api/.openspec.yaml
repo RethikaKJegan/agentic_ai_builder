@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-09
+goal: Connect Harihar's existing Lovable TanStack UI to the accepted workflow
+  and control APIs without redesigning it

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/tool-contract-v1.json",
+  "title": "Agentic AI Builder Tool v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool_id", "provider_id", "capability", "description", "input_schema", "output_schema", "authentication", "permission_scopes", "availability", "risk_level", "rate_limits", "estimated_cost", "retry_policy", "timeout_seconds", "approval_required"],
+  "properties": {
+    "tool_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "provider_id": { "type": "string", "minLength": 1 },
+    "capability": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$" },
+    "description": { "type": "string", "minLength": 1 },
+    "input_schema": { "type": "object" },
+    "output_schema": { "type": "object" },
+    "authentication": { "type": "object", "additionalProperties": false, "required": ["mode", "credential_reference_required"], "properties": { "mode": { "enum": ["none", "oauth", "api_key", "smtp", "service_account", "secret_reference"] }, "credential_reference_required": { "type": "boolean" }, "scopes": { "type": "array", "items": { "type": "string" } } } },
+    "permission_scopes": { "type": "array", "items": { "type": "string" } },
+    "availability": { "enum": ["enabled", "disabled", "needs_configuration", "quota_exceeded", "unavailable"] },
+    "risk_level": { "enum": ["low", "medium", "high", "critical"] },
+    "rate_limits": { "type": "object", "additionalProperties": false, "required": ["requests_per_minute"], "properties": { "requests_per_minute": { "type": "integer", "minimum": 1 }, "requests_per_day": { "type": "integer", "minimum": 1 } } },
+    "estimated_cost": { "type": "object", "additionalProperties": false, "required": ["currency", "per_call"], "properties": { "currency": { "const": "USD" }, "per_call": { "type": "number", "minimum": 0 } } },
+    "retry_policy": { "type": "object", "additionalProperties": false, "required": ["max_retries", "retryable_errors"], "properties": { "max_retries": { "type": "integer", "minimum": 0 }, "retryable_errors": { "type": "array", "items": { "type": "string" } } } },
+    "timeout_seconds": { "type": "integer", "minimum": 1 },
+    "approval_required": { "type": "boolean" },
+    "allowed_destinations": { "type": "array", "items": { "type": "string" } }
+  }
+}

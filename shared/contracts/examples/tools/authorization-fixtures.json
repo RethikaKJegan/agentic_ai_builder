@@ -1,0 +1,6 @@
+{
+  "missing_credentials": {"tool_id": "google_sheets_read_rows", "availability": "needs_configuration", "expected": "reject"},
+  "unallowlisted_destination": {"tool_id": "approved_http_request", "destination": "https://unapproved.example/write", "allowed_destinations": ["https://api.example/read"], "expected": "reject"},
+  "unavailable_tool": {"tool_id": "disabled_connector", "availability": "disabled", "expected": "reject"},
+  "cross_agent_assignment": {"agent_a_tools": ["google_sheets_read_rows"], "agent_b_requested_tool": "smtp_send_email", "expected": "reject"}
+}

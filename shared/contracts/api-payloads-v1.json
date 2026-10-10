@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/api-payloads-v1.json",
+  "title": "Agentic AI Builder API Payloads v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_envelope", "response_envelope", "collection_response", "operation_names"],
+  "properties": {
+    "request_envelope": {"type": "object", "additionalProperties": false, "required": ["request_id", "operation", "payload"], "properties": {"request_id": {"type": "string", "minLength": 1}, "operation": {"type": "string"}, "idempotency_key": {"type": "string"}, "payload": {"type": "object"}}},
+    "response_envelope": {"type": "object", "additionalProperties": false, "required": ["request_id", "status", "data"], "properties": {"request_id": {"type": "string"}, "status": {"type": "integer", "minimum": 100, "maximum": 599}, "data": {"type": ["object", "array", "null"]}}},
+    "collection_response": {"type": "object", "additionalProperties": false, "required": ["items", "has_more"], "properties": {"items": {"type": "array"}, "next_cursor": {"type": ["string", "null"]}, "has_more": {"type": "boolean"}, "total": {"type": ["integer", "null"], "minimum": 0}}},
+    "operation_names": {"type": "array", "minItems": 1, "items": {"type": "string", "enum": ["plan_workflow", "list_workflows", "get_workflow", "save_workflow_version", "validate_workflow", "approve_workflow", "execute_workflow", "get_run", "list_run_events", "list_tools", "list_capabilities", "decide_approval"]}}
+  }
+}

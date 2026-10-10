@@ -1,0 +1,10 @@
+{
+  "valid_request": {"request_id": "req_123", "operation": "plan_workflow", "payload": {"requirement": "Classify requests and notify the owner"}},
+  "valid_error": {"error_code": "WORKFLOW_VALIDATION_FAILED", "message": "The workflow contains an invalid edge", "request_id": "req_123", "retryable": false, "field": "edges[0].source", "details": {"expected": "existing node ID"}},
+  "viewer_denied": {"subject": {"subject_id": "user_viewer", "workspace_id": "workspace_1"}, "roles": ["viewer"], "permissions": [], "scopes": ["workspace:read"], "decision": "deny", "reason_code": "MISSING_WORKFLOW_EDIT"},
+  "valid_approval": {"condition": {"condition_id": "amount_check", "expression": "amount > 1000", "outcomes": ["high_value", "standard"]}, "branches": [{"outcome": "high_value", "target_node_id": "approval"}, {"outcome": "standard", "target_node_id": "complete"}], "approval_policy": {"approver_roles": ["approver"], "on_reject": "stop", "on_timeout": "stop", "timeout_seconds": 86400}},
+  "valid_run_event": {"event_id": "evt_1", "run_id": "run_1", "workflow_id": "invoice-review", "workflow_version": 1, "timestamp": "2026-10-09T00:00:00Z", "source": "runtime", "event_type": "run.paused_for_approval", "details": {"approval_id": "approval_1"}},
+  "duplicate_execution": {"request_id": "req_1", "idempotency_key": "idem_12345678", "workflow_id": "invoice-review", "workflow_version": 1},
+  "invalid_branch": {"condition": {"condition_id": "missing_outcome", "expression": "amount > 1000", "outcomes": ["high_value"]}, "branches": [{"outcome": "standard", "target_node_id": "complete"}], "approval_policy": {"approver_roles": ["approver"], "on_reject": "stop", "on_timeout": "stop", "timeout_seconds": 86400}},
+  "invalid_transition": {"from": "completed", "to": "running", "expected": "reject"}
+}

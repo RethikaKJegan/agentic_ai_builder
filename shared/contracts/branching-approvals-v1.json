@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/branching-approvals-v1.json",
+  "title": "Agentic AI Builder Branching and Approvals v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["condition", "branches", "approval_policy"],
+  "properties": {
+    "condition": {"type": "object", "additionalProperties": false, "required": ["condition_id", "expression", "outcomes"], "properties": {"condition_id": {"type": "string"}, "expression": {"type": "string"}, "outcomes": {"type": "array", "minItems": 1, "items": {"type": "string"}}}},
+    "branches": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["outcome", "target_node_id"], "properties": {"outcome": {"type": "string"}, "target_node_id": {"type": "string"}}}},
+    "approval_policy": {"type": "object", "additionalProperties": false, "required": ["approver_roles", "on_reject", "on_timeout"], "properties": {"approver_roles": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "on_reject": {"enum": ["stop", "branch", "retry"]}, "on_timeout": {"enum": ["stop", "branch", "retry"]}, "timeout_seconds": {"type": "integer", "minimum": 1}}}
+  }
+}

@@ -1,0 +1,108 @@
+"""Planner-specific safety and cross-reference validation."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from .contracts import validate_instance
+from .errors import PlannerFailure
+
+SECRET_PATTERNS = (
+    re.compile(r"(?:api[_-]?key|secret|password|token)\s*[:=]\s*[^\s,}]+", re.I),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
+    re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----"),
+)
+
+
+def redact_sensitive(value: Any) -> Any:
+    if isinstance(value, str):
+        result = value
+        for pattern in SECRET_PATTERNS:
+            result = pattern.sub("[REDACTED]", result)
+        return result
+    if isinstance(value, list):
+        return [redact_sensitive(item) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_sensitive(item) for key, item in value.items()}
+    return value
+
+
+def reject_sensitive(value: Any, path: str = "") -> None:
+    if isinstance(value, str):
+        if any(pattern.search(value) for pattern in SECRET_PATTERNS):
+            raise PlannerFailure("SENSITIVE_DATA_DETECTED", "The planning data contains secret-like material.", field=path or None)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            reject_sensitive(item, f"{path}[{index}]")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            reject_sensitive(item, f"{path}.{key}" if path else key)
+
+
+def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth: int = 50) -> dict[str, Any]:
+    reject_sensitive(workflow)
+    try:
+        validate_instance(workflow, "workflow")
+    except ValueError as exc:
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", str(exc), field="workflow") from exc
+    nodes = workflow["nodes"]
+    if len(nodes) > max_nodes:
+        raise PlannerFailure("WORKFLOW_GRAPH_TOO_LARGE", "The workflow exceeds the maximum node limit.", field="nodes", details={"max_nodes": max_nodes})
+    node_ids = [node["node_id"] for node in nodes]
+    if len(node_ids) != len(set(node_ids)):
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Workflow node identifiers must be unique.", field="nodes")
+    node_set = set(node_ids)
+    agent_ids = {agent["agent_id"] for agent in workflow["agents"]}
+    edges = workflow["edges"]
+    edge_ids = [edge["edge_id"] for edge in edges]
+    if len(edge_ids) != len(set(edge_ids)):
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Workflow edge identifiers must be unique.", field="edges")
+    for index, edge in enumerate(edges):
+        if edge["source"] not in node_set:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Edge source does not reference a workflow node.", field=f"edges[{index}].source")
+        if edge["target"] not in node_set:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Edge target does not reference a workflow node.", field=f"edges[{index}].target")
+    conditions = {item["condition_id"]: item for item in workflow["conditions"]}
+    approvals = {item["approval_gate_id"]: item for item in workflow["approval_gates"]}
+    tools = {item["tool_id"] for item in workflow["tools"]}
+    for index, node in enumerate(nodes):
+        if node.get("kind") == "condition" and node.get("condition_id") not in conditions:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Condition node references a missing condition.", field=f"nodes[{index}].condition_id")
+        if node.get("kind") == "approval" and node.get("approval_gate_id") not in approvals:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Approval node references a missing approval gate.", field=f"nodes[{index}].approval_gate_id")
+        if node.get("kind") == "tool" and node.get("tool_id") not in tools:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Tool node references a missing tool.", field=f"nodes[{index}].tool_id")
+        if node.get("kind") == "agent" and node.get("agent_id") not in agent_ids:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Agent node references a missing agent.", field=f"nodes[{index}].agent_id")
+    for condition in conditions.values():
+        declared = set(condition["outcomes"])
+        for edge in edges:
+            source = next((node for node in nodes if node["node_id"] == edge["source"]), None)
+            if source and source.get("condition_id") == condition["condition_id"] and edge.get("outcome") not in declared:
+                raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Condition edge has an undeclared outcome.", field="edges.outcome")
+    adjacency = {node_id: [] for node_id in node_set}
+    incoming = {node_id: 0 for node_id in node_set}
+    for edge in edges:
+        adjacency[edge["source"]].append(edge["target"])
+        incoming[edge["target"]] += 1
+    if not any(node.get("kind") == "trigger" for node in nodes) or not any(node.get("kind") == "output" for node in nodes):
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "A workflow requires a trigger and an output node.", field="nodes")
+    starts = [node_id for node_id, count in incoming.items() if count == 0]
+    seen: set[str] = set()
+    stack = [(node_id, 1, frozenset()) for node_id in starts]
+    while stack:
+        node_id, depth, path = stack.pop()
+        if node_id in path:
+            raise PlannerFailure("WORKFLOW_INVALID_TRANSITION", "Workflow graph contains a cycle.", field="edges")
+        if depth > max_depth:
+            raise PlannerFailure("WORKFLOW_GRAPH_TOO_DEEP", "The workflow exceeds the maximum graph depth.", field="edges", details={"max_depth": max_depth})
+        seen.add(node_id)
+        stack.extend((target, depth + 1, path | {node_id}) for target in adjacency[node_id])
+    if seen != node_set:
+        raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Workflow contains unreachable nodes.", field="nodes")
+    for gate in workflow["approval_gates"]:
+        if workflow["execution_policy"].get("allow_external_writes") and not gate.get("approver_roles"):
+            raise PlannerFailure("APPROVAL_REQUIRED", "External writes require an approval role.", field="approval_gates")
+    return redact_sensitive(workflow)
+

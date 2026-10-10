@@ -1,0 +1,48 @@
+{
+  "tool_id": "slack_send_notification",
+  "provider_id": "slack",
+  "capability": "send_notification",
+  "description": "Approved slack connector metadata fixture.",
+  "input_schema": {
+    "type": "object",
+    "required": [
+      "record_id"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": [
+      "result"
+    ]
+  },
+  "authentication": {
+    "mode": "api_key",
+    "credential_reference_required": true,
+    "scopes": [
+      "slack.access"
+    ]
+  },
+  "permission_scopes": [
+    "data.read"
+  ],
+  "availability": "enabled",
+  "risk_level": "low",
+  "rate_limits": {
+    "requests_per_minute": 10,
+    "requests_per_day": 300
+  },
+  "estimated_cost": {
+    "currency": "USD",
+    "per_call": 0
+  },
+  "retry_policy": {
+    "max_retries": 2,
+    "retryable_errors": [
+      "timeout",
+      "temporary_provider_error"
+    ]
+  },
+  "timeout_seconds": 30,
+  "approval_required": false,
+  "allowed_destinations": []
+}
