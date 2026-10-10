@@ -30,7 +30,8 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   const unresolved = workflow.canonical?.metadata["unresolved_requirements"];
   const review = backend.reviews[workflow.id];
   const exactReview = review?.workflow_version === version ? review : undefined;
-  const blockers = !!workflow.canonical && ((workflow.canonical.tools.length > 0 || workflow.canonical.agents.length > 0) && !exactReview?.ready || (Array.isArray(unresolved) && unresolved.length > 0) || (workflow.canonical.execution_policy.allow_external_writes === true && !backend.session?.approval_service_available));
+  const registryBlockers = !!workflow.canonical && ((workflow.canonical.tools.length > 0 || workflow.canonical.agents.length > 0) && !exactReview?.ready || (Array.isArray(unresolved) && unresolved.length > 0) || (workflow.canonical.execution_policy.allow_external_writes === true && !backend.session?.approval_service_available));
+  const approvalOnly = !!exactReview && exactReview.items.length > 0 && exactReview.items.every((item) => item.authorization_state === "authorized" || item.authorization_state === "pending_approval") && exactReview.reason_codes.every((code) => code === "APPROVAL_REQUIRED" || code === "TOOL_ASSIGNMENT_REQUIRED");
   const action = async (name: "save" | "validate" | "approve" | "publish") => {
     if (busy) return;
     setBusy(name); setError(null);
@@ -65,12 +66,12 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
       <span className="mr-auto text-xs text-muted-foreground">{version ? `Server revision v${version} · ${workflow.status}` : "Local draft · not saved to server"}</span>
       {backend.can("workflow.edit") && <button className={button} disabled={!!busy} onClick={() => void action("save")}>{busy === "save" ? "Saving…" : "Save revision"}</button>}
       {backend.can("workflow.validate") && <button className={button} disabled={!!busy || !version || dirty || !["draft", "validated"].includes(workflow.status)} onClick={() => void action("validate")}>{busy === "validate" ? "Validating…" : "Validate"}</button>}
-      {backend.can("workflow.approve") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "validated" || blockers} onClick={() => void action("approve")}>Approve revision</button>}
-      {backend.can("workflow.publish") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "approved" || blockers} onClick={() => void action("publish")}>
+      {backend.can("workflow.approve") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "validated" || (registryBlockers && !approvalOnly)} onClick={() => void action("approve")}>Approve revision</button>}
+      {backend.can("workflow.publish") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "approved" || registryBlockers} onClick={() => void action("publish")}>
         {busy === "publish" ? "Activating…" : activeRelease?.release_id ? "Republish" : "Publish"}
       </button>}
     </div>
-    {blockers && <p className="text-xs text-muted-foreground">Tool/capability assignments require registry authorization before approval or publication.</p>}
+    {registryBlockers && <p className="text-xs text-muted-foreground">Tool/capability assignments require registry authorization before approval or publication.</p>}
     {exactReview && <div className="space-y-1 text-xs text-muted-foreground" aria-label="Registry assignment review">
       <p>{exactReview.ready ? "Registry requirements authorized for this revision" : `Registry blockers: ${exactReview.reason_codes.join(", ")}`}</p>
       {exactReview.items.map((item, index) => <p key={`${item.agent_id}:${item.tool_id}:${index}`}>

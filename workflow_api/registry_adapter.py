@@ -8,6 +8,7 @@ from dataclasses import fields
 import json
 from pathlib import Path
 from threading import RLock
+import time
 
 from registry import RegistryService, WorkspacePolicy
 from registry.contracts import RegistryError, validate_json_schema
@@ -17,12 +18,152 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RegistryAdapter:
-    def __init__(self, service, agents=None, bindings=None):
+    def __init__(self, service, agents=None, bindings=None, auto_resolve_planner=False):
         self.service = service
         self.agents = deepcopy(agents or {})
         self.bindings = deepcopy(bindings or [])
         self._grants = {}
         self._lock = RLock()
+        self.auto_resolve_planner = bool(auto_resolve_planner)
+
+    def _management_auth(self, auth):
+        """Return server-owned registration authority, never supplied by the draft."""
+        return {**deepcopy(auth), 'roles': ['admin'],
+                'permissions': sorted(set(auth.get('permissions', [])) | {'tools.manage'}),
+                'subject': {'subject_id': 'planner-registry', 'workspace_id': auth['subject']['workspace_id']}}
+
+    def _tool_candidates(self, capability, auth):
+        response = self.service.list_tools(auth)
+        if response['status'] >= 400:
+            return []
+        candidates = [item for item in response['data'].get('items', [])
+                      if item['definition']['capability'] == capability and item['definition']['availability'] == 'enabled']
+        risk = {'low': 0, 'medium': 1, 'high': 2, 'critical': 3}
+        return sorted(candidates, key=lambda item: (risk.get(item['definition']['risk_level'], 99),
+                                                     bool(item['definition']['approval_required']), item['tool_id']))
+
+    def _ensure_planner_agent(self, workflow_agent, candidates, auth):
+        record = self.agents.get(workflow_agent['agent_id'])
+        if record and record['workspace_id'] == auth['subject']['workspace_id']:
+            return record
+        definition = deepcopy(workflow_agent)
+        definition['name'] = definition['agent_id'].replace('_', ' ').title()
+        definition['retry_policy'] = {'max_retries': definition['limits']['max_retries'], 'backoff_seconds': 1}
+        definition['guardrails'] = {'pii_redaction': True, 'prompt_injection_detection': True, 'output_validation': True}
+        permission_scopes = {scope for item in candidates for scope in item['definition']['permission_scopes']}
+        definition['permissions'] = sorted(set(definition.get('permissions', [])) | permission_scopes)
+        if definition['capabilities'] and candidates:
+            definition['limits']['max_tool_calls'] = max(1, definition['limits'].get('max_tool_calls', 0))
+            candidate_retries = max(item['definition']['retry_policy']['max_retries'] for item in candidates)
+            definition['limits']['max_retries'] = max(definition['limits'].get('max_retries', 0), candidate_retries)
+            definition['retry_policy']['max_retries'] = definition['limits']['max_retries']
+        response = self.service.register_agent(definition, self._management_auth(auth))
+        if response['status'] >= 400:
+            return None
+        record = response['data']['agent']
+        self.agents[definition['agent_id']] = deepcopy(record)
+        return record
+
+    def resolve_draft(self, workflow, auth):
+        """Resolve planner capabilities into a server-owned executable draft."""
+        if not self.auto_resolve_planner:
+            return deepcopy(workflow), self._review(workflow, auth)
+        resolved = deepcopy(workflow)
+        unresolved = list(resolved.get('metadata', {}).get('unresolved_requirements', []))
+        unresolved_capabilities = {item.get('requirement') for item in unresolved if isinstance(item, dict)}
+        for agent in resolved['agents']:
+            candidates = []
+            for capability in agent['capabilities']:
+                candidates.extend(self._tool_candidates(capability, auth))
+            record = self._ensure_planner_agent(agent, candidates, auth)
+            if record:
+                agent['permissions'] = deepcopy(record['definition']['permissions'])
+                agent['limits'] = deepcopy(record['definition']['limits'])
+            for tool in resolved['tools']:
+                if tool['capability'] not in agent['capabilities']:
+                    continue
+                candidates = self._tool_candidates(tool['capability'], auth)
+                if not candidates:
+                    continue
+                selected = next((item['definition'] for item in candidates if item['tool_id'] == tool['tool_id']), candidates[0]['definition'])
+                old_id = tool['tool_id']
+                tool['tool_id'] = selected['tool_id']
+                for node in resolved['nodes']:
+                    if node.get('kind') == 'tool' and node.get('tool_id') == old_id:
+                        node['tool_id'] = selected['tool_id']
+                unresolved_capabilities.discard(tool['capability'])
+        self._materialize_tool_nodes(resolved)
+        resolved['metadata']['unresolved_requirements'] = [item for item in unresolved
+            if not (isinstance(item, dict) and item.get('requirement') not in unresolved_capabilities)]
+        return resolved, self._review(resolved, auth)
+
+    @staticmethod
+    def _materialize_tool_nodes(workflow):
+        """Add missing executable nodes to provider-generated graphs without changing graph authority."""
+        existing = {node.get('tool_id') for node in workflow['nodes'] if node.get('kind') == 'tool'}
+        output = next((node for node in workflow['nodes'] if node.get('kind') == 'output' and node['node_id'] == 'workflow_output'), None)
+        if output is None:
+            output = next((node for node in workflow['nodes'] if node.get('kind') == 'output'), None)
+        for index, tool in enumerate(workflow['tools']):
+            if tool['tool_id'] in existing:
+                continue
+            agent = next((item for item in workflow['agents'] if tool['capability'] in item['capabilities']), None)
+            if agent is None:
+                continue
+            node_id = f"{tool['capability']}_action"
+            if any(node['node_id'] == node_id for node in workflow['nodes']):
+                continue
+            mapping = {}
+            if tool['capability'] == 'read_spreadsheet':
+                mapping = {'spreadsheet_id': 'inputs.spreadsheet_id', 'range': 'inputs.range'}
+            elif tool['capability'] == 'send_email':
+                mapping = {'to': 'inputs.email_to', 'subject': 'inputs.email_subject', 'body': 'inputs.email_body'}
+            node = {'node_id': node_id, 'kind': 'tool', 'label': tool['capability'].replace('_', ' ').title(),
+                    'agent_id': agent['agent_id'], 'tool_id': tool['tool_id'], 'configuration': {'input_mapping': mapping}}
+            inserted = False
+            if agent and any(n.get('kind') == 'approval' for n in workflow['nodes']) and tool['capability'] == 'send_email':
+                approval = next(n for n in workflow['nodes'] if n.get('kind') == 'approval')
+                edge = next((e for e in workflow['edges'] if e['source'] == approval['node_id'] and e.get('outcome') == 'approved'), None)
+                if edge:
+                    old_target = edge['target']; edge['target'] = node_id
+                    workflow['edges'].append({'edge_id': f'{approval["node_id"]}_to_{node_id}', 'source': node_id, 'target': old_target})
+                    inserted = True
+            if not inserted and output:
+                incoming = next((e for e in workflow['edges'] if e['target'] == output['node_id']), None)
+                if incoming:
+                    old_source = incoming['source']; incoming['target'] = node_id
+                    workflow['edges'].append({'edge_id': f'{node_id}_to_{output["node_id"]}', 'source': node_id, 'target': output['node_id']})
+                    inserted = True
+            if inserted:
+                workflow['nodes'].insert(workflow['nodes'].index(output), node)
+                existing.add(tool['tool_id'])
+
+    def approve_pending(self, workflow, auth):
+        """Install server-side evidence for a revision approver's exact assignments."""
+        if not self.auto_resolve_planner:
+            return self._review(workflow, auth)
+        pending = {}
+        for agent in workflow['agents']:
+            for tool in workflow['tools']:
+                if tool['capability'] not in agent['capabilities']:
+                    continue
+                candidates = self._tool_candidates(tool['capability'], auth)
+                if not candidates:
+                    continue
+                definition = candidates[0]['definition']
+                destination = next(iter(definition.get('allowed_destinations', [])), None)
+                response = self.service.assign(agent['agent_id'], tool['capability'], definition['input_schema'], definition['output_schema'],
+                                               auth, workflow['workflow_id'], workflow['version'], destination=destination, tool_id=definition['tool_id'])
+                assignment = response['data'].get('assignment')
+                if assignment and assignment.get('approval_fingerprint') and assignment['authorization_state'] == 'pending_approval':
+                    pending[assignment['approval_fingerprint']] = {
+                        'reference': 'approval_' + workflow['workflow_id'] + '_' + str(workflow['version']),
+                        'expires_at': time.time() + 86400,
+                        'approver': deepcopy(auth),
+                    }
+        if pending:
+            self.service.update_approval_evidence(pending, auth)
+        return self._review(workflow, auth)
 
     def review(self, workflow, auth):
         """Return a secret-free projection; keep executable references server-side."""
@@ -36,7 +177,24 @@ class RegistryAdapter:
         if workflow['metadata'].get('unresolved_requirements'):
             issues.append('UNRESOLVED_REQUIREMENTS')
         for agent in workflow['agents']:
-            record = self.agents.get(agent['agent_id'])
+            dynamic_bindings = []
+            if self.auto_resolve_planner:
+                candidates = []
+                for capability in agent['capabilities']:
+                    candidates.extend(self._tool_candidates(capability, auth))
+                record = self._ensure_planner_agent(agent, candidates, auth)
+                for capability in agent['capabilities']:
+                    ref = next((item for item in workflow['tools'] if item['capability'] == capability), None)
+                    candidate = next((item for item in self._tool_candidates(capability, auth)
+                                      if ref is None or item['tool_id'] == ref['tool_id']), None)
+                    if candidate:
+                        definition = candidate['definition']
+                        dynamic_bindings.append(dict(workflow_id=workflow['workflow_id'], workflow_version=workflow['version'],
+                            agent_id=agent['agent_id'], capability=capability, tool_id=definition['tool_id'],
+                            input_schema=deepcopy(definition['input_schema']), output_schema=deepcopy(definition['output_schema']),
+                            destination=next(iter(definition.get('allowed_destinations', [])), None)))
+            else:
+                record = self.agents.get(agent['agent_id'])
             if not record:
                 issues.append('AGENT_REGISTRATION_REQUIRED')
                 results.append(dict(agent_id=agent['agent_id'], capability=None, tool_id=None,
@@ -52,9 +210,9 @@ class RegistryAdapter:
                                     authorization_state='denied', reason_codes=['AGENT_CONFIGURATION_MISMATCH']))
                 continue
             for capability in agent['capabilities']:
-                bindings = [b for b in self.bindings if b['workflow_id'] == workflow['workflow_id']
+                bindings = ([b for b in dynamic_bindings if b['capability'] == capability] if self.auto_resolve_planner else [b for b in self.bindings if b['workflow_id'] == workflow['workflow_id']
                             and b['workflow_version'] == workflow['version']
-                            and b['agent_id'] == agent['agent_id'] and b['capability'] == capability]
+                            and b['agent_id'] == agent['agent_id'] and b['capability'] == capability])
                 if not bindings:
                     issues.append('ASSIGNMENT_CONFIGURATION_REQUIRED')
                     results.append(dict(agent_id=agent['agent_id'], capability=capability, tool_id=None,
@@ -129,7 +287,7 @@ def load_registry_config(path):
             raise ValueError()
         config = json.loads(source.read_text())
         reject_secrets(config)
-        if set(config) - {'policy', 'agents', 'tools', 'bindings', 'subject_permissions', 'subject_scopes'}:
+        if set(config) - {'policy', 'agents', 'tools', 'bindings', 'subject_permissions', 'subject_scopes', 'operator_permissions', 'auto_resolve_planner'}:
             raise ValueError()
         policy_data = deepcopy(config['policy'])
         if set(policy_data) - {f.name for f in fields(WorkspacePolicy)} or policy_data.get('workspace_id') != 'local-workspace':
@@ -195,13 +353,16 @@ def load_registry_config(path):
                 raise ValueError()
             seen.add(key)
         permissions, scopes = config.get('subject_permissions', []), config.get('subject_scopes', [])
+        operator_permissions = config.get('operator_permissions', [])
         if not isinstance(permissions, list) or not isinstance(scopes, list):
             raise ValueError()
-        if any(not isinstance(v, str) or '*' in v for v in permissions + scopes):
+        if not isinstance(operator_permissions, list) or set(operator_permissions) - {'tools.manage'}:
+            raise ValueError()
+        if any(not isinstance(v, str) or '*' in v for v in permissions + scopes + operator_permissions):
             raise ValueError()
         # Config may grant connector scopes, never arbitrary lifecycle/management powers.
         if set(permissions) - policy.agent_permissions:
             raise ValueError()
-        return RegistryAdapter(service, agents, bindings), permissions, scopes
+        return RegistryAdapter(service, agents, bindings, auto_resolve_planner=config.get('auto_resolve_planner', False)), permissions + operator_permissions, scopes
     except Exception:
         raise ValueError('Invalid trusted registry configuration. Check its schema, workspace and registrations.') from None

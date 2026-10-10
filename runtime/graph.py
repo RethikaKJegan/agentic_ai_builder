@@ -87,6 +87,11 @@ class GraphRunner:
         reject_secrets(result)
         return result
 
+    def action_digest(self, node, run):
+        """Hash the exact approved action without persisting its input values."""
+        return digest({'node_id': node['node_id'], 'kind': node['kind'], 'tool_id': node.get('tool_id'),
+                       'agent_id': node.get('agent_id'), 'params': self.params(node, run)})
+
     def reserve(self, db, run, workflow, agent, amount):
         if set(amount) - {'llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd'}:
             raise RuntimeFailure('INVALID_USAGE', 'The provider reservation contains unsupported usage counters.')
@@ -169,8 +174,11 @@ class GraphRunner:
                         self.finish_node(db, run, workflow, node, outcome=outcome)
                     elif kind == 'approval':
                         gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == node['approval_gate_id'])
+                        approved_edge = next((edge for edge in self.outgoing(workflow, node['node_id']) if edge.get('outcome') == 'approved'), None)
+                        approved_node = next((candidate for candidate in workflow['nodes'] if approved_edge and candidate['node_id'] == approved_edge['target']), None)
+                        action_hash = self.action_digest(approved_node, run) if approved_node and approved_node.get('kind') == 'tool' else None
                         approval = dict(approval_id='approval_' + uuid4().hex, workflow_id=run['workflow_id'], workflow_version=run['workflow_version'],
-                                        status='pending', allowed_decisions=['approved', 'rejected'])
+                                        status='pending', allowed_decisions=['approved', 'rejected'], action_digest=action_hash)
                         run['approvals'].append(approval)
                         run['approval_context'] = dict(node_id=node['node_id'], gate_id=gate['approval_gate_id'],
                                                        expires_at=runtime.clock() + gate.get('timeout_seconds', workflow['execution_policy']['limits']['timeout_seconds']))
@@ -217,6 +225,9 @@ class GraphRunner:
                                 raise RuntimeFailure('CONNECTOR_NOT_CONFIGURED', 'No authorized connector adapter is configured.', 503)
                             if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or not passed):
                                 raise RuntimeFailure('APPROVAL_REQUIRED', 'External writes require workflow policy and run approval.', 403)
+                            expected_action = run.get('approval_context', {}).get('action_digest')
+                            if connector.external_write and expected_action and expected_action != self.action_digest(node, run):
+                                raise RuntimeFailure('APPROVAL_ACTION_MISMATCH', 'The approved external action no longer matches the requested action.', 403)
                             discovery = runtime.workflows.registry.list_tools(auth)
                             tools = discovery['data'].get('items', []) if discovery['status'] == 200 else []
                             record = next((t for t in tools if t['tool_id'] == grant['tool_id'] and t['version'] == grant['tool_version']), None)

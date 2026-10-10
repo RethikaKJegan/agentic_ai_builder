@@ -46,6 +46,7 @@ class PlannerService:
             reject_sensitive(payload)
             workflow = self.provider.generate(objective.strip(), payload.get("context", {}))
             workflow["workflow_id"] = self._workflow_id(workspace_id, objective)
+            self._scope_planned_agents(workflow)
             workflow["metadata"] = {**workflow.get("metadata", {}), "contract_versions": CONTRACT_VERSIONS, "unresolved_requirements": workflow.get("metadata", {}).get("unresolved_requirements", [])}
             normalized = validate_workflow(workflow)
             response = {"request_id": request_id, "status": 200, "data": {"workflow": normalized, "correlation_id": f"corr_{uuid.uuid4().hex}", "contract_versions": CONTRACT_VERSIONS}}
@@ -60,4 +61,20 @@ class PlannerService:
     def _workflow_id(workspace_id: str, objective: str) -> str:
         digest = hashlib.sha256(f"{workspace_id}:{objective}".encode()).hexdigest()[:16]
         return f"planned_{digest}"
+
+    @staticmethod
+    def _scope_planned_agents(workflow: dict[str, Any]) -> None:
+        """Prevent unrelated generated revisions from sharing one mutable agent identity."""
+        workflow_id = workflow.get("workflow_id", "planned_workflow")
+        mapping = {}
+        for agent in workflow.get("agents", []):
+            old = agent.get("agent_id")
+            if not isinstance(old, str):
+                continue
+            new = f"{workflow_id}_{old}"[:128]
+            mapping[old] = new
+            agent["agent_id"] = new
+        for node in workflow.get("nodes", []):
+            if node.get("agent_id") in mapping:
+                node["agent_id"] = mapping[node["agent_id"]]
 

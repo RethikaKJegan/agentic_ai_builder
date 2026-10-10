@@ -67,6 +67,19 @@ test("trusted registry assignments allow publication and editable revisions drop
   await expect(page.getByText("Server revision v2 · draft")).toBeVisible();
   const revised = (await (await page.request.get("/api/backend/workflows/registry_ready")).json()).data.workflow;
   expect(revised.agents[0].allowed_tool_ids).toEqual([]);
+  await page.goto("/app/workflows");
+  const lifecycleRow = page.locator(".divide-y > div").filter({ hasText: "New editable registry revision" });
+  await lifecycleRow.getByLabel("Actions for New editable registry revision").click();
+  await page.getByText("Disable", { exact: true }).click();
+  await expect(lifecycleRow).toContainText("disabled");
+  const disabledOverview = (await (await page.request.get("/api/backend/workflow-overview")).json()).data.items
+    .find((item: { workflow_id: string }) => item.workflow_id === "registry_ready");
+  const deletion = await page.request.delete("/api/backend/workflows/registry_ready", { data: {
+    request_id: "req_browser_delete", operation: "delete_workflow", idempotency_key: "browser_delete_registry_ready",
+    payload: { workflow_id: "registry_ready", expected_release_id: disabledOverview.release_id, confirmed: true },
+  } });
+  expect(deletion.status()).toBe(200);
+  await expect(lifecycleRow).toHaveCount(0, { timeout: 10000 });
 });
 
 test("pending approvals and risky assignments remain blocked in the actual UI", async ({ page }) => {

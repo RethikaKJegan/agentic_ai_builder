@@ -68,7 +68,17 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         if host not in {'localhost', '127.0.0.1', '::1', 'testserver'}:
             return error('DEVELOPMENT_AUTH_LOCAL_ONLY', 'Development sessions are restricted to loopback hosts.', 403)
         origin = request.headers.get('origin')
-        allowed_origins = os.getenv('BUILDER_UI_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://127.0.0.1:3100').split(',')
+        # Keep the local development ports used by Next.js and the UI test
+        # harness in the default allowlist. An explicit BUILDER_UI_ORIGINS
+        # value still overrides this list for deployed environments.
+        allowed_origins = os.getenv(
+            'BUILDER_UI_ORIGINS',
+            ','.join((
+                'http://localhost:3000', 'http://127.0.0.1:3000',
+                'http://localhost:3001', 'http://127.0.0.1:3001',
+                'http://localhost:3100', 'http://127.0.0.1:3100',
+            )),
+        ).split(',')
         if origin and origin not in allowed_origins:
             return error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
         if request.url.path != '/session' and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):

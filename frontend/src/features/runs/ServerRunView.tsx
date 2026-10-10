@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { api, type ApprovalRecord, type RunRecord } from "@/api/client";
+import { useEffect, useState } from "react";
+import { api, ApiError, type ApprovalRecord, type RunRecord } from "@/api/client";
 import { useBackend } from "@/api/state";
 import type { RunEvent } from "@/api/contracts.generated";
 import { assertRunTransition, reconcileEvents } from "@/api/control";
@@ -34,14 +34,15 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
   const backend = useBackend();
   const [runId, setRunId] = useState("");
   const [run, setRun] = useState<RunRecord | null>(null);
+  const [availableRuns, setAvailableRuns] = useState<RunRecord[]>([]);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const load = async () => {
-    if (!runId.trim() || busy) return;
+  const loadRun = async (selectedRunId: string) => {
+    if (!selectedRunId.trim() || busy) return;
     setBusy(true); setError(null);
     try {
-      const result = await api.request("get_run", { run_id: runId.trim() });
+      const result = await api.request("get_run", { run_id: selectedRunId.trim() });
       if (run?.run_id === result.run.run_id) {
         if (run.workflow_id !== result.run.workflow_id || run.workflow_version !== result.run.workflow_version) throw new Error("The runtime changed the workflow revision for an existing run.");
         assertRunTransition(run.status, result.run.status);
@@ -52,8 +53,32 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
     } catch (caught) { setError(caught instanceof Error ? caught : new Error("Run loading failed.")); }
     finally { setBusy(false); }
   };
+  const load = async () => loadRun(runId);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const overview = await api.overview();
+        const candidates = overview.items.filter((item) => item.latest_run_id && (!approvalsOnly || item.pending_approval_count > 0));
+        const results = await Promise.allSettled(candidates.map((item) => api.request("get_run", { run_id: item.latest_run_id as string })));
+        if (!cancelled) setAvailableRuns(results.flatMap((result) => result.status === "fulfilled" ? [result.value.run] : []));
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof ApiError ? caught : new Error("Unable to load server runs."));
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [approvalsOnly]);
   if (!backend.session?.runtime_available) return <p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">The runtime API is not connected. No {approvalsOnly ? "approval requests" : "execution records"} are available.</p>;
   return <div className="space-y-4">
+    <div className="space-y-2" aria-label={approvalsOnly ? "Pending approvals" : "Recent runs"}>
+      {availableRuns.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">{approvalsOnly ? "No pending approvals." : "No runs yet."}</p>}
+      {availableRuns.map((item) => <button key={item.run_id} type="button" onClick={() => void loadRun(item.run_id)} className="block w-full rounded-xl border border-border p-3 text-left hover:border-primary">
+        <p className="text-sm font-medium">{item.run_id} · {item.status}</p>
+        <p className="text-xs text-muted-foreground">{item.workflow_id} · revision v{item.workflow_version} · {item.approvals.filter((approval) => approval.status === "pending").length} pending approval(s)</p>
+      </button>)}
+    </div>
     <form onSubmit={(event) => { event.preventDefault(); void load(); }} className="flex gap-2">
       <input aria-label="Run ID" value={runId} onChange={(event) => setRunId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm" placeholder="Run ID from an execution response" />
       <button disabled={busy || !runId.trim()} className="rounded-lg border border-border px-4 text-sm disabled:opacity-40">{busy ? "Loading…" : "Load run"}</button>

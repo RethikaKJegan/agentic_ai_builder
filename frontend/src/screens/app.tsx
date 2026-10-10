@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Keyboard, Menu } from "lucide-react";
 import { useMeshHydrated } from "@/features/shell/useHydrated";
 import { useMesh } from "@/domain/store";
+import { useBackend } from "@/api/state";
 import { roleLabel } from "@/domain/governance";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -50,7 +51,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const activity = useMesh((s) => s.activity);
   const role = useMesh((s) => s.role);
-  const pending = useMesh((s) => s.runs.filter((r) => r.status === "paused").length);
+  const localPending = useMesh((s) => s.runs.filter((r) => r.status === "paused").length);
+  const serverPending = useBackend((s) => Object.values(s.overview).reduce((total, item) => total + item.pending_approval_count, 0));
+  const pending = Math.max(localPending, serverPending);
   const inBuilder = /^\/app\/workflows\/[^/]+$/.test(pathname);
   const crumbs = pathname.split("/").filter(Boolean).slice(1);
 

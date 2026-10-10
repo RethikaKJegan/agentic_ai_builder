@@ -69,6 +69,9 @@ class RuleBasedStructuredOutputProvider:
         "search": "retrieve_records",
         "report": "generate_report",
         "spreadsheet": "read_spreadsheet",
+        "sheets": "read_spreadsheet",
+        "sheet": "read_spreadsheet",
+        "row": "read_spreadsheet",
         "email": "send_email",
         "notif": "send_notification",
     }
@@ -81,9 +84,12 @@ class RuleBasedStructuredOutputProvider:
         words = re.findall(r"[a-z0-9]+", objective.lower())
         capabilities = sorted({cap for token, cap in self._CAPABILITIES.items() if any(token in word for word in words)})
         external_write = any(cap in {"send_email", "send_notification"} for cap in capabilities)
+        row_trigger = bool(re.search(r"\b(new|added|created)\b.{0,40}\b(row|lead|record)\b|\b(row|lead|record)\b.{0,40}\b(new|added|created)\b", objective.lower()))
         agent_id = "workflow_planner_agent"
         nodes = [
-            {"node_id": "objective_received", "kind": "trigger", "label": "Objective received"},
+            {"node_id": "objective_received", "kind": "trigger",
+             "label": "New spreadsheet row" if row_trigger else "Objective received",
+             **({"configuration": {"source": "google_sheets", "event": "row.created", "requires_trigger_binding": True}} if row_trigger else {})},
             {"node_id": "plan_objective", "kind": "agent", "label": "Plan objective", "agent_id": agent_id},
         ]
         edges = [{"edge_id": "received_to_plan", "source": "objective_received", "target": "plan_objective"}]
@@ -94,32 +100,65 @@ class RuleBasedStructuredOutputProvider:
             conditions.append({"condition_id": "objective_condition", "expression": "objective_condition_is_met", "outcomes": ["yes", "no"]})
             nodes.append({"node_id": "objective_condition", "kind": "condition", "label": "Evaluate objective condition", "condition_id": "objective_condition"})
             edges.append({"edge_id": "plan_to_condition", "source": "plan_objective", "target": "objective_condition"})
+        approval_node = None
         if external_write:
             approval_gates.append({"approval_gate_id": "external_action_approval", "approver_roles": ["approver"], "on_reject": "stop", "timeout_seconds": 86400})
-            nodes.append({"node_id": "external_action_approval", "kind": "approval", "label": "Approve external action", "approval_gate_id": "external_action_approval"})
-            nodes.append({"node_id": "workflow_output", "kind": "output", "label": "Workflow result"})
-            nodes.append({"node_id": "rejected_output", "kind": "output", "label": "Approval rejected"})
-            if not conditional:
-                edges.append({"edge_id": "plan_to_approval", "source": "plan_objective", "target": "external_action_approval"})
-            edges.extend([
-                {"edge_id": "approval_to_output", "source": "external_action_approval", "target": "workflow_output", "outcome": "approved"},
-                {"edge_id": "approval_to_rejected", "source": "external_action_approval", "target": "rejected_output", "outcome": "rejected"},
-            ])
-            if conditional:
-                edges.extend([
-                    {"edge_id": "condition_to_approval", "source": "objective_condition", "target": "external_action_approval", "outcome": "yes"},
-                    {"edge_id": "condition_to_output_no", "source": "objective_condition", "target": "workflow_output", "outcome": "no"},
-                ])
+            approval_node = {"node_id": "external_action_approval", "kind": "approval", "label": "Approve external action", "approval_gate_id": "external_action_approval"}
+            nodes.append(approval_node)
         else:
-            nodes.append({"node_id": "workflow_output", "kind": "output", "label": "Workflow result"})
-            if conditional:
-                edges.extend([
-                    {"edge_id": "condition_to_output_yes", "source": "objective_condition", "target": "workflow_output", "outcome": "yes"},
-                    {"edge_id": "condition_to_output_no", "source": "objective_condition", "target": "workflow_output", "outcome": "no"},
-                ])
-            else:
-                edges.append({"edge_id": "plan_to_output", "source": "plan_objective", "target": "workflow_output"})
+            approval_node = None
         tool_refs = [{"tool_id": self._ACCEPTED_TOOL_IDS[cap], "capability": cap} for cap in capabilities if cap in self._ACCEPTED_TOOL_IDS]
+        input_fields = [{"name": "objective_context", "type": "object", "required": False}]
+        for cap in capabilities:
+            if cap == "read_spreadsheet":
+                input_fields.extend([
+                    {"name": "spreadsheet_id", "type": "string", "required": True},
+                    {"name": "range", "type": "string", "required": True},
+                ])
+            elif cap == "send_email":
+                input_fields.extend([
+                    {"name": "email_to", "type": "string", "required": True},
+                    {"name": "email_subject", "type": "string", "required": True},
+                    {"name": "email_body", "type": "string", "required": True},
+                ])
+        previous = "objective_condition" if conditional else "plan_objective"
+        if conditional:
+            edges.append({"edge_id": "condition_to_no_output", "source": "objective_condition", "target": "workflow_output", "outcome": "no"})
+        for index, tool in enumerate(tool_refs):
+            node_id = tool["capability"]
+            node = {"node_id": node_id, "kind": "tool", "label": tool["capability"].replace("_", " ").title(),
+                    "agent_id": agent_id, "tool_id": tool["tool_id"], "configuration": {"input_mapping": {}}}
+            if tool["capability"] == "read_spreadsheet":
+                node["configuration"]["input_mapping"] = {"spreadsheet_id": "inputs.spreadsheet_id", "range": "inputs.range"}
+            elif tool["capability"] == "send_email":
+                node["configuration"]["input_mapping"] = {"to": "inputs.email_to", "subject": "inputs.email_subject", "body": "inputs.email_body"}
+            nodes.append(node)
+            if external_write and tool["capability"] == "send_email":
+                if previous == "objective_condition":
+                    edges.append({"edge_id": "condition_to_approval", "source": previous, "target": "external_action_approval", "outcome": "yes"})
+                else:
+                    edges.append({"edge_id": "plan_to_approval", "source": previous, "target": "external_action_approval"})
+                edges.append({"edge_id": "approval_to_send", "source": "external_action_approval", "target": node_id, "outcome": "approved"})
+                previous = node_id
+            else:
+                edges.append({"edge_id": f"{previous}_to_{node_id}", "source": previous, "target": node_id,
+                              **({"outcome": "yes"} if previous == "objective_condition" else {})})
+                previous = node_id
+        output_node = {"node_id": "workflow_output", "kind": "output", "label": "Workflow result"}
+        nodes.append(output_node)
+        if external_write:
+            edges.append({"edge_id": "approval_to_rejected", "source": "external_action_approval", "target": "rejected_output", "outcome": "rejected"})
+            nodes.append({"node_id": "rejected_output", "kind": "output", "label": "Approval rejected",
+                          "configuration": {"input_mapping": {"workflow_result": "inputs"}}})
+        if previous == "objective_condition":
+            output_node["configuration"] = {"input_mapping": {"workflow_result": "inputs"}}
+            edges.extend([
+                {"edge_id": "condition_to_output_yes", "source": previous, "target": "workflow_output", "outcome": "yes"},
+                {"edge_id": "condition_to_output_no", "source": previous, "target": "workflow_output", "outcome": "no"},
+            ])
+        else:
+            output_node["configuration"] = {"input_mapping": {"workflow_result": f"outputs.{previous}"}}
+            edges.append({"edge_id": "last_to_output", "source": previous, "target": "workflow_output"})
         unresolved = [] if capabilities else [{"requirement": "No explicit capability identified", "reason": "needs_human_review"}]
         if capabilities:
             unresolved = [{"requirement": cap, "reason": "registry_assignment_pending"} for cap in capabilities]
@@ -129,7 +168,7 @@ class RuleBasedStructuredOutputProvider:
             "name": objective.strip()[:200],
             "description": objective.strip(),
             "status": "draft",
-            "inputs": [{"name": "objective_context", "type": "object", "required": False}],
+            "inputs": input_fields,
             "outputs": [{"name": "workflow_result", "type": "object", "required": True}],
             "stakeholders": [{"stakeholder_id": "requester", "name": "Requesting builder", "role": "builder"}],
             "agents": [{
@@ -137,8 +176,8 @@ class RuleBasedStructuredOutputProvider:
                 "instructions": "Produce structured workflow steps and identify unresolved requirements.",
                 "model": {"provider": "openai", "model_id": "structured-output"}, "input_schema": {}, "output_schema": {},
                 "capabilities": capabilities, "allowed_tool_ids": [], "permissions": ["workflow.read_input"],
-                "limits": {"max_llm_calls": 1, "max_tool_calls": 0, "max_tokens": 4000, "max_retries": 1, "timeout_seconds": 300},
-                "approval_requirements": ["external_write"] if external_write else [],
+                "limits": {"max_llm_calls": 1, "max_tool_calls": max(1, len(tool_refs)), "max_tokens": 4000, "max_retries": 1, "timeout_seconds": 300},
+                "approval_requirements": [],
             }],
             "tools": tool_refs,
             "nodes": nodes,

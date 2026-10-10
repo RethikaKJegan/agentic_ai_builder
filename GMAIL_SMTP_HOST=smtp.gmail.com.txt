@@ -1,5 +1,0 @@
-GMAIL_SMTP_HOST=smtp.gmail.com
-GMAIL_SMTP_PORT=587
-GMAIL_SMTP_USER=aravind@bellcorps.com
-GMAIL_SMTP_PASSWORD=bufa kgpb lvls yxvo
-

@@ -795,7 +795,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                       )}
                       {selected.data.kind === "approval" && (
                         <p className="text-xs text-muted-foreground">
-                          Approval gate · roles: {((selected.data["approval"] as { approver_roles?: string[] } | undefined)?.approver_roles ?? ["approver"]).join(", ")} · rejection: {String((selected.data["approval"] as { on_reject?: string } | undefined)?.on_reject ?? "stop")} · timeout: {String((selected.data["approval"] as { timeout_seconds?: number } | undefined)?.timeout_seconds ?? "not configured")}. Runtime approval decisions are not connected.
+                          Approval gate · roles: {((selected.data["approval"] as { approver_roles?: string[] } | undefined)?.approver_roles ?? ["approver"]).join(", ")} · rejection: {String((selected.data["approval"] as { on_reject?: string } | undefined)?.on_reject ?? "stop")} · timeout: {String((selected.data["approval"] as { timeout_seconds?: number } | undefined)?.timeout_seconds ?? "not configured")}. Runtime decisions resume the approved path.
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground">

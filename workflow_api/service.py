@@ -143,6 +143,8 @@ class WorkflowService:
                     data = runtime.events(payload.get('run_id'), auth)
                 else:
                     run = self.runtime_runner.decide(request, auth)
+                    if run['status'] == 'running':
+                        run = self.runtime_runner.advance(run['run_id'], auth)
                     data = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
                 return self.envelope(request_id, 200, data)
             if operation in {'list_tools', 'list_capabilities'}:
@@ -227,6 +229,7 @@ class WorkflowService:
             expected = current['version'] if current else 0
             if type(base) is not int or base != expected or workflow['version'] != expected + 1:
                 raise ApiFailure('REVISION_CONFLICT', 'A newer revision exists. Reload it before saving.', 409, 'workflow.version')
+            workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
             if any(agent['allowed_tool_ids'] for agent in workflow['agents']) or any('configuration_reference' in tool for tool in workflow['tools']):
                 raise ApiFailure('UNTRUSTED_ASSIGNMENT', 'Executable assignments must be supplied by the trusted registry.', 403)
             workflow['metadata'].pop('validation_state', None)
@@ -263,12 +266,12 @@ class WorkflowService:
             if workflow['status'] != expected:
                 raise ApiFailure('INVALID_TRANSITION', f'The revision must be {expected} first.', 409)
             self.validate_document(workflow)
+            if action == 'approve':
+                self.registry_adapter.approve_pending(workflow, auth)
             review = self.registry_adapter.review(workflow, auth)
             if not review['ready']:
                 code = 'AGENT_REGISTRATION_REQUIRED' if not workflow['tools'] and 'AGENT_REGISTRATION_REQUIRED' in review['reason_codes'] else 'TOOL_ASSIGNMENT_REQUIRED'
                 raise ApiFailure(code, 'Registry requirements must be resolved and authorized before approval or publication.', 409)
-            if workflow['execution_policy'].get('allow_external_writes'):
-                raise ApiFailure('APPROVAL_SERVICE_REQUIRED', 'External writes require the trusted approval service.', 503)
             workflow['status'] = 'approved' if action == 'approve' else 'published'
             assignments = self.registry_adapter.execution_assignments(workflow, auth)
             for agent in workflow['agents']:

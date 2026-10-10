@@ -130,3 +130,22 @@ replay artifact is `.local/lifecycle-review/evidence.json` and records release
 `corr_29e9af82fe5f46dc92bcc5f7c636c45d`, and trace
 `trace_0f0437cc5a1549b2a44e6666602c4a04`, with five canonical run events and overview
 sequences 1–3. This is deterministic local evidence, not a claim of external delivery.
+
+## Cross-segment vertical slice implementation — 2026-10-10
+
+The companion `cross-segment-poc-integration` change now implements the planner-to-Registry
+bridge rather than only verifying it. Planned agents receive workflow-scoped IDs; the
+trusted adapter registers normalized agent definitions, resolves capabilities to enabled
+schema-compatible tools, preserves unresolved requirements, and materializes explicit tool
+nodes with typed mappings. Revision approval installs Registry evidence through the
+configured operator permission and approver role; runtime approval hashes the exact action
+boundary before an external connector call. The browser fixture includes controlled SMTP
+metadata and deterministic offline CrewAI, Sheets, and SMTP adapters; it never sends a real
+message.
+
+Evidence: 105 Python tests, 62 frontend tests, frontend typecheck/lint/build, shared
+contract validation, strict cross-segment OpenSpec validation, and `git diff --check` pass.
+The controlled vertical slice plans an email workflow, resolves `smtp_send_email`, publishes
+it, pauses at run approval, resumes after an `approver` decision, and completes through the
+offline connector. Real SMTP delivery and final four-owner acceptance remain explicitly
+unclaimed until operator credentials and human signoff are provided.

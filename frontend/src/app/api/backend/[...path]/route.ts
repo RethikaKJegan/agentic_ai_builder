@@ -13,14 +13,27 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
     const url = new URL(path.map(encodeURIComponent).join("/") + request.nextUrl.search, (process.env["BUILDER_API_URL"] || "http://127.0.0.1:8000") + "/");
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const headers: Record<string, string> = {};
+    const contentType = request.headers.get("content-type");
+    const accept = request.headers.get("accept");
+    const lastEventId = request.headers.get("last-event-id");
+    const signature = request.headers.get("x-builder-signature");
+    const timestamp = request.headers.get("x-builder-timestamp");
+    if (contentType) headers["content-type"] = contentType;
+    if (accept) headers["accept"] = accept;
+    if (lastEventId) headers["last-event-id"] = lastEventId;
+    if (signature) headers["x-builder-signature"] = signature;
+    if (timestamp) headers["x-builder-timestamp"] = timestamp;
     const cookie = request.headers.get("cookie");
     const origin = request.headers.get("origin");
     if (cookie) headers["cookie"] = cookie;
     if (origin) headers["origin"] = origin;
     const response = await fetch(url, { method: request.method, headers, cache: "no-store", signal: controller.signal,
       ...(request.method === "GET" ? {} : { body: await request.text() }) });
-    const result = NextResponse.json(await response.json(), { status: response.status, headers: { "Cache-Control": "no-store" } });
+    const responseType = response.headers.get("content-type") || "";
+    const result = responseType.includes("text/event-stream")
+      ? new NextResponse(response.body, { status: response.status, headers: { "Cache-Control": "no-store", "Content-Type": "text/event-stream", "X-Accel-Buffering": "no" } })
+      : NextResponse.json(await response.json(), { status: response.status, headers: { "Cache-Control": "no-store" } });
     const sessionCookie = response.headers.get("set-cookie");
     if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
     return result;
@@ -33,3 +46,4 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 export const GET = proxy;
 export const POST = proxy;
 export const PUT = proxy;
+export const DELETE = proxy;

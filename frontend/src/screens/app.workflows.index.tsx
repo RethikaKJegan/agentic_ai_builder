@@ -21,6 +21,9 @@ export default function WorkflowsPage() {
   const backend = useBackend();
   const backendStatus = backend.status;
   const refreshOverview = backend.refreshOverview;
+  const visibleWorkflows = backend.status === "connected" && backend.lastOverviewUpdate
+    ? workflows.filter((workflow) => !workflow.serverVersion || backend.overview[workflow.id])
+    : workflows;
   const [actionError, setActionError] = useState<Error | null>(null);
   useEffect(() => {
     if (backendStatus !== "connected") return;
@@ -82,7 +85,7 @@ export default function WorkflowsPage() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">Workflows</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{workflows.filter((w) => w.serverVersion).length} server workflows · {workflows.filter((w) => !w.serverVersion).length} local drafts</p>
+          <p className="mt-2 text-sm text-muted-foreground">{visibleWorkflows.filter((w) => w.serverVersion).length} server workflows · {visibleWorkflows.filter((w) => !w.serverVersion).length} local drafts</p>
         </div>
         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
       </div>
@@ -93,11 +96,11 @@ export default function WorkflowsPage() {
         {backend.lastOverviewUpdate && ` · updated ${new Date(backend.lastOverviewUpdate).toLocaleTimeString()}`}
       </div>
       <ApiFeedback error={actionError ?? backend.error} />
-      {workflows.length === 0 ? (
+      {visibleWorkflows.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No workflows yet. <Link to="/app" className="text-primary">Create your first draft</Link>.</p>
       ) : (
         <div className="mt-8 divide-y divide-border rounded-xl border border-border">
-          {workflows.map((w) => {
+          {visibleWorkflows.map((w) => {
             const count = runs.filter((r) => r.workflowId === w.id).length;
             const live = backend.overview[w.id];
             return (
