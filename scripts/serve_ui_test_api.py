@@ -4,7 +4,7 @@ from copy import deepcopy
 import json
 import os
 import sys
-import tempfile
+from contextlib import nullcontext
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -39,7 +39,9 @@ def _offline_model_factory(definition):
 
 if __name__ == '__main__':
     (ROOT / '.local').mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='browser-tests-', dir=ROOT / '.local') as directory:
+    directory = ROOT / '.local' / 'browser-ui'
+    directory.mkdir(exist_ok=True)
+    with nullcontext(directory):
         # Explicit browser-only configured registry; never used by product startup.
         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
         agent.update(agent_id='reader_agent', capabilities=['read_spreadsheet'], permissions=['data.read'])

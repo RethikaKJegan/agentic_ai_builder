@@ -69,6 +69,22 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(template["event_type"], "row.created")
         self.assertEqual(template["provider_id"], "google_sheets")
 
+    def test_sheet_trigger_binds_the_resource_provided_for_this_workflow(self):
+        sheet_id = "1TTlDwqo9j7E3K95eNqAg6bDR7t5MlAOFxmKF3frhGKY"
+        workflow = RuleBasedStructuredOutputProvider().generate(
+            "When a new row is added to Google Sheets, qualify the lead",
+            {"google_sheets_resource": f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"},
+        )
+        template = workflow["metadata"]["trigger_templates"][0]
+        self.assertEqual(template["resource_id"], sheet_id)
+        self.assertNotIn("configured_default", repr(workflow))
+
+    def test_sheet_trigger_without_resource_requires_a_binding_before_publication(self):
+        workflow = RuleBasedStructuredOutputProvider().generate(
+            "When a new row is added to Google Sheets, qualify the lead", {})
+        self.assertIn({"requirement": "google_sheets_trigger_resource", "reason": "resource_reference_required"},
+                      workflow["metadata"]["unresolved_requirements"])
+
     def test_provider_words_select_catalog_tool_without_credentials(self):
         for objective, tool_id in (("Get the weather forecast", "open_meteo_forecast"),
                                    ("Search GitHub repositories", "github_rest_request"),

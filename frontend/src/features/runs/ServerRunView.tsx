@@ -56,13 +56,21 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
   };
   const load = async () => loadRun(runId);
   useEffect(() => {
+    // AppShell establishes the local development session asynchronously.  Do
+    // not race its /session call from a protected route: a 401 is expected
+    // until that cookie has been received and should never become a sticky UI
+    // error on the Runs or Approvals pages.
+    if (backend.status !== "connected") return;
     let cancelled = false;
     const refresh = async () => {
       try {
         const overview = await api.overview();
         const candidates = overview.items.filter((item) => item.latest_run_id && (!approvalsOnly || item.pending_approval_count > 0));
         const results = await Promise.allSettled(candidates.map((item) => api.request("get_run", { run_id: item.latest_run_id as string })));
-        if (!cancelled) setAvailableRuns(results.flatMap((result) => result.status === "fulfilled" ? [result.value.run] : []));
+        if (!cancelled) {
+          setAvailableRuns(results.flatMap((result) => result.status === "fulfilled" ? [result.value.run] : []));
+          setError(null);
+        }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof ApiError ? caught : new Error("Unable to load server runs."));
       }
@@ -70,7 +78,7 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [approvalsOnly]);
+  }, [approvalsOnly, backend.status]);
   if (!backend.session?.runtime_available) return <p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">The runtime API is not connected. No {approvalsOnly ? "approval requests" : "execution records"} are available.</p>;
   return <div className="space-y-4">
     <div className="space-y-2" aria-label={approvalsOnly ? "Pending approvals" : "Recent runs"}>

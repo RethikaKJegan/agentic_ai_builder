@@ -33,6 +33,28 @@ class RegistryAdapter:
                 'permissions': sorted(set(auth.get('permissions', [])) | {'tools.manage'}),
                 'subject': {'subject_id': 'planner-registry', 'workspace_id': auth['subject']['workspace_id']}}
 
+    @staticmethod
+    def _assignment_auth(auth):
+        """Use the server-pinned publisher identity for Registry revalidation.
+
+        Automation runs retain their own subject in run records, but a release's
+        approved grants are exact to the publisher of that revision.  The
+        lifecycle service adds this marker only to its server-owned identity;
+        no browser request can supply it.
+        """
+        origin = auth.get('_registry_assignment_subject')
+        subject = auth.get('subject', {})
+        if (not isinstance(origin, dict) or
+                not isinstance(origin.get('subject_id'), str) or
+                origin.get('workspace_id') != subject.get('workspace_id') or
+                not isinstance(subject.get('subject_id'), str) or
+                not subject['subject_id'].startswith('automation:')):
+            return auth
+        resolved = deepcopy(auth)
+        resolved['subject'] = deepcopy(origin)
+        resolved.pop('_registry_assignment_subject', None)
+        return resolved
+
     def _tool_candidates(self, capability, auth):
         response = self.service.list_tools(auth)
         if response['status'] >= 400:
@@ -53,6 +75,11 @@ class RegistryAdapter:
         definition['guardrails'] = {'pii_redaction': True, 'prompt_injection_detection': True, 'output_validation': True}
         permission_scopes = {scope for item in candidates for scope in item['definition']['permission_scopes']}
         definition['permissions'] = sorted(set(definition.get('permissions', [])) | permission_scopes)
+        # Planner drafts never self-assign executable tools.  The subsequent
+        # Registry assignment operation issues the exact, reviewed grants.
+        # Reset a persisted projection here so restart reconstruction follows
+        # the same registration sequence as first publication.
+        definition['allowed_tool_ids'] = []
         if definition['capabilities'] and candidates:
             definition['limits']['max_tool_calls'] = max(1, definition['limits'].get('max_tool_calls', 0))
             candidate_retries = max(item['definition']['retry_policy']['max_retries'] for item in candidates)
@@ -201,7 +228,7 @@ class RegistryAdapter:
     def review(self, workflow, auth):
         """Return a secret-free projection; keep executable references server-side."""
         with self._lock:
-            return self._review(workflow, auth)
+            return self._review(workflow, self._assignment_auth(auth))
 
     def _review(self, workflow, auth):
         results, issues = [], []
@@ -309,10 +336,38 @@ class RegistryAdapter:
     def execution_assignments(self, workflow, auth):
         """Trusted downstream-only boundary; never serialized into UI responses."""
         with self._lock:
-            review = self._review(workflow, auth)
+            assignment_auth = self._assignment_auth(auth)
+            review = self._review(workflow, assignment_auth)
+            # Registry authorization records are process-local.  An immutable
+            # published release carries server-verified workflow approval, so
+            # a restarted process may reconstruct its pending assignment
+            # evidence through the same Registry approval path before running
+            # an automation.  Ordinary browser/manual execution never has the
+            # lifecycle-only marker and cannot take this branch.
+            approved_by = workflow.get('metadata', {}).get('approved_by')
+            if (not review['ready'] and auth.get('_registry_assignment_subject') and
+                    workflow.get('status') == 'published' and
+                    workflow.get('metadata', {}).get('validation_state') == 'validated' and
+                    isinstance(approved_by, str) and
+                    approved_by == assignment_auth.get('subject', {}).get('subject_id')):
+                approval_auth = auth.get('_registry_approval_auth')
+                if not isinstance(approval_auth, dict) or approval_auth.get('subject') != assignment_auth.get('subject'):
+                    # Older releases were created before the full approving
+                    # authority was persisted.  Recover it only when this is
+                    # the exact publisher named in an already-approved,
+                    # immutable release and that authority still has the
+                    # approval permission.  This restores Registry's
+                    # in-memory evidence after a restart; it does not grant a
+                    # new workflow approval or bypass a runtime approval gate.
+                    if 'workflow.approve' in assignment_auth.get('permissions', []):
+                        approval_auth = deepcopy(assignment_auth)
+                        approval_auth['roles'] = sorted(set(approval_auth.get('roles', [])) | {'approver'})
+                if isinstance(approval_auth, dict) and approval_auth.get('subject') == assignment_auth.get('subject'):
+                    self.approve_pending(workflow, approval_auth)
+                    review = self._review(workflow, assignment_auth)
             if not review['ready']:
                 raise RegistryError('TOOL_ASSIGNMENT_REQUIRED', 'Assignments are not currently authorized.', status=403)
-            prefix = (auth['subject']['workspace_id'], auth['subject']['subject_id'], workflow['workflow_id'], workflow['version'])
+            prefix = (assignment_auth['subject']['workspace_id'], assignment_auth['subject']['subject_id'], workflow['workflow_id'], workflow['version'])
             return [deepcopy(grant) for key, grant in self._grants.items() if key[:4] == prefix]
 
 

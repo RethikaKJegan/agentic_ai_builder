@@ -48,8 +48,19 @@ class TriggerScheduler:
                     self.last_polled[binding_id] = now
                     polled += 1
                     queued += len(result.get("receipts", []))
-                except Exception:
-                    # Provider failures are retried next tick; no partial authority is persisted.
+                except Exception as exc:
+                    # Retry on the next interval and preserve only a stable,
+                    # redacted error code for operational diagnosis.
+                    code = getattr(exc, 'code', None) or 'POLL_FAILED'
+                    with lifecycle.store.transaction() as db:
+                        row = db.execute("SELECT document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+                        if row:
+                            import json
+                            trigger = json.loads(row[0])
+                            trigger['health'] = 'error'
+                            trigger['last_error_code'] = str(code)
+                            db.execute("UPDATE lifecycle_triggers SET document=? WHERE binding_id=?", (json.dumps(trigger), binding_id))
+                    self.last_polled[binding_id] = now
                     continue
             for job in lifecycle.lease(workspace):
                 lifecycle.execute_job(job["job_id"], runner)

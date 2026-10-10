@@ -122,14 +122,17 @@ class RuleBasedStructuredOutputProvider:
             return "brevo_send_email"
         return RuleBasedStructuredOutputProvider._ACCEPTED_TOOL_IDS.get(capability)
 
-    def _generate_hierarchy(self, objective: str, words: list[str]) -> dict[str, Any]:
+    def _generate_hierarchy(self, objective: str, words: list[str], context: dict[str, Any]) -> dict[str, Any]:
         """Build a canonical multi-agent graph from the same capability analysis.
 
         This remains deterministic for offline tests; the OpenAI provider receives
         the same generation mode in its structured prompt and can produce a richer
         graph without changing the contract or Registry boundary.
         """
-        workflow = self.generate(objective, {})
+        # Build the canonical linear plan first while retaining server-validated
+        # resource context.  Dropping this context made a hierarchy workflow
+        # silently fall back to a global connector default.
+        workflow = self.generate(objective, {key: value for key, value in context.items() if key != "generation_mode"})
         condition_nodes = [node for node in workflow["nodes"] if node.get("kind") == "condition"]
         condition_node = condition_nodes[0] if condition_nodes else None
         capabilities = workflow["agents"][0]["capabilities"] or ["classify_text"]
@@ -191,17 +194,32 @@ class RuleBasedStructuredOutputProvider:
         workflow["metadata"]["generation_mode"] = "hierarchy"
         return workflow
 
+    @staticmethod
+    def _google_sheet_id(objective: str, context: dict[str, Any]) -> str | None:
+        """Extract one workflow-owned Google Sheet resource without accepting URLs as tool inputs."""
+        candidates = [context.get("google_sheets_resource"), objective]
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                continue
+            match = re.search(r"(?:docs\\.google\\.com/spreadsheets/d/)?([A-Za-z0-9_-]{20,})", candidate)
+            if match:
+                return match.group(1)
+        return None
+
     def generate(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
         if context.get("generation_mode") == "hierarchy":
-            return self._generate_hierarchy(objective, [])
+            return self._generate_hierarchy(objective, [], context)
         words = re.findall(r"[a-z0-9]+", objective.lower())
         capabilities = sorted({cap for token, cap in self._CAPABILITIES.items() if any(token in word for word in words)})
         external_write = any(cap in {"send_email", "send_notification", "update_spreadsheet"} for cap in capabilities)
         objective_lower = objective.lower()
         row_trigger = bool(re.search(r"\b(new|added|created)\b.{0,40}\b(row|lead|record)\b|\b(row|lead|record)\b.{0,40}\b(new|added|created)\b", objective_lower))
         trigger_template = None
+        trigger_resource_missing = False
         if row_trigger:
-            trigger_template = {"provider_id": "google_sheets", "delivery": "poll", "event_type": "row.created", "resource_id": "configured_default", "poll_interval_seconds": 30, "baseline_policy": "current_only", "poll_input": {"range": "A:Z"}, "input_mapping": {"objective_context": "row", "spreadsheet_id": "spreadsheet_id", "range": "range"}}
+            sheet_id = self._google_sheet_id(objective, context)
+            trigger_resource_missing = sheet_id is None
+            trigger_template = {"provider_id": "google_sheets", "delivery": "poll", "event_type": "row.created", "resource_id": sheet_id or "resource_required", "poll_interval_seconds": 10, "baseline_policy": "current_only", "poll_input": {"range": "A:Z"}, "input_mapping": {"objective_context": "row", "spreadsheet_id": "spreadsheet_id", "range": "range", "condition_result": {"constant": True}, "email_to": "row.email", "email_subject": {"constant": "Follow-up from the workflow"}, "email_body": "row.requirements", "values": {"constant": []}}}
         elif "pull request" in objective_lower or "github pr" in objective_lower:
             trigger_template = {"provider_id": "github_webhook", "delivery": "push", "event_type": "pull_request", "resource_id": "configured_default", "baseline_policy": "current_only"}
         elif "incoming email" in objective_lower or "new email" in objective_lower:
@@ -265,6 +283,12 @@ class RuleBasedStructuredOutputProvider:
                         {"name": "path", "type": "string", "required": True},
                         {"name": "body", "type": "object", "required": True},
                     ])
+        unique_fields, seen_names = [], set()
+        for field in input_fields:
+            if field["name"] not in seen_names:
+                unique_fields.append(field)
+                seen_names.add(field["name"])
+        input_fields = unique_fields
         previous = "objective_condition" if conditional else "plan_objective"
         approval_inserted = False
         if conditional:
@@ -318,6 +342,8 @@ class RuleBasedStructuredOutputProvider:
         unresolved = [] if capabilities else [{"requirement": "No explicit capability identified", "reason": "needs_human_review"}]
         if capabilities:
             unresolved = [{"requirement": cap, "reason": "registry_assignment_pending"} for cap in capabilities]
+        if trigger_resource_missing:
+            unresolved.append({"requirement": "google_sheets_trigger_resource", "reason": "resource_reference_required"})
         return {
             "workflow_id": "planned_workflow",
             "version": 1,

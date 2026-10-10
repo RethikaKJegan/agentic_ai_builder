@@ -8,12 +8,34 @@ import smtplib
 import ssl
 import time
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from jsonschema import Draft202012Validator
 from registry.safety import reject_secrets
 from .service import RuntimeFailure
+
+
+def _google_credentials(token_file):
+    """Load and refresh an operator-managed OAuth token without leaking it."""
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request as GoogleRequest
+    except ImportError:
+        raise RuntimeFailure('GOOGLE_CLIENT_UNAVAILABLE', 'Install the Google integration dependencies on the runtime host.', 503) from None
+    try:
+        credentials = Credentials.from_authorized_user_file(str(token_file))
+    except (OSError, ValueError):
+        raise RuntimeFailure('GOOGLE_TOKEN_INVALID', 'Google authorization is invalid. Run scripts/authorize_google.py again.', 503) from None
+    try:
+        if not credentials.valid:
+            credentials.refresh(GoogleRequest())
+    except Exception:
+        raise RuntimeFailure('GOOGLE_TOKEN_REFRESH_FAILED', 'Google authorization could not be refreshed. Run scripts/authorize_google.py again.', 503) from None
+    if not credentials.token:
+        raise RuntimeFailure('GOOGLE_TOKEN_INVALID', 'Google authorization is invalid. Run scripts/authorize_google.py again.', 503)
+    return credentials
 
 
 class SMTPConnector:
@@ -118,13 +140,7 @@ class GoogleSheetsConnector:
         if configuration.get('provider_id') != 'google_sheets':
             raise RuntimeFailure('SHEETS_NOT_CONFIGURED', 'Configure a Google Sheets credential reference.', 503)
         try:
-            from google.oauth2.credentials import Credentials
-            from google.auth.transport.requests import Request as GoogleRequest
-            credentials = Credentials.from_authorized_user_file(str(self.token_file))
-            if not credentials.valid:
-                credentials.refresh(GoogleRequest())
-            if not credentials.token:
-                raise ValueError('missing token')
+            credentials = _google_credentials(self.token_file)
             request = Request(
                 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='') +
                 '/values/' + quote(cell_range, safe=''),
@@ -133,6 +149,12 @@ class GoogleSheetsConnector:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = json.load(response)
             output = {'rows': payload.get('values', [])}
+        except RuntimeFailure:
+            raise
+        except HTTPError as exc:
+            if exc.code in {401, 403}:
+                raise RuntimeFailure('SHEETS_ACCESS_DENIED', 'Google denied access to this Sheet. Reauthorize and confirm the authorized account can open the Sheet.', 403) from None
+            raise RuntimeFailure('SHEETS_READ_FAILED', 'Google Sheets read failed; provider details are suppressed.', 502) from None
         except Exception:
             raise RuntimeFailure('SHEETS_READ_FAILED', 'Google Sheets read failed; provider details are suppressed.', 502) from None
         if list(Draft202012Validator(grant['output_schema']).iter_errors(output)):
@@ -147,12 +169,27 @@ class GoogleSheetsConnector:
         """
         output = self.invoke(grant, inputs, 'poll:' + (previous_cursor or 'initial'))
         rows = output.get('rows', [])
-        snapshot = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        changes = [] if previous_cursor == snapshot else [
-            {'event_id': f'row:{snapshot}:{index}', 'row_index': index, 'row': row}
-            for index, row in enumerate(rows)
-        ]
-        return {'cursor': snapshot, 'changes': changes}
+        headers = rows[0] if rows and isinstance(rows[0], list) else []
+        data_rows = rows[1:] if headers else rows
+        current = {str(index): hashlib.sha256(json.dumps(row, separators=(',', ':')).encode()).hexdigest()
+                   for index, row in enumerate(data_rows, start=2)}
+        try:
+            prior = json.loads(previous_cursor) if previous_cursor else {}
+            previous_rows = prior.get('rows', {}) if isinstance(prior, dict) else {}
+        except (TypeError, ValueError):
+            previous_rows = {}
+        changes = []
+        for index, row in enumerate(data_rows, start=2):
+            fingerprint = current[str(index)]
+            if previous_rows.get(str(index)) == fingerprint:
+                continue
+            values = row if isinstance(row, list) else [row]
+            record = ({str(header): values[position] if position < len(values) else ''
+                       for position, header in enumerate(headers)} if headers else {'values': values})
+            changes.append({'event_id': f'row:{index}:{fingerprint}', 'row_index': index,
+                            'row': record, 'row_values': values})
+        cursor = json.dumps({'version': 1, 'rows': current}, sort_keys=True, separators=(',', ':'))
+        return {'cursor': cursor, 'changes': changes}
 
 
 class GoogleSheetsUpdateConnector(GoogleSheetsConnector):
@@ -175,11 +212,7 @@ class GoogleSheetsUpdateConnector(GoogleSheetsConnector):
         if configuration.get('provider_id') != 'google_sheets':
             raise RuntimeFailure('SHEETS_NOT_CONFIGURED', 'Configure a Google Sheets credential reference.', 503)
         try:
-            from google.oauth2.credentials import Credentials
-            from google.auth.transport.requests import Request as GoogleRequest
-            credentials = Credentials.from_authorized_user_file(str(self.token_file))
-            if not credentials.valid:
-                credentials.refresh(GoogleRequest())
+            credentials = _google_credentials(self.token_file)
             body = json.dumps({'range': cell_range, 'majorDimension': 'ROWS', 'values': values}).encode()
             request = Request(
                 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='') +
@@ -189,6 +222,12 @@ class GoogleSheetsUpdateConnector(GoogleSheetsConnector):
             with urlopen(request, timeout=self.timeout) as response:
                 payload = json.load(response)
             output = {'updated_cells': int(payload.get('updatedCells', 0))}
+        except RuntimeFailure:
+            raise
+        except HTTPError as exc:
+            if exc.code in {401, 403}:
+                raise RuntimeFailure('SHEETS_ACCESS_DENIED', 'Google denied access to this Sheet. Reauthorize and confirm the authorized account can edit the Sheet.', 403) from None
+            raise RuntimeFailure('SHEETS_UPDATE_FAILED', 'Google Sheets update failed; provider details are suppressed.', 502) from None
         except Exception:
             raise RuntimeFailure('SHEETS_UPDATE_FAILED', 'Google Sheets update failed; provider details are suppressed.', 502) from None
         if list(Draft202012Validator(grant['output_schema']).iter_errors(output)):

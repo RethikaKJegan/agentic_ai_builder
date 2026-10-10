@@ -195,6 +195,9 @@ class LifecycleService:
                             policy_version=max([g.get("policy_version", 1) for g in grants] or [1]), active=True)
             authority = deepcopy(auth)
             authority["subject"] = {"subject_id": identity["subject_id"], "workspace_id": workspace}
+            if grants:
+                authority["_registry_assignment_subject"] = deepcopy(auth["subject"])
+                authority["_registry_approval_auth"] = deepcopy(auth)
             authority["roles"] = ["admin"]
             authority["permissions"] = sorted(set(authority["permissions"]) | {"workflow.execute", "runs.view"})
             binding_ids = []

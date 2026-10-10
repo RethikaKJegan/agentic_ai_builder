@@ -20,6 +20,7 @@ export default function Overview() {
   const create = useMesh((s) => s.createBlankWorkflow);
   const workflows = useMesh((s) => s.workflows);
   const [description, setDescription] = useState("");
+  const [googleSheetsResource, setGoogleSheetsResource] = useState("");
   const [mode, setMode] = useState<"hierarchy" | "linear">("hierarchy");
   const [planning, setPlanning] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
@@ -29,14 +30,22 @@ export default function Overview() {
     if (planning || !prompt) return;
     setPlanning(true); setApiError(null);
     try {
+      const needsGoogleSheet = /google\s*sheets?|spreadsheet|\bnew\s+row\b/i.test(prompt);
+      if (needsGoogleSheet && !googleSheetsResource.trim()) {
+        throw new Error("Paste the Google Sheets URL or spreadsheet ID that this workflow should watch.");
+      }
+      const context = {
+        generation_mode: mode,
+        ...(googleSheetsResource.trim() ? { google_sheets_resource: googleSheetsResource.trim() } : {}),
+      };
       if (mode === "hierarchy") {
         if (!(backend.can("workflow.plan") && backend.session?.planning_available)) throw new Error("The workflow planner is unavailable.");
-        const result = await api.request("plan_workflow", { objective: prompt, context: { generation_mode: "hierarchy" } });
+        const result = await api.request("plan_workflow", { objective: prompt, context });
         const saved = await api.request("save_workflow_version", { workflow_id: result.workflow.workflow_id, workflow_version: result.workflow.version, base_version: 0, workflow: result.workflow });
         useMesh.getState().acceptWorkflow(saved.workflow);
         navigate({ to: "/app/workflows/$id", params: { id: result.workflow.workflow_id } });
       } else if (backend.can("workflow.plan") && backend.session?.planning_available) {
-        const result = await api.request("plan_workflow", { objective: prompt, context: { generation_mode: "linear" } });
+        const result = await api.request("plan_workflow", { objective: prompt, context });
         const saved = await api.request("save_workflow_version", { workflow_id: result.workflow.workflow_id, workflow_version: result.workflow.version, base_version: 0, workflow: result.workflow });
         useMesh.getState().acceptWorkflow(saved.workflow);
         navigate({ to: "/app/workflows/$id", params: { id: result.workflow.workflow_id } });
@@ -52,6 +61,9 @@ export default function Overview() {
     <p className="mt-3 text-lg text-muted-foreground">Describe a process in plain English. MESH drafts the agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+      <label className="mt-4 block text-sm font-medium text-foreground">Google Sheets URL or ID <span className="font-normal text-muted-foreground">(required only for a new-row workflow)</span>
+        <input value={googleSheetsResource} onChange={(e) => setGoogleSheetsResource(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/..." className="mt-2 block w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm font-normal outline-none placeholder:text-muted-foreground focus:border-primary" aria-label="Google Sheets URL or ID" />
+      </label>
       <div className="mt-6 flex flex-wrap items-center gap-3"><div className="inline-flex rounded-xl border border-border p-1" role="group" aria-label="Workflow generation mode">
         <button type="button" onClick={() => setMode("hierarchy")} className={`rounded-lg px-3 py-2 text-sm ${mode === "hierarchy" ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground"}`}>Master + sub-agents</button>
         <button type="button" onClick={() => setMode("linear")} className={`rounded-lg px-3 py-2 text-sm ${mode === "linear" ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground"}`}>Linear steps</button>
