@@ -7,6 +7,8 @@
   "required": ["agent_id", "name", "role", "goal", "instructions", "model", "input_schema", "output_schema", "capabilities", "allowed_tool_ids", "permissions", "limits", "retry_policy", "approval_requirements", "guardrails"],
   "properties": {
     "agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "parent_agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "hierarchy_role": { "enum": ["standalone", "master", "sub_agent"] },
     "name": { "type": "string", "minLength": 1 },
     "role": { "type": "string", "minLength": 1 },
     "goal": { "type": "string", "minLength": 1 },

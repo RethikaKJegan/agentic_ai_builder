@@ -22,6 +22,18 @@ SUPPORTED_PROVIDERS = {
     "fake_poll": "poll",
     "fake_schedule": "schedule",
     "generic_hmac_webhook": "push",
+    "google_sheets": "poll",
+    "github_webhook": "push",
+    "slack_events": "push",
+    "gmail_watch": "push",
+    "brevo_webhook": "push",
+    "configured_webhook": "push",
+    "generic_rest": "poll",
+    "google_drive": "poll",
+    "google_calendar": "poll",
+    "google_docs": "poll",
+    "open_meteo": "poll",
+    "open_library": "poll",
 }
 ACTIVE_RUN_STATES = {"queued", "running", "paused_for_approval"}
 
@@ -170,6 +182,8 @@ class LifecycleService:
             workflow = self.store.get(db, workspace, workflow_id, version)
             if not workflow or workflow.get("status") != "published" or workflow.get("metadata", {}).get("validation_state") != "validated":
                 raise LifecycleFailure("REVISION_NOT_PUBLISHED", "Activate a validated, approved, published revision.")
+            if not triggers:
+                triggers = deepcopy(workflow.get("metadata", {}).get("trigger_templates", []))
             review = self.workflows.registry_adapter.review(workflow, auth)
             if not review["ready"]:
                 raise LifecycleFailure("ASSIGNMENT_REVALIDATION_FAILED", "Registry grants are not currently authorized.", 403)
@@ -235,10 +249,11 @@ class LifecycleService:
                        delivery=delivery, credential_reference=raw.get("credential_reference", "none"),
                        event_schema=raw.get("event_schema", {"type": "object"}), input_mapping=raw.get("input_mapping", {}),
                        filters=raw.get("filters", {}), timezone=raw.get("timezone"), schedule=raw.get("schedule"),
+                       poll_input=raw.get("poll_input", {}),
                        poll_interval_seconds=raw.get("poll_interval_seconds"), baseline_policy=raw.get("baseline_policy", "current_only"), health="preparing")
         if (provider not in SUPPORTED_PROVIDERS or delivery not in {"push", "poll", "schedule"} or
                 trigger["baseline_policy"] not in {"current_only", "authorized_backfill"} or
-                not isinstance(trigger["event_schema"], dict) or not isinstance(trigger["input_mapping"], dict) or not isinstance(trigger["filters"], dict)):
+                not isinstance(trigger["event_schema"], dict) or not isinstance(trigger["input_mapping"], dict) or not isinstance(trigger["filters"], dict) or not isinstance(trigger["poll_input"], dict)):
             raise LifecycleFailure("INVALID_TRIGGER", "The trigger configuration is unsupported.", 400)
         Draft202012Validator.check_schema(trigger["event_schema"])
         return trigger
@@ -282,7 +297,7 @@ class LifecycleService:
                 receipt = json.loads(existing[0])
                 job = db.execute("SELECT document FROM lifecycle_jobs WHERE job_id=?", (receipt["job_id"],)).fetchone()
                 return {"accepted": True, "duplicate": True, "receipt_id": receipt["receipt_id"], "job": json.loads(job[0])}
-            inputs = {name: self._lookup(event, path) for name, path in trigger["input_mapping"].items()}
+            inputs = {name: self._input_value(event, path, trigger) for name, path in trigger["input_mapping"].items()}
             receipt_id, job_id = identifier("receipt_"), identifier("job_")
             identity_id = json.loads(db.execute("SELECT document FROM lifecycle_releases WHERE release_id=?", (release_id,)).fetchone()[0])["automation_identity_id"]
             receipt = dict(receipt_id=receipt_id, binding_id=binding_id, event_identity=event_id,
@@ -300,6 +315,30 @@ class LifecycleService:
                            (workspace, binding_id, checkpoint, now_iso(self.clock)))
             self.emit(db, workspace, workflow_id, "dispatch.queued")
             return {"accepted": True, "duplicate": False, "receipt_id": receipt_id, "job": job}
+
+    def verify_webhook(self, binding_id, provider_id, raw_body, signature, timestamp=None):
+        """Verify provider delivery before parsing or dispatching its event."""
+        with self.store.transaction() as db:
+            row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+        if not row or row[0] != "ready":
+            raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This trigger binding is not active.", 404)
+        trigger = json.loads(row[1])
+        if trigger["provider_id"] != provider_id or trigger["delivery"] != "push":
+            raise LifecycleFailure("TRIGGER_DELIVERY_MISMATCH", "This webhook does not match its trigger binding.", 400)
+        secret = self.trigger_secrets.get(trigger["credential_reference"])
+        if not isinstance(secret, str) or not secret or not isinstance(raw_body, bytes):
+            raise LifecycleFailure("SOURCE_VERIFICATION_FAILED", "The webhook could not be verified.", 401)
+        if provider_id == "github_webhook":
+            expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+        elif provider_id == "slack_events":
+            if not isinstance(timestamp, str) or not timestamp.isdigit() or abs(self.clock() - int(timestamp)) > 300:
+                raise LifecycleFailure("SOURCE_VERIFICATION_FAILED", "The webhook timestamp is outside the freshness window.", 401)
+            expected = "v0=" + hmac.new(secret.encode(), b"v0:" + timestamp.encode() + b":" + raw_body, hashlib.sha256).hexdigest()
+        else:
+            expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+        if not isinstance(signature, str) or not hmac.compare_digest(expected, signature):
+            raise LifecycleFailure("SOURCE_VERIFICATION_FAILED", "The webhook could not be verified.", 401)
+        return trigger
 
     def poll(self, binding_id, changes, cursor, auth):
         """Apply an adapter poll batch with an explicit first-poll baseline policy."""
@@ -353,6 +392,18 @@ class LifecycleService:
             current = current[part]
         return deepcopy(current)
 
+    @classmethod
+    def _input_value(cls, event, mapping, trigger):
+        if isinstance(mapping, str):
+            return cls._lookup(event, mapping)
+        if isinstance(mapping, dict) and set(mapping) == {"constant"}:
+            constant = mapping["constant"]
+            if constant == "$trigger.resource_id":
+                return trigger["resource_id"]
+            if isinstance(constant, (str, int, float, bool)) or constant is None:
+                return deepcopy(constant)
+        raise LifecycleFailure("EVENT_MAPPING_FAILED", "A configured input mapping is unsupported.", 400)
+
     def lease(self, workspace, limit=10, seconds=30):
         with self.store.transaction() as db:
             now = now_iso(self.clock)
@@ -365,6 +416,12 @@ class LifecycleService:
                 db.execute("UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?", (job["lease_until"], job["attempt"], json.dumps(job), job_id))
                 jobs.append(job)
             return jobs
+
+    def poll_bindings(self, workspace):
+        """Return active polling bindings without credential material."""
+        with self.store.transaction() as db:
+            rows = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'", (workspace,)).fetchall()
+        return [json.loads(encoded) for _binding, encoded in rows if json.loads(encoded).get('delivery') == 'poll']
 
     def execute_job(self, job_id, runner, max_attempts=3):
         with self.store.transaction() as db:

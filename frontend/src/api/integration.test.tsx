@@ -130,7 +130,7 @@ describe("workflow UI integration", () => {
     await waitFor(() => expect(activate).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: original.workflow_id, expected_release_id: null })));
     expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" }));
   });
-  it("shows exact authorized assignments and enables publication only for that revision", async () => {
+  it("keeps registry review details out of the editor while retaining a clear publish action", () => {
     const original = document();
     original.status = "approved";
     original.metadata["unresolved_requirements"] = [];
@@ -142,15 +142,11 @@ describe("workflow UI integration", () => {
     useMesh.setState({ agents: mapped.agents });
     const review = { workflow_id: original.workflow_id, workflow_version: original.version, ready: true, reason_codes: [], items: [] };
     useBackend.setState({ session: session(["workflow.publish"]), reviews: { [original.workflow_id]: review } });
-    vi.spyOn(api, "request").mockResolvedValue({ workflow: original, registry_review: review } as never);
-    const view = render(<WorkflowControls workflow={mapped.workflow} />);
+    render(<WorkflowControls workflow={mapped.workflow} />);
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
-    await waitFor(() => expect(screen.getByText("Registry requirements authorized for this revision")).toBeVisible());
-    act(() => useBackend.getState().acceptReview({ ...review, workflow_version: original.version + 1 }));
-    view.rerender(<WorkflowControls workflow={mapped.workflow} />);
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    expect(screen.queryByText("Registry requirements authorized for this revision")).toBeNull();
   });
-  it("renders pending and denied assignment reasons and keeps approval blocked", async () => {
+  it("surfaces a server-side publication rejection without exposing registry internals", async () => {
     const original = document();
     original.status = "validated";
     const mapped = fromCanonical(original);
@@ -159,45 +155,50 @@ describe("workflow UI integration", () => {
       { agent_id: "reader_agent", capability: "read_spreadsheet", tool_id: "google_sheets_read_rows", authorization_state: "pending_approval" as const, reason_codes: ["APPROVAL_REQUIRED"] },
       { agent_id: "sender_agent", capability: "send_email", tool_id: "smtp_send_email", authorization_state: "denied" as const, reason_codes: ["TOOL_UNAVAILABLE"] },
     ] };
-    useBackend.setState({ session: session(["workflow.approve"]), reviews: { [original.workflow_id]: review } });
-    vi.spyOn(api, "request").mockResolvedValue({ workflow: original, registry_review: review } as never);
+    useBackend.setState({ session: session(["workflow.publish"]), reviews: { [original.workflow_id]: review } });
+    vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "REGISTRY_REVIEW_REQUIRED", message: "Resolve the workflow review before publishing.", request_id: "req_review", retryable: false }, "corr_review"));
     render(<WorkflowControls workflow={mapped.workflow} />);
-    expect(screen.getByRole("button", { name: "Approve revision" })).toBeDisabled();
-    await waitFor(() => expect(screen.getByLabelText("Registry assignment review")).toHaveTextContent("pending_approval"));
-    expect(screen.getByLabelText("Registry assignment review")).toHaveTextContent("TOOL_UNAVAILABLE");
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Resolve the workflow review before publishing."));
   });
-  it("submits an edited canonical revision, updates its version and excludes it from browser draft persistence", async () => {
+  it("saves an edited canonical revision as part of publishing and excludes it from browser draft persistence", async () => {
     const original = document();
     useMesh.getState().acceptWorkflow(original);
     useMesh.getState().renameWorkflow(original.workflow_id, "Invoice edits");
     const edited = useMesh.getState().workflows[0]!;
-    const save = vi.spyOn(api, "request").mockImplementation(async (_operation, payload) => ({ workflow: { ...("workflow" in payload ? payload.workflow : original), metadata: { workspace_id: "local-workspace" } }, correlation_id: "corr_saved" }) as never);
+    useBackend.setState({ session: session(["workflow.publish"]), refreshOverview: vi.fn(async () => undefined) });
+    const saved = { ...original, version: original.version + 1, name: "Invoice edits", status: "draft" as const, metadata: { ...original.metadata, workspace_id: "local-workspace" } };
+    const save = vi.spyOn(api, "request").mockImplementation(async (operation, payload) => {
+      if (operation === "save_workflow_version") return { workflow: { ...saved, ...("workflow" in payload ? payload.workflow : {}) }, correlation_id: "corr_saved" } as never;
+      if (operation === "validate_workflow") return { workflow: { ...saved, status: "validated" }, correlation_id: "corr_validated" } as never;
+      if (operation === "approve_workflow" && "action" in payload && payload.action === "approve") return { workflow: { ...saved, status: "approved" }, correlation_id: "corr_approved" } as never;
+      return { workflow: { ...saved, status: "published" }, correlation_id: "corr_published" } as never;
+    });
+    vi.spyOn(api, "activateRelease").mockResolvedValue({} as never);
     render(<WorkflowControls workflow={edited} />);
-    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Save revision" }));
-    await waitFor(() => expect(screen.getByText("Request reference: corr_saved")).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" })));
     expect(save).toHaveBeenCalledWith("save_workflow_version", expect.objectContaining({ base_version: original.version, workflow: expect.objectContaining({ name: "Invoice edits", version: original.version + 1 }) }));
     expect(useMesh.getState().workflows[0]?.serverVersion).toBe(original.version + 1);
     expect(JSON.parse(localStorage.getItem("mesh-local-drafts-v1")!).state.workflows).toEqual([]);
   });
-  it("does not grant viewers mutation controls and blocks unresolved publication", () => {
+  it("allows viewers to run a safe local test but not publish", () => {
     const mapped = fromCanonical(document());
     useMesh.setState({ agents: mapped.agents });
     useBackend.setState({ session: session(["workflow.view"]) });
     const view = render(<WorkflowControls workflow={mapped.workflow} />);
-    expect(screen.queryByRole("button", { name: "Save revision" })).toBeNull();
-    act(() => useBackend.setState({ session: session(["workflow.approve", "workflow.publish"]) }));
-    view.rerender(<WorkflowControls workflow={{ ...mapped.workflow, status: "approved" }} />);
+    expect(screen.getByRole("button", { name: "Test workflow" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    view.unmount();
   });
   it("renders safe validation failures without changing revision state", async () => {
     const mapped = fromCanonical(document());
     useMesh.setState({ agents: mapped.agents });
     vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
+    useBackend.setState({ session: session(["workflow.publish"]) });
     render(<WorkflowControls workflow={mapped.workflow} />);
-    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("edges[0].source"));
-    expect(screen.getByRole("alert")).toHaveTextContent("corr_validate");
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Correct the edge."));
   });
 });
 

@@ -122,16 +122,87 @@ class RuleBasedStructuredOutputProvider:
             return "brevo_send_email"
         return RuleBasedStructuredOutputProvider._ACCEPTED_TOOL_IDS.get(capability)
 
+    def _generate_hierarchy(self, objective: str, words: list[str]) -> dict[str, Any]:
+        """Build a canonical multi-agent graph from the same capability analysis.
+
+        This remains deterministic for offline tests; the OpenAI provider receives
+        the same generation mode in its structured prompt and can produce a richer
+        graph without changing the contract or Registry boundary.
+        """
+        workflow = self.generate(objective, {})
+        capabilities = workflow["agents"][0]["capabilities"] or ["classify_text"]
+        tools_by_capability = {tool["capability"]: tool for tool in workflow["tools"]}
+        base_agent = workflow["agents"][0]
+        master = {**base_agent, "agent_id": "workflow_master_agent", "role": "Master orchestrator",
+                  "goal": "Coordinate specialist agents and combine their results.",
+                  "instructions": "Delegate each specialist task, then combine validated results." , "capabilities": [],
+                  "allowed_tool_ids": [], "hierarchy_role": "master"}
+        agents = [master]
+        nodes = [{"node_id": "objective_received", "kind": "trigger", "label": "Objective received"},
+                 {"node_id": "master_orchestrator", "kind": "agent", "label": "Master orchestrator", "agent_id": master["agent_id"]}]
+        edges = [{"edge_id": "received_to_master", "source": "objective_received", "target": "master_orchestrator"}]
+        previous = "master_orchestrator"
+        for index, capability in enumerate(capabilities[:6], 1):
+            agent_id = f"specialist_agent_{index}"
+            agent = {**base_agent, "agent_id": agent_id, "role": capability.replace("_", " ").title() + " specialist",
+                     "goal": f"Perform the {capability.replace('_', ' ')} part of the request.",
+                     "instructions": f"Complete the assigned {capability.replace('_', ' ')} task and return structured data.",
+                     "capabilities": [capability], "allowed_tool_ids": [], "parent_agent_id": master["agent_id"], "hierarchy_role": "sub_agent"}
+            agents.append(agent)
+            agent_node = f"specialist_{index}"
+            nodes.append({"node_id": agent_node, "kind": "agent", "label": agent["role"], "agent_id": agent_id})
+            edges.append({"edge_id": f"master_to_{agent_node}", "source": previous, "target": agent_node})
+            previous = agent_node
+            tool = tools_by_capability.get(capability)
+            if tool:
+                tool_node = f"specialist_{index}_action"
+                mapping = {}
+                if capability == "read_spreadsheet": mapping = {"spreadsheet_id": "inputs.spreadsheet_id", "range": "inputs.range"}
+                elif capability == "send_email": mapping = {"to": "inputs.email_to", "subject": "inputs.email_subject", "body": "inputs.email_body"}
+                elif capability == "update_spreadsheet": mapping = {"spreadsheet_id": "inputs.spreadsheet_id", "range": "inputs.range", "values": "inputs.values"}
+                elif capability == "retrieve_records": mapping = {"path": "inputs.path", "query": "inputs.query"}
+                elif capability == "send_notification": mapping = {"text": "inputs.notification_text"}
+                if capability in {"send_email", "send_notification", "update_spreadsheet"}:
+                    gate_id = f"external_action_approval_{index}"
+                    workflow["approval_gates"].append({"approval_gate_id": gate_id, "approver_roles": ["approver"], "on_reject": "stop", "timeout_seconds": 86400})
+                    approval_node = f"approval_{index}"
+                    nodes.append({"node_id": approval_node, "kind": "approval", "label": "Approve external action", "approval_gate_id": gate_id})
+                    edges.append({"edge_id": f"{agent_node}_to_{approval_node}", "source": agent_node, "target": approval_node})
+                    previous = approval_node
+                    workflow["execution_policy"]["allow_external_writes"] = True
+                nodes.append({"node_id": tool_node, "kind": "tool", "label": tool["tool_id"].replace("_", " ").title(), "agent_id": agent_id,
+                              "tool_id": tool["tool_id"], "configuration": {"input_mapping": mapping}})
+                edges.append({"edge_id": f"{previous}_to_{tool_node}", "source": previous, "target": tool_node, **({"outcome": "approved"} if previous.startswith("approval_") else {})})
+                previous = tool_node
+        nodes.extend([{"node_id": "combined_result", "kind": "transform", "label": "Combined result"},
+                      {"node_id": "workflow_output", "kind": "output", "label": "Workflow result", "configuration": {"input_mapping": {"workflow_result": f"outputs.{previous}"}}}])
+        edges.extend([{"edge_id": "last_to_combined", "source": previous, "target": "combined_result"},
+                      {"edge_id": "combined_to_output", "source": "combined_result", "target": "workflow_output"}])
+        workflow["agents"], workflow["nodes"], workflow["edges"] = agents, nodes, edges
+        workflow["metadata"]["generation_mode"] = "hierarchy"
+        return workflow
+
     def generate(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
+        if context.get("generation_mode") == "hierarchy":
+            return self._generate_hierarchy(objective, [])
         words = re.findall(r"[a-z0-9]+", objective.lower())
         capabilities = sorted({cap for token, cap in self._CAPABILITIES.items() if any(token in word for word in words)})
         external_write = any(cap in {"send_email", "send_notification", "update_spreadsheet"} for cap in capabilities)
-        row_trigger = bool(re.search(r"\b(new|added|created)\b.{0,40}\b(row|lead|record)\b|\b(row|lead|record)\b.{0,40}\b(new|added|created)\b", objective.lower()))
+        objective_lower = objective.lower()
+        row_trigger = bool(re.search(r"\b(new|added|created)\b.{0,40}\b(row|lead|record)\b|\b(row|lead|record)\b.{0,40}\b(new|added|created)\b", objective_lower))
+        trigger_template = None
+        if row_trigger:
+            trigger_template = {"provider_id": "google_sheets", "delivery": "poll", "event_type": "row.created", "resource_id": "configured_default", "poll_interval_seconds": 30, "baseline_policy": "current_only", "poll_input": {"range": "A:Z"}, "input_mapping": {"objective_context": "row", "spreadsheet_id": "spreadsheet_id", "range": "range"}}
+        elif "pull request" in objective_lower or "github pr" in objective_lower:
+            trigger_template = {"provider_id": "github_webhook", "delivery": "push", "event_type": "pull_request", "resource_id": "configured_default", "baseline_policy": "current_only"}
+        elif "incoming email" in objective_lower or "new email" in objective_lower:
+            trigger_template = {"provider_id": "gmail_watch", "delivery": "push", "event_type": "message.created", "resource_id": "configured_default", "baseline_policy": "current_only"}
+        elif "slack message" in objective_lower:
+            trigger_template = {"provider_id": "slack_events", "delivery": "push", "event_type": "message", "resource_id": "configured_default", "baseline_policy": "current_only"}
         agent_id = "workflow_planner_agent"
         nodes = [
             {"node_id": "objective_received", "kind": "trigger",
-             "label": "New spreadsheet row" if row_trigger else "Objective received",
-             **({"configuration": {"source": "google_sheets", "event": "row.created", "requires_trigger_binding": True}} if row_trigger else {})},
+             "label": "New spreadsheet row" if row_trigger else "Objective received"},
             {"node_id": "plan_objective", "kind": "agent", "label": "Plan objective", "agent_id": agent_id},
         ]
         edges = [{"edge_id": "received_to_plan", "source": "objective_received", "target": "plan_objective"}]
@@ -263,6 +334,7 @@ class RuleBasedStructuredOutputProvider:
             "approval_gates": approval_gates,
             "execution_policy": {"limits": {"max_llm_calls": 3, "max_tool_calls": 4, "max_tokens": 4000, "max_retries": 2, "timeout_seconds": 300}, "requires_review_before_execution": True, "allow_external_writes": external_write},
             "error_policy": {"on_validation_error": "reject", "on_runtime_error": "retry", "max_retries": 2},
-            "metadata": {"domain": "generic", "unresolved_requirements": unresolved},
+            "metadata": {"domain": "generic", "unresolved_requirements": unresolved,
+                         **({"trigger_templates": [trigger_template]} if trigger_template else {})},
         }
 

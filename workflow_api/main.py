@@ -53,8 +53,26 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         auth['permissions'] = sorted(set(auth['permissions']) | set(extra_permissions))
         auth['scopes'] = sorted(set(auth['scopes']) | set(extra_scopes))
     auth['permissions'] = sorted(set(auth['permissions']) | runtime_permissions)
+    workers = []
+    if workflow_service.runtime_runner is not None and os.getenv('BUILDER_RUNTIME_WORKER') == '1':
+        from runtime.worker import RuntimeWorker
+        runtime_worker = RuntimeWorker(workflow_service.runtime_runner, lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
+                                       interval=float(os.getenv('BUILDER_RUNTIME_WORKER_INTERVAL', '1')))
+        runtime_worker.start(); workers.append(runtime_worker)
+    if workflow_service.runtime_runner is not None and os.getenv('BUILDER_TRIGGER_WORKER') == '1':
+        from .scheduler import TriggerScheduler
+        scheduler = TriggerScheduler(workflow_service, lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
+                                     poll_source=getattr(workflow_service, 'trigger_poller', None),
+                                     interval=float(os.getenv('BUILDER_TRIGGER_INTERVAL', '5')))
+        scheduler.start(); workers.append(scheduler)
     app = FastAPI(title='Agentic AI Builder workflow API', docs_url=None, redoc_url=None)
     app.state.workflow_service = workflow_service
+    app.state.workers = workers
+
+    @app.on_event('shutdown')
+    async def stop_workers():
+        for worker in app.state.workers:
+            worker.stop()
 
     def error(code, message, status):
         result = workflow_service.failure(f'req_{uuid4().hex}', ApiFailure(code, message, status))
@@ -81,7 +99,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         ).split(',')
         if origin and origin not in allowed_origins:
             return error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
-        if request.url.path != '/session' and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
+        if request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
             return error('AUTHENTICATION_REQUIRED', 'Open the workspace to establish your local session.', 401)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
@@ -211,6 +229,31 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     async def trigger_event(binding_id: str, request: Request):
         return await lifecycle_dispatch(request, 'ingest_trigger_event', {'binding_id': binding_id})
 
+    @app.post('/webhooks/{provider_id}/{binding_id}')
+    async def provider_webhook(provider_id: str, binding_id: str, request: Request):
+        """Provider-facing delivery endpoint. Signature verification happens on raw bytes."""
+        try:
+            raw = await request.body()
+            trigger = await run_in_threadpool(workflow_service.lifecycle.verify_webhook, binding_id, provider_id, raw,
+                                              request.headers.get('x-hub-signature-256') if provider_id == 'github_webhook' else request.headers.get('x-slack-signature') if provider_id == 'slack_events' else request.headers.get('x-builder-signature'),
+                                              request.headers.get('x-slack-request-timestamp') if provider_id == 'slack_events' else request.headers.get('x-builder-timestamp'))
+            event = json.loads(raw)
+            if not isinstance(event, dict):
+                return error('INVALID_EVENT', 'The webhook payload must be an object.', 400)
+            if provider_id == 'slack_events' and event.get('type') == 'url_verification':
+                return JSONResponse({'challenge': event.get('challenge', '')})
+            # In production this is an isolated provider principal. The local
+            # server uses the configured development administrator only after
+            # the provider signature has been verified.
+            result = await run_in_threadpool(workflow_service.lifecycle.ingest, binding_id, event, auth)
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, result))
+        except Exception:
+            return error('SOURCE_VERIFICATION_FAILED', 'The webhook could not be verified or processed.', 401)
+
+    @app.post('/trigger-bindings/{binding_id}/poll')
+    async def poll_trigger(binding_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'poll_trigger', {'binding_id': binding_id})
+
     @app.post('/dispatch-jobs/{job_id}/replay')
     async def replay_dispatch(job_id: str, request: Request):
         return await lifecycle_dispatch(request, 'replay_dispatch_job', {'job_id': job_id})
@@ -227,6 +270,14 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     async def run(run_id: str, request: Request):
         return await dispatch(request, 'get_run', {'run_id': run_id})
 
+    @app.get('/runs')
+    async def runs(request: Request):
+        return await dispatch(request, 'list_runs')
+
+    @app.get('/approvals')
+    async def approvals(request: Request):
+        return await dispatch(request, 'list_approvals')
+
     @app.get('/runs/{run_id}/events')
     async def events(run_id: str, request: Request):
         return await dispatch(request, 'list_run_events', {'run_id': run_id})
@@ -241,6 +292,58 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, data))
         except Exception:
             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+
+    @app.get('/workspace/{collection}')
+    async def workspace_collection(collection: str, request: Request):
+        if collection not in {'settings', 'knowledge', 'governance'}:
+            return error('NOT_FOUND', 'The workspace collection was not found.', 404)
+        table = {'settings': 'workspace_settings', 'knowledge': 'knowledge_sources', 'governance': 'governance_policies'}[collection]
+        try:
+            with workflow_service.store.transaction() as db:
+                if collection == 'settings':
+                    rows = db.execute('SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key', (auth['subject']['workspace_id'],)).fetchall()
+                    items = [{'key': k, 'value': json.loads(v), 'updated_at': t} for k, v, t in rows]
+                else:
+                    rows = db.execute(f'SELECT document FROM {table} WHERE workspace=? ORDER BY updated_at DESC', (auth['subject']['workspace_id'],)).fetchall()
+                    items = [json.loads(row[0]) for row in rows]
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}))
+        except Exception:
+            return error('INVALID_API_DATA', 'The workspace collection is unavailable.', 400)
+
+    @app.put('/workspace/{collection}/{item_id}')
+    async def save_workspace_item(collection: str, item_id: str, request: Request):
+        if collection not in {'settings', 'knowledge', 'governance'}:
+            return error('NOT_FOUND', 'The workspace collection was not found.', 404)
+        if 'admin' not in auth['roles']:
+            return error('OPERATION_NOT_AUTHORIZED', 'Workspace administration is required.', 403)
+        try:
+            payload = await request.json()
+            from registry.safety import reject_secrets
+            reject_secrets(payload)
+            import datetime
+            updated = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            workspace = auth['subject']['workspace_id']
+            with workflow_service.store.transaction() as db:
+                if collection == 'settings':
+                    db.execute('INSERT INTO workspace_settings VALUES (?, ?, ?, ?) ON CONFLICT(workspace, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at', (workspace, item_id, json.dumps(payload.get('value')), updated))
+                    document = {'key': item_id, 'value': payload.get('value'), 'updated_at': updated}
+                else:
+                    table = 'knowledge_sources' if collection == 'knowledge' else 'governance_policies'
+                    document = {'id': item_id, **payload, 'updated_at': updated}
+                    db.execute(f'INSERT INTO {table} VALUES (?, ?, ?, ?) ON CONFLICT({"source_id" if collection == "knowledge" else "policy_id"}) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at', (workspace, item_id, json.dumps(document), updated))
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, document))
+        except Exception:
+            return error('INVALID_API_DATA', 'The workspace item is invalid.', 400)
+
+    @app.post('/integrations/{provider}/test')
+    async def integration_test(provider: str, request: Request):
+        # Connection tests are server-owned and accept only a provider name;
+        # browser requests can never submit credentials.
+        allowed = {'smtp', 'google_sheets', 'google_drive', 'google_calendar', 'google_docs', 'slack', 'github', 'open_meteo', 'open_library', 'generic_rest', 'webhook', 'brevo_smtp'}
+        if provider not in allowed:
+            return error('INTEGRATION_UNSUPPORTED', 'The provider is not supported.', 400)
+        configured = bool(os.getenv('GMAIL_SMTP_USER')) if provider == 'smtp' else bool(os.getenv('GOOGLE_TOKEN_FILE')) if provider.startswith('google_') else True
+        return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, {'provider': provider, 'configured': configured, 'tested': configured, 'message': 'Server-side connection test completed.' if configured else 'Configure this provider on the server.'}))
 
     @app.post('/approvals/{approval_id}/decision')
     async def decision(approval_id: str, request: Request):

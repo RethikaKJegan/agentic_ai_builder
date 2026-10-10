@@ -38,6 +38,8 @@ PERMISSIONS = {
     'get_run': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
     'list_run_events': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
     'decide_approval': ('workflow.approve', {'admin', 'approver'}),
+    'list_runs': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
+    'list_approvals': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
 }
 
 
@@ -75,6 +77,9 @@ class WorkflowService:
                 data = self.lifecycle.ingest(context.get('binding_id'), request.get('payload', {}).get('event'), auth,
                                              context.get('signature'), context.get('timestamp'),
                                              request.get('payload', {}).get('checkpoint'))
+            elif operation == 'poll_trigger':
+                data = self.lifecycle.poll(context.get('binding_id'), request.get('payload', {}).get('changes', []),
+                                           request.get('payload', {}).get('cursor'), auth)
             elif operation == 'replay_dispatch_job':
                 data = {'job': self.lifecycle.replay(context.get('job_id'), auth)}
             else:
@@ -147,6 +152,14 @@ class WorkflowService:
                         run = self.runtime_runner.advance(run['run_id'], auth)
                     data = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
                 return self.envelope(request_id, 200, data)
+            if operation == 'list_runs':
+                if self.runtime_runner is None:
+                    raise ApiFailure('SERVICE_UNAVAILABLE', 'The runtime and approval service is not connected.', 503, retryable=True)
+                return self.envelope(request_id, 200, self.runtime_runner.runtime.list_runs(auth, payload.get('limit', 100), payload.get('status')))
+            if operation == 'list_approvals':
+                if self.runtime_runner is None:
+                    raise ApiFailure('SERVICE_UNAVAILABLE', 'The runtime and approval service is not connected.', 503, retryable=True)
+                return self.envelope(request_id, 200, self.runtime_runner.runtime.list_approvals(auth, payload.get('pending_only', False), payload.get('limit', 100)))
             if operation in {'list_tools', 'list_capabilities'}:
                 return self.registry.handle(request, auth)
             if operation == 'plan_workflow':
@@ -267,6 +280,12 @@ class WorkflowService:
                 raise ApiFailure('INVALID_TRANSITION', f'The revision must be {expected} first.', 409)
             self.validate_document(workflow)
             if action == 'approve':
+                # Reconcile older validated drafts with the current trusted
+                # registry before reviewing them. This lets an existing draft
+                # recover after a configured planner capability becomes
+                # resolvable, without accepting browser-supplied grants.
+                workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
+                self.validate_document(workflow)
                 self.registry_adapter.approve_pending(workflow, auth)
             review = self.registry_adapter.review(workflow, auth)
             if not review['ready']:

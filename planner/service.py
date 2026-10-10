@@ -74,6 +74,10 @@ class PlannerService:
             new = f"{workflow_id}_{old}"[:128]
             mapping[old] = new
             agent["agent_id"] = new
+        for agent in workflow.get("agents", []):
+            parent = agent.get("parent_agent_id")
+            if parent in mapping:
+                agent["parent_agent_id"] = mapping[parent]
         for node in workflow.get("nodes", []):
             if node.get("agent_id") in mapping:
                 node["agent_id"] = mapping[node["agent_id"]]

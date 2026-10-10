@@ -29,7 +29,6 @@ import {
   Undo2,
   ChevronDown,
   ChevronUp,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useMesh } from "@/domain/store";
@@ -103,7 +102,6 @@ function Builder({ workflow }: { workflow: Workflow }) {
   const [future, setFuture] = useState<Graph[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<"inspector" | null>(null);
-  const [savedAt, setSavedAt] = useState<Date>(new Date(workflow.updatedAt));
   const [composerOpen, setComposerOpen] = useState(
     () => typeof window === "undefined" || window.innerWidth >= 768,
   );
@@ -125,7 +123,6 @@ function Builder({ workflow }: { workflow: Workflow }) {
       setNodes(g.nodes as MeshFlowNode[]);
       setEdges(g.edges);
       store.updateGraph(workflow.id, clean(g.nodes as MeshFlowNode[]), g.edges);
-      setSavedAt(new Date());
     },
     [store, workflow.id],
   );
@@ -452,10 +449,6 @@ function Builder({ workflow }: { workflow: Workflow }) {
             tone={current.status === "published" ? "success" : "neutral"}
           />
         </span>
-        <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">
-          <Check className="h-3 w-3" />
-          {current.serverVersion ? "Unsaved edits stay in memory" : `Saved in browser ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-        </span>
         <div className="flex-1" />
         <button
           onClick={undo}
@@ -513,6 +506,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <WorkflowControls workflow={current} />
         <DropdownMenu>
           <DropdownMenuTrigger
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
@@ -562,7 +556,6 @@ function Builder({ workflow }: { workflow: Workflow }) {
         </DropdownMenu>
       </div>
 
-      <WorkflowControls workflow={current} />
       <div className="flex min-h-0 flex-1">
         {/* Canvas */}
         <div className="relative min-w-0 flex-1 bg-canvas">

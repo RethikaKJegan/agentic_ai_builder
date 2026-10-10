@@ -119,6 +119,7 @@ if __name__ == '__main__':
         connectors = {'smtp_send_email': _OfflineConnector(external_write=True),
                       'google_sheets_read_rows': _OfflineConnector(),
                       'google_sheets_update_row': _OfflineConnector(external_write=True, result={'updated_cells': 1})}
+        trigger_defaults = {}
         if os.getenv('BUILDER_REAL_CONNECTORS') == '1':
             from runtime.connectors import GoogleAPIConnector, GoogleSheetsConnector, GoogleSheetsUpdateConnector, HTTPJSONConnector, SlackWebhookConnector, SMTPConnector
             env = load_env()
@@ -157,8 +158,11 @@ if __name__ == '__main__':
                 'webhook_send': HTTPJSONConnector(resolve, 'webhook', 'http://127.0.0.1:8787', method='POST', external_write=True, required_tool_id='webhook_send'),
                 'brevo_send_email': SMTPConnector(resolve, allowed, [env.get('BREVO_SMTP_HOST', 'smtp-relay.brevo.com')]),
             }
+            trigger_defaults = {'google_sheets': env.get('GOOGLE_SHEETS_SPREADSHEET_ID', '')}
         service.runtime_runner = GraphRunner(RuntimeService(service),
             agents=CrewExecutor(service.registry_adapter, _offline_model_factory), connectors=connectors)
+        from workflow_api.trigger_sources import ProviderTriggerSource
+        service.trigger_poller = ProviderTriggerSource(service, connectors, trigger_defaults).poll
         auth = dict(subject=dict(subject_id='local-builder', workspace_id='local-workspace'), roles=['admin', 'approver'],
                     permissions=ROLE_PERMISSIONS['admin'] + ['data.read', 'communication.send'], scopes=['data.read', 'spreadsheets.readonly', 'communication.send', 'email.send'], decision='allow')
         for document in documents:

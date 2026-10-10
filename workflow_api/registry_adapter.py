@@ -15,6 +15,7 @@ from registry.contracts import RegistryError, validate_json_schema
 from registry.safety import reject_secrets
 
 ROOT = Path(__file__).resolve().parents[1]
+MODEL_ONLY_CAPABILITIES = frozenset({'classify_text', 'generate_report'})
 
 
 class RegistryAdapter:
@@ -92,6 +93,11 @@ class RegistryAdapter:
                     if node.get('kind') == 'tool' and node.get('tool_id') == old_id:
                         node['tool_id'] = selected['tool_id']
                 unresolved_capabilities.discard(tool['capability'])
+            # These capabilities execute within the registered model agent and
+            # intentionally have no connector/tool reference to authorize.
+            for capability in agent['capabilities']:
+                if capability in MODEL_ONLY_CAPABILITIES:
+                    unresolved_capabilities.discard(capability)
         self._materialize_tool_nodes(resolved)
         resolved['metadata']['unresolved_requirements'] = [item for item in unresolved
             if not (isinstance(item, dict) and item.get('requirement') not in unresolved_capabilities)]
@@ -216,6 +222,15 @@ class RegistryAdapter:
                                     authorization_state='denied', reason_codes=['AGENT_CONFIGURATION_MISMATCH']))
                 continue
             for capability in agent['capabilities']:
+                # Some capabilities are performed by the agent's model alone
+                # (for example classify_text or generate_report). Only a
+                # capability represented by a workflow tool needs a Registry
+                # connector assignment. Treating every model capability as a
+                # missing connector made otherwise executable multi-agent
+                # workflows impossible to approve.
+                ref = next((item for item in workflow['tools'] if item['capability'] == capability), None)
+                if ref is None:
+                    continue
                 bindings = ([b for b in dynamic_bindings if b['capability'] == capability] if self.auto_resolve_planner else [b for b in self.bindings if b['workflow_id'] == workflow['workflow_id']
                             and b['workflow_version'] == workflow['version']
                             and b['agent_id'] == agent['agent_id'] and b['capability'] == capability])

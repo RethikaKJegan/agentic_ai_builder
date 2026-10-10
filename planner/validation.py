@@ -54,6 +54,27 @@ def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth:
         raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Workflow node identifiers must be unique.", field="nodes")
     node_set = set(node_ids)
     agent_ids = {agent["agent_id"] for agent in workflow["agents"]}
+    hierarchy = {agent["agent_id"]: agent for agent in workflow["agents"]}
+    for agent in workflow["agents"]:
+        parent = agent.get("parent_agent_id")
+        role = agent.get("hierarchy_role", "standalone")
+        if parent and (parent not in agent_ids or parent == agent["agent_id"]):
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Agent hierarchy references an invalid parent.", field="agents.parent_agent_id")
+        if role == "sub_agent" and not parent:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "A sub-agent must identify its parent.", field="agents.hierarchy_role")
+        if role == "master" and parent:
+            raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "A master agent cannot have a parent.", field="agents.parent_agent_id")
+    for agent in workflow["agents"]:
+        seen_parents = set()
+        current = agent
+        while current.get("parent_agent_id"):
+            parent_id = current["parent_agent_id"]
+            if parent_id in seen_parents:
+                raise PlannerFailure("WORKFLOW_INVALID_TRANSITION", "Agent hierarchy contains a cycle.", field="agents.parent_agent_id")
+            seen_parents.add(parent_id)
+            current = hierarchy[parent_id]
+            if len(seen_parents) > 8:
+                raise PlannerFailure("WORKFLOW_GRAPH_TOO_DEEP", "Agent hierarchy exceeds the maximum depth.", field="agents.parent_agent_id")
     edges = workflow["edges"]
     edge_ids = [edge["edge_id"] for edge in edges]
     if len(edge_ids) != len(set(edge_ids)):

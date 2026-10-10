@@ -45,7 +45,7 @@ Start the planned FastAPI boundary from the repository root in a separate termin
 BUILDER_DEV_AUTH=1 .venv-integrations/bin/python -m uvicorn workflow_api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Then start Next.js as above. `/api/backend/*` forwards same-origin requests to `http://127.0.0.1:8000`; an optional server-only `BUILDER_API_URL` changes the destination. No provider keys reach the browser.
+Then start Next.js as above. `/api/backend/*` forwards same-origin requests to `http://127.0.0.1:8011`, the repository-local API; an optional server-only `BUILDER_API_URL` changes the destination. No provider keys reach the browser.
 
 Development authentication is opt-in. It issues an HttpOnly/SameSite session for a server-configured identity and defaults to the builder role. This is a local POC session, not a production login system. Bind both servers to loopback. `BUILDER_DEV_ROLES` configures trusted development roles (builder/viewer/approver/admin); there is no browser role switch. Default builders can plan, save, read and validate, but cannot approve, publish or execute.
 

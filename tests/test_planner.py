@@ -65,7 +65,9 @@ class PlannerTests(unittest.TestCase):
         workflow = result["data"]["workflow"]
         self.assertIn({"tool_id": "google_sheets_read_rows", "capability": "read_spreadsheet"}, workflow["tools"])
         self.assertEqual(workflow["nodes"][0]["label"], "New spreadsheet row")
-        self.assertEqual(workflow["nodes"][0]["configuration"]["event"], "row.created")
+        template = workflow["metadata"]["trigger_templates"][0]
+        self.assertEqual(template["event_type"], "row.created")
+        self.assertEqual(template["provider_id"], "google_sheets")
 
     def test_provider_words_select_catalog_tool_without_credentials(self):
         for objective, tool_id in (("Get the weather forecast", "open_meteo_forecast"),
@@ -76,6 +78,16 @@ class PlannerTests(unittest.TestCase):
             self.assertIn(tool_id, {tool["tool_id"] for tool in workflow["tools"]})
             self.assertNotIn("api_key", repr(workflow))
             self.assertNotIn("password", repr(workflow))
+
+    def test_hierarchy_mode_returns_multiple_canonical_agents(self):
+        workflow = RuleBasedStructuredOutputProvider().generate(
+            "When a lead arrives, classify it and notify Slack",
+            {"generation_mode": "hierarchy"},
+        )
+        self.assertGreaterEqual(len(workflow["agents"]), 3)
+        self.assertEqual(workflow["metadata"]["generation_mode"], "hierarchy")
+        self.assertTrue(any(node["kind"] == "agent" and node["agent_id"] == "workflow_master_agent" for node in workflow["nodes"]))
+        validate_workflow(workflow)
 
     def test_condition_has_declared_paths_and_external_rejection_path(self):
         conditional = local_service().plan(request("If the request is urgent, send an email notification"))

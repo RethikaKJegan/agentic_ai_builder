@@ -12,7 +12,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
-    const url = new URL(path.map(encodeURIComponent).join("/") + request.nextUrl.search, (process.env["BUILDER_API_URL"] || "http://127.0.0.1:8000") + "/");
+    // The repository-local development API started by
+    // scripts/serve_ui_test_api.py listens on 8011. Using 8000 here can
+    // silently proxy to an unrelated project running on the same machine.
+    const url = new URL(path.map(encodeURIComponent).join("/") + request.nextUrl.search, (process.env["BUILDER_API_URL"] || "http://127.0.0.1:8011") + "/");
     const headers: Record<string, string> = {};
     const contentType = request.headers.get("content-type");
     const accept = request.headers.get("accept");

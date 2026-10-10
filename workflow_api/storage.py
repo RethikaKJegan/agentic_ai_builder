@@ -12,6 +12,9 @@ class WorkflowStore:
         with self.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))')
             db.execute('CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))')
+            db.execute('CREATE TABLE IF NOT EXISTS workspace_settings (workspace TEXT, key TEXT, value TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace, key))')
+            db.execute('CREATE TABLE IF NOT EXISTS knowledge_sources (workspace TEXT, source_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS governance_policies (workspace TEXT, policy_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)')
 
     @contextmanager
     def transaction(self):

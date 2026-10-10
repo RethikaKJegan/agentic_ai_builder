@@ -162,6 +162,29 @@ class RuntimeService:
         with self.store.transaction() as db:
             return self.public(self.load(db, run_id, auth))
 
+    def list_runs(self, auth, limit=100, status=None):
+        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+        workspace = auth['subject']['workspace_id']
+        with self.store.transaction() as db:
+            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+        items = [self.public(json.loads(row[0])) for row in rows]
+        if status:
+            items = [item for item in items if item['status'] == status]
+        return {'items': items, 'total': len(items), 'has_more': len(items) >= min(max(int(limit), 1), 500), 'next_cursor': None}
+
+    def list_approvals(self, auth, pending_only=False, limit=100):
+        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+        workspace = auth['subject']['workspace_id']
+        with self.store.transaction() as db:
+            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+        items = []
+        for row in rows:
+            run = json.loads(row[0])
+            for approval in run.get('approvals', []):
+                if not pending_only or approval.get('status') == 'pending':
+                    items.append({**approval, 'run_id': run['run_id']})
+        return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
+
     def events(self, run_id, auth):
         with self.store.transaction() as db:
             self.load(db, run_id, auth)
@@ -180,8 +203,11 @@ class RuntimeService:
             for counters in run.get('usage', {}).values():
                 for key in usage:
                     usage[key] += counters.get(key, 0)
+        by_status = {status: sum(r['status'] == status for r in runs) for status in ('queued', 'running', 'paused_for_approval', 'completed', 'failed', 'blocked', 'rejected', 'cancelled')}
+        durations = [max(0, (r.get('finished_at', r.get('created_at', self.clock())) - r.get('created_at', self.clock()))) for r in runs if isinstance(r.get('finished_at'), (int, float))]
         return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
                          'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
+                'status_breakdown': by_status, 'duration_seconds': {'count': len(durations), 'avg': sum(durations) / len(durations) if durations else 0},
                 'events': event_count, 'usage': usage,
                 'latest': [self.public(run) for run in runs[:20]]}
 

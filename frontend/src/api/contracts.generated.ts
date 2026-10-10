@@ -17,7 +17,7 @@ export const CanonicalWorkflowSchema = z.object({"workflow_id":z.string().regex(
 "name":z.string(),
 "role":z.string(),
 "contact_reference":z.string().optional()}).strict()),
-"agents":z.array(z.object({"agent_id":z.string().regex(new RegExp("^[a-z][a-z0-9_-]{2,127}$")),
+"agents":z.array(z.object({"agent_id":z.string().regex(new RegExp("^[a-z][a-z0-9_-]{2,127}$")),"parent_agent_id":z.string().regex(new RegExp("^[a-z][a-z0-9_-]{2,127}$")).optional(),"hierarchy_role":z.union([z.literal("standalone"),z.literal("master"),z.literal("sub_agent")]).optional(),
 "role":z.string().min(1),
 "goal":z.string().min(1),
 "instructions":z.string().min(1),
@@ -74,6 +74,8 @@ export const CanonicalWorkflowSchema = z.object({"workflow_id":z.string().regex(
 "metadata":z.record(z.unknown())}).strict();
 export type CanonicalWorkflow = z.infer<typeof CanonicalWorkflowSchema>;
 export const CanonicalAgentSchema = z.object({"agent_id":z.string().regex(new RegExp("^[a-z][a-z0-9_-]{2,127}$")),
+"parent_agent_id":z.string().regex(new RegExp("^[a-z][a-z0-9_-]{2,127}$")).optional(),
+"hierarchy_role":z.union([z.literal("standalone"),z.literal("master"),z.literal("sub_agent")]).optional(),
 "name":z.string().min(1),
 "role":z.string().min(1),
 "goal":z.string().min(1),

@@ -14,6 +14,7 @@ from runtime.graph import GraphRunner
 from workflow_api.lifecycle import LifecycleFailure, TriggerAdapter
 from workflow_api.service import WorkflowService
 from workflow_api.storage import WorkflowStore
+from workflow_api.scheduler import TriggerScheduler
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -156,6 +157,23 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(tick["job"]["release_id"], scheduled["release"]["release_id"])
         with self.assertRaisesRegex(LifecycleFailure, "timezone-aware"):
             self.service.lifecycle.tick_schedule("schedule_binding", {"body": "Tick"}, "2027-01-15T08:10:00", self.auth)
+
+    def test_publish_uses_template_and_scheduler_dispatches_new_events(self):
+        self.workflow["metadata"]["trigger_templates"] = [self.trigger("fake_poll", "poll", "template_poll")]
+        with self.service.store.transaction() as db:
+            self.service.store.put(db, "local-workspace", self.workflow)
+        release = self.activate("template_activate_1234", triggers=[])
+        self.assertEqual(release["release"]["trigger_binding_ids"], ["template_poll"])
+        batches = [([], "cursor_1"), ([{"event_id": "new_row", "body": "New"}], "cursor_2")]
+        scheduler = TriggerScheduler(self.service, lambda workspace, subject: self.auth if workspace == "local-workspace" else None,
+                                     poll_source=lambda binding, cursor: batches.pop(0), interval=1)
+        scheduler.last_polled["template_poll"] = 0
+        first = scheduler.tick()
+        scheduler.last_polled["template_poll"] = 0
+        second = scheduler.tick()
+        self.assertEqual(first["queued"], 0)
+        self.assertEqual(second["queued"], 1)
+        self.assertEqual(second["dispatched"], 1)
 
     def test_signed_real_webhook_rejects_invalid_and_accepts_fresh_signature(self):
         self.activate(triggers=[self.trigger("generic_hmac_webhook", "push", "webhook_binding")])

@@ -98,6 +98,29 @@ class CrossSegmentIntegrationTests(unittest.TestCase):
         self.assertEqual(approved.json()['data']['workflow']['status'], 'approved')
         self.assertTrue(approved.json()['data']['registry_review']['ready'])
 
+    def test_hierarchical_prompt_resolves_specialist_assignments_before_publication(self):
+        planned = self.request('plan_workflow', 'plan_hierarchy_123456', {
+            'objective': 'Classify the request and send an email to the owner', 'context': {'generation_mode': 'hierarchy'},
+        }, '/workflows/plan')
+        self.assertEqual(planned.status_code, 200, planned.text)
+        workflow = planned.json()['data']['workflow']
+        self.assertEqual(workflow['agents'][0]['hierarchy_role'], 'master')
+        saved = self.client.put(f"/workflows/{workflow['workflow_id']}/versions/1", json={
+            'request_id': 'req_save_hierarchy_123456', 'operation': 'save_workflow_version', 'idempotency_key': 'save_hierarchy_123456',
+            'payload': {'workflow_id': workflow['workflow_id'], 'workflow_version': 1, 'base_version': 0, 'workflow': workflow},
+        })
+        self.assertEqual(saved.status_code, 200, saved.text)
+        # Simulate a draft saved before the Registry learnt that model-only
+        # capabilities do not need connector assignments.
+        legacy = saved.json()['data']['workflow']
+        legacy['metadata']['unresolved_requirements'] = [{'requirement': 'classify_text', 'reason': 'registry_assignment_pending'}]
+        with self.app.state.workflow_service.store.transaction() as db:
+            self.app.state.workflow_service.store.put(db, 'local-workspace', legacy)
+        ref = {'workflow_id': workflow['workflow_id'], 'workflow_version': 1}
+        self.assertEqual(self.request('validate_workflow', 'validate_hierarchy_123456', ref, f"/workflows/{workflow['workflow_id']}/validate").status_code, 200)
+        approved = self.request('approve_workflow', 'approve_hierarchy_123456', {**ref, 'action': 'approve'}, f"/workflows/{workflow['workflow_id']}/approve")
+        self.assertEqual(approved.status_code, 200, approved.text)
+
     def test_missing_capability_remains_unresolved(self):
         planned = self.request('plan_workflow', 'plan_unknown_123456', {'objective': 'Notify the team through an unknown provider'}, '/workflows/plan')
         self.assertEqual(planned.status_code, 200, planned.text)

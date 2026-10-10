@@ -139,6 +139,21 @@ class GoogleSheetsConnector:
             raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'The connector result does not meet the assignment schema.')
         return output
 
+    def poll_changes(self, grant, inputs, previous_cursor=None):
+        """Read a sheet range and return replay-safe row events plus a cursor.
+
+        Scheduling and durable checkpoint storage remain lifecycle concerns; this
+        method only performs the provider read and creates stable row identities.
+        """
+        output = self.invoke(grant, inputs, 'poll:' + (previous_cursor or 'initial'))
+        rows = output.get('rows', [])
+        snapshot = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        changes = [] if previous_cursor == snapshot else [
+            {'event_id': f'row:{snapshot}:{index}', 'row_index': index, 'row': row}
+            for index, row in enumerate(rows)
+        ]
+        return {'cursor': snapshot, 'changes': changes}
+
 
 class GoogleSheetsUpdateConnector(GoogleSheetsConnector):
     """Update a configured range through the same trusted OAuth boundary."""

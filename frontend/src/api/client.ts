@@ -22,7 +22,7 @@ const toolsData = CollectionSchema.extend({ items: z.array(z.object({
 const capabilitiesData = CollectionSchema.extend({ items: z.array(z.object({ capability: z.string(), registered_tool_ids: z.array(z.string()) })), ...metadata });
 const workflowsData = CollectionSchema.extend({ items: z.array(CanonicalWorkflowSchema), ...metadata });
 export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(),
-  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]),
+  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().optional(),
   allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]) });
 const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
@@ -187,6 +187,13 @@ export class WorkflowClient {
     const result = overviewCollectionSchema.safeParse(await this.read(path));
     if (!result.success) return fail("INVALID_API_DATA", "The workflow overview response is invalid.");
     return result.data;
+  }
+
+  async pollTrigger(bindingId: string, changes: Record<string, unknown>[], cursor: string) {
+    return this.read(`trigger-bindings/${encodeURIComponent(bindingId)}/poll`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_id: crypto.randomUUID(), operation: "poll_trigger", idempotency_key: await retryKey("poll_trigger", { bindingId, cursor }), payload: { changes, cursor } }),
+    });
   }
 
   private async lifecycle(operation: string, path: string, payload: Record<string, unknown>, method = "POST") {

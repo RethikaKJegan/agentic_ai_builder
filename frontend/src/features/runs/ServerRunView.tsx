@@ -24,6 +24,7 @@ export function ApprovalControl({ approval, onUpdated }: { approval: ApprovalRec
   };
   return <div className="space-y-2 rounded-lg border border-border p-3">
     <p className="text-sm">Approval {record.approval_id} · {record.status} · v{record.workflow_version}</p>
+    <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
     {record.status === "pending" && backend.session?.approval_service_available && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
     {record.status === "unmatched" && <p className="text-xs text-muted-foreground">This approval does not match the current workflow revision.</p>}
     <ApiFeedback error={error} />
