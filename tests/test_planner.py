@@ -58,6 +58,25 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(workflow["approval_gates"])
         self.assertTrue(workflow["execution_policy"]["requires_review_before_execution"])
 
+    def test_provider_neutral_sheet_wording_creates_read_capability_and_trigger_metadata(self):
+        result = local_service().plan(request(
+            "When a new row is added to Google Sheets, read the record and notify the owner",
+            "sheets-12345678"))
+        workflow = result["data"]["workflow"]
+        self.assertIn({"tool_id": "google_sheets_read_rows", "capability": "read_spreadsheet"}, workflow["tools"])
+        self.assertEqual(workflow["nodes"][0]["label"], "New spreadsheet row")
+        self.assertEqual(workflow["nodes"][0]["configuration"]["event"], "row.created")
+
+    def test_provider_words_select_catalog_tool_without_credentials(self):
+        for objective, tool_id in (("Get the weather forecast", "open_meteo_forecast"),
+                                   ("Search GitHub repositories", "github_rest_request"),
+                                   ("List files from Drive", "google_drive_list_files"),
+                                   ("Notify the team in Slack", "slack_send_notification")):
+            workflow = RuleBasedStructuredOutputProvider().generate(objective, {})
+            self.assertIn(tool_id, {tool["tool_id"] for tool in workflow["tools"]})
+            self.assertNotIn("api_key", repr(workflow))
+            self.assertNotIn("password", repr(workflow))
+
     def test_condition_has_declared_paths_and_external_rejection_path(self):
         conditional = local_service().plan(request("If the request is urgent, send an email notification"))
         workflow = conditional["data"]["workflow"]

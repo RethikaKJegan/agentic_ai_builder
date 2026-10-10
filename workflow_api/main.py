@@ -231,6 +231,17 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     async def events(run_id: str, request: Request):
         return await dispatch(request, 'list_run_events', {'run_id': run_id})
 
+    @app.get('/monitoring')
+    async def monitoring(request: Request):
+        try:
+            if workflow_service.runtime_runner is None:
+                return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+            workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+            data = workflow_service.runtime_runner.runtime.monitoring(auth)
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, data))
+        except Exception:
+            return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+
     @app.post('/approvals/{approval_id}/decision')
     async def decision(approval_id: str, request: Request):
         return await dispatch(request, 'decide_approval', {'approval_id': approval_id})

@@ -26,9 +26,9 @@
 
 ## 5. Generic provider execution
 
-- [ ] 5.1 Define a versioned Registry catalog for all configured provider actions: Google Sheets read/update, Drive, Calendar, Slack, GitHub, Open-Meteo, Open Library, Google Docs, generic REST, webhook, Gmail SMTP, and Brevo SMTP; include schemas, scopes, destinations, risk, quota, and approval metadata.
-- [ ] 5.2 Extend planner capability normalization to recognize provider-neutral intents, trigger requirements, typed mappings, and declared condition outcomes without selecting credentials or provider IDs.
-- [ ] 5.3 Implement provider adapters behind the Registry grant boundary; support real credentials only in explicit operator mode and retain offline adapters for tests.
+- [x] 5.1 Define a versioned Registry catalog for all configured provider actions: Google Sheets read/update, Drive, Calendar, Slack, GitHub, Open-Meteo, Open Library, Google Docs, generic REST, webhook, Gmail SMTP, and Brevo SMTP; include schemas, scopes, destinations, risk, quota, and approval metadata.
+- [x] 5.2 Extend planner capability normalization to recognize provider-neutral intents, trigger requirements, typed mappings, and declared condition outcomes without selecting credentials or provider IDs.
+- [x] 5.3 Implement provider adapters behind the Registry grant boundary; support real credentials only in explicit operator mode and retain offline adapters for tests.
 - [ ] 5.4 Add generic Google Sheets polling/row-change trigger support with cursor, receipt, release binding, replay protection, and durable dispatch.
 - [ ] 5.5 Add generic workflow graph validation for multi-agent branches, update actions, rejection/error paths, and trigger nodes; reject incomplete graphs before publication.
 - [ ] 5.6 Replace manual run/approval lookup with server-backed collections, automatic pending approval notifications, and generic run/event projections.

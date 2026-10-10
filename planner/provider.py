@@ -67,23 +67,65 @@ class RuleBasedStructuredOutputProvider:
         "categor": "classify_text",
         "retriev": "retrieve_records",
         "search": "retrieve_records",
+        "weather": "retrieve_records",
+        "forecast": "retrieve_records",
+        "github": "retrieve_records",
+        "repository": "retrieve_records",
+        "repo": "retrieve_records",
+        "drive": "retrieve_records",
+        "file": "retrieve_records",
+        "calendar": "retrieve_records",
+        "meeting": "retrieve_records",
+        "document": "retrieve_records",
+        "docs": "retrieve_records",
+        "rest": "retrieve_records",
+        "api": "retrieve_records",
+        "book": "retrieve_records",
+        "library": "retrieve_records",
         "report": "generate_report",
         "spreadsheet": "read_spreadsheet",
         "sheets": "read_spreadsheet",
         "sheet": "read_spreadsheet",
         "row": "read_spreadsheet",
+        "update": "update_spreadsheet",
+        "append": "update_spreadsheet",
         "email": "send_email",
         "notif": "send_notification",
     }
     _ACCEPTED_TOOL_IDS = {
         "read_spreadsheet": "google_sheets_read_rows",
+        "update_spreadsheet": "google_sheets_update_row",
         "send_email": "smtp_send_email",
     }
+
+    @staticmethod
+    def _tool_for(capability: str, words: set[str]) -> str | None:
+        """Choose a provider-specific tool from the request while retaining generic capabilities."""
+        if capability == "retrieve_records":
+            if any(word in words for word in {"weather", "forecast", "temperature"}):
+                return "open_meteo_forecast"
+            if any(word in words for word in {"book", "books", "library", "isbn"}):
+                return "open_library_search"
+            if any(word in words for word in {"github", "repository", "repo", "issue", "pull"}):
+                return "github_rest_request"
+            if any(word in words for word in {"drive", "file", "files"}):
+                return "google_drive_list_files"
+            if any(word in words for word in {"calendar", "meeting", "event", "events"}):
+                return "google_calendar_list_events"
+            if any(word in words for word in {"document", "docs"}):
+                return "google_docs_read"
+            if any(word in words for word in {"api", "rest", "http"}):
+                return "generic_rest_request"
+        if capability == "send_notification":
+            return "webhook_send" if "webhook" in words else "slack_send_notification"
+        if capability == "send_email" and "brevo" in words:
+            return "brevo_send_email"
+        return RuleBasedStructuredOutputProvider._ACCEPTED_TOOL_IDS.get(capability)
 
     def generate(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
         words = re.findall(r"[a-z0-9]+", objective.lower())
         capabilities = sorted({cap for token, cap in self._CAPABILITIES.items() if any(token in word for word in words)})
-        external_write = any(cap in {"send_email", "send_notification"} for cap in capabilities)
+        external_write = any(cap in {"send_email", "send_notification", "update_spreadsheet"} for cap in capabilities)
         row_trigger = bool(re.search(r"\b(new|added|created)\b.{0,40}\b(row|lead|record)\b|\b(row|lead|record)\b.{0,40}\b(new|added|created)\b", objective.lower()))
         agent_id = "workflow_planner_agent"
         nodes = [
@@ -107,7 +149,8 @@ class RuleBasedStructuredOutputProvider:
             nodes.append(approval_node)
         else:
             approval_node = None
-        tool_refs = [{"tool_id": self._ACCEPTED_TOOL_IDS[cap], "capability": cap} for cap in capabilities if cap in self._ACCEPTED_TOOL_IDS]
+        tool_refs = [{"tool_id": selected, "capability": cap}
+                     for cap in capabilities if (selected := self._tool_for(cap, set(words))) is not None]
         input_fields = [{"name": "objective_context", "type": "object", "required": False}]
         for cap in capabilities:
             if cap == "read_spreadsheet":
@@ -121,7 +164,27 @@ class RuleBasedStructuredOutputProvider:
                     {"name": "email_subject", "type": "string", "required": True},
                     {"name": "email_body", "type": "string", "required": True},
                 ])
+            elif cap == "update_spreadsheet":
+                input_fields.extend([
+                    {"name": "spreadsheet_id", "type": "string", "required": True},
+                    {"name": "range", "type": "string", "required": True},
+                    {"name": "values", "type": "array", "required": True},
+                ])
+            elif cap == "retrieve_records":
+                input_fields.extend([
+                    {"name": "path", "type": "string", "required": True},
+                    {"name": "query", "type": "object", "required": False},
+                ])
+            elif cap == "send_notification":
+                if self._tool_for(cap, set(words)) == "slack_send_notification":
+                    input_fields.append({"name": "notification_text", "type": "string", "required": True})
+                else:
+                    input_fields.extend([
+                        {"name": "path", "type": "string", "required": True},
+                        {"name": "body", "type": "object", "required": True},
+                    ])
         previous = "objective_condition" if conditional else "plan_objective"
+        approval_inserted = False
         if conditional:
             edges.append({"edge_id": "condition_to_no_output", "source": "objective_condition", "target": "workflow_output", "outcome": "no"})
         for index, tool in enumerate(tool_refs):
@@ -132,13 +195,27 @@ class RuleBasedStructuredOutputProvider:
                 node["configuration"]["input_mapping"] = {"spreadsheet_id": "inputs.spreadsheet_id", "range": "inputs.range"}
             elif tool["capability"] == "send_email":
                 node["configuration"]["input_mapping"] = {"to": "inputs.email_to", "subject": "inputs.email_subject", "body": "inputs.email_body"}
+            elif tool["capability"] == "update_spreadsheet":
+                node["configuration"]["input_mapping"] = {"spreadsheet_id": "inputs.spreadsheet_id", "range": "inputs.range", "values": "inputs.values"}
+            elif tool["capability"] == "retrieve_records":
+                node["configuration"]["input_mapping"] = {"path": "inputs.path", "query": "inputs.query"}
+            elif tool["capability"] == "send_notification":
+                node["configuration"]["input_mapping"] = ({"text": "inputs.notification_text"}
+                    if tool["tool_id"] == "slack_send_notification" else {"path": "inputs.path", "body": "inputs.body"})
             nodes.append(node)
-            if external_write and tool["capability"] == "send_email":
-                if previous == "objective_condition":
-                    edges.append({"edge_id": "condition_to_approval", "source": previous, "target": "external_action_approval", "outcome": "yes"})
+            if external_write and tool["capability"] in {"send_email", "send_notification", "update_spreadsheet"}:
+                if not approval_inserted:
+                    if previous == "objective_condition":
+                        edges.append({"edge_id": "condition_to_approval", "source": previous, "target": "external_action_approval", "outcome": "yes"})
+                    else:
+                        edges.append({"edge_id": "plan_to_approval", "source": previous, "target": "external_action_approval"})
+                    approval_inserted = True
+                    source = "external_action_approval"
+                    outcome = "approved"
                 else:
-                    edges.append({"edge_id": "plan_to_approval", "source": previous, "target": "external_action_approval"})
-                edges.append({"edge_id": "approval_to_send", "source": "external_action_approval", "target": node_id, "outcome": "approved"})
+                    source = previous
+                    outcome = None
+                edges.append({"edge_id": f"{source}_to_{node_id}", "source": source, "target": node_id, **({"outcome": outcome} if outcome else {})})
                 previous = node_id
             else:
                 edges.append({"edge_id": f"{previous}_to_{node_id}", "source": previous, "target": node_id,

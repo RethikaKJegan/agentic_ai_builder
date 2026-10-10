@@ -118,6 +118,12 @@ class RegistryAdapter:
                 mapping = {'spreadsheet_id': 'inputs.spreadsheet_id', 'range': 'inputs.range'}
             elif tool['capability'] == 'send_email':
                 mapping = {'to': 'inputs.email_to', 'subject': 'inputs.email_subject', 'body': 'inputs.email_body'}
+            elif tool['capability'] == 'retrieve_records':
+                mapping = {'path': 'inputs.path', 'query': 'inputs.query'}
+            elif tool['capability'] == 'send_notification':
+                mapping = {'text': 'inputs.notification_text'} if tool['tool_id'] == 'slack_send_notification' else {'path': 'inputs.path', 'body': 'inputs.body'}
+            elif tool['capability'] == 'update_spreadsheet':
+                mapping = {'spreadsheet_id': 'inputs.spreadsheet_id', 'range': 'inputs.range', 'values': 'inputs.values'}
             node = {'node_id': node_id, 'kind': 'tool', 'label': tool['capability'].replace('_', ' ').title(),
                     'agent_id': agent['agent_id'], 'tool_id': tool['tool_id'], 'configuration': {'input_mapping': mapping}}
             inserted = False

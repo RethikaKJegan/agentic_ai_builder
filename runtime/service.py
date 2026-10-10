@@ -168,6 +168,23 @@ class RuntimeService:
             items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
             return dict(items=items, total=len(items), has_more=False, next_cursor=None)
 
+    def monitoring(self, auth):
+        """Return workspace-scoped counters and safe trace references."""
+        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+        workspace = auth['subject']['workspace_id']
+        with self.store.transaction() as db:
+            runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
+            event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+        usage = {'llm_calls': 0, 'tool_calls': 0, 'tokens': 0, 'retries': 0, 'estimated_cost_usd': 0}
+        for run in runs:
+            for counters in run.get('usage', {}).values():
+                for key in usage:
+                    usage[key] += counters.get(key, 0)
+        return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
+                         'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
+                'events': event_count, 'usage': usage,
+                'latest': [self.public(run) for run in runs[:20]]}
+
     def export_traces(self, observer_id='default', limit=100):
         """Export committed events. Export failure never permits a side effect.
 

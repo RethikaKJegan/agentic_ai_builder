@@ -18,8 +18,9 @@ from integration_config import load_env
 
 class _OfflineConnector:
     """Deterministic browser fixture connector; it never reaches a provider."""
-    def __init__(self, external_write=False):
+    def __init__(self, external_write=False, result=None):
         self.external_write = external_write
+        self.result = result
         self.timeout = 30
 
     @staticmethod
@@ -28,7 +29,7 @@ class _OfflineConnector:
 
     def invoke(self, grant, inputs, effect_id):
         if self.external_write:
-            return {'message_id': effect_id}
+            return self.result or {'message_id': effect_id}
         return {'rows': []}
 
 
@@ -46,18 +47,49 @@ if __name__ == '__main__':
         agent['retry_policy']['max_retries'] = 2
         tool = json.loads((ROOT / 'shared/contracts/examples/tools/google-sheets-read.json').read_text())
         tool['availability'] = 'enabled'
+        update_tool = json.loads((ROOT / 'shared/contracts/examples/tools/google-sheets-update-row.json').read_text())
+        update_tool['availability'] = 'enabled'
         smtp_tool = json.loads((ROOT / 'shared/contracts/examples/tools/smtp-send-email.json').read_text())
-        config = dict(policy=dict(workspace_id='local-workspace', agent_permissions=['workflow.read_input', 'data.read', 'communication.send'],
-            approved_providers=['google_sheets', 'smtp'], allowed_destinations=['verified_recipients'], remaining_quota={},
-            credential_references={'cred_browser_sheets': dict(provider_id='google_sheets', scopes=['data.read', 'spreadsheets.readonly']),
-                                   'cred_browser_smtp': dict(provider_id='smtp', scopes=['communication.send', 'email.send'])}),
+        catalog_names = ('slack-send-notification.json', 'github-rest.json', 'open-meteo.json', 'open-library.json',
+                         'generic-rest.json', 'google-drive-list.json', 'google-calendar-list.json',
+                         'google-docs-read.json', 'webhook-send.json', 'brevo-send-email.json')
+        catalog = [json.loads((ROOT / 'shared/contracts/examples/tools' / name).read_text()) for name in catalog_names]
+        credential_references = {
+            'cred_browser_sheets': dict(provider_id='google_sheets', scopes=['data.read', 'data.write', 'spreadsheets', 'spreadsheets.readonly']),
+            'cred_browser_smtp': dict(provider_id='smtp', scopes=['communication.send', 'email.send']),
+            'cred_browser_slack': dict(provider_id='slack', scopes=['communication.send', 'slack.access']),
+            'cred_browser_github': dict(provider_id='github', scopes=['data.read', 'github.access']),
+            'cred_browser_weather': dict(provider_id='open_meteo', scopes=['data.read', 'weather.access']),
+            'cred_browser_books': dict(provider_id='open_library', scopes=['data.read', 'books.access']),
+            'cred_browser_rest': dict(provider_id='generic_rest', scopes=['data.read', 'http.access']),
+            'cred_browser_drive': dict(provider_id='google_drive', scopes=['data.read', 'drive.metadata.readonly']),
+            'cred_browser_calendar': dict(provider_id='google_calendar', scopes=['data.read', 'calendar.events.readonly']),
+            'cred_browser_docs': dict(provider_id='google_docs', scopes=['data.read', 'documents.readonly']),
+            'cred_browser_webhook': dict(provider_id='webhook', scopes=['communication.send', 'webhook.access']),
+            'cred_browser_brevo': dict(provider_id='brevo_smtp', scopes=['communication.send', 'email.send']),
+        }
+        config = dict(policy=dict(workspace_id='local-workspace', agent_permissions=['workflow.read_input', 'data.read', 'data.write', 'communication.send'],
+            approved_providers=list({value['provider_id'] for value in credential_references.values()}),
+            allowed_destinations=['verified_recipients', 'configured_slack_webhook', 'configured_webhook'], remaining_quota={},
+            credential_references=credential_references),
             agents=[agent], tools=[dict(definition=smtp_tool, credential_reference='cred_browser_smtp')], bindings=[],
-            subject_permissions=['data.read', 'communication.send'], subject_scopes=['data.read', 'spreadsheets.readonly', 'communication.send', 'email.send'],
+            subject_permissions=['data.read', 'data.write', 'communication.send'], subject_scopes=['data.read', 'data.write', 'spreadsheets.readonly', 'spreadsheets', 'communication.send', 'email.send', 'slack.access', 'github.access', 'weather.access', 'books.access', 'http.access', 'drive.metadata.readonly', 'calendar.events.readonly', 'documents.readonly', 'webhook.access'],
             operator_permissions=['tools.manage'],
             auto_resolve_planner=True)
         config['policy']['remaining_quota']['smtp_send_email'] = 10
         config['tools'].append(dict(definition=deepcopy(tool), credential_reference='cred_browser_sheets'))
+        config['tools'].append(dict(definition=deepcopy(update_tool), credential_reference='cred_browser_sheets'))
         config['policy']['remaining_quota']['google_sheets_read_rows'] = 10
+        config['policy']['remaining_quota']['google_sheets_update_row'] = 10
+        for definition in catalog:
+            definition['availability'] = 'enabled'
+            reference = {
+                'slack': 'cred_browser_slack', 'github': 'cred_browser_github', 'open_meteo': 'cred_browser_weather',
+                'open_library': 'cred_browser_books', 'generic_rest': 'cred_browser_rest', 'google_drive': 'cred_browser_drive',
+                'google_calendar': 'cred_browser_calendar', 'google_docs': 'cred_browser_docs', 'webhook': 'cred_browser_webhook',
+                'brevo_smtp': 'cred_browser_brevo'}[definition['provider_id']]
+            config['tools'].append(dict(definition=definition, credential_reference=reference))
+            config['policy']['remaining_quota'][definition['tool_id']] = 10
         documents = []
         for kind in ('ready', 'pending', 'risky'):
             definition = {**deepcopy(tool), 'tool_id': f'sheets_{kind}', 'approval_required': kind == 'pending', 'risk_level': 'high' if kind == 'risky' else 'low'}
@@ -85,9 +117,10 @@ if __name__ == '__main__':
         from runtime.crew import CrewExecutor
         from runtime.graph import GraphRunner
         connectors = {'smtp_send_email': _OfflineConnector(external_write=True),
-                      'google_sheets_read_rows': _OfflineConnector()}
+                      'google_sheets_read_rows': _OfflineConnector(),
+                      'google_sheets_update_row': _OfflineConnector(external_write=True, result={'updated_cells': 1})}
         if os.getenv('BUILDER_REAL_CONNECTORS') == '1':
-            from runtime.connectors import GoogleSheetsConnector, SMTPConnector
+            from runtime.connectors import GoogleAPIConnector, GoogleSheetsConnector, GoogleSheetsUpdateConnector, HTTPJSONConnector, SlackWebhookConnector, SMTPConnector
             env = load_env()
             allowed = [item.strip() for item in os.getenv('BUILDER_ALLOWED_RECIPIENTS', env.get('GMAIL_SMTP_USER', '')).split(',') if item.strip()]
             if not allowed:
@@ -99,10 +132,30 @@ if __name__ == '__main__':
                                 sender=env.get('GMAIL_SMTP_USER'))
                 if reference == 'cred_browser_sheets':
                     return dict(provider_id='google_sheets')
-                raise RuntimeError('Unknown credential reference')
+                provider = credential_references.get(reference, {}).get('provider_id')
+                if provider == 'slack':
+                    return dict(provider_id='slack', webhook_url=env.get('SLACK_WEBHOOK_URL', ''))
+                if provider == 'github':
+                    return dict(provider_id='github', token=env.get('GITHUB_TOKEN', ''))
+                if provider == 'smtp':
+                    return dict(host=env.get('BREVO_SMTP_HOST'), port=int(env.get('BREVO_SMTP_PORT', '587')),
+                                username=env.get('BREVO_SMTP_USER'), password=env.get('BREVO_SMTP_PASSWORD'),
+                                sender=env.get('BREVO_SMTP_USER'))
+                return dict(provider_id=provider)
             connectors = {
                 'smtp_send_email': SMTPConnector(resolve, allowed, [env.get('GMAIL_SMTP_HOST', 'smtp.gmail.com')]),
                 'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env.get('GOOGLE_TOKEN_FILE', 'token.json')),
+                'google_sheets_update_row': GoogleSheetsUpdateConnector(resolve, ROOT / env.get('GOOGLE_TOKEN_FILE', 'token.json')),
+                'slack_send_notification': SlackWebhookConnector(resolve),
+                'github_rest_request': HTTPJSONConnector(resolve, 'github', env.get('GITHUB_API_BASE_URL', 'https://api.github.com'), required_tool_id='github_rest_request'),
+                'open_meteo_forecast': HTTPJSONConnector(resolve, 'open_meteo', env.get('OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'), required_tool_id='open_meteo_forecast'),
+                'open_library_search': HTTPJSONConnector(resolve, 'open_library', env.get('OPEN_LIBRARY_BASE_URL', 'https://openlibrary.org'), required_tool_id='open_library_search'),
+                'generic_rest_request': HTTPJSONConnector(resolve, 'generic_rest', env.get('REST_API_BASE_URL', 'https://jsonplaceholder.typicode.com'), required_tool_id='generic_rest_request'),
+                'google_drive_list_files': GoogleAPIConnector(resolve, ROOT / env.get('GOOGLE_TOKEN_FILE', 'token.json'), 'google_drive', 'https://www.googleapis.com/drive/v3', required_tool_id='google_drive_list_files'),
+                'google_calendar_list_events': GoogleAPIConnector(resolve, ROOT / env.get('GOOGLE_TOKEN_FILE', 'token.json'), 'google_calendar', 'https://www.googleapis.com/calendar/v3', required_tool_id='google_calendar_list_events'),
+                'google_docs_read': GoogleAPIConnector(resolve, ROOT / env.get('GOOGLE_TOKEN_FILE', 'token.json'), 'google_docs', 'https://docs.googleapis.com/v1', required_tool_id='google_docs_read'),
+                'webhook_send': HTTPJSONConnector(resolve, 'webhook', 'http://127.0.0.1:8787', method='POST', external_write=True, required_tool_id='webhook_send'),
+                'brevo_send_email': SMTPConnector(resolve, allowed, [env.get('BREVO_SMTP_HOST', 'smtp-relay.brevo.com')]),
             }
         service.runtime_runner = GraphRunner(RuntimeService(service),
             agents=CrewExecutor(service.registry_adapter, _offline_model_factory), connectors=connectors)

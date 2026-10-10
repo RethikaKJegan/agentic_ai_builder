@@ -1,0 +1,18 @@
+{
+  "tool_id": "google_sheets_update_row",
+  "provider_id": "google_sheets",
+  "capability": "update_spreadsheet",
+  "description": "Update cells in an authorized Google Sheet.",
+  "input_schema": {"type": "object", "required": ["spreadsheet_id", "range", "values"]},
+  "output_schema": {"type": "object", "required": ["updated_cells"]},
+  "authentication": {"mode": "oauth", "credential_reference_required": true, "scopes": ["spreadsheets"]},
+  "permission_scopes": ["data.write"],
+  "availability": "needs_configuration",
+  "risk_level": "medium",
+  "rate_limits": {"requests_per_minute": 30},
+  "estimated_cost": {"currency": "USD", "per_call": 0},
+  "retry_policy": {"max_retries": 1, "retryable_errors": ["timeout", "quota"]},
+  "timeout_seconds": 30,
+  "approval_required": true,
+  "allowed_destinations": ["configured_spreadsheet"]
+}
