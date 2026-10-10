@@ -14,6 +14,7 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   const [error, setError] = useState<Error | null>(null);
   const [correlation, setCorrelation] = useState<string>();
   const version = workflow.serverVersion;
+  const activeRelease = backend.overview[workflow.id];
   useEffect(() => {
     if (backend.status !== "connected" || !version) return;
     let active = true;
@@ -49,7 +50,12 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
       }
       useMesh.getState().acceptWorkflow(result.workflow);
       if (result.registry_review) backend.acceptReview(result.registry_review);
-      setCorrelation(result.correlation_id);
+      if (name === "publish" && version) {
+        const activation = await api.activateRelease({ workflow_id: workflow.id, workflow_version: version,
+          expected_release_id: activeRelease?.activation_state === "active" ? activeRelease.release_id : null, triggers: [] });
+        await backend.refreshOverview();
+        setCorrelation(activation.correlation_id ?? result.correlation_id);
+      } else setCorrelation(result.correlation_id);
     } catch (caught) { setError(caught instanceof Error ? caught : new Error("The operation failed.")); }
     finally { setBusy(""); }
   };
@@ -60,7 +66,9 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
       {backend.can("workflow.edit") && <button className={button} disabled={!!busy} onClick={() => void action("save")}>{busy === "save" ? "Saving…" : "Save revision"}</button>}
       {backend.can("workflow.validate") && <button className={button} disabled={!!busy || !version || dirty || !["draft", "validated"].includes(workflow.status)} onClick={() => void action("validate")}>{busy === "validate" ? "Validating…" : "Validate"}</button>}
       {backend.can("workflow.approve") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "validated" || blockers} onClick={() => void action("approve")}>Approve revision</button>}
-      {backend.can("workflow.publish") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "approved" || blockers} onClick={() => void action("publish")}>Publish</button>}
+      {backend.can("workflow.publish") && <button className={button} disabled={!!busy || dirty || !!graphError || workflow.status !== "approved" || blockers} onClick={() => void action("publish")}>
+        {busy === "publish" ? "Activating…" : activeRelease?.release_id ? "Republish" : "Publish"}
+      </button>}
     </div>
     {blockers && <p className="text-xs text-muted-foreground">Tool/capability assignments require registry authorization before approval or publication.</p>}
     {exactReview && <div className="space-y-1 text-xs text-muted-foreground" aria-label="Registry assignment review">

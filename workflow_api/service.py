@@ -3,6 +3,7 @@ from copy import deepcopy
 import hashlib
 import json
 import re
+import time
 from uuid import uuid4
 
 from jsonschema import Draft202012Validator
@@ -15,6 +16,7 @@ from registry.safety import reject_secrets
 from .storage import WorkflowStore
 from .registry_adapter import RegistryAdapter
 from runtime.service import RuntimeFailure
+from .lifecycle import LifecycleService, LifecycleFailure
 
 
 class ApiFailure(Exception):
@@ -40,12 +42,51 @@ PERMISSIONS = {
 
 
 class WorkflowService:
-    def __init__(self, store, planner=None, registry=None, registry_adapter=None, runtime_runner=None):
+    def __init__(self, store, planner=None, registry=None, registry_adapter=None, runtime_runner=None,
+                 lifecycle_adapter=None, trigger_secrets=None, clock=time.time):
         self.runtime_runner = runtime_runner
         self.store = store
         self.planner = planner or PlannerService()
         self.registry = registry_adapter.service if registry_adapter else registry or RegistryService(WorkspacePolicy('local-workspace'))
         self.registry_adapter = registry_adapter or RegistryAdapter(self.registry)
+        self.lifecycle = LifecycleService(self, clock, lifecycle_adapter, trigger_secrets)
+
+    def handle_lifecycle(self, operation, request, auth, **context):
+        """Additive v2 boundary; accepted v1 request operations remain unchanged."""
+        request_id = request.get('request_id', f'req_{uuid4().hex}') if isinstance(request, dict) else f'req_{uuid4().hex}'
+        try:
+            if not isinstance(request, dict) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', request_id):
+                raise LifecycleFailure('INVALID_REQUEST', 'Use a valid lifecycle request envelope.', 400)
+            if any(key in request.get('payload', {}) for key in ('auth_context', 'roles', 'permissions', 'subject', 'authorization_reference')):
+                raise LifecycleFailure('UNTRUSTED_AUTHORITY', 'Authority must come from the server session.', 400)
+            if operation == 'activate_release':
+                data = self.lifecycle.activate(request, auth)
+            elif operation == 'disable_release':
+                data = self.lifecycle.disable(request, auth)
+            elif operation == 'delete_workflow':
+                data = self.lifecycle.delete(request, auth)
+            elif operation == 'list_workflow_overview':
+                data = self.lifecycle.overview(auth)
+            elif operation == 'subscribe_workflow_overview':
+                data = self.lifecycle.overview(auth, context.get('after_sequence', 0))
+            elif operation == 'get_lifecycle_operation':
+                data = self.lifecycle.get_operation(context.get('operation_id'), auth)
+            elif operation == 'ingest_trigger_event':
+                data = self.lifecycle.ingest(context.get('binding_id'), request.get('payload', {}).get('event'), auth,
+                                             context.get('signature'), context.get('timestamp'),
+                                             request.get('payload', {}).get('checkpoint'))
+            elif operation == 'replay_dispatch_job':
+                data = {'job': self.lifecycle.replay(context.get('job_id'), auth)}
+            else:
+                raise LifecycleFailure('INVALID_OPERATION', 'The lifecycle operation is not supported.', 400)
+            return self.envelope(request_id, 200, data)
+        except LifecycleFailure as exc:
+            if operation in {'activate_release', 'disable_release', 'delete_workflow'}:
+                try:
+                    self.lifecycle.record_failure(request, auth, operation, exc)
+                except Exception:
+                    pass
+            return self.failure(request_id, ApiFailure(exc.code, str(exc), exc.status, retryable=exc.retryable))
 
     @staticmethod
     def envelope(request_id, status, data):

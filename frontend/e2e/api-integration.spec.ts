@@ -51,6 +51,13 @@ test("trusted registry assignments allow publication and editable revisions drop
   await expect(page.getByText("Server revision v1 · published")).toBeVisible();
   await page.reload();
   await expect(page.getByText("Server revision v1 · published")).toBeVisible();
+  await page.goto("/app/workflows");
+  const overviewRow = page.locator(".divide-y > div").filter({ hasText: "Registry ready" });
+  await expect(overviewRow).toContainText("published v1");
+  await expect(overviewRow).toContainText("active");
+  await overviewRow.getByLabel("Actions for Registry ready").click();
+  await page.getByText("Edit draft", { exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/workflows\/registry_ready/);
   const result = await page.request.get("/api/backend/workflows/registry_ready");
   const document = (await result.json()).data.workflow;
   expect(document.agents[0].allowed_tool_ids).toEqual(["sheets_ready"]);

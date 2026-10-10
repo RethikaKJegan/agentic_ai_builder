@@ -145,7 +145,7 @@ class GraphRunner:
                 if run.get('worker') != worker or run['status'] != 'running':
                     return runtime.public(run)
                 try:
-                    workflow, grants = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth)
+                    workflow, grants = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
                     if digest(workflow) != run['workflow_digest']:
                         raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed after execution was queued.')
                     if runtime.clock() - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
@@ -289,7 +289,7 @@ class GraphRunner:
                         self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT'})
                         return runtime.public(run)
                     try:
-                        workflow, _ = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth)
+                        workflow, _ = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
                         if digest(workflow) != run['workflow_digest']:
                             raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed.')
                         self.finish_node(db, run, workflow, node, output)

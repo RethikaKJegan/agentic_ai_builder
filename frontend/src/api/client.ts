@@ -29,6 +29,22 @@ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.st
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
 const sessionData = z.object({ auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
+  published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
+  activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
+  active_run_count: z.number().int().nonnegative(), latest_run_id: z.string().nullable(),
+  latest_run_status: RunStatusSchema.nullable(), pending_approval_count: z.number().int().nonnegative(), updated_at: z.string() }).strict();
+const overviewCollectionSchema = z.object({ items: z.array(workflowOverviewSchema), next_sequence: z.number().int().nonnegative(), has_more: z.boolean(), ...metadata });
+const lifecycleOperationSchema = z.object({ operation_id: z.string(), workspace_id: z.string(), workflow_id: z.string(), subject_id: z.string(),
+  idempotency_key: z.string(), expected_release_id: z.string().nullable(), kind: z.enum(["activate_release", "disable_release", "delete_workflow"]),
+  state: z.enum(["preparing", "succeeded", "failed", "cleanup_pending"]), error_code: z.string().nullable() }).strict();
+const releaseSchema = z.object({ release_id: z.string(), workspace_id: z.string(), revision: z.object({ workflow_id: z.string(), workflow_version: z.number().int().positive() }),
+  state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]), generation: z.number().int().positive(), automation_identity_id: z.string(),
+  agent_versions: z.record(z.string(), z.number().int().positive()), tool_versions: z.record(z.string(), z.number().int().positive()), policy_version: z.number().int().positive(),
+  trigger_binding_ids: z.array(z.string()), created_at: z.string() }).strict();
+const activationSchema = z.object({ operation: lifecycleOperationSchema, release: releaseSchema, ...metadata });
+const lifecycleResultSchema = z.object({ operation: lifecycleOperationSchema, ...metadata });
+export type WorkflowOverview = z.infer<typeof workflowOverviewSchema>;
 
 type Ref = { workflow_id: string; workflow_version: number };
 export type Payloads = {
@@ -87,7 +103,7 @@ function route(operation: Operation, payload: Payloads[Operation]): [string, str
   }
 }
 
-async function retryKey(operation: Operation, payload: unknown): Promise<string> {
+async function retryKey(operation: string, payload: unknown): Promise<string> {
   // Store only a digest and retry key, never workflow documents, prompts or credentials.
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ operation, payload })));
   const slot = "mesh-api-retry-v1:" + Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
@@ -164,6 +180,37 @@ export class WorkflowClient {
       if (operation === "plan_workflow" && "workflow" in result.data) assertWorkflowReferences(result.data.workflow as CanonicalWorkflow);
     } catch (error) { return fail("INVALID_WORKFLOW", error instanceof Error ? error.message : "The workflow graph is invalid.", requestId); }
     return result.data as z.infer<(typeof responseSchemas)[K]>;
+  }
+
+  async overview(afterSequence?: number) {
+    const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
+    const result = overviewCollectionSchema.safeParse(await this.read(path));
+    if (!result.success) return fail("INVALID_API_DATA", "The workflow overview response is invalid.");
+    return result.data;
+  }
+
+  private async lifecycle(operation: string, path: string, payload: Record<string, unknown>, method = "POST") {
+    if (containsSecret(payload)) return fail("SENSITIVE_DATA_DETECTED", "Remove secret material before submitting.");
+    const body = JSON.stringify({ request_id: crypto.randomUUID(), operation, idempotency_key: await retryKey(operation, payload), payload });
+    return this.read(path, { method, headers: { "Content-Type": "application/json" }, body });
+  }
+
+  async activateRelease(payload: { workflow_id: string; workflow_version: number; expected_release_id: string | null; triggers?: unknown[] }) {
+    const parsed = activationSchema.safeParse(await this.lifecycle("activate_release", `workflows/${encodeURIComponent(payload.workflow_id)}/releases`, { ...payload, triggers: payload.triggers ?? [] }));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The release activation response is invalid.");
+    return parsed.data;
+  }
+
+  async disableRelease(workflowId: string, expectedReleaseId: string | null) {
+    const parsed = lifecycleResultSchema.safeParse(await this.lifecycle("disable_release", `workflows/${encodeURIComponent(workflowId)}/disable`, { workflow_id: workflowId, expected_release_id: expectedReleaseId }));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The release disable response is invalid.");
+    return parsed.data;
+  }
+
+  async deleteWorkflow(workflowId: string, expectedReleaseId: string | null) {
+    const parsed = lifecycleResultSchema.safeParse(await this.lifecycle("delete_workflow", `workflows/${encodeURIComponent(workflowId)}`, { workflow_id: workflowId, expected_release_id: expectedReleaseId, confirmed: true }, "DELETE"));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The workflow deletion response is invalid.");
+    return parsed.data;
   }
 }
 export const api = new WorkflowClient();

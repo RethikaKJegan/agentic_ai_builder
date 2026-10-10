@@ -47,7 +47,7 @@ class RuntimeService:
                 not set(auth['roles']) & set(roles) or not all(auth['subject'].values())):
             raise RuntimeFailure('OPERATION_NOT_AUTHORIZED', 'The current subject cannot perform this runtime operation.', 403)
 
-    def revision(self, db, workflow_id, version, auth):
+    def revision(self, db, workflow_id, version, auth, allow_superseded=False):
         self.authorize(auth, 'workflow.execute', {'admin', 'builder'})
         workspace = auth['subject']['workspace_id']
         if not isinstance(workflow_id, str) or type(version) is not int or version < 1:
@@ -63,7 +63,7 @@ class RuntimeService:
         # A newer draft does not change this approved revision. A newer approved
         # revision supersedes manual execution until the release contract is reviewed.
         rows = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version>?', (workspace, workflow_id, version)).fetchall()
-        if any(json.loads(row[0])['status'] in {'approved', 'published'} for row in rows):
+        if not allow_superseded and any(json.loads(row[0])['status'] in {'approved', 'published'} for row in rows):
             raise RuntimeFailure('STALE_REVISION', 'A newer approved revision exists.')
         self.workflows.validate_document(document)
         reject_secrets(document)
@@ -91,6 +91,13 @@ class RuntimeService:
         reject_secrets(inputs)
 
     def create_run(self, request, auth):
+        return self._create_run(request, auth, allow_superseded=False)
+
+    def create_automation_run(self, request, auth):
+        """Trusted lifecycle entry point for a job pinned to an immutable release."""
+        return self._create_run(request, auth, allow_superseded=True)
+
+    def _create_run(self, request, auth, allow_superseded):
         self.authorize(auth, 'workflow.execute', {'admin', 'builder'})
         key = request.get('idempotency_key')
         if not isinstance(key, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{8,128}', key):
@@ -102,7 +109,7 @@ class RuntimeService:
         workspace, subject = auth['subject']['workspace_id'], auth['subject']['subject_id']
         with self.store.transaction() as db:
             # Authorize even retries; an idempotent result is not a fresh grant.
-            workflow, _ = self.revision(db, payload.get('workflow_id'), payload.get('workflow_version'), auth)
+            workflow, _ = self.revision(db, payload.get('workflow_id'), payload.get('workflow_version'), auth, allow_superseded)
             self.validate_inputs(workflow, payload.get('inputs', {}))
             row = db.execute('SELECT fingerprint, document FROM runtime_runs WHERE workspace=? AND subject=? AND retry_key=?', (workspace, subject, digest(key))).fetchone()
             if row:
@@ -113,7 +120,7 @@ class RuntimeService:
                        status='queued', approvals=[], workflow_digest=digest(workflow), workspace_id=workspace, subject_id=subject,
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
-                       request_id=request['request_id'])
+                       request_id=request['request_id'], release_bound=allow_superseded)
             db.execute('INSERT INTO runtime_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                        (workspace, run['run_id'], run['workflow_id'], run['workflow_version'], subject, digest(key), fingerprint, json.dumps(run)))
             self.event(db, run, 'run.queued', {'status': 'queued'})

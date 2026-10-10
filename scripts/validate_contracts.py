@@ -108,6 +108,10 @@ def validate_api_and_control_contracts() -> None:
     assert fixtures["invalid_transition"]["from"] == "completed"
     assert fixtures["invalid_transition"]["to"] == "running"
 
+    lifecycle = validator(CONTRACTS / "workflow-operations-v2.json")
+    assert "release" in lifecycle.schema["$defs"]
+    assert "overview_event" in lifecycle.schema["$defs"]
+
 
 def main() -> None:
     validate_workflows()

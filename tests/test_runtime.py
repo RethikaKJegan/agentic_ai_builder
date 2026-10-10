@@ -751,15 +751,16 @@ class CrewExecutionTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
-class UnsupportedLifecycleTests(RuntimeFixture):
-    def test_runtime_enablement_does_not_enable_trigger_or_release_routes(self):
+class LifecycleBoundaryTests(RuntimeFixture):
+    def test_lifecycle_routes_are_additive_and_v1_execute_rejects_v2_operation(self):
         from fastapi.testclient import TestClient
         from workflow_api.main import create_app, COOKIE
         with TestClient(create_app(self.workflows, dev_auth=True, roles=['admin'], runtime_enabled=True)) as client:
             session = client.get('/session')
             client.cookies.set(COOKIE, session.cookies[COOKIE], path='/')
             self.assertTrue(session.json()['data']['runtime_available'])
-            for path in ('/triggers', '/releases', '/workflow-overview'):
+            self.assertEqual(client.get('/workflow-overview').status_code, 200)
+            for path in ('/triggers', '/releases'):
                 self.assertEqual(client.get(path).status_code, 404)
             request = self.request()
             request['operation'] = 'activate_release'

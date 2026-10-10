@@ -25,7 +25,8 @@ beforeEach(() => {
   vi.stubGlobal("TextEncoder", TextEncoder);
   localStorage.clear();
   useMesh.setState({ workflows: [], agents: [] });
-  useBackend.setState({ status: "connected", session: session(), tools: [], error: null, reviews: {} });
+  useBackend.setState({ status: "connected", session: session(), tools: [], error: null, reviews: {}, overview: {},
+    overviewSequence: 0, liveStatus: "live", lastOverviewUpdate: null });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -106,6 +107,29 @@ describe("API envelopes and retries", () => {
 });
 
 describe("workflow UI integration", () => {
+  it("publishes the revision and activates a release through the additive v2 boundary", async () => {
+    const original = CanonicalWorkflowSchema.parse(fixture("workflows/support-triage.json"));
+    original.status = "approved";
+    original.metadata["unresolved_requirements"] = [];
+    const mapped = fromCanonical(original);
+    const published = { ...original, status: "published" as const };
+    useMesh.setState({ agents: mapped.agents });
+    useBackend.setState({ session: session(["workflow.publish"]), reviews: {
+      [original.workflow_id]: { workflow_id: original.workflow_id, workflow_version: original.version, ready: true, reason_codes: [], items: [] },
+    }, refreshOverview: vi.fn(async () => undefined) });
+    const request = vi.spyOn(api, "request").mockResolvedValue({ workflow: published, registry_review: {
+      workflow_id: original.workflow_id, workflow_version: original.version, ready: true, reason_codes: [], items: [],
+    }, correlation_id: "corr_publish" } as never);
+    const activate = vi.spyOn(api, "activateRelease").mockResolvedValue({ operation: { operation_id: "op_1", workspace_id: "local-workspace",
+      workflow_id: original.workflow_id, subject_id: "builder", idempotency_key: "publish_key", expected_release_id: null,
+      kind: "activate_release", state: "succeeded", error_code: null }, release: { release_id: "rel_1", workspace_id: "local-workspace",
+      revision: { workflow_id: original.workflow_id, workflow_version: original.version }, state: "active", generation: 1,
+      automation_identity_id: "auto_1", agent_versions: {}, tool_versions: {}, policy_version: 1, trigger_binding_ids: [], created_at: new Date().toISOString() } } as never);
+    render(<WorkflowControls workflow={mapped.workflow} />);
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(activate).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: original.workflow_id, expected_release_id: null })));
+    expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" }));
+  });
   it("shows exact authorized assignments and enables publication only for that revision", async () => {
     const original = document();
     original.status = "approved";

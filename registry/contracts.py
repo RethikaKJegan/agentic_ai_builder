@@ -9,6 +9,7 @@ VERSIONS = {
     'tool': 'tool-contract-v1', 'api': 'api-payloads-v1',
     'error': 'error-format-v1', 'auth': 'auth-permissions-v1',
     'branching': 'branching-approvals-v1', 'run_status': 'run-status-versioning-v1',
+    'lifecycle': 'workflow-operations-v2',
 }
 
 

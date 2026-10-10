@@ -5,7 +5,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+import json
 from starlette.concurrency import run_in_threadpool
 from .service import ApiFailure, WorkflowService
 from .storage import WorkflowStore
@@ -17,11 +18,12 @@ ROLE_PERMISSIONS = {
     'builder': ['workflow.view', 'workflow.plan', 'workflow.edit', 'workflow.validate', 'tools.read', 'tools.assign', 'runs.view'],
     'viewer': ['workflow.view', 'tools.read', 'runs.view'],
     'approver': ['workflow.view', 'workflow.approve', 'tools.read', 'runs.view'],
-    'admin': ['workflow.view', 'workflow.plan', 'workflow.edit', 'workflow.validate', 'workflow.approve', 'workflow.publish', 'tools.read', 'tools.assign', 'runs.view'],
+    'admin': ['workflow.view', 'workflow.plan', 'workflow.edit', 'workflow.validate', 'workflow.approve', 'workflow.publish', 'workflow.delete', 'events.ingest', 'tools.read', 'tools.assign', 'runs.view'],
 }
 
 
-def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None, runtime_enabled=None):
+def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
+               runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None):
     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
     configured_roles = roles or os.getenv('BUILDER_DEV_ROLES', 'builder').split(',')
     if any(role not in ROLE_PERMISSIONS for role in configured_roles):
@@ -30,7 +32,8 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     configuration = registry_config or os.getenv('BUILDER_REGISTRY_CONFIG')
     if service is None and configuration:
         adapter, extra_permissions, extra_scopes = load_registry_config(configuration)
-    workflow_service = service or WorkflowService(WorkflowStore(database or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter)
+    workflow_service = service or WorkflowService(WorkflowStore(database or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
+                                                  lifecycle_adapter=lifecycle_adapter, trigger_secrets=trigger_secrets)
     connect_runtime = runtime_enabled if runtime_enabled is not None else os.getenv('BUILDER_RUNTIME_ENABLED') == '1'
     if connect_runtime:
         from runtime import RuntimeService
@@ -132,6 +135,75 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.post('/workflows/{workflow_id}/execute')
     async def execute(workflow_id: str, request: Request):
         return await dispatch(request, 'execute_workflow', {'workflow_id': workflow_id})
+
+    async def lifecycle_dispatch(request, operation, additions=None):
+        try:
+            if request.method == 'GET':
+                body = {'request_id': request.query_params.get('request_id', f'req_{uuid4().hex}'), 'payload': {}}
+            else:
+                body = await request.json()
+                if not isinstance(body, dict) or body.get('operation') != operation or not isinstance(body.get('payload'), dict):
+                    return error('INVALID_REQUEST', 'Use the workflow operations v2 envelope for this route.', 400)
+            additions = additions or {}
+            payload = body['payload']
+            for key, value in additions.items():
+                if key in payload and payload[key] != value:
+                    return error('REFERENCE_MISMATCH', 'Route and payload references must match.', 400)
+                payload[key] = value
+            result = await run_in_threadpool(workflow_service.handle_lifecycle, operation, body, auth,
+                                             signature=request.headers.get('x-builder-signature'),
+                                             timestamp=request.headers.get('x-builder-timestamp'),
+                                             after_sequence=int(request.query_params.get('after_sequence', '0')),
+                                             operation_id=additions.get('operation_id'), binding_id=additions.get('binding_id'),
+                                             job_id=additions.get('job_id'))
+            return JSONResponse(result, status_code=result['status'])
+        except (ValueError, TypeError):
+            return error('INVALID_REQUEST', 'The lifecycle request is invalid.', 400)
+
+    @app.post('/workflows/{workflow_id}/releases')
+    async def activate_release(workflow_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'activate_release', {'workflow_id': workflow_id})
+
+    @app.post('/workflows/{workflow_id}/disable')
+    async def disable_release(workflow_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'disable_release', {'workflow_id': workflow_id})
+
+    @app.delete('/workflows/{workflow_id}')
+    async def delete_workflow(workflow_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'delete_workflow', {'workflow_id': workflow_id})
+
+    @app.get('/workflow-overview')
+    async def workflow_overview(request: Request):
+        return await lifecycle_dispatch(request, 'list_workflow_overview')
+
+    @app.get('/workflow-overview/events')
+    async def workflow_overview_events(request: Request):
+        if 'text/event-stream' in request.headers.get('accept', ''):
+            try:
+                raw_cursor = request.headers.get('last-event-id') or request.query_params.get('after_sequence', '0')
+                events = await run_in_threadpool(workflow_service.lifecycle.overview, auth, int(raw_cursor))
+                async def stream():
+                    yield 'retry: 2000\n\n'
+                    for item in events['items']:
+                        yield f"id: {item['sequence']}\ndata: {json.dumps(item, separators=(',', ':'))}\n\n"
+                    if not events['items']:
+                        yield ': keepalive\n\n'
+                return StreamingResponse(stream(), media_type='text/event-stream', headers={'X-Accel-Buffering': 'no'})
+            except (ValueError, TypeError):
+                return error('INVALID_REQUEST', 'Use a non-negative event sequence.', 400)
+        return await lifecycle_dispatch(request, 'subscribe_workflow_overview')
+
+    @app.get('/lifecycle-operations/{operation_id}')
+    async def lifecycle_operation(operation_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'get_lifecycle_operation', {'operation_id': operation_id})
+
+    @app.post('/trigger-bindings/{binding_id}/events')
+    async def trigger_event(binding_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'ingest_trigger_event', {'binding_id': binding_id})
+
+    @app.post('/dispatch-jobs/{job_id}/replay')
+    async def replay_dispatch(job_id: str, request: Request):
+        return await lifecycle_dispatch(request, 'replay_dispatch_job', {'job_id': job_id})
 
     @app.get('/tools')
     async def tools(request: Request):

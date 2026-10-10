@@ -1,15 +1,15 @@
 # Handoff — Rethika
 
 - **Segment:** Runtime and observability, including the planned published workflow lifecycle.
-- **Status:** in-progress — core runtime implemented and locally verified; lifecycle/trigger contract review and extended acceptance pending.
-- **Contract versions:** workflow-schema-v1, agent-contract-v1, tool-contract-v1, api-payloads-v1, error-format-v1, auth-permissions-v1, branching-approvals-v1, run-status-versioning-v1. No accepted shared contract changed.
+- **Status:** ready-for-handoff — core runtime and the accepted lifecycle/trigger extension are implemented; final verification evidence is recorded below.
+- **Contract versions:** workflow-schema-v1, agent-contract-v1, tool-contract-v1, api-payloads-v1, error-format-v1, auth-permissions-v1, branching-approvals-v1, run-status-versioning-v1, and additive workflow-operations-v2. All four owners unanimously accepted v2 on 2026-10-10; v1 was not extended.
 - **Completed work:** Approved revision/auth/provenance/grant checks; durable idempotent runs and canonical events; actual CrewAI construction/execution with bounded model bridge; deterministic branches/joins; approval decisions/rejection/timeout paths; cumulative budgets; credential-reference SMTP adapter; interrupted-call denial; trusted worker identity resolution; redacted OTel export. Existing runtime API routes are opt-in connected. See `runtime/README.md` for exact configuration and limits.
 - **Verification evidence:** Fresh evidence and commands are recorded in the implementation review below; all earlier upstream implementation evidence remains attributed to its owner.
-- **Known defects / limits:** Production auth/PostgreSQL and live provider quota reservation remain absent. Upstream external-write publication approval integration remains unavailable. Default dev runtime has no model/connector adapter or automatically started worker. Tests use offline model/SMTP transports, not real email delivery. Ambiguous condition expressions/configuration fail closed. Registry approval/reference persistence across restart needs reviewed integration. Basic redaction/injection detection is not exhaustive.
+- **Known defects / limits:** Production auth/PostgreSQL and live provider quota reservation remain absent. Upstream external-write publication approval integration remains unavailable. Default dev runtime has no model/connector adapter or automatically started worker. Tests use offline model/SMTP transports, not real email delivery. Generic signed webhook is the only real incoming transport; provider-specific subscriptions, poll clients, and cron calculation require operator adapters. Basic redaction/injection detection is not exhaustive.
 - **Dependencies:** Suprajha's canonical drafts; Aravind's current exact assignments, policy/scopes/credentials and approval evidence; Harihar's exact approved revisions and trusted API/auth boundary. Rethika explicitly accepted their delivered boundaries in this session; unfinished upstream integration is not claimed complete.
 - **Downstream consumers:** Harihar for runtime/approval DTO wiring and remaining UI tasks; Aravind for authorization/approval and restart review; Suprajha for executable expression/input mappings; cross-segment POC integration and operational consumers for run/trace/connector evidence.
-- **Unresolved decisions / blockers:** All-owner lifecycle/trigger/automation/overview/stream contract signoff; restart reauthorization and durable approval evidence; final transport/permission/retention decisions; supported real event source and explicitly approved provider setup. No release/trigger UI availability is claimed.
-- **Next actions:** Review `openspec/changes/rethika-runtime-observability/contract-review.md` and companion draft schema, record real owner signoffs, then implement lifecycle sections 5–8. Configure live adapters/worker and connect publication approval evidence before enabling external-write end-to-end workflows. Keep final acceptance and archive open.
+- **Unresolved decisions / blockers:** No blocker remains for the accepted local POC. Production authentication, external provider setup, retention duration, distributed workers, and external-write publication approval are deployment work outside this change.
+- **Next actions:** Review the recorded evidence and archive the OpenSpec change after acceptance. Operators may then configure production auth/storage and explicitly authorized provider adapters without broadening the accepted capability inventory.
 
 ## Aravind registry delivery — 2026-10-09
 
@@ -91,3 +91,42 @@ Repository notification: Suprajha should review executable expression/input mapp
 Aravind should review trigger scopes/restart authorization; Harihar should review
 lifecycle DTO/overview/stream integration; cross-segment POC/operations should consume
 the run/trace limits and evidence. No external message was sent.
+
+## Extended lifecycle acceptance — 2026-10-10
+
+The four-owner unanimous review supersedes the historical blockers in the core review
+above. `shared/contracts/workflow-operations-v2.json` is the additive authority for
+immutable releases, triggers, automation identities, lifecycle operations, overview
+records and resume events. Existing v1 operation names and state contracts were not
+changed. The accepted transport and permission mapping is recorded in
+`openspec/changes/rethika-runtime-observability/contract-review.md`.
+
+Implemented behavior includes atomic first publish/republish with compensation and
+optimistic conflict checks; trusted Registry reconstruction and fresh assignment
+revalidation after restart; verified push events; polling baselines and transactional
+checkpoints; timezone-aware schedule ticks; receipts, deduplicated jobs, leases,
+bounded retries, dead letters and replay; release-pinned automation identities;
+sequence-resumable authenticated SSE with snapshot/poll fallback; and overview Run,
+Edit, Publish/Republish, Disable and confirmed Delete actions. Deletion tombstones the
+workflow, blocks dispatch, cancels queued jobs and safe active runs, prevents approval
+resume, retains audit data, and retries provider cleanup.
+
+Exact incoming-provider inventory: `generic_hmac_webhook` is supported through the
+real authenticated HTTP route with an opaque server secret reference, HMAC-SHA256 and
+five-minute freshness. `fake_push`, `fake_poll`, and `fake_schedule` are test adapters.
+SMTP is outbound only. GitHub, Google, Gmail/IMAP, Slack, and arbitrary Registry tools
+are not claimed as event sources. No external provider account or network side effect
+was used in acceptance.
+
+Fresh evidence: 102 Python tests passed, including eight lifecycle suites and signed
+HTTP delivery; 62 frontend tests passed; eight Playwright browser flows passed;
+frontend typecheck, lint and production build passed; shared-contract validation,
+generated-client drift, `pip check`, and strict OpenSpec validation passed. The local
+replay artifact is `.local/lifecycle-review/evidence.json` and records release
+`rel_44cffa4d2f64441eaef4b038ae408c07`, receipt
+`receipt_6654ac99af1f478db705c27a8bfea6f1`, job
+`job_1fd96994865447028edda28d7e88840a`, run
+`run_a38e3b8c92a64235a1e4f26ea231878b`, correlation
+`corr_29e9af82fe5f46dc92bcc5f7c636c45d`, and trace
+`trace_0f0437cc5a1549b2a44e6666602c4a04`, with five canonical run events and overview
+sequences 1–3. This is deterministic local evidence, not a claim of external delivery.

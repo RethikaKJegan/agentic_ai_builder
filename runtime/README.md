@@ -1,8 +1,9 @@
 # Rethika runtime
 
 This package implements application-owned execution on the existing canonical
-workflow, agent, tool, authentication, run/event and API contracts. Shared
-contracts, planner and registry implementation are unchanged.
+workflow, agent, tool, authentication, run/event and API contracts. The accepted
+additive `workflow-operations-v2` contract owns release and trigger lifecycle;
+all v1 contracts remain unchanged.
 
 ## Local development
 
@@ -90,14 +91,44 @@ SMTP submission blocks; completed external effects are never claimed reversed.
 Registry policy/credentials/quota remain trusted snapshots. The runtime revalidates
 exact assignments and tool metadata before calls but does not provide a live
 provider quota reservation service. Workers must refresh policy/configuration and
-resolve trusted approval evidence. Restart-safe release automation remains gated
-by task 5.3; old authorization references are never replayed as authority.
+resolve trusted approval evidence. Release automation stores a server-issued
+automation identity, but never stores a Registry authorization reference as
+authority. After restart, operator-owned Registry configuration is reconstructed
+and exact assignments are issued and revalidated again before dispatch.
 
 CrewAI 1.0 is pinned to preserve the upstream OpenAI SDK constraint. Its first-run
 trace collection/interactive prompt and raw task replay store are disabled. Our
 validated records and allowlisted OTel spans are the observability boundary.
 
-## Verification and outstanding lifecycle gate
+## Published lifecycle and incoming event support
+
+`workflow_api.lifecycle.LifecycleService` persists immutable releases, atomic active
+pointers, trigger bindings, receipts, checkpoints, leased jobs, dead letters,
+overview sequences and deletion tombstones. Publication registers triggers and
+cuts over only after all preparations succeed. It never runs a workflow. Existing
+jobs retain their release when a newer revision is published.
+
+Supported incoming sources are deliberately narrow:
+
+- `generic_hmac_webhook` is the real HTTP source. It requires an opaque server-side
+  secret reference, HMAC-SHA256 over `timestamp.canonical_json`, and a timestamp no
+  more than five minutes old. Workspace routing comes from the binding.
+- `fake_push`, `fake_poll`, and `fake_schedule` are deterministic acceptance adapters.
+  Polling stores a stable cursor and defaults to a current-state baseline. Schedules
+  require an IANA timezone, five-field cron text, and timezone-aware tick instants.
+
+SMTP remains outbound only. GitHub, Google, Gmail/IMAP, Slack, and arbitrary Registry
+tools are not incoming sources. The generic webhook does not manage a remote provider
+subscription. Provider challenge flows, cron calculation, poll HTTP clients, and a
+distributed queue transport remain operator adapter work.
+
+Lifecycle workers lease bounded batches. Expired leases recover after a crash; jobs
+move to dead letter after bounded retries and can be explicitly replayed. Delete
+blocks dispatch locally, cancels queued jobs and active runs at safe runtime
+boundaries, retains audit evidence, and retries cleanup through `reconcile_cleanup`.
+Authenticated overview snapshots and sequence-resumable SSE use polling fallback.
+
+## Verification
 
 ```sh
 .venv-integrations/bin/python -m unittest discover -s tests -v
@@ -110,9 +141,9 @@ Tests use explicit offline providers/SMTP transports and trusted test-only regis
 fixtures. No real model request, email, event registration or provider trace export
 is made by the suite. Actual CrewAI execution and actual OTel SDK spans are tested.
 
-Published releases, trigger subscriptions/polling/schedules, durable event dispatch,
-Workflows live overview, republishing, disablement and deletion are not implemented.
-The concrete draft contracts and review decisions are in
-`openspec/changes/rethika-runtime-observability/contract-review.md`. Joint review is
-required before implementing sections 5–8. Do not declare segment acceptance or
-archive using only the core runtime suite.
+The lifecycle suite covers first publish, activation compensation/conflicts, push,
+poll baseline/checkpoints, timezone schedules, signed webhook freshness, duplicate
+and self-event rejection, lease recovery, dead-letter replay, restart recovery,
+release-pinned republish, overview resume, disablement, deletion and cleanup retry.
+The real-source demonstration is authenticated local HTTP using the generic signed
+webhook; it makes no external SaaS subscription or external call.
