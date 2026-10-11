@@ -340,3 +340,66 @@ class LiveProviderTests(unittest.TestCase):
         baseline = GoogleSheetsConnector._created_rows(inputs, headers, [['old', 'High', '']], None, 'record_id', ['requirements'])
         complete = GoogleSheetsConnector._created_rows(inputs, headers, [['old', 'High', 'Completed later']], baseline['cursor'], 'record_id', ['requirements'])
         self.assertEqual(complete['changes'], [])
+
+
+class PlannerOutputSafetyTests(unittest.TestCase):
+    def provider_and_draft(self):
+        provider = LivePlannerProvider('gpt-5.6-luna', ['owner@example.com'], SimpleNamespace())
+        correct = draft()
+        for agent in correct['agents']:
+            agent['model']['model_id'] = 'gpt-5.6-luna'
+        return provider, correct
+
+    def test_reserved_metadata_is_corrected_before_returning(self):
+        provider, correct = self.provider_and_draft()
+        unsafe = deepcopy(correct)
+        unsafe['metadata']['authorization'] = 'Registry review is required'
+        with patch.object(provider.provider, 'generate', side_effect=[unsafe, correct]) as generate:
+            result = provider.generate('Restock flagged inventory', {})
+        self.assertEqual(result, correct)
+        self.assertEqual(generate.call_count, 2)
+        feedback = generate.call_args.args[1]['validation_feedback']
+        self.assertEqual(feedback, [{'code': 'REMOVE_UNSAFE_PROVIDER_FIELDS'}])
+        self.assertNotIn('Registry review is required', repr(feedback))
+
+    def test_repeated_unsafe_output_is_not_cached_or_returned(self):
+        from planner import PlannerService
+        from tests.test_planner import request
+        provider, unsafe = self.provider_and_draft()
+        unsafe['metadata']['password'] = 'do_not_echo_generated_value'
+        service = PlannerService(provider)
+        with patch.object(provider.provider, 'generate', return_value=unsafe) as generate:
+            first = service.plan(request('Restock flagged inventory', 'unsafe-output-1234'))
+            second = service.plan(request('Restock flagged inventory', 'unsafe-output-1234'))
+        self.assertEqual(generate.call_count, 4)
+        for result in (first, second):
+            self.assertEqual(result['error']['error_code'], 'PLANNER_OUTPUT_UNSAFE')
+            self.assertTrue(result['error']['retryable'])
+            self.assertIsNone(result['data'])
+            self.assertNotIn('do_not_echo_generated_value', repr(result))
+
+    def test_input_credentials_are_rejected_without_model_calls(self):
+        from planner import PlannerService
+        from tests.test_planner import request
+        provider, correct = self.provider_and_draft()
+        with patch.object(provider.provider, 'generate', return_value=correct) as generate:
+            result = PlannerService(provider).plan(request('password=do_not_echo_input', 'unsafe-input-1234'))
+        generate.assert_not_called()
+        self.assertEqual(result['error']['error_code'], 'SENSITIVE_DATA_DETECTED')
+        self.assertNotIn('do_not_echo_input', repr(result))
+
+
+    def test_missing_workflow_cost_budget_gets_bounded_correction(self):
+        provider, correct = self.provider_and_draft()
+        incorrect = deepcopy(correct)
+        incorrect['execution_policy']['limits'].pop('max_estimated_cost_usd', None)
+        with patch.object(provider.provider, 'generate', side_effect=[incorrect, correct]) as generate:
+            result = provider.generate('Escalate complaints', {})
+        self.assertEqual(result, correct)
+        self.assertEqual(generate.call_count, 2)
+        self.assertIn('WORKFLOW_COST_BUDGET_REQUIRED',
+                      {item['code'] for item in generate.call_args.args[1]['validation_feedback']})
+        with patch.object(provider.provider, 'generate', return_value=incorrect) as generate:
+            with self.assertRaises(RuntimeError):
+                provider.generate('Escalate complaints', {})
+        self.assertEqual(generate.call_count, 2)

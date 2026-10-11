@@ -184,7 +184,8 @@ class WorkflowService:
                     code = error.get('error_code', 'PLANNER_PROVIDER_FAILED')
                     safe = {'VALIDATION_FAILED': 'Enter a non-empty process description.',
                             'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
-                            'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.'}
+                            'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
+                            'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
                     return self.failure(request_id, ApiFailure(code, safe.get(code, 'The planner could not produce a valid draft.'),
                         result['status'], error.get('field'), bool(error.get('retryable'))))
                 validate_workflow(result['data']['workflow'])

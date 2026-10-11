@@ -12,3 +12,6 @@
 - [x] 11. Support safe bracket event paths, validate them before publication, and verify stalled row dispatch recovers without resetting its checkpoint.
 - [x] 12. Correct runtime usage aggregation and show server source health, enforced agent guardrails and audit events in Monitoring and Governance.
 - [x] 13. Recover a missing named range on a single-tab spreadsheet, report ambiguous ranges clearly, and verify generic Tickets delivery.
+- [x] 14. Check model output against Registry safety during bounded correction; preserve incoming secret rejection and verify rejected output never reaches save/cache.
+- [x] 15. Recover Overview generation's revision conflict by opening the current saved workflow; verify existing revisions are preserved and unrelated failures remain errors.
+- [x] 16. Check live model-node cost reservations against the workflow ceiling and prepare a reviewed repair draft for omitted workflow cost budgets.

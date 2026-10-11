@@ -102,6 +102,8 @@ class LivePlannerProvider:
         from .service import WorkflowService
         from planner.errors import PlannerFailure
         from runtime.expressions import validate_expression
+        from registry.safety import reject_secrets
+        from registry.contracts import RegistryError
         import ast
         supplied = {**context, **self.context}
         # At most two bounded planning calls. A correction edits the draft;
@@ -109,10 +111,30 @@ class LivePlannerProvider:
         for attempt in range(2):
             workflow = self.provider.generate(objective, supplied)
             errors = []
+            # Match the API/Registry boundary before returning or caching model
+            # output. Rejected content never enters correction feedback.
+            try:
+                reject_secrets(workflow)
+            except RegistryError as exc:
+                if exc.code != 'SENSITIVE_DATA_DETECTED':
+                    raise
+                if attempt == 0:
+                    supplied['validation_feedback'] = [{'code': 'REMOVE_UNSAFE_PROVIDER_FIELDS'}]
+                    continue
+                raise PlannerFailure('PLANNER_OUTPUT_UNSAFE',
+                    'The planner generated unsafe metadata. No draft was saved. Try generating again.',
+                    retryable=True) from None
             try:
                 WorkflowService.validate_document(workflow)
             except PlannerFailure as exc:
                 errors.append({'code': exc.code, 'field': exc.field})
+            agents_by_id = {agent['agent_id']: agent for agent in workflow.get('agents', [])}
+            reserved_cost = sum(agents_by_id.get(node.get('agent_id'), {}).get('limits', {}).get('max_estimated_cost_usd', 0)
+                                for node in workflow.get('nodes', []) if node.get('kind') == 'agent')
+            workflow_cost = workflow.get('execution_policy', {}).get('limits', {}).get('max_estimated_cost_usd', 0)
+            if round(reserved_cost, 12) > round(workflow_cost, 12):
+                errors.append({'code': 'WORKFLOW_COST_BUDGET_REQUIRED',
+                               'field': 'execution_policy.limits.max_estimated_cost_usd'})
             node_ids = {node['node_id'] for node in workflow.get('nodes', [])}
             for agent in workflow.get('agents', []):
                 if any(agent.get('model', {}).get(key) != value for key, value in self.context['runtime_model'].items()):

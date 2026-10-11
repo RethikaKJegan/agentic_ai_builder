@@ -72,3 +72,28 @@ Connection checks SHALL report stable errors without credentials or raw provider
 #### Scenario: Poll batch ends with a filtered event
 - **WHEN** ingestion succeeds and the final event fails a workflow filter
 - **THEN** the checkpoint advances to the supplied cursor
+
+### Requirement: Registry-safe generated drafts
+Live planning SHALL scan raw model proposals with Registry safety before returning them, use at most one correction with code-only feedback, and report repeated unsafe proposals as provider failures. Incoming credential rejection SHALL remain unchanged.
+
+#### Scenario: Model invents a reserved credential metadata field
+- **WHEN** a proposal contains a field rejected by Registry safety
+- **THEN** the live provider requests one corrected draft without echoing the rejected content and returns only a safe proposal
+
+#### Scenario: Corrected proposal remains unsafe
+- **WHEN** both bounded proposals fail safety checks
+- **THEN** no proposal is returned or cached and the error identifies unsafe provider output
+
+### Requirement: Existing workflow creation recovery
+Overview SHALL recover a creation save's REVISION_CONFLICT by fetching and opening the current saved workflow with an existing-workflow notice. It SHALL preserve existing revisions and published releases, and SHALL surface unrelated failures.
+
+#### Scenario: Repeated objective already has a validated revision
+- **WHEN** Overview attempts an initial save for an existing planner workflow identity
+- **THEN** it opens the current saved revision without replacing the graph or publishing a new revision
+
+### Requirement: Explicit workflow model cost ceiling
+Live planning SHALL check that the workflow cost ceiling covers all declared model-node cost reservations and use bounded correction when it does not. Missing ceilings SHALL mean zero. Published ceilings SHALL not be raised automatically.
+
+#### Scenario: Two model agents have cost limits but the workflow does not
+- **WHEN** a proposal omits its workflow cost ceiling while model nodes reserve positive costs
+- **THEN** bounded correction reports WORKFLOW_COST_BUDGET_REQUIRED and no inadequate draft is returned

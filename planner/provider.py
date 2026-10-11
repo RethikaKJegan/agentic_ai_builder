@@ -104,11 +104,17 @@ class OpenAIStructuredOutputProvider:
                     "When action approval is required, approval nodes reference approval_gates and use approved/rejected edges; gate on_reject=stop. "
                     "Bound model agents to 1 call, 8000 total tokens, zero retries, 60 seconds and $0.05 each. "
                     "Set sender max_tool_calls=1, zero retries and timeout_seconds=60. Workflow max_tokens and max_llm_calls "
-                    "must cover all agents, max_tool_calls must cover tools, and workflow timeout_seconds=3600 "
+                    "must cover all agents, max_tool_calls must cover tools. Always set workflow limits max_estimated_cost_usd "
+                    "to at least the sum of model-node agent cost ceilings (at least 0.10 for two agents at 0.05 each); "
+                    "an omitted cost ceiling means zero and blocks execution. Set workflow timeout_seconds=3600 "
                     "with approval timeout_seconds=3300 permits review. Do not exceed Registry's agent ceilings "
                     "of 10 calls, 20 tools, 20000 tokens, 300 seconds and $10. Always require review before execution. "
                     "Source agents that exist only to authorize polling have max_llm_calls=0 and no agent node. "
-                    "Do not include commentary."
+                    "Never generate raw credentials or credential-bearing field names. Never add an authorization "
+                    "field, even for descriptive policy metadata or JSON schemas. "
+                    "Use execution_policy.requires_review_before_execution for review; Registry owns authorization. "
+                    "If feedback includes REMOVE_UNSAFE_PROVIDER_FIELDS, regenerate without credential-like fields "
+                    "or secret-like strings. Do not include commentary."
                 )},
                 {"role": "user", "content": json.dumps({"objective": objective, "context": context, "canonical_workflow_schema": load_contracts()["workflow"]}, sort_keys=True)},
             ],

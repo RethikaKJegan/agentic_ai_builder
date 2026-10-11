@@ -63,3 +63,17 @@ The live launcher adds nonsecret server context for the exact runtime model, ena
 A synthetic live draft and two actual model agent steps were verified. 135 Python tests and canonical validation pass, including bounded correction tests. See `docs/sheets-gmail.md` and Rethika's accumulated handoff for evidence and live-delivery limitations. No contributor acceptance is inferred.
 
 Planner assignment fix: fresh provider proposals are checked for secrets before clearing agent allowed_tool_ids and removing tool configuration_reference. This prevents UNTRUSTED_ASSIGNMENT during UI draft saving; forged client saves still fail, and Registry review remains responsible for assignments. Verification: 144 offline Python tests, shared contract validation and strict live-workflow-providers OpenSpec validation pass. Regression tests cover generation-to-save, client forgery and secrets in discarded fields. Restart the operator-managed backend to load the change. No live email was sent or backend started/stopped for this fix.
+
+
+## Generated metadata safety correction — 2026-10-10
+
+Live planning now applies Registry's safety scan before returning model proposals, uses the existing one bounded correction with code-only feedback, and reports repeated rejected output as PLANNER_OUTPUT_UNSAFE rather than blaming user input. Provider guidance excludes reserved credential metadata fields. Incoming credential rejection and Registry authorization remain unchanged. The original UI error's exact generated field could not be recovered; this fixes the verified mismatch between planner value checks and Registry key/value checks.
+
+Verification: 154 Python tests PASS, shared contracts valid, strict live-workflow-providers OpenSpec valid, git diff --check PASS. New regressions cover reserved authorization metadata correction, repeated unsafe output without return/cache, and input secret rejection without model calls. A live inventory planning/save check passed against an isolated database; no workflow was activated or email sent. Backend restart approval was declined, so the existing port-8002 process still needs the operator to restart it with the documented direct-send command. Existing frontend edits are unrelated and were preserved.
+
+
+## Complaint missing-email diagnosis — 2026-10-11 IST
+
+The published complaint workflow received matching rows but failed before its first model call: BUDGET_EXHAUSTED. Its two model agents each reserve $0.05; its workflow omitted max_estimated_cost_usd, which runtime correctly treats as zero. Live planner correction now checks total model-node cost ceilings and guidance requires an explicit workflow ceiling. 45 focused planner/live-provider tests and shared contracts PASS.
+
+Using the local authenticated API, prepared complaint workflow planned_d1477ce2f38deb07 version 2 as a draft with a $0.10 overall ceiling and 300-second timeout; cleared executable references through the canonical editable-revision flow. It remains unpublished for user review. Version-1 releases and blocked runs were preserved. No model or email calls occurred during repair. The running backend needs an operator restart to load preventive planner code; saved version 2 itself can be reviewed/published without restart.

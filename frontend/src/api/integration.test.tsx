@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, WorkflowClient, ApiError, type Session } from "./client";
 import { CanonicalWorkflowSchema, CanonicalAgentSchema, CanonicalToolSchema, type RunEvent } from "./contracts.generated";
+import { createWorkflow } from "./create-workflow";
 import { fromCanonical, toCanonical, hasWorkflowEdits } from "./mapping";
 import { assertRunTransition, reconcileEvents } from "./control";
 import { useMesh } from "@/domain/store";
@@ -284,5 +285,45 @@ describe("Slack-triggered approval collection", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /run_dm_1/ })).toBeVisible());
     expect(screen.getByRole("button", { name: /run_dm_2/ })).toBeVisible();
     spy.mockRestore();
+  });
+});
+
+
+describe("Overview creation recovery", () => {
+  const conflict = () => envelope({ error: { error_code: "REVISION_CONFLICT", message: "A newer revision exists.",
+    request_id: "req_test", retryable: false, field: "workflow.version" } }, 409);
+
+  it("opens the latest saved revision after an initial-save conflict", async () => {
+    const planned = { ...document(), status: "draft" as const, version: 1 };
+    const current = { ...planned, name: "Existing reviewed inventory", status: "validated" as const, version: 3 };
+    const transport = vi.fn()
+      .mockResolvedValueOnce(envelope({ workflow: planned }))
+      .mockResolvedValueOnce(conflict())
+      .mockResolvedValueOnce(envelope({ workflow: current }));
+    const result = await createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport));
+    expect(result.existing).toBe(true);
+    expect(result.workflow).toEqual(current);
+    expect(transport).toHaveBeenCalledTimes(3);
+    expect(transport.mock.calls[2]![0]).toMatch(new RegExp(`/api/backend/workflows/${planned.workflow_id}\\?request_id=`));
+    expect(transport.mock.calls[2]![1].method).toBe("GET");
+  });
+
+  it("returns a newly saved draft without fetching an existing workflow", async () => {
+    const planned = { ...document(), status: "draft" as const, version: 1 };
+    const transport = vi.fn().mockImplementation(async () => envelope({ workflow: planned }));
+    const result = await createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport));
+    expect(result.existing).toBe(false);
+    expect(result.workflow).toEqual(planned);
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces unrelated save failures without loading or replacing another revision", async () => {
+    const transport = vi.fn()
+      .mockResolvedValueOnce(envelope({ workflow: document() }))
+      .mockResolvedValueOnce(envelope({ error: { error_code: "UNTRUSTED_ASSIGNMENT", message: "Assignment denied.",
+        request_id: "req_test", retryable: false } }, 403));
+    await expect(createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport)))
+      .rejects.toMatchObject({ error: { error_code: "UNTRUSTED_ASSIGNMENT" } });
+    expect(transport).toHaveBeenCalledTimes(2);
   });
 });
