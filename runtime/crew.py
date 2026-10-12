@@ -84,6 +84,31 @@ class CrewExecutor:
             raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'Use an accepted registered agent.', 403)
         definition = deepcopy(record['definition'])
         definition['allowed_tool_ids'] = deepcopy(agent['allowed_tool_ids'])
+        definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         # The persisted DAG, rather than CrewAI's internal delegation, controls
         # the order and number of agent and tool calls for every workflow.
+        return CrewAdapter(self.model_factory).execute(definition, inputs)
+
+    def invoke_decision(self, agent, inputs, invocation_id, output_schema):
+        record = self.registry_adapter.agents.get(agent['agent_id'])
+        if record is None or agent.get('hierarchy_role') != 'master':
+            raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'A registered master is required.', 403)
+        return self.invoke_protocol(agent, inputs, output_schema)
+
+    def invoke_tool_decision(self, agent, inputs, invocation_id, output_schema):
+        if agent.get('hierarchy_role') != 'sub_agent':
+            raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'A registered subagent is required.', 403)
+        return self.invoke_protocol(agent, inputs, output_schema)
+
+    def invoke_protocol(self, agent, inputs, output_schema):
+        record = self.registry_adapter.agents.get(agent['agent_id'])
+        if record is None:
+            raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'A registered agent is required.', 403)
+        definition = deepcopy(record['definition'])
+        # Only the trusted application selects this control protocol. It does not
+        # grant tools or alter the registered model, limits, or guardrails.
+        definition['input_schema'] = {'type': 'object'}
+        definition['output_schema'] = deepcopy(output_schema)
+        definition['allowed_tool_ids'] = []
+        definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         return CrewAdapter(self.model_factory).execute(definition, inputs)

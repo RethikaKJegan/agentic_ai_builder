@@ -101,6 +101,7 @@ class LivePlannerProvider:
     def generate(self, objective, context):
         from .service import WorkflowService
         from planner.errors import PlannerFailure
+        from planner.validation import mark_automatic_inputs
         from runtime.expressions import validate_expression
         from registry.safety import reject_secrets
         from registry.contracts import RegistryError
@@ -110,6 +111,7 @@ class LivePlannerProvider:
         # neither call registers grants, publishes, executes or approves it.
         for attempt in range(2):
             workflow = self.provider.generate(objective, supplied)
+            mark_automatic_inputs(workflow, supplied)
             errors = []
             # Match the API/Registry boundary before returning or caching model
             # output. Rejected content never enters correction feedback.
@@ -131,6 +133,10 @@ class LivePlannerProvider:
             agents_by_id = {agent['agent_id']: agent for agent in workflow.get('agents', [])}
             reserved_cost = sum(agents_by_id.get(node.get('agent_id'), {}).get('limits', {}).get('max_estimated_cost_usd', 0)
                                 for node in workflow.get('nodes', []) if node.get('kind') == 'agent')
+            dynamic_master_ids = {node.get('agent_id') for node in workflow.get('nodes', [])
+                                  if node['node_id'] in workflow.get('metadata', {}).get('dynamic_delegation', {})}
+            reserved_cost += sum(agent['limits'].get('max_estimated_cost_usd', 0)
+                                 for agent in workflow.get('agents', []) if agent.get('parent_agent_id') in dynamic_master_ids)
             workflow_cost = workflow.get('execution_policy', {}).get('limits', {}).get('max_estimated_cost_usd', 0)
             if round(reserved_cost, 12) > round(workflow_cost, 12):
                 errors.append({'code': 'WORKFLOW_COST_BUDGET_REQUIRED',

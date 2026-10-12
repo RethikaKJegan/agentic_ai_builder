@@ -66,11 +66,36 @@ class OpenAIStructuredOutputProvider:
                     "Use context.runtime_model for every model agent when supplied. Agent schemas describe the exact mapped node input/output objects. "
                     "Agent and tool nodes use configuration.input_mapping with restricted expressions, for example row: inputs.row "
                     "and summary: outputs.analysis.summary. String literals in mappings must be quoted Python expressions. "
+                    "When context.execution_input_mode=automatic, the objective is the user's ONE setup prompt, not a request "
+                    "to collect run fields later. Save known resource identifiers, ranges, instructions, thresholds and recipients "
+                    "in node configuration.input or literal expressions in input_mapping. Use source references supplied in the "
+                    "objective or context; no separate Google Sheets resource field is required. Do not invent unknown settings: "
+                    "record them as unresolved setup requirements. Manual-start automatic workflows MUST have inputs=[]. "
+                    "Event-start automatic workflows declare ONLY changing event inputs and map EVERY declared input from each "
+                    "trigger template. Keep business instructions in agent instructions or constant mappings. Do not ask for "
+                    "request_text, spreadsheet_id or range again on each run when already known from the setup prompt. "
+                    "Fetch fresh source facts through authorized read tools or use actual trigger data; never freeze source rows "
+                    "as setup constants. If the master needs source data first, delegate a read task to a tool-capable specialist. "
+                    "Let agents evaluate semantic conditions and delegate using their intelligence; deterministic conditions "
+                    "may use actual event/output fields but must not depend on a user-supplied condition_result. "
                     "Only these node configuration keys are executable: input, input_mapping, description, ui, on_timeout, timeout_outcome, error_outcome. "
                     "Never use output_mapping. Output nodes use input_mapping and produce every required workflow output on every terminal branch. "
                     "Trigger nodes omit configuration entirely; event mapping and provider settings belong only in metadata.trigger_templates. "
                     "Tool references contain ONLY tool_id and capability; never generate configuration_reference. "
                     "Every agent MUST include allowed_tool_ids=[]; executable assignments come only from Registry review. "
+                    "When context.generation_mode is hierarchy, create a master (hierarchy_role=master) and specialist definitions "
+                    "(hierarchy_role=sub_agent, parent_agent_id=the master agent ID). Specialists are available templates and MUST NOT "
+                    "have agent-kind graph nodes. Put metadata.dynamic_delegation={master_node_id:{max_rounds:4,max_tasks:6}}. "
+                    "The runtime asks the master to choose specialists and task inputs and combine validated results into its final output. "
+                    "When independent work remains, the master can delegate with continuation data and keep working while specialists run. "
+                    "Describe domain-specific delegation triggers and remaining master work in agent instructions, not fixed child graph routes. "
+                    "Give the master max_llm_calls=4 and max_tokens=16000; give each specialist max_llm_calls=3 and max_tokens=12000. "
+                    "Workflow budgets must cover all master turns and permitted child calls. Use broad object input schemas for the master "
+                    "and meaningful specialist schemas. Specialists that need external facts declare the appropriate available connector "
+                    "capabilities and workflow tool references; Registry assigns their allowed tools. Read tools owned by dynamic "
+                    "specialists execute inside delegated tasks and MUST NOT have fixed tool graph nodes after the master. "
+                    "Pass resource IDs, ranges and claims through master and specialist input schemas. "
+                    "External writes retain reviewed policy and approval gates before execution. "
                     "Each tool node MUST name both tool_id and agent_id. Agents with zero model-call budget have no agent-kind nodes; "
                     "reference the deterministic sender directly from the tool node immediately following the approval node. "
                     "Permissions must use only context.allowed_agent_permissions, never invented names. "
@@ -80,7 +105,7 @@ class OpenAIStructuredOutputProvider:
                     "If context.validation_feedback is present, return a complete corrected draft addressing those errors. "
                     "Do not place model calls, Python code, or side effects inside condition or transform nodes. "
                     "For an incoming Google Sheets row use metadata.trigger_templates containing provider_id=google_sheets, delivery=poll, "
-                    "event_type=row.created, resource_id=the ID extracted from context.google_sheets_resource, "
+                    "event_type=row.created, resource_id=the ID extracted from the Sheet URL/ID in the objective or context.google_sheets_resource, "
                     "credential_reference=cred_google_sheets, poll_interval_seconds=10, baseline_policy=current_only, "
                     "poll_input with range, identity_field and required_fields chosen from the user's Sheet headers. "
                     "If the stable identity field or range is unknown record an unresolved requirement rather than guessing. "
@@ -102,10 +127,12 @@ class OpenAIStructuredOutputProvider:
                     "Use a separate deterministic sender agent (max_llm_calls=0) for the tool node after any required approval, "
                     "so waiting for human approval does not exhaust a writing agent's timeout. "
                     "When action approval is required, approval nodes reference approval_gates and use approved/rejected edges; gate on_reject=stop. "
-                    "Bound model agents to 1 call, 8000 total tokens, zero retries, 60 seconds and $0.05 each. "
+                    "Bound ordinary sequential model agents to 1 call, 8000 total tokens, zero retries, 60 seconds and $0.05 each. "
+                    "For dynamic hierarchy masters use 4 calls, 16000 total tokens, 300 seconds and a $0.20 ceiling; "
+                    "for dynamic specialists use 3 calls, 12000 total tokens, 300 seconds and a $0.15 ceiling. "
                     "Set sender max_tool_calls=1, zero retries and timeout_seconds=60. Workflow max_tokens and max_llm_calls "
                     "must cover all agents, max_tool_calls must cover tools. Always set workflow limits max_estimated_cost_usd "
-                    "to at least the sum of model-node agent cost ceilings (at least 0.10 for two agents at 0.05 each); "
+                    "to at least the sum of model-node agent cost ceilings AND available dynamic specialist ceilings (at least 0.10 for two agents at 0.05 each); "
                     "an omitted cost ceiling means zero and blocks execution. Set workflow timeout_seconds=3600 "
                     "with approval timeout_seconds=3300 permits review. Do not exceed Registry's agent ceilings "
                     "of 10 calls, 20 tools, 20000 tokens, 300 seconds and $10. Always require review before execution. "
@@ -123,7 +150,10 @@ class OpenAIStructuredOutputProvider:
             store=False,
         )
         raw = getattr(response, "output_text", "")
-        return json.loads(raw)
+        workflow = json.loads(raw)
+        if context.get('generation_mode') == 'hierarchy' and not workflow.get('metadata', {}).get('dynamic_delegation'):
+            raise ValueError('Hierarchy generation must include dynamic delegation, not fixed specialist execution steps.')
+        return workflow
 
 
 class RuleBasedStructuredOutputProvider:
@@ -259,6 +289,29 @@ class RuleBasedStructuredOutputProvider:
             edges.append({"edge_id": "condition_to_no_output", "source": condition_node["node_id"], "target": "workflow_output", "outcome": "no"})
         workflow["agents"], workflow["nodes"], workflow["edges"] = agents, nodes, edges
         workflow["metadata"]["generation_mode"] = "hierarchy"
+        # Child definitions are an available specialist pool. Only the master's
+        # runtime decisions create and invoke task instances.
+        removed = {n['node_id'] for n in nodes if
+                   (n['kind'] == 'agent' and n.get('agent_id') != master['agent_id']) or
+                   (n['kind'] == 'tool' and tools_by_capability.get('read_spreadsheet', {}).get('tool_id') == n.get('tool_id'))}
+        successors = {e['source']: e['target'] for e in edges if e['source'] in removed}
+        retained_edges = []
+        for edge in edges:
+            if edge['source'] in removed:
+                continue
+            edge = dict(edge)
+            while edge['target'] in removed:
+                edge['target'] = successors[edge['target']]
+            retained_edges.append(edge)
+        workflow['nodes'] = [n for n in nodes if n['node_id'] not in removed]
+        workflow['edges'] = retained_edges
+        if previous in removed:
+            workflow['nodes'][-1]['configuration']['input_mapping']['workflow_result'] = 'outputs.master_orchestrator'
+        master['limits'] = {**master['limits'], 'max_llm_calls': 4, 'max_tokens': 16000, 'max_estimated_cost_usd': .2}
+        for agent in agents[1:]:
+            agent['limits'] = {**agent['limits'], 'max_llm_calls': 3, 'max_tokens': 12000, 'max_estimated_cost_usd': .15}
+        workflow['execution_policy']['limits'].update(max_llm_calls=4 + 3 * (len(agents) - 1), max_tokens=16000 + 12000 * (len(agents) - 1), max_estimated_cost_usd=.2 + .15 * (len(agents) - 1), max_tool_calls=max(workflow['execution_policy']['limits']['max_tool_calls'], len(workflow['tools'])))
+        workflow['metadata']['dynamic_delegation'] = {'master_orchestrator': {'max_rounds': 4, 'max_tasks': 6}}
         return workflow
 
     @staticmethod

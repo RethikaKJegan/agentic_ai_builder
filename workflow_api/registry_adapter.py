@@ -148,6 +148,13 @@ class RegistryAdapter:
             agent = next((item for item in workflow['agents'] if tool['capability'] in item['capabilities']), None)
             if agent is None:
                 continue
+            dynamic_masters = {node.get('agent_id') for node in workflow['nodes']
+                               if node['node_id'] in workflow.get('metadata', {}).get('dynamic_delegation', {})}
+            if (tool_node is None and agent.get('hierarchy_role') == 'sub_agent' and
+                    agent.get('parent_agent_id') in dynamic_masters):
+                # The child selects its connector and inputs during its task.
+                # A fixed graph read would occur too late for verification.
+                continue
             if (tool_node is None and tool['capability'] == 'read_spreadsheet' and
                     any(trigger.get('provider_id') == 'google_sheets' and trigger.get('delivery') == 'poll'
                         for trigger in workflow.get('metadata', {}).get('trigger_templates', []))):

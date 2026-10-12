@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/dynamic-delegation-v1.json",
+  "title": "Dynamic delegation v1 metadata",
+  "type": "object",
+  "minProperties": 1,
+  "maxProperties": 20,
+  "propertyNames": {"pattern": "^[a-z][a-z0-9_-]{2,127}$"},
+  "additionalProperties": {
+    "type": "object", "additionalProperties": false,
+    "required": ["max_rounds", "max_tasks"],
+    "properties": {
+      "max_rounds": {"type": "integer", "minimum": 1, "maximum": 20},
+      "max_tasks": {"type": "integer", "minimum": 1, "maximum": 50}
+    }
+  }
+}

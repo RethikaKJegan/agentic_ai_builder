@@ -111,6 +111,10 @@ def validate_api_and_control_contracts() -> None:
     lifecycle = validator(CONTRACTS / "workflow-operations-v2.json")
     assert "release" in lifecycle.schema["$defs"]
     assert "overview_event" in lifecycle.schema["$defs"]
+    delegation = validator(CONTRACTS / "dynamic-delegation-v1.json")
+    assert_document_valid(delegation, {'master_node': {'max_rounds': 4, 'max_tasks': 6}}, 'dynamic delegation')
+    assert list(delegation.iter_errors({'master_node': {'max_rounds': 0, 'max_tasks': 6}}))
+    assert list(delegation.iter_errors({'master_node': {'max_rounds': 4, 'max_tasks': 6, 'permissions': ['*']}}))
 
 
 def main() -> None:

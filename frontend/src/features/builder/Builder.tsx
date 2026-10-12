@@ -38,7 +38,6 @@ import { uid } from "@/domain/ids";
 import { makeAgent } from "@/domain/templates";
 import type {
   NodeKind,
-  StepStatus,
   Workflow,
   WorkflowEdge,
   WorkflowNode,
@@ -67,6 +66,10 @@ import {
 } from "@/domain/hierarchy";
 import { NODE_META } from "./nodeMeta";
 import { WorkflowControls } from "@/features/workflows/WorkflowControls";
+
+import { useWorkflowTrace } from "./useWorkflowTrace";
+import { NodeTrace } from "./NodeTrace";
+import { AgentCommunication } from "./AgentCommunication";
 
 const nodeTypes = { mesh: MeshNode };
 type Graph = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
@@ -106,8 +109,9 @@ function Builder({ workflow }: { workflow: Workflow }) {
     () => typeof window === "undefined" || window.innerWidth >= 768,
   );
   const [cmd, setCmd] = useState("");
-  const [runState] = useState<Record<string, StepStatus | "running">>({});
-  const [activeEdges] = useState<Set<string>>(new Set());
+  const trace = useWorkflowTrace(workflow.id);
+  const { runState, activeEdges } = trace;
+  const [inspectorTab, setInspectorTab] = useState<"trace" | "configuration">("trace");
   const isMobile = useIsMobile();
 
   const commit = useCallback(
@@ -551,11 +555,21 @@ function Builder({ workflow }: { workflow: Workflow }) {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Recent runs
             </DropdownMenuLabel>
-            <p className="px-2 py-1.5 text-sm text-muted-foreground">Run history awaits backend integration</p>
+            {trace.runs.slice(0, 5).map((run) => <DropdownMenuItem key={run.run_id} onSelect={() => trace.selectRun(run.run_id)}>{run.run_id} · {run.status}</DropdownMenuItem>)}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-xs">
+        <label htmlFor="trace-run" className="font-medium">Execution trace</label>
+        <select id="trace-run" aria-label="Select workflow run" value={trace.runId} onChange={(event) => trace.selectRun(event.target.value)} disabled={!trace.available || !trace.runs.length} className="min-w-0 max-w-full rounded-md border border-border bg-background p-1.5">
+          {!trace.runs.length && <option value="">{trace.available ? "No recorded runs" : "Runtime unavailable"}</option>}
+          {trace.runs.map((run) => <option key={run.run_id} value={run.run_id}>{run.run_id} · v{run.workflow_version} · {run.status}</option>)}
+        </select>
+        <span className="text-muted-foreground">Click a step to inspect its execution.</span>
+        <AgentCommunication workflow={{ ...current, nodes: clean(nodes), edges }} trace={trace} />
+        {trace.run && trace.run.workflow_version !== current.serverVersion && <span className="text-warning">Historical run · v{trace.run.workflow_version}; canvas shows the current draft.</span>}
+      </div>
       <div className="flex min-h-0 flex-1">
         {/* Canvas */}
         <div className="relative min-w-0 flex-1 bg-canvas">
@@ -569,6 +583,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                     <button
                       onClick={() => {
                         setSelectedId(n.id);
+                        setInspectorTab("trace");
                         setPanel("inspector");
                       }}
                       className={`flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left ${selectedId === n.id ? "border-primary" : "border-border"}`}
@@ -611,6 +626,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                 onNodeDragStop={() => commit({ nodes: nodesRef.current, edges: edgesRef.current })}
                 onNodeClick={(_, n) => {
                   setSelectedId(n.id);
+                  setInspectorTab("trace");
                   setPanel("inspector");
                 }}
                 onPaneClick={() => {
@@ -737,8 +753,11 @@ function Builder({ workflow }: { workflow: Workflow }) {
                     ×
                   </button>
                 </div>
+                <div className="flex gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="Step inspector">
+                  {(["trace", "configuration"] as const).map((tab) => <button key={tab} role="tab" aria-selected={inspectorTab === tab} onClick={() => setInspectorTab(tab)} className={`rounded-md px-3 py-1.5 text-sm ${inspectorTab === tab ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{tab === "trace" ? "Trace" : "Configuration"}</button>)}
+                </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  {selectedAgent ? (
+                  {inspectorTab === "trace" ? <NodeTrace node={selected} trace={trace} /> : selectedAgent ? (
                     <>
                       <HierarchyBox
                         node={selected}

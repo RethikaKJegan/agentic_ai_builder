@@ -2,12 +2,55 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from typing import Any
 
 from .contracts import validate_instance
 from .errors import PlannerFailure
 from runtime.expressions import validate_expression
+
+
+def mark_automatic_inputs(workflow: dict[str, Any], context: dict[str, Any]) -> None:
+    """Opt fresh proposals into prompt-only setup without rewriting their mappings."""
+    if context.get('execution_input_mode') == 'automatic':
+        workflow.setdefault('metadata', {})['execution_input_mode'] = 'automatic'
+
+
+def validate_automatic_inputs(workflow: dict[str, Any]) -> None:
+    if workflow['metadata'].get('execution_input_mode') != 'automatic':
+        return
+    fields = {field['name'] for field in workflow['inputs']}
+    triggers = workflow['metadata'].get('trigger_templates', [])
+    if not isinstance(triggers, list) or any(not isinstance(trigger, dict) or
+            not isinstance(trigger.get('input_mapping', {}), dict) for trigger in triggers):
+        raise PlannerFailure('AUTOMATIC_INPUT_SOURCE_REQUIRED',
+            'Configure automatic trigger inputs with event mappings.', field='metadata.trigger_templates')
+    if not triggers and fields:
+        raise PlannerFailure('AUTOMATIC_INPUT_SOURCE_REQUIRED',
+            'Save fixed settings in node configuration. Automatic manual workflows cannot ask for run inputs.',
+            field='inputs')
+    for trigger in triggers:
+        if fields - set(trigger.get('input_mapping', {})):
+            raise PlannerFailure('AUTOMATIC_INPUT_SOURCE_REQUIRED',
+                'Map every automatic workflow input from its trigger; save fixed settings in node configuration.',
+                field='metadata.trigger_templates.input_mapping')
+    expressions = [condition['expression'] for condition in workflow['conditions']]
+    for node in workflow['nodes']:
+        expressions.extend(node.get('configuration', {}).get('input_mapping', {}).values())
+    for expression in expressions:
+        try:
+            tree = validate_expression(expression)
+        except Exception:
+            continue  # The ordinary expression validator reports unsupported syntax.
+        for part in ast.walk(tree):
+            name = None
+            if isinstance(part, (ast.Attribute, ast.Subscript)) and isinstance(part.value, ast.Name) and part.value.id in {'input', 'inputs'}:
+                name = part.attr if isinstance(part, ast.Attribute) else part.slice.value if isinstance(part.slice, ast.Constant) else None
+                if name not in fields:
+                    raise PlannerFailure('AUTOMATIC_INPUT_SOURCE_REQUIRED',
+                        'Automatic mappings cannot reference undeclared run inputs. Use saved settings or trigger data.',
+                        field='nodes.configuration.input_mapping')
 
 SECRET_PATTERNS = (
     re.compile(r"(?:api[_-]?key|secret|password|token)\s*[:=]\s*[^\s,}]+", re.I),
@@ -81,6 +124,7 @@ def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth:
         validate_instance(workflow, "workflow")
     except ValueError as exc:
         raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", str(exc), field="workflow") from exc
+    validate_automatic_inputs(workflow)
     nodes = workflow["nodes"]
     if len(nodes) > max_nodes:
         raise PlannerFailure("WORKFLOW_GRAPH_TOO_LARGE", "The workflow exceeds the maximum node limit.", field="nodes", details={"max_nodes": max_nodes})
@@ -131,6 +175,11 @@ def validate_workflow(workflow: dict[str, Any], max_nodes: int = 100, max_depth:
             raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Tool node references a missing tool.", field=f"nodes[{index}].tool_id")
         if node.get("kind") == "agent" and node.get("agent_id") not in agent_ids:
             raise PlannerFailure("WORKFLOW_VALIDATION_FAILED", "Agent node references a missing agent.", field=f"nodes[{index}].agent_id")
+    from runtime.delegation import validate_delegation
+    try:
+        validate_delegation(workflow)
+    except Exception as exc:
+        raise PlannerFailure('WORKFLOW_VALIDATION_FAILED', 'Invalid dynamic delegation configuration.', field='metadata.dynamic_delegation') from exc
     condition_nodes = {condition_id: [] for condition_id in conditions}
     for node in nodes:
         if node.get("kind") == "condition":

@@ -27,7 +27,8 @@ export const useBackend = create<BackendState>((set, get) => ({
     try {
       const snapshot = await api.overview();
       const overview = Object.fromEntries(snapshot.items.map((item) => [item.workflow_id, item]));
-      set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString() });
+      set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
+        error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" ? null : get().error });
     } catch (error) {
       set({ liveStatus: "stale", error: error instanceof ApiError ? error : get().error });
     }

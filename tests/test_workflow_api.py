@@ -62,6 +62,41 @@ class WorkflowApiTests(unittest.TestCase):
     def ref(self):
         return dict(workflow_id=self.workflow['workflow_id'], workflow_version=1)
 
+    def test_same_prompt_after_deletion_gets_stable_fresh_identity_and_agents(self):
+        payload = {'objective': 'Summarize product inventory', 'context': {'generation_mode': 'hierarchy'}}
+        def plan():
+            response = self.mutate('/workflows/plan', 'plan_workflow', payload, 'recreate_plan_12345')
+            self.assertEqual(response.status_code, 200, response.json())
+            return response.json()['data']['workflow']
+        original = plan()
+        historical = deepcopy(original)
+        historical['status'] = 'published'
+        with self.service.store.transaction() as db:
+            self.service.store.put(db, 'local-workspace', historical)
+            db.execute('INSERT INTO lifecycle_tombstones VALUES (?, ?, ?, ?)',
+                ('local-workspace', original['workflow_id'], '2026-10-11T18:26:37Z', 'complete'))
+        replacement = plan()
+        self.assertNotEqual(replacement['workflow_id'], original['workflow_id'])
+        self.assertEqual(replacement, plan())
+        self.assertEqual(replacement['status'], 'draft')
+        self.assertEqual({a['agent_id'] for a in replacement['agents']} & {a['agent_id'] for a in original['agents']}, set())
+        self.assertEqual(self.save(replacement, key='save_recreated_12345').status_code, 200)
+        with self.service.store.transaction() as db:
+            self.assertEqual(self.service.store.get(db, 'local-workspace', original['workflow_id']), historical)
+            db.execute('INSERT INTO lifecycle_tombstones VALUES (?, ?, ?, ?)',
+                ('local-workspace', replacement['workflow_id'], '2026-10-11T18:30:00Z', 'complete'))
+        next_replacement = plan()
+        self.assertNotIn(next_replacement['workflow_id'], {original['workflow_id'], replacement['workflow_id']})
+        self.assertEqual(next_replacement, plan())
+
+    def test_deletion_identity_is_workspace_scoped(self):
+        with self.service.store.transaction() as db:
+            db.execute('INSERT INTO lifecycle_tombstones VALUES (?, ?, ?, ?)',
+                ('other-workspace', self.workflow['workflow_id'], '2026-10-11T18:26:37Z', 'complete'))
+        before = deepcopy(self.workflow)
+        self.service.replace_deleted_plan(self.workflow, 'local-workspace')
+        self.assertEqual(self.workflow, before)
+
     def test_session_opt_in_cookie_and_scope(self):
         disabled = TestClient(create_app(self.service, dev_auth=False))
         self.assertEqual(disabled.get('/session').status_code, 401)

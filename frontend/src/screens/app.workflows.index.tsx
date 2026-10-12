@@ -47,13 +47,23 @@ export default function WorkflowsPage() {
     const workflow = useMesh.getState().workflows.find((item) => item.id === workflowId);
     const overview = useBackend.getState().overview[workflowId];
     if (!workflow?.canonical || !overview?.published_version) return;
-    const inputs: Record<string, unknown> = {};
-    for (const field of workflow.canonical.inputs) {
-      const value = window.prompt(`Run input: ${field.name}${field.required ? " (required)" : ""}`);
-      if (value === null) return;
-      if (value || field.required) inputs[field.name] = field.type === "number" ? Number(value) : field.type === "boolean" ? value === "true" : value;
-    }
     try {
+      setActionError(null);
+      const published = await api.request("get_workflow", { workflow_id: workflowId, workflow_version: overview.published_version });
+      const automatic = published.workflow.metadata["execution_input_mode"] === "automatic";
+      const triggers = published.workflow.metadata["trigger_templates"];
+      if (automatic && Array.isArray(triggers) && triggers.length) {
+        toast.info(overview.activation_state === "active"
+          ? "This workflow starts automatically when its configured event arrives. Create a new event in its source, then check Runs."
+          : "Publish and activate this workflow to start receiving its configured events.");
+        return;
+      }
+      const inputs: Record<string, unknown> = {};
+      if (!automatic) for (const field of published.workflow.inputs) {
+        const value = window.prompt(`Run input: ${field.name}${field.required ? " (required)" : ""}`);
+        if (value === null) return;
+        if (value || field.required) inputs[field.name] = field.type === "number" || field.type === "integer" ? Number(value) : field.type === "boolean" ? value === "true" : field.type === "object" || field.type === "array" ? JSON.parse(value) : value;
+      }
       const result = await api.request("execute_workflow", { workflow_id: workflowId, workflow_version: overview.published_version, inputs });
       toast(`Run ${result.run.run_id} is ${result.run.status}`);
       await useBackend.getState().refreshOverview();

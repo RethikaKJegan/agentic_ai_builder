@@ -1,0 +1,5 @@
+- [x] Implement bounded local session renewal and overview error clearing.
+- [x] Test concurrency, repeated failure, preserved mutation identity and non-local denial.
+- [x] Verify recovery on desktop/mobile and against the running local backend.
+- [x] Record validation and handoff evidence.
+- [x] Refresh the session before generation and verify stale planner availability recovery.

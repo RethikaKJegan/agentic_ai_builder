@@ -11,7 +11,7 @@ from .contracts import CONTRACT_VERSIONS
 from .errors import PlannerFailure
 from .idempotency import IdempotencyRecord, IdempotencyStore
 from .provider import OpenAIStructuredOutputProvider, StructuredOutputProvider
-from .validation import reject_sensitive, validate_workflow, preserve_unmapped_conditions
+from .validation import reject_sensitive, validate_workflow, preserve_unmapped_conditions, mark_automatic_inputs
 
 
 class PlannerService:
@@ -46,8 +46,12 @@ class PlannerService:
             reject_sensitive(payload)
             workflow = self.provider.generate(objective.strip(), payload.get("context", {}))
             reject_sensitive(workflow)
+            mark_automatic_inputs(workflow, payload.get('context', {}))
             self._clear_proposed_assignments(workflow)
-            workflow["workflow_id"] = self._workflow_id(workspace_id, objective)
+            identity_objective = objective + '\n[dynamic-delegation-v1]' if workflow.get('metadata', {}).get('dynamic_delegation') else objective
+            if workflow.get('metadata', {}).get('execution_input_mode') == 'automatic':
+                identity_objective += '\n[automatic-inputs-v1]'
+            workflow["workflow_id"] = self._workflow_id(workspace_id, identity_objective)
             self._scope_planned_agents(workflow)
             workflow["metadata"] = {**workflow.get("metadata", {}), "contract_versions": CONTRACT_VERSIONS, "unresolved_requirements": workflow.get("metadata", {}).get("unresolved_requirements", [])}
             preserve_unmapped_conditions(workflow)
@@ -74,7 +78,7 @@ class PlannerService:
         return f"planned_{digest}"
 
     @staticmethod
-    def _scope_planned_agents(workflow: dict[str, Any]) -> None:
+    def _scope_planned_agents(workflow: dict[str, Any], previous_workflow_id: str | None = None) -> None:
         """Prevent unrelated generated revisions from sharing one mutable agent identity."""
         workflow_id = workflow.get("workflow_id", "planned_workflow")
         mapping = {}
@@ -82,7 +86,8 @@ class PlannerService:
             old = agent.get("agent_id")
             if not isinstance(old, str):
                 continue
-            new = f"{workflow_id}_{old}"[:128]
+            local_id = old.removeprefix(previous_workflow_id + '_') if previous_workflow_id else old
+            new = f"{workflow_id}_{local_id}"[:128]
             mapping[old] = new
             agent["agent_id"] = new
         for agent in workflow.get("agents", []):

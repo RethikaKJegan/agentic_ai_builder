@@ -188,6 +188,8 @@ class WorkflowService:
                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
                     return self.failure(request_id, ApiFailure(code, safe.get(code, 'The planner could not produce a valid draft.'),
                         result['status'], error.get('field'), bool(error.get('retryable'))))
+                result = deepcopy(result)
+                self.replace_deleted_plan(result['data']['workflow'], auth['subject']['workspace_id'])
                 validate_workflow(result['data']['workflow'])
                 reject_secrets(result)
                 return self.envelope(result['request_id'], 200, result['data'])
@@ -274,6 +276,20 @@ class WorkflowService:
                 poll_input = trigger.get('poll_input', {})
                 if not poll_input.get('identity_field') or not poll_input.get('range'):
                     raise PlannerFailure('TRIGGER_ROW_IDENTITY_REQUIRED', 'Configure the stable row identity column and Sheet range.', field='metadata.trigger_templates.poll_input')
+
+    def replace_deleted_plan(self, workflow, workspace):
+        """Keep tombstoned history immutable; the same prompt can start a new draft."""
+        previous = workflow['workflow_id']
+        with self.store.transaction() as db:
+            while True:
+                deleted = db.execute('SELECT deleted_at FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',
+                    (workspace, workflow['workflow_id'])).fetchone()
+                if not deleted:
+                    break
+                identity = f"{workspace}:{workflow['workflow_id']}:{deleted[0]}"
+                workflow['workflow_id'] = 'planned_' + hashlib.sha256(identity.encode()).hexdigest()[:16]
+        if workflow['workflow_id'] != previous:
+            PlannerService._scope_planned_agents(workflow, previous_workflow_id=previous)
 
     def mutate(self, db, workspace, operation, payload, auth, request_id):
         workflow_id = payload.get('workflow_id')

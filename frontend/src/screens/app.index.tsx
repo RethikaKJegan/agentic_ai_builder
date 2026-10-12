@@ -13,24 +13,23 @@ export default function Overview() {
   const navigate = useNavigate();
   const workflows = useMesh((s) => s.workflows);
   const [description, setDescription] = useState("");
-  const [googleSheetsResource, setGoogleSheetsResource] = useState("");
   const [planning, setPlanning] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
-  const backend = useBackend();
   const generate = async () => {
     const prompt = description.trim();
     if (planning || !prompt) return;
     setPlanning(true); setApiError(null);
     try {
-      const needsGoogleSheet = /google\s*sheets?|spreadsheet|\bnew\s+row\b/i.test(prompt);
-      if (needsGoogleSheet && !googleSheetsResource.trim()) {
-        throw new Error("Paste the Google Sheets URL or spreadsheet ID that this workflow should watch.");
-      }
       const context = {
         generation_mode: "hierarchy",
-        ...(googleSheetsResource.trim() ? { google_sheets_resource: googleSheetsResource.trim() } : {}),
+        delegation_mode: "runtime_v1",
+        execution_input_mode: "automatic",
       };
-      if (!(backend.can("workflow.plan") && backend.session?.planning_available)) throw new Error("The workflow planner is unavailable.");
+      await useBackend.getState().initialize();
+      const currentBackend = useBackend.getState();
+      if (currentBackend.status !== "connected") throw currentBackend.error ?? new Error("Could not connect to the workflow API. Retry when it is connected.");
+      if (!currentBackend.can("workflow.plan")) throw new Error("Your current account does not have permission to generate workflows.");
+      if (!currentBackend.session?.planning_available) throw new Error("The backend has not enabled the workflow planner. Check its model configuration.");
       const saved = await createWorkflow({ objective: prompt, context });
       if (saved.existing) toast.info("Opened the existing saved workflow for this request. Your previous revision was preserved.");
       useMesh.getState().acceptWorkflow(saved.workflow);
@@ -40,12 +39,10 @@ export default function Overview() {
   };
   return <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
     <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-5xl font-semibold tracking-tight md:text-6xl">What should we automate today?</motion.h1>
-    <p className="mt-3 text-lg text-muted-foreground">Describe a process in plain English. MESH drafts the agents, tools and approvals.</p>
+    <p className="mt-3 text-lg text-muted-foreground">Describe the process, when it should run, and its data sources in one prompt. MESH saves the setup and drafts the agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
-      <label className="mt-4 block text-sm font-medium text-foreground">Google Sheets URL or ID <span className="font-normal text-muted-foreground">(required only for a new-row workflow)</span>
-        <input value={googleSheetsResource} onChange={(e) => setGoogleSheetsResource(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/..." className="mt-2 block w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm font-normal outline-none placeholder:text-muted-foreground focus:border-primary" aria-label="Google Sheets URL or ID" />
-      </label>
+      <p className="mt-4 text-sm text-muted-foreground">Include the source URL and any range or trigger details here. Published event workflows receive new data automatically.</p>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       <button type="button" disabled={planning || !description.trim()} onClick={() => void generate()} className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Sparkles className="h-4 w-4" />{planning ? "Generating…" : "Generate workflow"}</button></div><ApiFeedback error={apiError} />
     </section>

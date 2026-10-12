@@ -29,7 +29,7 @@ class BoundedLLM(BaseLLM):
 
     def call(self, messages, tools=None, callbacks=None, available_functions=None, **kwargs):
         if tools or available_functions:
-            raise RuntimeFailure('MODEL_TOOL_CALL_DENIED', 'Graph tools are dispatched only by the application.', 403)
+            raise RuntimeFailure('MODEL_TOOL_CALL_DENIED', 'Tools are dispatched only through the authorized application boundary.', 403)
         reject_secrets(messages)
         # Basic data guardrails; policy/schema gates remain authoritative even
         # when injection detection misses an adversarial phrasing.

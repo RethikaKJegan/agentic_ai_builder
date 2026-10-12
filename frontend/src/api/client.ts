@@ -117,8 +117,21 @@ async function retryKey(operation: string, payload: unknown): Promise<string> {
 }
 
 export class WorkflowClient {
+  private sessionRecovery: Promise<boolean> | null = null;
+  private sessionGeneration = 0;
   constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {}
-  private async read(path: string, options: RequestInit = {}) {
+  private async renewLocalSession() {
+    if (!this.sessionRecovery) {
+      this.sessionRecovery = this.session().then((session) => {
+        if (session.mode !== "local-development") return false;
+        this.sessionGeneration += 1;
+        return true;
+      }).finally(() => { this.sessionRecovery = null; });
+    }
+    return this.sessionRecovery;
+  }
+  private async read(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
+    const generation = this.sessionGeneration;
     let response: Response;
     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
     catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", "req_client", true); }
@@ -131,6 +144,11 @@ export class WorkflowClient {
     if (!response.ok || envelope.data.status >= 400) {
       const error = SafeErrorSchema.safeParse(data && !Array.isArray(data) ? data["error"] : null);
       if (!error.success) return fail("INVALID_API_ERROR", "The API did not return a safe error.", envelope.data.request_id);
+      // The local middleware rejects an expired cookie before executing actions.
+      // Retry only that explicit rejection, preserving the exact original body/key.
+      if (recoverSession && path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
+        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
+      }
       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
       throw new ApiError(error.data, correlation);
     }

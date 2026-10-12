@@ -1,0 +1,4 @@
+- [x] Implement replacement identities and agent rebinding at the authenticated planning boundary.
+- [x] Verify repeated deletion, stable retries, history and workspace isolation.
+- [x] Load the change into the local backend and verify the retained deleted revision receives a replacement identity.
+- [x] Record validation and handoff evidence.

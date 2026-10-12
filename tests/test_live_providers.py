@@ -152,6 +152,7 @@ class LiveProviderTests(unittest.TestCase):
         self.service = self.app.state.workflow_service
         self.auth = self.app.state.live_operator_auth
         self.workflow = draft()
+        self.workflow['metadata']['execution_input_mode'] = 'automatic'
         self.ref = dict(workflow_id=self.workflow['workflow_id'], workflow_version=1)
         self.call('save_workflow_version', {**self.ref, 'base_version': 0, 'workflow': self.workflow}, 'save_authored')
         self.call('validate_workflow', self.ref, 'validate_authored')

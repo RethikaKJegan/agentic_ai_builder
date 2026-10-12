@@ -198,6 +198,81 @@ class GraphTests(RuntimeFixture):
         self.assertEqual(run['node_states']['accepted'], 'completed')
         self.assertEqual(run['node_states']['finish'], 'completed')
 
+    def test_branch_trace_records_actual_evidence_and_remains_workspace_scoped(self):
+        self.branch()
+        run_id = self.queue()
+        self.runner().advance(run_id, self.auth)
+        events = self.runtime.events(run_id, self.auth)['items']
+        observed = next(e['details'] for e in events if e['event_type'] == 'node.observed' and e['details']['node_id'] == 'choose')
+        self.assertEqual(observed['observation']['inputs']['request_text'], 'Route this request')
+        decision = next(e['details'] for e in events if e['event_type'] == 'node.completed' and e['details']['node_id'] == 'choose')
+        self.assertEqual(decision['expression'], self.workflow['conditions'][0]['expression'])
+        self.assertIs(decision['evaluated_value'], True)
+        self.assertEqual(decision['outcome'], 'yes')
+        self.assertEqual(decision['selected_edges'], ['b'])
+        self.assertEqual(decision['next_nodes'], ['accepted'])
+        skipped = next(e['details'] for e in events if e['event_type'] == 'node.skipped')
+        self.assertIn('incoming paths', skipped['explanation'])
+        other = deepcopy(self.auth)
+        other['subject']['workspace_id'] = 'other-workspace'
+        with self.assertRaises(RuntimeFailure):
+            self.runtime.events(run_id, other)
+
+    def test_trace_snapshot_redacts_secrets_private_reasoning_and_bounds_size(self):
+        from runtime.trace import snapshot
+        from registry.safety import reject_secrets
+        data = snapshot({'password': 'hidden', 'reasoning': 'private thoughts', 'answer': 'sk-abcdefgh12345', 'nested': [{'large': 'x' * 10000}] * 100})
+        reject_secrets(data)
+        serialized = json.dumps(data)
+        self.assertNotIn('hidden', serialized)
+        self.assertNotIn('private thoughts', serialized)
+        self.assertNotIn('sk-abcdefgh12345', serialized)
+        self.assertLess(len(serialized), 20000)
+
+    def test_handoffs_record_mapped_fields_nonadjacent_sources_and_uuid_identity(self):
+        from uuid import UUID
+        self.branch()
+        self.workflow['nodes'][2]['configuration'] = {'input_mapping': {'request_text': 'outputs.start.request_text'}}
+        self.workflow['nodes'][-1]['configuration'] = {'input_mapping': {'request_text': "nodes['start'].request_text"}}
+        run_id = self.queue()
+        self.assertEqual(self.runner().advance(run_id, self.auth)['status'], 'completed')
+        events = self.runtime.events(run_id, self.auth)['items']
+        handoffs = [event['details'] for event in events if event['event_type'] == 'node.handoff']
+        self.assertEqual(len({event['handoff_id'] for event in handoffs}), len(handoffs))
+        for event in handoffs:
+            self.assertEqual(UUID(event['handoff_id']).version, 4)
+            self.assertEqual(UUID(event['target_invocation_id']).version, 4)
+            self.assertEqual(event['stage'], 'inputs_prepared')
+        data = next(event for event in handoffs if event['source_node_id'] == 'start' and event['target_node_id'] == 'accepted')
+        self.assertEqual(data['transfer_kind'], 'mapped_data')
+        self.assertIsNone(data['edge_id'])
+        self.assertEqual(data['mapped_fields'], {'request_text': 'Route this request'})
+        source = next(event['details'] for event in events if event['event_type'] == 'node.observed' and event['details']['node_id'] == 'start')
+        self.assertEqual(data['source_invocation_id'], source['invocation_id'])
+        control = next(event for event in handoffs if event['edge_id'] == 'b')
+        self.assertEqual(control['transfer_kind'], 'execution_transition')
+        self.assertEqual(control['mapped_fields'], {})
+        self.assertFalse(any(event['target_node_id'] == 'declined' for event in handoffs))
+        before = len(events)
+        self.runner().advance(run_id, self.auth)
+        self.assertEqual(len(self.runtime.events(run_id, self.auth)['items']), before)
+
+    def test_literal_input_does_not_claim_unused_output_mapping(self):
+        self.branch()
+        self.workflow['nodes'][2]['configuration'] = {'input': {'request_text': 'literal'}, 'input_mapping': {'request_text': 'outputs.start.request_text'}}
+        run_id = self.queue()
+        self.runner().advance(run_id, self.auth)
+        handoffs = [event['details'] for event in self.runtime.events(run_id, self.auth)['items'] if event['event_type'] == 'node.handoff' and event['details']['target_node_id'] == 'accepted']
+        self.assertEqual(len(handoffs), 1)
+        self.assertEqual(handoffs[0]['transfer_kind'], 'execution_transition')
+        self.assertEqual(handoffs[0]['receiver_input'], {'request_text': 'literal'})
+
+    def test_output_reference_analysis_flags_dynamic_sources(self):
+        from runtime.handoffs import output_sources
+        self.assertEqual(output_sources("nodes['start'].value", {'start': {}}), ({'start'}, False))
+        self.assertEqual(output_sources('outputs[inputs.source]', {'start': {}}), (set(), True))
+        self.assertEqual(output_sources('outputs', {'start': {}}), (set(), True))
+
     def test_arbitrary_condition_code_is_never_executed(self):
         self.branch()
         self.workflow['conditions'][0]['expression'] = "__import__('os').system('touch .local/never-created')"
@@ -610,7 +685,56 @@ class RetryTests(RuntimeFixture):
         run = self.runtime.create_run(self.request(), self.auth)
         self.assertEqual(self.graph.advance(run['run_id'], self.auth)['status'], 'completed')
         self.assertEqual(self.attempts, 2)
-        self.assertIn('node.retry', json.dumps(self.runtime.events(run['run_id'], self.auth)))
+        events = self.runtime.events(run['run_id'], self.auth)['items']
+        self.assertIn('node.retry', json.dumps(events))
+        observed = [event['details']['invocation_id'] for event in events if event['event_type'] == 'node.observed' and event['details']['node_id'] == 'classify']
+        handoffs = [event['details'] for event in events if event['event_type'] == 'node.handoff' and event['details']['target_node_id'] == 'classify']
+        self.assertEqual(len(set(observed)), 2)
+        self.assertEqual([event['target_invocation_id'] for event in handoffs], observed)
+        self.assertEqual(len({event['handoff_id'] for event in handoffs}), 2)
+
+    def test_master_sub_agent_data_handoff_has_actual_identities_and_results(self):
+        from registry import RegistryService, WorkspacePolicy
+        from workflow_api.registry_adapter import RegistryAdapter
+        from runtime.graph import GraphRunner
+        registry = RegistryService(WorkspacePolicy('local-workspace'))
+        self.auth['permissions'] += ['tools.manage']
+        records, agents = {}, []
+        for agent_id, role in [('master_agent', 'master'), ('specialist_agent', 'sub_agent')]:
+            definition = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
+            definition.update(agent_id=agent_id, hierarchy_role=role, capabilities=[], input_schema={'type': 'object'}, output_schema={'type': 'object'})
+            if role == 'sub_agent': definition['parent_agent_id'] = 'master_agent'
+            records[agent_id] = registry.register_agent(definition, self.auth)['data']['agent']
+            agents.append({key: value for key, value in definition.items() if key not in {'name', 'retry_policy', 'guardrails'}})
+        adapter = RegistryAdapter(registry, records)
+        self.workflows = WorkflowService(self.store, registry_adapter=adapter)
+        self.runtime = RuntimeService(self.workflows)
+        self.workflow['agents'] = agents
+        self.workflow['execution_policy']['limits'].update(max_llm_calls=2, max_tokens=2400)
+        self.workflow['nodes'] = [dict(node_id='start', kind='trigger', label='Start'), dict(node_id='master', kind='agent', label='Master', agent_id='master_agent'), dict(node_id='specialist', kind='agent', label='Specialist', agent_id='specialist_agent', configuration={'input_mapping': {'task': 'outputs.master.task'}}), dict(node_id='finish', kind='output', label='Finish', configuration={'input_mapping': {'result': 'outputs.specialist.result'}})]
+        self.workflow['edges'] = [dict(edge_id='a', source='start', target='master'), dict(edge_id='b', source='master', target='specialist'), dict(edge_id='c', source='specialist', target='finish')]
+        received = []
+        class OfflineAgents:
+            retry_safe = False
+            external_write = False
+            @staticmethod
+            def reservation(agent): return {'llm_calls': 1, 'tokens': 10}
+            def invoke(self, agent, params, invocation_id):
+                received.append((agent['agent_id'], params))
+                return {'task': 'Collect supporting facts'} if agent['agent_id'] == 'master_agent' else {'result': 'Evidence collected'}
+        self.put()
+        runner = GraphRunner(self.runtime, agents=OfflineAgents())
+        run_id = self.runtime.create_run(self.request(), self.auth)['run_id']
+        self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
+        self.assertEqual(received[1], ('specialist_agent', {'task': 'Collect supporting facts'}))
+        events = self.runtime.events(run_id, self.auth)['items']
+        handoff = next(event['details'] for event in events if event['event_type'] == 'node.handoff' and event['details']['edge_id'] == 'b')
+        self.assertEqual((handoff['source_agent_id'], handoff['target_agent_id']), ('master_agent', 'specialist_agent'))
+        self.assertEqual(handoff['transfer_kind'], 'mapped_data')
+        self.assertEqual(handoff['mapped_fields'], {'task': 'Collect supporting facts'})
+        completed = next(event['details'] for event in events if event['event_type'] == 'node.completed' and event['details']['node_id'] == 'specialist')
+        self.assertEqual(completed['invocation_id'], handoff['target_invocation_id'])
+        self.assertEqual(completed['output'], {'result': 'Evidence collected'})
 
     def test_retry_exhaustion_stops_with_stable_error(self):
         self.configure(always_fail=True)
