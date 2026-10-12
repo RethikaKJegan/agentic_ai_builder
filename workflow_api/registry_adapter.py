@@ -174,7 +174,8 @@ class RegistryAdapter:
             elif tool['capability'] == 'send_notification':
                 mapping = {'text': 'inputs.notification_text'} if tool['tool_id'] == 'slack_send_notification' else {'path': 'inputs.path', 'body': 'inputs.body'}
             elif tool['capability'] == 'update_spreadsheet':
-                mapping = {'spreadsheet_id': 'inputs.spreadsheet_id', 'range': 'inputs.range', 'values': 'inputs.values'}
+                fields = ('spreadsheet_id', 'range', 'identity_column', 'identity', 'fields') if tool['tool_id'] == 'google_sheets_upsert_record' else ('spreadsheet_id', 'range', 'values')
+                mapping = {field: f'inputs.{field}' for field in fields if field in workflow_inputs}
             definition = tool_definitions.get(tool['tool_id'], {})
             input_schema = definition.get('input_schema', {})
             properties = input_schema.get('properties', {})
@@ -194,6 +195,21 @@ class RegistryAdapter:
                 valid_input = isinstance(source, str) and source.startswith('inputs.') and source.split('.', 2)[1] in workflow_inputs
                 valid_output = isinstance(source, str) and source.startswith('outputs.') and source.split('.', 2)[1] in {node['node_id'] for node in workflow['nodes']}
                 import ast
+                # Header names may contain spaces. Resolve the first declared
+                # input/node through the same safe parser used at execution.
+                try:
+                    from runtime.expressions import validate_expression
+                    tree = validate_expression(source)
+                    roots = []
+                    for part in ast.walk(tree):
+                        if isinstance(part, (ast.Attribute, ast.Subscript)) and isinstance(part.value, ast.Name):
+                            key = part.attr if isinstance(part, ast.Attribute) else (
+                                part.slice.value if isinstance(part.slice, ast.Constant) else None)
+                            roots.append((part.value.id, key))
+                    valid_input = bool(roots) and all(root in {'input','inputs'} and key in workflow_inputs for root,key in roots)
+                    valid_output = bool(roots) and all(root in {'outputs','nodes'} and key in {n['node_id'] for n in workflow['nodes']} for root,key in roots)
+                except Exception:
+                    valid_input = valid_output = False
                 try:
                     ast.literal_eval(source)
                     valid_literal = True

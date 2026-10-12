@@ -60,6 +60,19 @@ def _google_credentials(token_file):
 class SMTPConnector:
     external_write = True
 
+    def bind_run(self, workflow, run):
+        from copy import copy
+        from .email_recipients import source_recipient
+        recipient = source_recipient(workflow, run['inputs'])
+        if recipient is None:
+            return self
+        bound = copy(self)
+        bound.allowed_recipients = frozenset({recipient})
+        from .customer_automation import automatic_policy
+        bound.require_approval = self.require_approval or automatic_policy(workflow) is None
+        bound.routine_only = automatic_policy(workflow) is not None
+        return bound
+
     def __init__(self, resolve, allowed_recipients, allowed_hosts, timeout=30, transport=smtplib.SMTP, require_approval=True):
         # All arguments are operator/server-owned. The resolver returns secrets
         # only here; they never enter workflow documents, records, or traces.
@@ -67,6 +80,7 @@ class SMTPConnector:
         self.allowed_recipients, self.allowed_hosts = frozenset(allowed_recipients), frozenset(allowed_hosts)
         self.timeout, self.transport = timeout, transport
         self.require_approval = require_approval
+        self.routine_only = False
         if not 1 <= timeout <= 120:
             raise ValueError('Configure an SMTP timeout within the runtime ceiling.')
 
@@ -91,6 +105,10 @@ class SMTPConnector:
                 any(c in inputs['subject'] for c in '\r\n')):
             raise RuntimeFailure('DESTINATION_NOT_AUTHORIZED', 'Use one explicitly allowlisted recipient and safe message fields.', 403)
         configuration = self.resolve(grant['credential_reference'])
+        if self.routine_only:
+            from .customer_automation import routine_email_allowed
+            if not routine_email_allowed(inputs['body']):
+                raise RuntimeFailure('COMPENSATION_REVIEW_REQUIRED', 'A compensation commitment requires manager authorization.', 403)
         if (configuration.get('host') not in self.allowed_hosts or configuration.get('port') != 587 or
                 not all(isinstance(configuration.get(k), str) and configuration[k] for k in ('username', 'password', 'sender')) or
                 any(c in configuration['sender'] for c in '\r\n')):
@@ -138,12 +156,89 @@ class GoogleSheetsConnector:
 
     def __init__(self, resolve, token_file, timeout=30):
         self.resolve, self.token_file, self.timeout = resolve, Path(token_file), timeout
+        self.allowed_ranges = None
         if not 1 <= timeout <= 120:
             raise ValueError('Configure a Sheets timeout within the runtime ceiling.')
+
+    def bind_workflow(self, workflow):
+        from copy import copy
+        from .customer_automation import automatic_policy
+        if automatic_policy(workflow) is None:
+            return self
+        bound = copy(self)
+        locations = [(t['spreadsheet_id'], t['range']) for t in workflow['metadata'].get('sheet_read_targets', [])]
+        locations += [(t['resource_id'], t['poll_input']['range']) for t in workflow['metadata'].get('trigger_templates', [])
+                      if t.get('provider_id') == 'google_sheets']
+        bound.allowed_ranges = {(google_spreadsheet_id(s), r) for s,r in locations}
+        # Quoted and unquoted simple tab names refer to the same published table.
+        for s,r in list(bound.allowed_ranges):
+            match = re.fullmatch(r"'([A-Za-z0-9_]+)'!(.+)",r)
+            if match:
+                bound.allowed_ranges.add((s, match[1]+'!'+match[2]))
+            else:
+                match = re.fullmatch(r'([A-Za-z0-9_]+)!(.+)',r)
+                if match:
+                    bound.allowed_ranges.add((s, "'"+match[1]+"'!"+match[2]))
+        return bound
 
     @staticmethod
     def reservation(grant):
         return {'tool_calls': 1, 'estimated_cost_usd': 0}
+
+    def discover(self, resource):
+        """Inspect an explicitly supplied setup link using the operator's read consent."""
+        spreadsheet_id = google_spreadsheet_id(resource)
+        credentials = _google_credentials(self.token_file)
+        base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='')
+        headers = {'Authorization': 'Bearer ' + credentials.token, 'Accept': 'application/json'}
+        def read(url):
+            with urlopen(Request(url, headers=headers), timeout=self.timeout) as response:
+                return json.load(response)
+        def column(number):
+            result = ''
+            while number:
+                number, rest = divmod(number - 1, 26)
+                result = chr(65 + rest) + result
+            return result
+        try:
+            metadata = read(base + '?fields=properties.title,sheets.properties')
+            sheets = metadata.get('sheets', [])
+            if not sheets or len(sheets) > 32:
+                raise RuntimeFailure('SHEETS_DISCOVERY_LIMIT', 'Use a spreadsheet with between one and 32 tabs.', 400)
+            tables = []
+            for sheet in sheets:
+                prop = sheet['properties']
+                if prop.get('sheetType', 'GRID') != 'GRID':
+                    continue
+                grid = prop['gridProperties']
+                columns = min(grid['columnCount'], 128)
+                named = "'" + prop['title'].replace("'", "''") + "'!"
+                sampled = read(base + '/values/' + quote(named + f'A1:{column(columns)}10', safe='')).get('values', [])
+                index = next((i for i, row in enumerate(sampled) if any(str(v).strip() for v in row)), None)
+                if index is None:
+                    continue
+                actual_headers = sampled[index]
+                if (any(not isinstance(h, str) or not h.strip() for h in actual_headers) or
+                        len(set(actual_headers)) != len(actual_headers)):
+                    raise RuntimeFailure('SHEETS_HEADERS_AMBIGUOUS', 'Each populated table needs unique, nonempty column headers.', 400)
+                if grid['columnCount'] > 128 and len(actual_headers) == 128:
+                    raise RuntimeFailure('SHEETS_DISCOVERY_LIMIT', 'Tables with more than 128 populated columns need a smaller source table.', 400)
+                cell_range = named + f'A{index + 1}:{column(len(actual_headers))}{grid["rowCount"]}'
+                tables.append({'title': prop['title'], 'range': cell_range, 'header_row': index + 1,
+                               'headers': actual_headers, 'sample_summary': {
+                                   'rows_inspected': len(sampled[index + 1:index + 4]),
+                                   'nonempty_columns': {h: sum(len(r) > i and bool(str(r[i]).strip()) for r in sampled[index + 1:index + 4])
+                                                        for i,h in enumerate(actual_headers)}}})
+            if not tables:
+                raise RuntimeFailure('SHEETS_TABLES_REQUIRED', 'Add table headers before generating the workflow.', 400)
+            return {'spreadsheet_id': spreadsheet_id, 'title': metadata.get('properties', {}).get('title', ''), 'tables': tables}
+        except RuntimeFailure:
+            raise
+        except HTTPError as exc:
+            code = 'SHEETS_ACCESS_DENIED' if exc.code in {401, 403} else 'SHEETS_DISCOVERY_FAILED'
+            raise RuntimeFailure(code, 'Cannot inspect this spreadsheet. Check the link and Google account access.', 403 if exc.code in {401,403} else 502) from None
+        except Exception:
+            raise RuntimeFailure('SHEETS_DISCOVERY_FAILED', 'Spreadsheet setup discovery failed.', 502) from None
 
     def invoke(self, grant, inputs, effect_id):
         reject_secrets(inputs)
@@ -158,6 +253,8 @@ class GoogleSheetsConnector:
                 not isinstance(cell_range, str) or not cell_range or any(c in spreadsheet_id + cell_range for c in '\r\n')):
             raise RuntimeFailure('SHEETS_INPUT_INVALID', 'Use a spreadsheet ID and A1 range.', 400)
         spreadsheet_id = google_spreadsheet_id(spreadsheet_id)
+        if self.allowed_ranges is not None and (spreadsheet_id,cell_range) not in self.allowed_ranges:
+            raise RuntimeFailure('SHEETS_READ_TARGET_NOT_AUTHORIZED', 'Read only the tables published for this workflow.', 403)
         configuration = self.resolve(grant['credential_reference'])
         if configuration.get('provider_id') != 'google_sheets':
             raise RuntimeFailure('SHEETS_NOT_CONFIGURED', 'Configure a Google Sheets credential reference.', 503)

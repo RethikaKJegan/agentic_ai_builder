@@ -67,7 +67,7 @@ def validate_agents() -> None:
 
 def validate_tools() -> None:
     checker = validator(CONTRACTS / "tool-contract-v1.json")
-    for path in [EXAMPLES / "tools" / "smtp-send-email.json", EXAMPLES / "tools" / "google-sheets-read.json"]:
+    for path in [EXAMPLES / "tools" / "smtp-send-email.json", EXAMPLES / "tools" / "google-sheets-read.json", EXAMPLES / "tools" / "google-sheets-upsert-record.json"]:
         assert_valid(checker, path)
     assert_invalid(checker, EXAMPLES / "tools" / "incomplete-tool.json")
 

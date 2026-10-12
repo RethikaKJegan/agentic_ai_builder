@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from runtime.connectors import GoogleSheetsConnector, google_spreadsheet_id
 from runtime.service import RuntimeFailure
+from planner.errors import PlannerFailure
 from runtime.model import BoundedLLM
 from workflow_api.live_providers import create_configured_app, LivePlannerProvider
 from workflow_api.slack_gmail import mapped_draft
@@ -328,9 +329,32 @@ class LiveProviderTests(unittest.TestCase):
         feedback = generate.call_args.args[1]['validation_feedback']
         self.assertIn('REFERENCE_GRAPH_NODE_ID', {item['code'] for item in feedback})
         with patch.object(provider.provider, 'generate', return_value=incorrect) as generate:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(PlannerFailure) as failed:
                 provider.generate('Synthetic objective', {})
+        self.assertEqual(failed.exception.code, 'PLANNER_OUTPUT_INVALID')
+        self.assertIn('REFERENCE_GRAPH_NODE_ID', failed.exception.details['requirements'])
         self.assertEqual(generate.call_count, 2)
+
+    def test_explicit_sender_gets_capability_and_invalid_tool_output_is_corrected(self):
+        provider = LivePlannerProvider('gpt-5.6-luna', ['owner@example.com'], SimpleNamespace())
+        incorrect = draft()
+        for agent in incorrect['agents']:
+            agent['model']['model_id'] = 'gpt-5.6-luna'
+        incorrect['agents'][-1]['capabilities'] = []
+        next(n for n in incorrect['nodes'] if n['node_id'] == 'done')['configuration'] = {
+            'input_mapping': {'email_sent':'outputs.send_email.sent'}}
+        correct = deepcopy(incorrect)
+        next(n for n in correct['nodes'] if n['node_id'] == 'done')['configuration']['input_mapping'] = {
+            'email_sent':'True','message_id':'outputs.send_email.message_id'}
+        with patch.object(provider.provider, 'generate', side_effect=[incorrect,correct]) as generate:
+            result = provider.generate('Send an approved notification.', {})
+        self.assertEqual(result['agents'][-1]['capabilities'], ['send_email'])
+        self.assertIn('OUTPUT_FIELD_NOT_DECLARED', {item['code'] for item in generate.call_args.args[1]['validation_feedback']})
+        from planner.validation import validate_output_mappings
+        broken = deepcopy(result)
+        next(n for n in broken['nodes'] if n['node_id'] == 'done')['configuration']['input_mapping']['email_sent'] = 'outputs.send_email.sent'
+        with self.assertRaises(PlannerFailure):
+            validate_output_mappings(broken, provider.context['tool_output_schemas'])
 
     def test_authorized_backfill_and_baseline_partial_rows(self):
         inputs = {'spreadsheet_id': 'spreadsheet', 'range': 'A:C'}
@@ -344,6 +368,20 @@ class LiveProviderTests(unittest.TestCase):
 
 
 class PlannerOutputSafetyTests(unittest.TestCase):
+    def test_fixed_email_recipient_from_model_is_corrected_to_literal(self):
+        provider, correct = self.provider_and_draft()
+        send = next(n for n in correct['nodes'] if n.get('tool_id') == 'smtp_send_email')
+        send['configuration'].pop('input', None)
+        send['configuration']['input_mapping'] = {'to': "'owner@example.com'", 'subject': "'Test'", 'body': "'Draft'"}
+        invalid = deepcopy(correct)
+        next(n for n in invalid['nodes'] if n.get('tool_id') == 'smtp_send_email')['configuration']['input_mapping']['to'] = 'outputs.classify.recipient'
+        with patch.object(provider.provider, 'generate', side_effect=[invalid, correct]) as generate:
+            result = provider.generate('Send to owner@example.com', {})
+        self.assertEqual(result, correct)
+        self.assertEqual(generate.call_count, 2)
+        self.assertIn('USE_LITERAL_ALLOWED_EMAIL_RECIPIENT',
+                      [e['code'] for e in generate.call_args.args[1]['validation_feedback']])
+
     def provider_and_draft(self):
         provider = LivePlannerProvider('gpt-5.6-luna', ['owner@example.com'], SimpleNamespace())
         correct = draft()
@@ -401,6 +439,8 @@ class PlannerOutputSafetyTests(unittest.TestCase):
         self.assertIn('WORKFLOW_COST_BUDGET_REQUIRED',
                       {item['code'] for item in generate.call_args.args[1]['validation_feedback']})
         with patch.object(provider.provider, 'generate', return_value=incorrect) as generate:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(PlannerFailure) as failed:
                 provider.generate('Escalate complaints', {})
+        self.assertEqual(failed.exception.code, 'PLANNER_OUTPUT_INVALID')
+        self.assertIn('WORKFLOW_COST_BUDGET_REQUIRED', failed.exception.details['requirements'])
         self.assertEqual(generate.call_count, 2)

@@ -1,0 +1,32 @@
+{
+  "tool_id": "google_sheets_upsert_record",
+  "provider_id": "google_sheets",
+  "capability": "update_spreadsheet",
+  "description": "Save scalar record fields by stable ID in an authorized table; preserve other columns and optionally create missing records.",
+  "input_schema": {
+    "type": "object", "additionalProperties": false,
+    "required": ["spreadsheet_id", "range", "identity_column", "identity", "fields"],
+    "properties": {
+      "spreadsheet_id": {"type": "string", "minLength": 1},
+      "range": {"type": "string", "minLength": 1},
+      "identity_column": {"type": "string", "minLength": 1},
+      "identity": {"type": "string", "minLength": 1},
+      "fields": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean", "null"]}}
+    }
+  },
+  "output_schema": {
+    "type": "object", "additionalProperties": false,
+    "required": ["identity", "row_index", "created", "updated_cells"],
+    "properties": {
+      "identity": {"type": "string"}, "row_index": {"type": "integer", "minimum": 1},
+      "created": {"type": "boolean"}, "updated_cells": {"type": "integer", "minimum": 0}
+    }
+  },
+  "authentication": {"mode": "oauth", "credential_reference_required": true, "scopes": ["spreadsheets"]},
+  "permission_scopes": ["data.write"], "availability": "needs_configuration",
+  "risk_level": "medium", "rate_limits": {"requests_per_minute": 30},
+  "estimated_cost": {"currency": "USD", "per_call": 0},
+  "retry_policy": {"max_retries": 0, "retryable_errors": []},
+  "timeout_seconds": 30, "approval_required": true,
+  "allowed_destinations": ["configured_spreadsheet"]
+}

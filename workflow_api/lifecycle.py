@@ -183,6 +183,8 @@ class LifecycleService:
             workflow = self.store.get(db, workspace, workflow_id, version)
             if not workflow or workflow.get("status") != "published" or workflow.get("metadata", {}).get("validation_state") != "validated":
                 raise LifecycleFailure("REVISION_NOT_PUBLISHED", "Activate a validated, approved, published revision.")
+            if getattr(self.workflows, 'configuration_validator', None):
+                self.workflows.configuration_validator(workflow)
             if not triggers:
                 triggers = deepcopy(workflow.get("metadata", {}).get("trigger_templates", []))
             review = self.workflows.registry_adapter.review(workflow, auth)

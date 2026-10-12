@@ -38,7 +38,7 @@ PERMISSIONS = {
     'execute_workflow': ('workflow.execute', {'admin', 'builder'}),
     'get_run': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
     'list_run_events': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
-    'decide_approval': ('workflow.approve', {'admin', 'approver'}),
+    'decide_approval': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
     'list_runs': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
     'list_approvals': ('runs.view', {'admin', 'builder', 'viewer', 'approver'}),
 }
@@ -160,7 +160,8 @@ class WorkflowService:
                                 (auth['subject']['workspace_id'], run['run_id'])).fetchone()
                         # Approval authority is not execution authority. Automation
                         # resumes through the worker's fresh identity resolver.
-                        if execution_subject and execution_subject[0] == auth['subject']['subject_id']:
+                        if (execution_subject and execution_subject[0] == auth['subject']['subject_id'] and
+                                'workflow.execute' in auth['permissions'] and {'admin', 'builder'} & set(auth['roles'])):
                             run = self.runtime_runner.advance(run['run_id'], auth)
                     data = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
                 return self.envelope(request_id, 200, data)
@@ -186,8 +187,13 @@ class WorkflowService:
                             'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
                             'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
+                    safe.update(PLANNER_PROVIDER_TIMEOUT='Workflow generation timed out. Retry generation.',
+                                PLANNER_PROVIDER_UNAVAILABLE='The model connection is unavailable. Retry generation.',
+                                PLANNER_RATE_LIMITED='The model provider rate limit was reached. Retry later.',
+                                PLANNER_OUTPUT_INVALID='The generated workflow needs corrections before it can be saved. Retry generation.')
                     return self.failure(request_id, ApiFailure(code, safe.get(code, 'The planner could not produce a valid draft.'),
-                        result['status'], error.get('field'), bool(error.get('retryable'))))
+                        result['status'], error.get('field'), bool(error.get('retryable')),
+                        {'requirements': error['details']['requirements']} if code == 'PLANNER_OUTPUT_INVALID' and isinstance(error.get('details', {}).get('requirements'), list) else {}))
                 result = deepcopy(result)
                 self.replace_deleted_plan(result['data']['workflow'], auth['subject']['workspace_id'])
                 validate_workflow(result['data']['workflow'])
@@ -322,6 +328,8 @@ class WorkflowService:
                 raise ApiFailure('INVALID_TRANSITION', 'This revision cannot be validated again.', 409)
             try:
                 self.validate_document(workflow)
+                if getattr(self, 'configuration_validator', None):
+                    self.configuration_validator(workflow)
                 # A structurally valid draft may still lack executable tool assignments.
                 workflow['status'] = 'validated'
                 workflow['metadata']['validation_state'] = 'validated'
@@ -341,6 +349,8 @@ class WorkflowService:
             if workflow['status'] != expected:
                 raise ApiFailure('INVALID_TRANSITION', f'The revision must be {expected} first.', 409)
             self.validate_document(workflow)
+            if getattr(self, 'configuration_validator', None):
+                self.configuration_validator(workflow)
             if action == 'approve':
                 # Reconcile older validated drafts with the current trusted
                 # registry before reviewing them. This lets an existing draft

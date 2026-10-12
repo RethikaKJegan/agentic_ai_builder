@@ -39,7 +39,7 @@ def check(env, sheet_resource, cell_range):
         sheet_id = match.group(1) if match else sheet_resource
         if not re.fullmatch(r'[A-Za-z0-9_-]{20,}', sheet_id):
             raise ValueError('Use a Google spreadsheet URL or ID.')
-        definition = config['tools'][-1]['definition']
+        definition = next(item['definition'] for item in config['tools'] if item['definition']['tool_id'] == 'google_sheets_read_rows')
         # Diagnostic read only; not an execution grant and never persisted.
         grant = {**definition, 'authorization_state': 'authorized', 'authorization_reference': 'operator_read_check', 'credential_reference': 'cred_google_sheets'}
         connector = GoogleSheetsConnector(lambda reference: {'provider_id': 'google_sheets'}, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=20)

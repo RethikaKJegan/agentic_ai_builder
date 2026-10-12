@@ -1,6 +1,7 @@
 """FastAPI transport. Local development authentication is explicitly opt-in."""
 import hmac
 import os
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -273,6 +274,42 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.get('/runs')
     async def runs(request: Request):
         return await dispatch(request, 'list_runs')
+
+    @app.get('/cases')
+    async def cases(request: Request):
+        manager = getattr(workflow_service, 'reply_cases', None)
+        if manager is None:
+            return error('SERVICE_UNAVAILABLE', 'Reply monitoring is not configured.', 503)
+        if 'runs.view' not in auth['permissions']:
+            return error('OPERATION_NOT_AUTHORIZED', 'Run access is required.', 403)
+        try:
+            items = await run_in_threadpool(manager.list_cases, auth['subject']['workspace_id'])
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200,
+                {'items': items, 'monitor': getattr(workflow_service, 'reply_monitor_health', {'state': 'unknown'})}))
+        except Exception:
+            return error('CASE_LIST_UNAVAILABLE', 'Case records are unavailable.', 503)
+
+    @app.post('/cases/{case_id}/actions')
+    async def case_action(case_id: str, request: Request):
+        manager = getattr(workflow_service, 'reply_cases', None)
+        if manager is None:
+            return error('SERVICE_UNAVAILABLE', 'Reply monitoring is not configured.', 503)
+        if 'workflow.approve' not in auth['permissions'] or not {'admin', 'approver'} & set(auth['roles']):
+            return error('OPERATION_NOT_AUTHORIZED', 'Approval access is required.', 403)
+        if not re.fullmatch(r'run_[A-Za-z0-9]+', case_id):
+            return error('INVALID_REQUEST', 'Use a valid case ID.', 400)
+        try:
+            body = await request.json()
+            if (not isinstance(body, dict) or set(body) != {'reply_id', 'kind'} or
+                    not isinstance(body['reply_id'], str) or not isinstance(body['kind'], str)):
+                return error('INVALID_REQUEST', 'Choose a case action and reply.', 400)
+            result = await run_in_threadpool(manager.send_action, auth['subject']['workspace_id'], case_id,
+                                             body['reply_id'], body['kind'])
+            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, result))
+        except ValueError as exc:
+            return error(str(exc), 'This case action is unavailable or already attempted.', 409)
+        except Exception:
+            return error('SMTP_DELIVERY_UNCERTAIN', 'Email submission was uncertain; do not retry automatically.', 503)
 
     @app.get('/approvals')
     async def approvals(request: Request):

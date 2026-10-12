@@ -15,7 +15,7 @@ class CrewAdapter:
         # There is no implicit provider selection or credential/config from clients.
         self.llm_factory = llm_factory
 
-    def build(self, definition, inputs):
+    def build(self, definition, inputs, protocol=None):
         validate(definition, 'agent')
         reject_secrets(definition)
         reject_secrets(inputs)
@@ -36,6 +36,9 @@ class CrewAdapter:
         llm = self.llm_factory(deepcopy(definition))
         if not isinstance(llm, BoundedLLM):
             raise RuntimeFailure('BOUNDED_MODEL_REQUIRED', 'The trusted model factory must return a bounded CrewAI model.', 503)
+        if protocol is not None:
+            from .model_protocol import response_format
+            llm.control_format = response_format(protocol, inputs)
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'],
                       llm=llm, tools=[], allow_delegation=False, allow_code_execution=False,
                       max_iter=1, max_retry_limit=0, max_execution_time=definition['limits']['timeout_seconds'],
@@ -54,13 +57,22 @@ class CrewAdapter:
         crew._task_output_handler = DiscardOutputs()
         return crew
 
-    def execute(self, definition, inputs):
-        result = self.build(definition, inputs).kickoff()
+    def execute(self, definition, inputs, usage_callback=None, protocol=None):
+        crew = self.build(definition, inputs, protocol=protocol)
+        try:
+            result = crew.kickoff()
+        except Exception:
+            failure = getattr(crew.agents[0].llm, 'last_failure', None)
+            if failure is not None:
+                raise failure from None
+            raise
         try:
             output = json.loads(result.raw)
             reject_secrets(output)
             if list(Draft202012Validator(definition['output_schema']).iter_errors(output)):
                 raise ValueError()
+            if usage_callback is not None:
+                usage_callback(deepcopy(crew.agents[0].llm.actual_usage))
             return output
         except Exception as exc:
             raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'The agent did not produce a safe schema-valid result.') from None
@@ -77,6 +89,26 @@ class CrewExecutor:
         limits = agent['limits']
         return dict(llm_calls=limits['max_llm_calls'], tokens=limits['max_tokens'],
                     estimated_cost_usd=limits.get('max_estimated_cost_usd', 0))
+
+    def invoke_accounted(self, agent, inputs, invocation_id, output_schema=None):
+        """One bounded delegated turn with confirmed provider usage on success."""
+        record = self.registry_adapter.agents.get(agent['agent_id'])
+        if record is None:
+            raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'Use an accepted registered agent.', 403)
+        definition = deepcopy(record['definition'])
+        if output_schema is not None:
+            definition['input_schema'] = {'type': 'object'}
+            definition['output_schema'] = deepcopy(output_schema)
+            definition['allowed_tool_ids'] = []
+        else:
+            definition['allowed_tool_ids'] = deepcopy(agent['allowed_tool_ids'])
+        definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
+        usage = []
+        protocol = None if output_schema is None else ('master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool')
+        output = CrewAdapter(self.model_factory).execute(definition, inputs, usage_callback=usage.append, protocol=protocol)
+        if len(usage) != 1 or usage[0]['llm_calls'] != 1:
+            raise RuntimeFailure('INVALID_USAGE', 'A delegated model turn must report one confirmed call.')
+        return output, usage[0]
 
     def invoke(self, agent, inputs, invocation_id):
         record = self.registry_adapter.agents.get(agent['agent_id'])
@@ -111,4 +143,5 @@ class CrewExecutor:
         definition['output_schema'] = deepcopy(output_schema)
         definition['allowed_tool_ids'] = []
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
-        return CrewAdapter(self.model_factory).execute(definition, inputs)
+        protocol = 'master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool'
+        return CrewAdapter(self.model_factory).execute(definition, inputs, protocol=protocol)

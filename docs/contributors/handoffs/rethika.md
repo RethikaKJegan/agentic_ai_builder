@@ -1,5 +1,27 @@
 # Handoff — Rethika
 
+## Restaurant generation failure recovery — 2026-10-12
+
+Live diagnosis reproduced an OpenAI timeout mislabeled INVALID_API_DATA. Planning now has an explicit bounded 180-second default deadline, preserving runtime timeouts/zero retries, and SDK failures return safe retryable planner errors. Captured real model drafts also exposed mixed literal/dynamic configurations and omitted closed save-field schemas. Fresh proposals normalize disjoint supported literals into one mapping and tighten omitted extra-property restrictions for explicit save-field schemas; ambiguous/unsupported inputs and explicit open schemas are not guessed. Exhausted correction reports structured requirement codes. Existing saved-workflow execution semantics are preserved.
+
+226 Python tests, shared contracts, generated-client drift and strict OpenSpec pass. The actual captured model draft passed corrected generation and save in isolated storage; no fresh post-fix live model success or live workflow execution is claimed. No Sheets writes, emails, publication or credentials changed. The requested backend reload was rejected, so the operator must restart their running backend and refresh the UI. Evidence and limits: `openspec/changes/planner-timeout-errors/tasks.md`.
+
+## Prompt-owned Sheets destinations — 2026-10-12
+
+Supersedes the mandatory environment target setup in the original Phase 1 note below. Generated workflows now save `metadata.sheet_write_targets` from the UI setup prompt. The live planner exposes record writes without an environment destination list; publication validates the metadata and graph mappings, and the shared graph/delegated tool boundary binds a restricted connector to the exact reviewed revision. Optional environment targets only narrow access or support legacy workflows. The editor shows spreadsheet IDs, ranges, writable columns and record-creation permission before publishing. Google write consent and the separate automatic-write opt-in remain one-time backend setup.
+
+Verification: 221 Python tests, 90 frontend tests, types, lint, production build, two desktop/mobile Playwright checks, shared contracts, generated-client drift, strict OpenSpec and diff checks passed. Tests use offline providers and mocked browser API responses; live accounts and deployments are not claimed verified. No credentials or user sheets were changed. See `openspec/changes/prompt-owned-sheet-access/` and the revised `docs/sheet-drafts-phase1.md`. Existing v1 schema/grant shapes remain unchanged; prompt-supplied business roles are not hardcoded.
+
+## Generic Sheets draft automation, Phase 1 — 2026-10-12
+
+Added `google_sheets_upsert_record` through the existing `update_spreadsheet` capability and live Registry/connector map. Server-owned target/range/ID/column policies and a separate `BUILDER_SHEETS_DIRECT_WRITE` opt-in restrict automatic writes. The prompt-driven planner retains generated master/specialist roles, receives the actual record schema and authorized target configuration, and maps validated final outputs into deterministic save steps. Generation, validation, review/publication and activation check graph save destinations and scalar output schemas. Existing versioned contracts, read polling, email policy, budgets and communication traces are preserved.
+
+217 Python tests pass; final focused planner/approval checks pass; shared contracts, generated-client drift, strict OpenSpec and diff-format checks pass. The 18 new test methods include offline actual planner/Registry/publication/polling/CrewAI/connector execution for restaurant and manufacturing, approval pauses, missing/ambiguous evidence, sorted/offset rows, concurrent saves, restart deduplication and partial failure. These results do not establish live Google access or live model accuracy. No user credentials, live sheets, workflow database or running backend were changed.
+
+Setup, example prompts and deployment limits: `docs/sheet-drafts-phase1.md`. OpenSpec delivery/evidence: `openspec/changes/generic-sheet-draft-automation/`. Operator target configuration, Google edit consent, restart and a reviewed generated workflow are needed for live use. Local file locks coordinate cooperating processes only; external editors and separate hosts can race, and multiple target saves are not atomic. Inbox reading and email delivery remain later phases.
+
+Repository handoff for Suprajha (planner context/schema), Aravind (new tool and restricted destinations), Harihar (existing publish/validation UI) and Rethika (connector/runtime behavior). No external messages or owner acceptance are claimed.
+
 ## Delegated connector access — 2026-10-11
 
 Dynamic subagents can now call their exact reviewed Registry tools through a bounded application-managed decision loop, receive actual connector output and return findings while the master continues independent work. Graph and delegated calls share authorization, schema, approval, timeout and budget checks. Dynamic read tools remain inside specialist tasks rather than becoming fixed reads after the master. The communication view shows delegated connector calls and result handoffs.

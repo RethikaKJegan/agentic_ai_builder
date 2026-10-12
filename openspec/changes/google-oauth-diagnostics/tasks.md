@@ -1,0 +1,4 @@
+- [ ] Add safe OAuth errors and account selection.
+- [ ] Validate granted scopes and handle equivalent/expanded grants without another code exchange.
+- [ ] Verify callback rejection, denied permissions, token preservation and secret-free errors.
+- [ ] Document remote consent and run focused tests, contracts and OpenSpec validation.

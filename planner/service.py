@@ -60,9 +60,28 @@ class PlannerService:
             self.idempotency.put(workspace_id, idempotency_key, IdempotencyRecord(fingerprint, response))
             return response
         except PlannerFailure as exc:
-            return {"request_id": request_id, "status": 403 if exc.code in {"AUTHENTICATION_REQUIRED", "PLANNING_NOT_AUTHORIZED"} else 400, "data": None, "error": exc.envelope(request_id)}
+            status = 403 if exc.code in {"AUTHENTICATION_REQUIRED", "PLANNING_NOT_AUTHORIZED"} else 502 if exc.code == 'PLANNER_OUTPUT_INVALID' else 400
+            return {"request_id": request_id, "status": status, "data": None, "error": exc.envelope(request_id)}
         except (ValueError, TypeError, RuntimeError) as exc:
             return {"request_id": request_id, "status": 502, "data": None, "error": PlannerFailure("PLANNER_PROVIDER_FAILED", "The planning provider did not return a usable draft.", retryable=True).envelope(request_id)}
+        except Exception as exc:
+            # SDK exceptions do not inherit RuntimeError. Never reflect their
+            # request headers, response bodies or messages into the API.
+            code, message, status = 'PLANNER_PROVIDER_FAILED', 'The planning provider failed. Retry generation.', 502
+            try:
+                from openai import APITimeoutError, APIConnectionError, RateLimitError, APIStatusError
+                if isinstance(exc, APITimeoutError):
+                    code, message, status = 'PLANNER_PROVIDER_TIMEOUT', 'Workflow generation timed out. Retry generation.', 504
+                elif isinstance(exc, APIConnectionError):
+                    code, message = 'PLANNER_PROVIDER_UNAVAILABLE', 'The model connection is unavailable. Retry generation.'
+                elif isinstance(exc, RateLimitError):
+                    code, message, status = 'PLANNER_RATE_LIMITED', 'The model provider rate limit was reached. Retry later.', 429
+                elif isinstance(exc, APIStatusError):
+                    message = 'The model provider rejected the generation request. Check the server model configuration.'
+            except ImportError:
+                pass
+            return {"request_id": request_id, "status": status, "data": None,
+                    "error": PlannerFailure(code, message, retryable=True).envelope(request_id)}
 
     @staticmethod
     def _clear_proposed_assignments(workflow: dict[str, Any]) -> None:

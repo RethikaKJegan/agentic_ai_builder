@@ -1,5 +1,11 @@
 # Rethika runtime
 
+## Prompt-selected sheet writes
+
+Phase 1 record saves now use `metadata.sheet_write_targets` from the generated, reviewed workflow revision. A user enters spreadsheet IDs/URLs, tab ranges, stable ID columns and desired output columns in the setup prompt; the editor's Sheet write access panel shows the generated scope before publication. No per-spreadsheet environment configuration is required. Each target contains spreadsheet_id, range, identity_column, writable_columns and allow_create. See `docs/sheet-drafts-phase1.md`.
+
+The graph/delegated tool boundary binds `GoogleSheetsRecordConnector` to the exact workflow's validated targets. An unbound adapter with no targets denies all writes. Optional `BUILDER_SHEETS_WRITE_TARGETS` is an additional operator restriction and supports legacy workflows; it cannot be broadened by workflow metadata. `BUILDER_SHEETS_DIRECT_WRITE=1` is a separate one-time opt-in for automatic reviewed writes; Google OAuth edit consent is still required. Input rows and tool results never set the binding. Registry grants, revision hashes, approvals, budgets and the existing record-lock/recovery limitations still apply.
+
 This package implements application-owned execution on the existing canonical
 workflow, agent, tool, authentication, run/event and API contracts. The accepted
 additive `workflow-operations-v2` contract owns release and trigger lifecycle;

@@ -1,5 +1,7 @@
 # Sheets → agents → Gmail through a UI-created workflow
 
+For generic prompt-generated checks and drafts saved back to Sheets, see [Phase 1 sheet drafts](sheet-drafts-phase1.md). That workflow adds restricted ID-based record saves and does not send customer email.
+
 The live launcher supplies reusable provider connections. Your UI-created workflow owns the trigger range, stable ID column, priority condition, agent instructions, output handoffs, email content and optional approval gate. Starting the launcher does not create, publish or approve a workflow.
 
 ## Start the backend and UI
@@ -32,6 +34,8 @@ cd /home/raf/agentic-ai-builder
 ```
 
 Checks list available models, read the selected range and perform Gmail STARTTLS/AUTH/NOOP. They send no email. If Google access fails, run `.venv-integrations/bin/python scripts/authorize_google.py` and ensure the authorized Google account can open the Sheet.
+
+For a remote VM, run `.venv-integrations/bin/python scripts/authorize_google.py --paste-redirect --account your-account@example.com`. Open the newly printed link in your browser, choose the intended account and approve every requested permission. Scroll down to finish consent. If the browser then shows connection refused at `http://127.0.0.1:8765/`, copy that entire address into the waiting terminal's hidden prompt. The connection refusal is expected in this mode; do not paste the Google consent-page address or reuse an old link/redirect. Keep passwords and redirect URLs out of chat. The helper reports safe retry guidance and replaces the old token only after offline access and all configured permissions are validated. Sheets edit consent covers Sheets read permission; other configured scopes remain required. A web OAuth client must register the exact loopback redirect; a desktop OAuth client supports this loopback flow directly. This command does not add Docs, Calendar or Drive write scopes to your configuration.
 
 Unknown runtime models require operator-owned BUILDER_MODEL_RATES JSON keyed by the exact model ID, containing input_per_token/output_per_token. The launcher includes gpt-5.6-luna standard short-context rates, verified against the [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna) on 2026-10-10. Configure BUILDER_MODEL_TOKENIZER only if installed tiktoken lacks the exact model. SDK retries are disabled and Responses storage is disabled, following the [Responses API documentation](https://developers.openai.com/api/docs/guides/migrate-to-responses). The planner permits at most two bounded requests, including one correction; runtime agents reserve their own budgets before calls.
 

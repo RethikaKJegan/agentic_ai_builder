@@ -13,6 +13,46 @@ from runtime.model import BoundedLLM
 
 
 class DynamicDelegationTests(RuntimeFixture):
+    def test_accounted_turns_use_remaining_tokens_and_settle_actual_usage(self):
+        caps, turns = [], []
+        def factory(definition):
+            def provider(messages, cap, timeout):
+                if definition['agent_id'] == 'master_agent':
+                    caps.append(cap)
+                    turns.append(1)
+                    if len(turns) < 3:
+                        child = 'research_agent' if len(turns) == 1 else 'analysis_agent'
+                        output = {'action': 'delegate', 'reason': 'Check another source.', 'tasks': [
+                            {'agent_id': child, 'inputs': {'task': 'check'}, 'reason': 'Required check.'}]}
+                    else:
+                        output = {'action': 'finish', 'reason': 'Combine both sources.', 'output': {'summary': 'Verified.'}}
+                else:
+                    output = {'verified': True}
+                return json.dumps(output), 1500, 1000
+            return BoundedLLM(definition, provider, lambda messages: 2000, 0, 0)
+        result, events = self.run_case(executor=CrewExecutor(self.workflows.registry_adapter, factory))
+        self.assertEqual(result['status'], 'completed', json.dumps(events))
+        self.assertEqual(caps, [14000, 11500, 9000])
+        with self.store.transaction() as db:
+            stored = self.runtime.load(db, result['run_id'], self.auth)
+        self.assertEqual(stored['usage']['master_agent']['tokens'], 7500)
+        self.assertEqual(stored['usage']['workflow']['tokens'], 12500)
+        self.assertEqual(len([e for e in events if e['event_type'] == 'budget.settled']), 5)
+
+    def test_unconfirmed_provider_failure_keeps_full_reservation(self):
+        def factory(definition):
+            def provider(*args):
+                raise RuntimeFailure('MODEL_OUTPUT_TRUNCATED', 'The provider truncated its answer.')
+            return BoundedLLM(definition, provider, lambda messages: 2000, 0, 0)
+        from runtime.service import RuntimeFailure
+        result, events = self.run_case(executor=CrewExecutor(self.workflows.registry_adapter, factory))
+        self.assertEqual(result['status'], 'failed')
+        with self.store.transaction() as db:
+            stored = self.runtime.load(db, result['run_id'], self.auth)
+        self.assertEqual(stored['error_code'], 'MODEL_OUTPUT_TRUNCATED')
+        self.assertEqual(stored['usage']['master_agent']['tokens'], 16000)
+        self.assertFalse(any(e['event_type'] == 'budget.settled' for e in events))
+
     def test_master_continues_while_child_runs_and_joins_before_final_output(self):
         started, release, finished = Event(), Event(), Event()
         contexts = []

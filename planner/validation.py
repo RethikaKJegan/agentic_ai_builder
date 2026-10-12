@@ -17,6 +17,77 @@ def mark_automatic_inputs(workflow: dict[str, Any], context: dict[str, Any]) -> 
         workflow.setdefault('metadata', {})['execution_input_mode'] = 'automatic'
 
 
+def normalize_generated_inputs(workflow: dict[str, Any]) -> None:
+    """Combine disjoint setup literals and mappings in fresh model proposals.
+
+    Saved workflows retain existing execution semantics. Unsupported literals or
+    overlapping keys are left for validation rather than resolved by guessing.
+    """
+    for node in workflow.get('nodes', []):
+        configuration = node.get('configuration', {})
+        literals, mappings = configuration.get('input'), configuration.get('input_mapping')
+        if not isinstance(literals, dict) or not isinstance(mappings, dict) or set(literals) & set(mappings):
+            continue
+        expressions = {key: repr(value) for key, value in literals.items()}
+        try:
+            for expression in expressions.values():
+                validate_expression(expression)
+        except Exception:
+            continue
+        configuration['input_mapping'] = {**expressions, **mappings}
+        del configuration['input']
+
+
+def normalize_tool_agent_capabilities(workflow: dict[str, Any]) -> None:
+    """An explicit tool-node binding also declares its required capability."""
+    tools = {t['tool_id']: t['capability'] for t in workflow.get('tools', [])}
+    agents = {a['agent_id']: a for a in workflow.get('agents', [])}
+    for node in workflow.get('nodes', []):
+        if node.get('kind') != 'tool':
+            continue
+        agent, capability = agents.get(node.get('agent_id')), tools.get(node.get('tool_id'))
+        if agent is not None and capability is not None and capability not in agent['capabilities']:
+            agent['capabilities'].append(capability)
+
+
+def validate_output_mappings(workflow: dict[str, Any], tool_schemas: dict[str, Any]) -> None:
+    agents = {a['agent_id']: a for a in workflow['agents']}
+    nodes = {n['node_id']: n for n in workflow['nodes']}
+    for node in workflow['nodes']:
+        for name, expression in node.get('configuration', {}).get('input_mapping', {}).items():
+            tree = validate_expression(expression)
+            for part in ast.walk(tree):
+                path, current = [], part
+                while isinstance(current, (ast.Attribute, ast.Subscript)):
+                    if isinstance(current, ast.Attribute):
+                        path.append(current.attr)
+                    elif isinstance(current.slice, ast.Constant):
+                        path.append(current.slice.value)
+                    else:
+                        break
+                    current = current.value
+                if not isinstance(current, ast.Name) or current.id not in {'outputs','nodes'} or len(path) < 2:
+                    continue
+                path.reverse()
+                source = nodes.get(path[0])
+                if source is None:
+                    continue  # Ordinary graph-reference validation reports this.
+                is_tool = source['kind'] == 'tool'
+                schema = tool_schemas.get(source.get('tool_id'), {}) if is_tool else agents.get(source.get('agent_id'), {}).get('output_schema', {})
+                for depth, field in enumerate(path[1:]):
+                    if isinstance(field, int) and schema.get('type') == 'array':
+                        schema = schema.get('items', {})
+                        continue
+                    props = schema.get('properties', {})
+                    known = set(props) | set(schema.get('required', []))
+                    if field not in known:
+                        if schema.get('additionalProperties') is False or (is_tool and depth == 0 and known):
+                            raise PlannerFailure('OUTPUT_FIELD_NOT_DECLARED', 'Map only fields declared by the source agent or tool output schema.',
+                                                 field=f'nodes.{node["node_id"]}.configuration.input_mapping.{name}')
+                        break
+                    schema = props.get(field, {})
+
+
 def validate_automatic_inputs(workflow: dict[str, Any]) -> None:
     if workflow['metadata'].get('execution_input_mode') != 'automatic':
         return

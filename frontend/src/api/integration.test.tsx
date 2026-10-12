@@ -232,7 +232,7 @@ describe("registry review contract safety", () => {
 
 describe("approval and run consumers", () => {
   it("submits only the exact trusted pending approval binding and renders the returned decision", async () => {
-    useBackend.setState({ session: { ...session(["workflow.approve"]), auth: { ...session(["workflow.approve"]).auth, roles: ["approver"] }, approval_service_available: true } });
+    useBackend.setState({ session: { ...session(["runs.view"]), auth: { ...session(["runs.view"]).auth, roles: ["viewer"] }, approval_service_available: true } });
     const approval = { approval_id: "approval_exact", workflow_id: "invoice_review", workflow_version: 3, status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] };
     const decision = vi.spyOn(api, "request").mockResolvedValue({ ...approval, status: "approved", allowed_decisions: [] } as never);
     render(<ApprovalControl approval={approval} />);

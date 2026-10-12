@@ -7,7 +7,7 @@ import { assertRunTransition, reconcileEvents } from "@/api/control";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { StatusPill } from "@/features/shell/StatusPill";
 
-export function ApprovalControl({ approval, onUpdated }: { approval: ApprovalRecord; onUpdated?: (() => void) | undefined }) {
+export function ApprovalControl({ approval, emailPreview, onUpdated }: { approval: ApprovalRecord; emailPreview?: unknown; onUpdated?: (() => void) | undefined }) {
   const backend = useBackend();
   const [record, setRecord] = useState(approval);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,8 @@ export function ApprovalControl({ approval, onUpdated }: { approval: ApprovalRec
   return <div className="space-y-2 rounded-lg border border-border p-3">
     <p className="text-sm">Approval {record.approval_id} · {record.status} · v{record.workflow_version}</p>
     <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
-    {record.status === "pending" && backend.session?.approval_service_available && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
+    {emailPreview != null && <pre aria-label="Email awaiting approval" className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{JSON.stringify(emailPreview, null, 2)}</pre>}
+    {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
     {record.status === "unmatched" && <p className="text-xs text-muted-foreground">This approval does not match the current workflow revision.</p>}
     <ApiFeedback error={error} />
   </div>;
@@ -95,7 +96,8 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
       {run.approvals.map((approval) => {
         const matched = approval.workflow_id === run.workflow_id && approval.workflow_version === run.workflow_version;
         const record = matched ? approval : { ...approval, status: "unmatched" as const, allowed_decisions: [] };
-        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} onUpdated={() => void loadRun(run.run_id)} />;
+        const preview = events.find((event) => event.event_type === "approval.pending" && event.details?.["approval_id"] === record.approval_id)?.details?.["email_preview"];
+        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} emailPreview={preview} onUpdated={() => void loadRun(run.run_id)} />;
       })}
       {!approvalsOnly && <ol className="divide-y divide-border rounded-xl border border-border" aria-label="Run events">{events.map((event) => <li key={event.event_id} className="p-3"><p className="text-sm">{event.event_type}</p><p className="text-xs text-muted-foreground">{event.timestamp} · {event.source} · {event.event_id} · v{event.workflow_version}</p></li>)}</ol>}
     </>}

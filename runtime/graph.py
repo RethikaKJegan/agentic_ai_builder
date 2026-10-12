@@ -147,6 +147,12 @@ class GraphRunner:
         connector = self.connectors.get(grant['tool_id'])
         if connector is None:
             raise RuntimeFailure('CONNECTOR_NOT_CONFIGURED', 'No authorized connector adapter is configured.', 503)
+        bind_workflow = getattr(connector, 'bind_workflow', None)
+        if callable(bind_workflow):
+            connector = bind_workflow(workflow)
+        bind_run = getattr(connector, 'bind_run', None)
+        if callable(bind_run):
+            connector = bind_run(workflow, run)
         direct = grant['tool_id'] in self.direct_write_tools and grant.get('approval_required') is False
         if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or (not passed and not direct)):
             raise RuntimeFailure('APPROVAL_REQUIRED', 'External writes require workflow policy and run approval.', 403)
@@ -236,17 +242,29 @@ class GraphRunner:
                         approved_edge = next((edge for edge in self.outgoing(workflow, node['node_id']) if edge.get('outcome') == 'approved'), None)
                         approved_node = next((candidate for candidate in workflow['nodes'] if approved_edge and candidate['node_id'] == approved_edge['target']), None)
                         action_hash = self.action_digest(approved_node, run) if approved_node and approved_node.get('kind') == 'tool' else None
+                        email_preview = None
+                        if approved_node and approved_node.get('tool_id') == 'smtp_send_email':
+                            from .email_recipients import source_recipient
+                            recipient = source_recipient(workflow, run['inputs'])
+                            email_preview = self.params(approved_node, run)
+                            if recipient is not None and email_preview.get('to') != recipient:
+                                raise RuntimeFailure('DESTINATION_NOT_AUTHORIZED', 'Recipient must match the original review row.', 403)
                         approval = dict(approval_id='approval_' + uuid4().hex, workflow_id=run['workflow_id'], workflow_version=run['workflow_version'],
                                         status='pending', allowed_decisions=['approved', 'rejected'], action_digest=action_hash)
                         run['approvals'].append(approval)
                         run['approval_context'] = dict(node_id=node['node_id'], gate_id=gate['approval_gate_id'],
+                                                       action_digest=action_hash,
                                                        expires_at=runtime.clock() + gate.get('timeout_seconds', workflow['execution_policy']['limits']['timeout_seconds']))
                         run['node_states'][node['node_id']] = 'paused'
                         run['lease_until'] = 0
-                        runtime.event(db, run, 'approval.pending', {'approval_id': approval['approval_id'], 'node_id': node['node_id']})
+                        runtime.event(db, run, 'approval.pending', {'approval_id': approval['approval_id'], 'node_id': node['node_id'],
+                                      **({'email_preview': email_preview} if email_preview is not None else {})})
                         runtime.transition(db, run, 'paused_for_approval')
                         return runtime.public(run)
                     elif kind in {'trigger', 'transform', 'output'}:
+                        if kind == 'trigger':
+                            from .email_recipients import source_recipient
+                            source_recipient(workflow, run['inputs'])
                         output = self.params(node, run)
                         if kind == 'output':
                             fields = workflow['outputs']
@@ -344,9 +362,9 @@ class GraphRunner:
 
     def decide(self, request, approver):
         runtime = self.runtime
-        runtime.authorize(approver, 'workflow.approve', {'admin', 'approver'})
-        if 'workspace:write' not in approver['scopes']:
-            raise RuntimeFailure('APPROVAL_SCOPE_REQUIRED', 'Approval requires the trusted workspace write scope.', 403)
+        runtime.authorize(approver, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+        if not {'workspace:read', 'workspace:write'} & set(approver['scopes']):
+            raise RuntimeFailure('APPROVAL_SCOPE_REQUIRED', 'Approval requires trusted workspace membership.', 403)
         payload = request['payload']
         if set(payload) - {'approval_id', 'workflow_id', 'workflow_version', 'decision'}:
             raise RuntimeFailure('INVALID_REQUEST', 'Approval contains unsupported fields.', 400)
@@ -364,8 +382,8 @@ class GraphRunner:
             if not workflow or digest(workflow) != run['workflow_digest'] or workflow['status'] not in {'approved', 'published'}:
                 raise RuntimeFailure('REVISION_CHANGED', 'The reviewed approval revision is no longer current.')
             gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == run['approval_context']['gate_id'])
-            if not set(approver['roles']) & set(gate['approver_roles']):
-                raise RuntimeFailure('APPROVER_ROLE_REQUIRED', 'The approver role does not match the gate.', 403)
+            # Run actions can be approved by any authenticated member of this
+            # workspace. Publication and execution keep their own permissions.
             approval = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
             decision = payload.get('decision')
             if decision not in {'approved', 'rejected'}:

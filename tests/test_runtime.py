@@ -318,6 +318,43 @@ class GraphTests(RuntimeFixture):
         self.assertEqual(runner.decide(request, self.approver()), approved)
         self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
 
+    def test_workspace_members_can_approve_a_gate_with_an_unknown_role(self):
+        self.approval_graph()
+        self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+        self.put()
+        for index, role in enumerate(('admin', 'builder', 'viewer', 'approver')):
+            with self.subTest(role=role):
+                request = self.request()
+                request['idempotency_key'] = 'member-approval-run-' + str(index)
+                run = self.runtime.create_run(request, self.auth)
+                runner = self.runner()
+                paused = runner.advance(run['run_id'], self.auth)
+                member = dict(subject=dict(subject_id='member-' + str(index), workspace_id='local-workspace'),
+                    roles=[role], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+                approved = runner.decide(self.decision(paused, 'approved'), member)
+                self.assertEqual(approved['status'], 'running')
+
+    def test_viewer_can_approve_through_api_without_execution_permission(self):
+        self.approval_graph()
+        self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+        self.put()
+        runner = self.runner()
+        paused = runner.advance(self.queue(), self.auth)
+        self.workflows.runtime_runner = runner
+        member = dict(subject=dict(subject_id='viewer-member', workspace_id='local-workspace'),
+            roles=['viewer'], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+        result = self.workflows.handle(self.decision(paused, 'approved'), member)
+        self.assertEqual(result['status'], 200, result)
+        self.assertEqual(result['data']['status'], 'approved')
+
+    def test_members_cannot_approve_another_workspace_or_without_authentication(self):
+        self.approval_graph()
+        paused = self.runner().advance(self.queue(), self.auth)
+        for changes in ({'subject': {'subject_id': 'other', 'workspace_id': 'another-workspace'}}, {'decision': 'deny'}):
+            member = self.approver() | changes
+            with self.assertRaises(RuntimeFailure):
+                self.runner().decide(self.decision(paused, 'approved'), member)
+
     def test_rejection_and_timeout_never_continue_the_approved_path(self):
         self.approval_graph()
         run_id = self.queue()
