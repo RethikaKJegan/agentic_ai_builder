@@ -4,7 +4,7 @@ import argparse
 import getpass
 import hmac
 import os
-import sys
+from functools import partial
 from urllib.parse import urlparse, parse_qs
 from integration_config import ROOT, load_env, private_write
 
@@ -49,6 +49,28 @@ def failure_message(error):
         return 'Authorization input was cancelled. Retry in an interactive terminal.'
     if isinstance(error, Warning):
         return 'Google returned different permissions. Retry and approve all requested access.'
+    from google.auth.exceptions import RefreshError, TransportError
+    if isinstance(error, RefreshError):
+        # Google-auth stores the parsed response separately from its exception
+        # text. Only known codes may leave this boundary; descriptions can echo
+        # supplied credentials and are never displayed.
+        response = next((arg for arg in error.args if isinstance(arg, dict)), {})
+        code = response.get('error')
+        if code == 'invalid_grant' and response.get('error_subtype') == 'invalid_rapt':
+            code = 'invalid_rapt'
+        messages = {
+            'invalid_client': 'Google error: invalid_client. The client ID/secret was rejected. Use the same enabled secret in credentials.json and Playground.',
+            'invalid_grant': 'Google error: invalid_grant. The refresh token is invalid, revoked or belongs to another client. Copy the complete Refresh token field from Playground Step 2; if needed authorize again with this project\'s own OAuth client.',
+            'invalid_scope': 'Google error: invalid_scope. The refresh token does not support the requested scopes. Authorize all configured permissions again in Playground.',
+            'unauthorized_client': 'Google error: unauthorized_client. This OAuth client is not authorized for the refresh flow. Check the web OAuth client configuration.',
+            'invalid_request': 'Google error: invalid_request. Google rejected the refresh request. Check the local client configuration and copy only the refresh token value.',
+            'invalid_rapt': 'Google error: invalid_rapt. Google requires reauthentication. Sign in and authorize again; Workspace session policy may require an administrator review.',
+        }
+        if isinstance(code, str) and code in messages:
+            return messages[code]
+        return 'Google rejected the refresh token. In Playground select Use your own OAuth credentials, use this project\'s client ID/secret, and generate a NEW refresh token.'
+    if isinstance(error, TransportError):
+        return 'Could not reach Google to verify the refresh token. Check network access and retry locally.'
     from requests.exceptions import RequestException
     if isinstance(error, RequestException):
         return 'Could not exchange the code with Google. Check network access and retry with a NEW authorization link.'
@@ -78,9 +100,45 @@ def complete_pasted_redirect(flow, redirect_url, expected_state):
     return flow.credentials
 
 
+def import_refresh_token(client_config, requested_scopes, refresh_token):
+    """Verify a private Playground token; never infer grants from user input."""
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from requests import Session
+    if not refresh_token.strip():
+        raise AuthorizationError('No refresh token entered. Copy the refresh_token value from OAuth Playground Step 2 into this terminal only.')
+    refresh_token = refresh_token.strip()
+    if refresh_token.startswith('ya29.'):
+        raise AuthorizationError('That is an ACCESS token. Copy the Refresh token field from Playground Step 2 instead.')
+    if refresh_token.startswith('4/'):
+        raise AuthorizationError('That is an authorization CODE. Exchange it in Playground Step 2, then copy the Refresh token field.')
+    if refresh_token.startswith('GOCSPX-'):
+        raise AuthorizationError('That is a CLIENT SECRET. Copy the Refresh token field from Playground Step 2 instead.')
+    if any(character.isspace() for character in refresh_token) or any(character in refresh_token for character in ('"', "'", '{', '}')):
+        raise AuthorizationError('Paste only the complete refresh token value, without quotes, JSON, spaces or line breaks. Copy it from the Refresh token field in Step 2.')
+    refresh_scopes = list(requested_scopes)
+    sheet_write = 'https://www.googleapis.com/auth/spreadsheets'
+    sheet_read = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+    if sheet_write in refresh_scopes:
+        refresh_scopes = [scope for scope in refresh_scopes if scope != sheet_read]
+    creds = Credentials(None, refresh_token=refresh_token.strip(),
+                        token_uri='https://oauth2.googleapis.com/token',
+                        client_id=client_config['client_id'],
+                        client_secret=client_config['client_secret'],
+                        scopes=refresh_scopes)
+    with Session() as session:
+        creds.refresh(partial(Request(session=session), timeout=30))
+    if not creds.token or creds.granted_scopes is None:
+        raise AuthorizationError('Google did not return verified scope information. The existing token was preserved; authorize all configured permissions using your own OAuth client in Playground.')
+    checked_scopes(requested_scopes, creds.granted_scopes)
+    return creds
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--paste-redirect', action='store_true', help='Complete consent from a remote workspace without a callback listener.')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--paste-redirect', action='store_true', help='Complete consent from a remote workspace without a callback listener.')
+    mode.add_argument('--paste-refresh-token', action='store_true', help='Privately import and verify a refresh token from Google OAuth Playground using your own client.')
     parser.add_argument('--account', help='Suggest the Google account to authorize; Google still requires sign-in and consent.')
     args = parser.parse_args()
     env = load_env()
@@ -103,7 +161,11 @@ def main():
         # Google can otherwise reuse a prior consent grant without returning a
         # refresh token.  A long-running trigger worker needs a refreshable
         # offline credential, not a short-lived access token.
-        if args.paste_redirect:
+        if args.paste_refresh_token:
+            print('Use Google OAuth Playground with YOUR OWN configured OAuth client. Paste only its refresh_token value here; never send it in chat.', flush=True)
+            refresh_token = getpass.getpass('Paste Playground refresh token (hidden): ')
+            creds = import_refresh_token(flow.client_config, env['GOOGLE_OAUTH_SCOPES'].split(), refresh_token)
+        elif args.paste_redirect:
             flow.redirect_uri = 'http://127.0.0.1:8765/'
             url, state = flow.authorization_url(**consent_options)
             print('Open this NEW link in your browser, select the intended account and approve ALL requested permissions, including Google Sheets editing:\n' + url, flush=True)
@@ -114,7 +176,7 @@ def main():
             try:
                 creds = flow.run_local_server(host='127.0.0.1', port=8765, open_browser=True,
                                           authorization_prompt_message='Complete consent in your local browser.',
-                                          success_message='Authorization saved locally. You can close this tab.',
+                                          success_message='Google callback received. Check your terminal for the final authorization result. You can close this tab.',
                                           **consent_options)
             except Warning as warning:
                 creds = recover_scope_change(flow, warning)

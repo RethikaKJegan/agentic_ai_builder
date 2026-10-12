@@ -1,4 +1,12 @@
-- [ ] Add safe OAuth errors and account selection.
-- [ ] Validate granted scopes and handle equivalent/expanded grants without another code exchange.
-- [ ] Verify callback rejection, denied permissions, token preservation and secret-free errors.
-- [ ] Document remote consent and run focused tests, contracts and OpenSpec validation.
+- [x] Add safe OAuth errors and account selection.
+- [x] Validate granted scopes and handle equivalent/expanded grants without another code exchange.
+- [x] Verify callback rejection, denied permissions, token preservation and secret-free errors.
+- [x] Document remote consent and run focused tests, contracts and OpenSpec validation.
+- [x] Add and verify private OAuth Playground refresh-token import and setup instructions.
+- [x] Distinguish safe structured refresh errors, reject incorrect paste formats and omit redundant Sheets read scope from refresh requests.
+
+Refresh failure follow-up: 13 focused tests pass, covering known/unknown/malformed structured error categories without leaking descriptions, invalid_rapt session-control subtype, access-token/code/client-secret/JSON paste rejection and Sheets scope normalization while retaining all required grant checks. Contracts, strict OpenSpec and diff checks pass. A live dummy-token client diagnostic returned HTTP 400 invalid_grant (not invalid_client); this is not a verified refresh of the user's token. The local client ID matches the expected application and its secret is present, unmasked and has no surrounding whitespace. No saved credential or user token changed; the actual pasted-token failure remains pending the next safe categorized error.
+
+Playground alternative: ten focused tests pass, including the real Google credential refresh parser with mocked transport, fixed official endpoint, bounded timeout, explicit actual grants, denied/missing scope evidence, rejected refresh tokens and private saving without callback generation. Shared contracts, strict scoped OpenSpec and diff checks pass. Live Playground consent/refresh and Google Cloud client redirect changes remain operator actions and were not performed.
+
+Verification on 2026-10-12: eight OAuth regression tests pass, including actual OAuthlib token parsing with mocked HTTP responses, missing refresh tokens, actual-grant persistence and private file modes. Shared contracts, strict scoped OpenSpec validation and diff formatting pass. No real user authorization, credential replacement, spreadsheet write or backend restart occurred. The initial test mock accidentally sent synthetic client credentials to Google's token endpoint and received invalid_client; subsequent tests mock the actual request boundary. No user credentials were transmitted. The existing token was inspected for scope names only and lacks Sheets write permission. The original live failure's cause remains unconfirmed because the old script suppressed it.

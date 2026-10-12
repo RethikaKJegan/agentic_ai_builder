@@ -1,5 +1,13 @@
 # Handoff — Rethika
 
+## Google consent diagnostics — 2026-10-12
+
+Remote OAuth setup now offers account selection and credential-free actionable errors. Scope-change responses are accepted only if all configured permissions are covered (Sheets write includes Sheets read); denied permissions or absent offline access preserve the old token. Actual grants are persisted privately. Eight focused OAuth tests, shared contracts, strict scoped OpenSpec and diff checks pass. Live consent remains pending; the saved token has no Sheets edit scope. No user credentials, workflows or backend processes were changed. See `openspec/changes/google-oauth-diagnostics/` and the remote command in `docs/sheets-gmail.md`.
+
+Alternative added after the browser remained on Google's consent page: `--paste-refresh-token` imports a hidden refresh token from Google OAuth Playground using the configured client's credentials. Actual Google refresh response scope evidence is mandatory; the old token is preserved on failure. Ten focused tests pass with mocked transports, including the real refresh parser. Operator must add Google's Playground HTTPS URI to their web client's redirect list and complete consent; neither client settings nor live tokens were changed here. This alternative does not bypass Google consent or prove the original browser failure's cause.
+
+Refresh failures now display only allowlisted structured Google error categories, including invalid_rapt session-policy subtype, and reject plainly wrong paste formats. Redundant Sheets readonly is omitted from refresh requests when Sheets write is configured; validation still requires all original permissions. Thirteen focused tests pass. Live dummy-token diagnostic returned invalid_grant rather than invalid_client; no actual user-token refresh or permission validation is claimed. Saved credentials were unchanged. User must retry the hidden import and provide only the safe categorized error if it fails.
+
 ## Restaurant generation failure recovery — 2026-10-12
 
 Live diagnosis reproduced an OpenAI timeout mislabeled INVALID_API_DATA. Planning now has an explicit bounded 180-second default deadline, preserving runtime timeouts/zero retries, and SDK failures return safe retryable planner errors. Captured real model drafts also exposed mixed literal/dynamic configurations and omitted closed save-field schemas. Fresh proposals normalize disjoint supported literals into one mapping and tighten omitted extra-property restrictions for explicit save-field schemas; ambiguous/unsupported inputs and explicit open schemas are not guessed. Exhausted correction reports structured requirement codes. Existing saved-workflow execution semantics are preserved.

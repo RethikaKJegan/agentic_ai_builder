@@ -17,3 +17,22 @@ The helper SHALL save a token only when every requested permission is granted an
 #### Scenario: Missing permission
 - **WHEN** Google omits a required grant
 - **THEN** the existing token remains unchanged
+
+### Requirement: Alternative HTTPS authorization
+The helper SHALL accept a privately pasted refresh token obtained using the configured web client through Google's OAuth Playground, verify it with Google's official token endpoint, and require explicit scope evidence.
+
+#### Scenario: Playground token is valid
+- **WHEN** a pasted refresh token successfully refreshes and its returned scopes cover all configured permissions
+- **THEN** the helper saves a private authorized-user token without a localhost redirect
+
+#### Scenario: Refresh token cannot prove access
+- **WHEN** refresh fails or its response omits required scope evidence
+- **THEN** the existing token remains unchanged and no token value is displayed
+
+#### Scenario: Equivalent Sheets grant is refreshed
+- **WHEN** configuration requests both Sheets readonly and Sheets write but Playground grants Sheets write
+- **THEN** the refresh request omits redundant Sheets readonly while the saved token must cover every originally configured permission
+
+#### Scenario: Google reports a refresh failure
+- **WHEN** the structured response contains a known OAuth error category
+- **THEN** the helper displays only the allowlisted category and fixed guidance without response descriptions or token values

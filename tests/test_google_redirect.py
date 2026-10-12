@@ -84,7 +84,81 @@ class GoogleRedirectTests(unittest.TestCase):
     def test_missing_offline_access_preserves_existing_token(self):
         self.check_token_save(['read', 'write'], 'offline access', refresh_token=None)
 
-    def check_token_save(self, grants, error, refresh_token='private-refresh'):
+    def test_playground_import_checks_real_refresh_response(self):
+        from google.auth.exceptions import RefreshError
+        config = {'client_id': 'test-client', 'client_secret': 'private-secret',
+                  'token_uri': 'https://untrusted.example/token'}
+        for scopes, accepted in (('read write', True), ('read', False), (None, False)):
+            body = {'access_token': 'private-access', 'expires_in': 3600, 'token_type': 'Bearer'}
+            if scopes is not None:
+                body['scope'] = scopes
+            response = SimpleNamespace(status=200, data=json.dumps(body).encode())
+            request = Mock(return_value=response)
+            with patch('google.auth.transport.requests.Request', return_value=request):
+                if accepted:
+                    creds = self.module['import_refresh_token'](config, ['read', 'write'], 'private-refresh')
+                    self.assertEqual(creds.refresh_token, 'private-refresh')
+                    self.assertEqual(creds.granted_scopes, ['read', 'write'])
+                else:
+                    with self.assertRaises(ValueError):
+                        self.module['import_refresh_token'](config, ['read', 'write'], 'private-refresh')
+            self.assertEqual(request.call_args.kwargs['url'], 'https://oauth2.googleapis.com/token')
+            self.assertEqual(request.call_args.kwargs['timeout'], 30)
+        request = Mock(return_value=SimpleNamespace(status=400, data=b'{"error":"invalid_grant"}'))
+        with patch('google.auth.transport.requests.Request', return_value=request):
+            with self.assertRaises(RefreshError):
+                self.module['import_refresh_token'](config, ['read', 'write'], 'private-refresh')
+
+    def test_playground_import_saves_private_verified_token(self):
+        self.check_token_save(['read', 'write'], None, mode='--paste-refresh-token')
+
+    def test_refresh_errors_display_only_known_codes(self):
+        from google.auth.exceptions import RefreshError
+        for code in ('invalid_client', 'invalid_grant', 'invalid_scope', 'invalid_request',
+                     'unauthorized_client', 'invalid_rapt'):
+            error = RefreshError('private-secret', {'error': code,
+                'error_description': 'private-secret', 'refresh_token': 'private-secret'})
+            message = self.module['failure_message'](error)
+            self.assertIn('Google error: ' + code, message)
+            self.assertNotIn('private-secret', message)
+        for code in ('private-secret', ['private-secret'], {'private-secret': True}):
+            message = self.module['failure_message'](RefreshError('private-secret', {'error': code}))
+            self.assertNotIn('private-secret', message)
+        message = self.module['failure_message'](RefreshError('private-secret', {
+            'error': 'invalid_grant', 'error_subtype': 'invalid_rapt'}))
+        self.assertIn('invalid_rapt', message)
+        self.assertNotIn('private-secret', message)
+
+    def test_wrong_paste_is_rejected_before_google_request(self):
+        config = {'client_id': 'test-client', 'client_secret': 'private-secret'}
+        for token in ('ya29.access-token', '4/authorization-code', 'GOCSPX-client-secret', '"quoted-token"',
+                      'token with space', 'token\nwrapped', '{"refresh_token":"token"}'):
+            with patch('google.auth.transport.requests.Request') as request:
+                with self.assertRaises(ValueError):
+                    self.module['import_refresh_token'](config, ['read'], token)
+                request.assert_not_called()
+
+    def test_refresh_omits_redundant_read_scope_but_requires_other_scopes(self):
+        from urllib.parse import parse_qs
+        read = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+        write = 'https://www.googleapis.com/auth/spreadsheets'
+        docs = 'https://www.googleapis.com/auth/documents.readonly'
+        config = {'client_id': 'test-client', 'client_secret': 'private-secret'}
+        for grants, accepted in ((write + ' ' + docs, True), (write, False)):
+            response = SimpleNamespace(status=200, data=json.dumps({
+                'access_token': 'private-access', 'scope': grants, 'expires_in': 3600}).encode())
+            request = Mock(return_value=response)
+            with patch('google.auth.transport.requests.Request', return_value=request):
+                if accepted:
+                    creds = self.module['import_refresh_token'](config, [read, write, docs], 'private-refresh')
+                    self.assertEqual(set(creds.granted_scopes), {write, docs})
+                else:
+                    with self.assertRaisesRegex(ValueError, 'permissions were not granted'):
+                        self.module['import_refresh_token'](config, [read, write, docs], 'private-refresh')
+            body = parse_qs(request.call_args.kwargs['body'].decode())
+            self.assertEqual(set(body['scope'][0].split()), {write, docs})
+
+    def check_token_save(self, grants, error, refresh_token='private-refresh', mode='--paste-redirect'):
         from google.oauth2.credentials import Credentials
         creds = Credentials('private-access', refresh_token=refresh_token,
             token_uri='https://oauth2.googleapis.com/token', client_id='test',
@@ -100,9 +174,10 @@ class GoogleRedirectTests(unittest.TestCase):
                    'GOOGLE_TOKEN_FILE': 'token.json', 'GOOGLE_OAUTH_SCOPES': 'read write'}
             with patch.dict(main.__globals__, {'ROOT': root, 'load_env': lambda: env,
                        'complete_pasted_redirect': lambda *args: creds,
+                       'import_refresh_token': lambda *args: creds,
                        'getpass': SimpleNamespace(getpass=Mock(return_value='private-redirect'))}), \
                  patch('google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file', return_value=flow), \
-                 patch('sys.argv', ['authorize_google.py', '--paste-redirect', '--account', 'test@example.com']), \
+                 patch('sys.argv', ['authorize_google.py', mode, '--account', 'test@example.com']), \
                  patch('builtins.print'):
                 if error:
                     with self.assertRaisesRegex(SystemExit, error):
@@ -114,5 +189,8 @@ class GoogleRedirectTests(unittest.TestCase):
             else:
                 self.assertEqual(json.loads((root / 'token.json').read_text())['scopes'], sorted(grants))
                 self.assertEqual((root / 'token.json').stat().st_mode & 0o777, 0o600)
-            self.assertEqual(flow.authorization_url.call_args.kwargs['login_hint'], 'test@example.com')
-            self.assertIn('select_account', flow.authorization_url.call_args.kwargs['prompt'])
+            if mode == '--paste-redirect':
+                self.assertEqual(flow.authorization_url.call_args.kwargs['login_hint'], 'test@example.com')
+                self.assertIn('select_account', flow.authorization_url.call_args.kwargs['prompt'])
+            else:
+                flow.authorization_url.assert_not_called()
