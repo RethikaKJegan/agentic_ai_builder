@@ -25,7 +25,7 @@ def headers(message):
     result = {}
     for item in message.get('payload', {}).get('headers', []):
         name, value = item.get('name', '').lower(), item.get('value', '')
-        if name in {'from', 'to', 'subject', 'message-id', 'references', 'reply-to'}:
+        if name in {'from', 'to', 'subject', 'message-id', 'references', 'reply-to','in-reply-to','auto-submitted','precedence'}:
             if not isinstance(value, str) or any(c in value for c in '\r\n'):
                 denied('MAIL_HEADER_INVALID', 'The provider returned an invalid mail header.', 502)
             if name in result: denied('MAIL_HEADER_INVALID', 'The provider returned ambiguous mail headers.', 502)
@@ -60,10 +60,18 @@ def summarize(message):
                                 'mime_type': part.get('mimeType', 'application/octet-stream'), 'size': body.get('size', 0)})
         elif part.get('mimeType') == 'text/plain' and body.get('data'):
             text.append(decode_data(body['data'], 32000).decode('utf-8', errors='replace'))
-    return {'message_id': message['id'], 'thread_id': message.get('threadId'),
+    result={'message_id': message['id'], 'thread_id': message.get('threadId'),
             'from': values.get('from', ''), 'to': values.get('to', ''), 'subject': values.get('subject', ''),
             'rfc_message_id': values.get('message-id', ''), 'text': '\n'.join(text)[:32000],
             'attachments': attachments[:100], 'snippet': message.get('snippet', '')[:1000]}
+    # Keep absent metadata absent for older provider fixtures/consumers.
+    if message.get('internalDate'):
+        from datetime import datetime,timezone
+        try:result['received_at']=datetime.fromtimestamp(int(message['internalDate'])/1000,timezone.utc).isoformat()
+        except (ValueError,TypeError,OverflowError,OSError):denied('MAIL_DATE_INVALID','Message receipt timestamp is invalid.',502)
+    for field in ('in-reply-to','references','auto-submitted','precedence','reply-to'):
+        if field in values:result[field.replace('-','_')]=values[field]
+    return result
 
 
 class MailConnector(Connector):

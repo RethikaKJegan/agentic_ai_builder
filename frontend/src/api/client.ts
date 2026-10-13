@@ -172,6 +172,9 @@ export class WorkflowClient {
         categories: z.array(z.string()), assessment: z.string(), contact_state: z.string(),
         evidence: z.array(z.object({ url: z.string(), quote: z.string(), content_sha256: z.string() })) })).default([]),
       shortlist_digest: z.string().nullable().optional(), supplier_mode: z.string().optional(),
+      recommendations: z.array(z.object({ scope_digest: z.string(), item_ids: z.array(z.string()), reason: z.string(),
+        quotation_id: z.string().nullable(), amount: z.string().nullable(), currency: z.string() }).passthrough()).optional(),
+      calendar_events: z.record(z.string(), z.string()).optional(),
       record_counts: z.record(z.string(), z.number()), resources: z.array(z.object({
         provider: z.string(), resource_type: z.string(), resource_id: z.string(), metadata: z.record(z.string(), z.unknown()),
       }).passthrough()), actions: z.record(z.string(), z.object({ workflow_id: z.string(),

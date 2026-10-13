@@ -13,6 +13,31 @@ from runtime.model import BoundedLLM
 
 
 class DynamicDelegationTests(RuntimeFixture):
+    def test_exhausted_required_reviews_join_before_next_master_turn(self):
+        from time import sleep
+        self.workflow['metadata']['dynamic_delegation']['master']['max_tasks']=2
+        self.workflow['metadata']['procurement_required_reviews']=['research_agent','analysis_agent']
+        self.put()
+        contexts=[]
+        def choose(context):
+            contexts.append(context)
+            if len(contexts)==1:
+                return {'action':'delegate','reason':'Review both sources.','continuation':{},'tasks':[
+                    {'agent_id':a,'inputs':{'task':'check'},'reason':'Required review.'}
+                    for a in ('research_agent','analysis_agent')]}
+            self.assertEqual(len(context['results']),2)
+            self.assertEqual(context['pending_tasks'],[])
+            self.assertEqual(context['remaining_tasks'],0)
+            return {'action':'finish','reason':'Both reviews returned.','output':{'summary':'Verified.'}}
+        executor=self.executor(choose)
+        def child(*args):
+            sleep(0.05)
+            return {'verified':True}
+        executor.invoke=child
+        result,events=self.run_case(executor=executor)
+        self.assertEqual(result['status'],'completed',json.dumps(events))
+        self.assertEqual(len([e for e in events if e['event_type']=='agent.spawned']),2)
+
     def test_accounted_turns_use_remaining_tokens_and_settle_actual_usage(self):
         caps, turns = [], []
         def factory(definition):

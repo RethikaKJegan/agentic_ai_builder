@@ -59,6 +59,9 @@ export function compactProcurementGraph(project: ProjectCommunication) {
   for (const action of project.actions) {
     const stage = action.key === "ingestion" ? "Master and specialist review" : action.key.startsWith("research_") ? "Supplier research and verification" :
       action.key === "tracking" ? "Create tracking spreadsheet" : action.key.startsWith("sync_") ? "Save tracking records" :
+      action.key.startsWith("calendar_") ? "Calendar deadlines" :
+      action.key.startsWith("read_quotes_") || action.key.startsWith("extract_") || action.key.startsWith("clarify_") ? "Read and validate quotations" :
+      action.key.startsWith("send_award_") || action.key.startsWith("send_po_") ? "Awards and purchase orders" :
       action.key.startsWith("draft_") ? "Prepare RFQ drafts" : action.key.startsWith("send_") ? "Send RFQs" : "Project actions";
     stages.set(stage, [...(stages.get(stage) ?? []), action]);
   }

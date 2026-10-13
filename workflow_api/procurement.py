@@ -15,6 +15,7 @@ from connector_extension.procurement.layout import TABLE_HEADERS
 from connector_extension.procurement.store import require, SCHEMA
 from connector_extension.procurement.runtime_tools import PROJECT, TOOLS, ProcurementConnector, ingestion_workflow
 from .supplier_discovery import SupplierDiscovery, CONTACTS, SelectedContacts
+from .procurement_quotes import ProcurementQuotes
 from runtime.supplier_search import SEARCH, PAGE, SupplierSearchConnector
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,10 +75,19 @@ def extend_registry(config, settings):
 
 def validate_plan(plan, catalogs=None):
     require(isinstance(plan, dict) and {'project_id','name','simulation','context','requirements','vendors'}<=set(plan) and
-            not set(plan)-{'project_id','name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode'}, 'PROCUREMENT_SETUP_INVALID')
+            not set(plan)-{'project_id','name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2'}, 'PROCUREMENT_SETUP_INVALID')
     require(plan.get('action_mode','approval') in ('approval','automatic'),'PROCUREMENT_ACTION_MODE_INVALID')
     mode=plan.get('supplier_mode','supplied')
     require(mode in ('supplied','discover','combined'),'SUPPLIER_MODE_INVALID')
+    phase2=plan.get('phase2')
+    if phase2 is not None:
+        require(isinstance(phase2,dict) and set(phase2)=={'enabled','calendar_id','reminder_minutes','purchasing_limit','allow_single_offer'} and
+                phase2['enabled'] is True and mode=='supplied' and
+                isinstance(phase2['calendar_id'],str) and 1<=len(phase2['calendar_id'])<=255 and
+                type(phase2['reminder_minutes']) is int and 0<=phase2['reminder_minutes']<=40320 and
+                type(phase2['allow_single_offer']) is bool and
+                (phase2['purchasing_limit'] is None or isinstance(phase2['purchasing_limit'],str) and
+                 re.fullmatch(r'[1-9][0-9]{0,15}(?:\.[0-9]{1,2})?',phase2['purchasing_limit'])),'PROCUREMENT_PHASE2_SETUP_INVALID')
     require(isinstance(plan.get('search_region','wt-wt'),str) and re.fullmatch(r'[a-z]{2}-[a-z]{2}',plan.get('search_region','wt-wt')),'SEARCH_REGION_INVALID')
     require(isinstance(plan['project_id'], str) and re.fullmatch(PROJECT['pattern'], plan['project_id']), 'PROCUREMENT_SETUP_INVALID')
     require(isinstance(plan['name'],str) and 1 <= len(plan['name']) <= 160 and type(plan['simulation']) is bool, 'PROCUREMENT_SETUP_INVALID')
@@ -102,6 +112,40 @@ def validate_plan(plan, catalogs=None):
                     set(source['columns'].values()) <= set(tables[0]['headers']), 'PROCUREMENT_MAPPING_REQUIRED')
             discovered=read_location(tables[0]['range'])
             require(location[1]>=discovered[1] and location[3]<=discovered[3] and location[4]<=discovered[4], 'PROCUREMENT_SOURCE_BOUNDS')
+    return plan
+
+
+def normalize_generated_plan(plan, catalogs):
+    """Reconcile model formatting with discovered tables; never choose a table."""
+    from runtime.connectors import google_spreadsheet_id
+    from connector_extension.sheets import read_location
+    for kind in ('requirements','vendors'):
+        source=plan.get(kind)
+        if not isinstance(source,dict):continue
+        if isinstance(source.get('columns'),dict):
+            source['columns']={k:v for k,v in source['columns'].items() if v is not None}
+        identifier=google_spreadsheet_id(source['spreadsheet_url'])
+        location=read_location(source['range'])
+        tables=[t for c in catalogs if c['spreadsheet_id']==identifier for t in c['tables']
+                if read_location(t['range'])[0]==location[0]]
+        if len(tables)!=1:continue
+        table=tables[0];discovered=read_location(table['range'])
+        if (location[2]==table['header_row'] and location[1]>=discovered[1] and
+            location[3]<=discovered[3] and location[4]<=discovered[4] and
+            location[4]-location[2]+1>101):
+            # Discovery reports worksheet capacity; the reviewed execution
+            # range always has at most 100 rows below its header.
+            source['range']=source['range'].rsplit(':',1)[0]+':'+re.sub(r'\d+$','',source['range'].rsplit(':',1)[1])+str(location[2]+100)
+    phase2=plan.get('phase2')
+    if isinstance(phase2,dict) and isinstance(phase2.get('purchasing_limit'),str):
+        value=phase2['purchasing_limit'].strip()
+        currency=plan.get('context',{}).get('comparison_currency')
+        if isinstance(currency,str) and re.fullmatch(r'[A-Z]{3}',currency):
+            # A matching currency label changes formatting, never the amount
+            # or currency. Conflicting currency labels remain invalid.
+            value=re.sub(r'^'+re.escape(currency)+r'\s+|\s+'+re.escape(currency)+r'$', '', value, flags=re.I).strip()
+        if re.fullmatch(r'[1-9][0-9]{0,2}(?:,[0-9]{3})+(?:\.[0-9]{1,2})?',value):value=value.replace(',','')
+        phase2['purchasing_limit']=value
     return plan
 
 
@@ -142,8 +186,9 @@ def communication_workflow(plan, workflow_id, model=None):
     master.update(agent_id=master_id, hierarchy_role='master', role='Procurement master',
         goal='Coordinate source review for '+plan['name'], capabilities=[], permissions=['workflow.read_input'],
         input_schema={'type':'object'}, output_schema=summary,
-        instructions='Delegate requirements completeness and vendor coverage review to both registered specialists using the actual source rows and column mappings in your input. '
-        'Collect both returned results, then finish with a concise summary of findings and uncertainty. Do not invent or replace source records, suppliers or approvals.')
+        instructions='Delegate requirements completeness and vendor coverage review to each registered specialist exactly once using the actual source rows and column mappings in your input. '
+        'Never repeat a pending or completed review. If reviews are pending, wait. Once both results have returned, '
+        'return action=finish with a concise summary of findings and uncertainty. Do not invent or replace source records, suppliers or approvals.')
     master['limits'].update(max_llm_calls=4, max_tool_calls=0, max_tokens=16000, max_estimated_cost_usd=1)
     if model:
         for a in [master, *reviewers]:
@@ -182,10 +227,15 @@ class ProcurementPlanner:
         schema=obj({'name':{'type':'string'},'simulation':{'type':'boolean'},'context':context_schema,
                     'action_mode':{'enum':['approval','automatic']},
                     'supplier_mode':{'enum':['supplied','discover','combined']},'search_region':{'type':'string'},
+                    'phase2':{'anyOf':[{'type':'null'},obj({'enabled':{'type':'boolean','const':True},
+                        'calendar_id':{'type':'string'},'reminder_minutes':{'type':'integer'},
+                        'purchasing_limit':{'type':['string','null'],'pattern':r'^[1-9][0-9]{0,15}(?:\.[0-9]{1,2})?$'},'allow_single_offer':{'type':'boolean'}},
+                        ['enabled','calendar_id','reminder_minutes','purchasing_limit','allow_single_offer'])]},
                     'requirements':source(['item_id',*ITEM_FIELDS]),
                     'vendors':{'anyOf':[source(['vendor_id','name','email','item_categories']),{'type':'null'}]}},
-                   ['name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode'])
+                   ['name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2'])
         supplied={'objective':objective,'catalog':catalog_snapshot(catalogs),'today':__import__('datetime').date.today().isoformat()}
+        failures=[]
         for attempt in range(2):
             response=self.client.responses.create(model=self.model,timeout=180,max_output_tokens=4000,
                 input=[{'role':'system','content':
@@ -198,24 +248,35 @@ class ProcurementPlanner:
                     'use combined if both a supplied list and web research are requested, otherwise supplied. '
                     'search_region is a DDGS region code such as wt-wt; do not invent a vendor table for discovery. '
                     'Use action_mode=automatic only if requested by the operator; otherwise approval. '
+                    'Set phase2=null for RFQ preparation only. Enable phase2 for quotation monitoring, comparison, awards and PO release using supplied vendors. '
+                    'Use calendar_id=primary and reminder_minutes=60 unless specified. purchasing_limit is the explicitly provided total project spending limit, '
+                    'otherwise null. purchasing_limit must contain decimal digits only, optionally a decimal point; '
+                    'never include a currency label, symbol or commas (for example "100000", not "INR 100000"). '
+                    'allow_single_offer=false unless the operator explicitly permits selecting a sole qualifying offer. '
                     'Do not infer vendor contacts, prices or requirements. Return only the strict setup object.'},
                        {'role':'user','content':json.dumps(supplied)}],
                 text={'format':{'type':'json_schema','name':'procurement_setup','schema':schema,'strict':True}})
             try:
                 if getattr(response,'status','completed')!='completed': raise ValueError('Incomplete plan')
                 plan=json.loads(response.output_text); reject_secrets(plan)
-                for kind in ('requirements','vendors'):
-                    if plan[kind] is not None:plan[kind]['columns']={k:v for k,v in plan[kind]['columns'].items() if v is not None}
+                normalize_generated_plan(plan,catalogs)
                 plan['project_id']='project_'+hashlib.sha256(objective.encode()).hexdigest()[:24]
                 validate_plan(plan,catalogs)
                 w=start_workflow(plan,objective); w['metadata']['sheet_catalog']=catalog_snapshot(catalogs)
                 return w
             except (ValueError,KeyError,TypeError,ProcurementError) as exc:
-                supplied['correction']={'code':getattr(exc,'code','PROCUREMENT_PLAN_INVALID')}
-        raise PlannerFailure('PROCUREMENT_MAPPING_REQUIRED','Could not identify requirements/vendor mappings. Clarify the source tables in your prompt.')
+                code=getattr(exc,'code','PROCUREMENT_PLAN_INVALID');failures.append(code)
+                supplied['correction']={'code':code}
+        code=failures[-1]
+        messages={'PROCUREMENT_SOURCE_BOUNDS':'The source range exceeds the bounded discovered table. Review the table range.',
+                  'PROCUREMENT_MAPPING_REQUIRED':'Source columns do not match the discovered headers. Clarify the source tables.',
+                  'PROCUREMENT_PHASE2_SETUP_INVALID':'The generated Phase 2 policy is invalid. Specify supplied vendors, a Calendar and a numeric project spending limit.',
+                  'PROCUREMENT_CONTEXT_INVALID':'The generated project terms are invalid. Check currency, timezone and ISO deadlines.'}
+        raise PlannerFailure(code,messages.get(code,'The generated procurement setup is invalid. Retry generation or clarify the project settings.'),
+                             details={'requirement_codes':list(dict.fromkeys(failures))})
 
 
-class IntegratedProcurement(SupplierDiscovery, ProcurementService):
+class IntegratedProcurement(ProcurementQuotes, SupplierDiscovery, ProcurementService):
     """Same canonical workflow store/approvals; only domain ledger is separate."""
     def setup(self, plan, auth, *, owner_workflow=None):
         require(owner_workflow is not None,'PROCUREMENT_PUBLISHED_WORKFLOW_REQUIRED')
@@ -223,9 +284,11 @@ class IntegratedProcurement(SupplierDiscovery, ProcurementService):
         if plan.get('supplier_mode','supplied')!='supplied':return self.start_discovery(plan,auth,owner_workflow)
         automatic=plan.get('action_mode')=='automatic'
         require(not automatic or self.automatic_enabled,'PROCUREMENT_AUTOMATIC_NOT_ENABLED')
-        plan={k:v for k,v in plan.items() if k not in ('supplier_mode','search_region','action_mode')}
+        phase2=deepcopy(plan.get('phase2'))
+        plan={k:v for k,v in plan.items() if k not in ('supplier_mode','search_region','action_mode','phase2')}
         # Persist reviewed execution policy before any child mutation.
         owner=deepcopy(owner_workflow);owner['automatic_actions']=automatic
+        if phase2 is not None:owner['phase2_settings']=phase2
         return super().setup(plan,auth,owner_workflow=owner)
     def ingestion_workflow(self, plan, workflow_id, workspace=None):
         # Recovery keeps the exact already-published child revision; new source
@@ -253,12 +316,17 @@ class IntegratedProcurement(SupplierDiscovery, ProcurementService):
         result.update(candidates=job.get('candidates',[]),shortlist_digest=job.get('shortlist_digest'),
                       supplier_mode=job.get('discovery_plan',{}).get('supplier_mode','supplied'),
                       shortlist_review=job.get('shortlist_review'),rejected_pages=job.get('rejected_pages',[]))
+        result.update(phase2_settings=self.phase2_settings(job),recommendations=job.get('recommendations',[]),
+                      calendar_events=job.get('calendar_events',{}))
+        for kind in ('quotation','award','purchase_order'):
+            result['record_counts'][kind]=sum(r['record_type']==kind for r in result['records'])
         return result
 
     def tick(self):
         with self.store.connection() as db:
             rows=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') "
-                            "NOT IN ('RFQS_SENT','SHORTLIST_REVIEW','NEEDS_CLARIFICATION','STOPPED') ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
+                            "NOT IN ('PO_RELEASED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION','STOPPED') "
+                            "AND (json_extract(body,'$.phase')!='RFQS_SENT' OR json_extract(body,'$.owner_workflow.phase2_settings.enabled')=1) ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
         if not rows:self.cursor=0
         for rowid,workspace,project,body in rows:
             self.cursor=rowid
@@ -298,6 +366,14 @@ class IntegratedProcurement(SupplierDiscovery, ProcurementService):
         workspace=self.authorize(auth)
         if not self.active(workspace,self.job(workspace,project)):return self.status(workspace,project)
         phase=self.job(workspace,project)['phase']
+        if phase in ('RFQS_SENT','WAITING_FOR_QUOTES','QUOTE_REVIEW_REQUIRED','PO_RELEASED') and self.phase2_settings(self.job(workspace,project)):
+            from connector_extension.procurement.store import ProcurementError
+            try:return self.advance_phase2(project,auth)
+            except ProcurementError as exc:
+                job=self.job(workspace,project)
+                if job['phase']!='STOPPED':job['phase']='QUOTE_REVIEW_REQUIRED'
+                job['issues']=list(dict.fromkeys(job['issues']+[exc.code]));self.save_job(workspace,job)
+                return self.status(workspace,project)
         if phase=='DISCOVERING':
             from connector_extension.procurement.store import ProcurementError
             try:return self.research(project,auth)
@@ -412,6 +488,7 @@ def install(app, settings, env, client, model, auth):
     procurement=IntegratedProcurement(service,state,settings['procurement_currency_precision'],supplier)
     procurement.model = model
     procurement.automatic_enabled=bool(settings.get('_automatic_actions'))
+    procurement.phase2_initialize()
     for tool in definitions(settings):
         provider=tool['provider_id']
         if tool['tool_id']==START_ID:connector=StartConnector(procurement,supplier)
@@ -441,6 +518,7 @@ def install(app, settings, env, client, model, auth):
         if metadata.get('procurement_plan'):
             plan=validate_plan(metadata['procurement_plan'],metadata.get('sheet_catalog'))
             require(plan.get('action_mode')!='automatic' or procurement.automatic_enabled,'PROCUREMENT_AUTOMATIC_NOT_ENABLED')
+            require(not plan.get('phase2') or 'extension_calendar_create' in runner.connectors,'PROCUREMENT_CALENDAR_REQUIRED')
             require(metadata.get('procurement_project_id')==plan['project_id'],'PROCUREMENT_SCOPE_MISMATCH')
             require(any(n.get('tool_id')==START_ID and n.get('configuration',{}).get('input')=={'project_id':plan['project_id']} for n in workflow['nodes']), 'PROCUREMENT_SETUP_INVALID')
         if any(t['tool_id']=='extension_procurement_ingest' for t in workflow['tools']):

@@ -9,7 +9,8 @@ import { ApiFeedback } from "./ApiFeedback";
 type Plan = { project_id: string; name: string; simulation: boolean;
   context: Record<string, string | null>; requirements: { spreadsheet_url: string; range: string; columns: Record<string, string> };
   vendors: { spreadsheet_url: string; range: string; columns: Record<string, string> } | null;
-  supplier_mode?: "supplied" | "discover" | "combined"; search_region?: string; action_mode?: "approval" | "automatic" };
+  supplier_mode?: "supplied" | "discover" | "combined"; search_region?: string; action_mode?: "approval" | "automatic";
+  phase2?: { enabled: true; calendar_id: string; reminder_minutes: number; purchasing_limit: string | null; allow_single_offer: boolean } | null };
 export function ProcurementReview({ workflow }: { workflow: Workflow }) {
   const backend = useBackend();
   const raw = workflow.canonical?.metadata["procurement_plan"];
@@ -95,6 +96,18 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
         {field.replaceAll("_", " ")}<input disabled={!editable} className="mt-1 w-full rounded border p-1" value={value ?? ""}
           placeholder="Required project information" onChange={e => setDraft({ ...draft, context: { ...draft.context, [field]: e.target.value || null } })} />
       </label>)}
+      {draft.phase2 && <section className="space-y-2 rounded border p-2 text-sm">
+        <p className="font-medium">Quotation comparison and purchase orders</p>
+        <p>{draft.action_mode === "automatic" ? "Automatic simulation awards and PO release use the published project spending limit." : "Award and PO emails require action approval."}</p>
+        <label className="block">Calendar<input disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.calendar_id}
+          onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, calendar_id: e.target.value } })} /></label>
+        <label className="block">Reminder minutes<input type="number" min={0} max={40320} disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.reminder_minutes}
+          onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, reminder_minutes: Number(e.target.value) } })} /></label>
+        <label className="block">Total project spending limit ({draft.context["comparison_currency"]})<input disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.purchasing_limit ?? ""}
+          onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, purchasing_limit: e.target.value || null } })} /></label>
+        <label className="block"><input type="checkbox" disabled={!editable} checked={draft.phase2.allow_single_offer}
+          onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.target.checked } })} /> Permit a sole qualifying offer</label>
+      </section>}
       {editable && <button disabled={busy} onClick={() => void save()} className="rounded border px-3 py-1 text-sm">Save project settings</button>}
       <p className="text-sm">This workflow starts manually. No new spreadsheet row is needed. Publish, then start procurement here. Runs, Agent communication and Approvals show the actual actions.</p>
       <button disabled={busy || !publishedVersion || !backend.can("workflow.execute")} onClick={() => void start()} className="rounded border px-3 py-1 text-sm disabled:opacity-40">{busy ? "Working…" : "Start procurement"}</button>
@@ -103,6 +116,8 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
       {status && <div className="space-y-2 text-sm"><p className="font-medium">{status.phase}</p>
         <p>{Object.entries(status.record_counts).map(([kind, count]) => `${kind}: ${count}`).join(" · ")}</p>
         {status.issues.map(issue => <p key={issue}>{issue}</p>)}
+        {(status.recommendations ?? []).map(r => <p key={r.scope_digest}>{r.item_ids.join(", ")}: {r.reason.replaceAll("_", " ")}{r.amount ? ` · ${r.amount} ${r.currency}` : ""}{r.quotation_id ? ` · ${r.quotation_id}` : ""}</p>)}
+        {Object.entries(status.calendar_events ?? {}).map(([key, id]) => <p key={key}>Calendar: {key.replaceAll("_", " ")} · {id}</p>)}
         {status.phase === "SHORTLIST_REVIEW" && <section className="space-y-2 rounded border p-2">
           <p className="font-medium">Review supplier shortlist</p>
           <p>Published contacts and product claims require your review. Availability and delivery are not verified quotations.</p>

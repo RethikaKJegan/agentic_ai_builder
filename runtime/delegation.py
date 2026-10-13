@@ -224,6 +224,10 @@ class DelegationSession:
             with self.runtime.store.transaction() as db:
                 self.current(db)
             if decision:
+                if inputs.get('remaining_tasks') == 0:
+                    binding['instructions'] += (' No delegation task slots remain. Never return action=delegate. '
+                        'If tasks are pending, wait for their results or continue independent work. '
+                        'If the required results have returned, finish by synthesizing those results.')
                 output = self.model_turn(agent, binding, inputs, invocation_id, DECISION_SCHEMA, reservation)
                 schema = DECISION_SCHEMA
             elif agent['allowed_tool_ids']:
@@ -388,7 +392,10 @@ class DelegationSession:
 
         for round_number in range(1, self.config['max_rounds'] + 1):
             # Reserve the final turn for synthesis, with every child result.
-            collect(wait=round_number == self.config['max_rounds'])
+            required=set(self.workflow.get('metadata',{}).get('procurement_required_reviews',[]))
+            scheduled={r['agent_id'] for r in results}|{t['agent_id'] for t,_ in pending}
+            join_required=bool(required) and required<=scheduled and count>=self.config['max_tasks']
+            collect(wait=round_number == self.config['max_rounds'] or join_required)
             context = {'request': self.inputs, 'final_output_schema': self.master['output_schema'], 'available_agents': [
                 {k: a[k] for k in ('agent_id', 'role', 'goal', 'input_schema')}
                 for a in self.children.values()], 'results': deepcopy(results),
