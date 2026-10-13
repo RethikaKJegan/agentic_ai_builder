@@ -1,0 +1,483 @@
+[
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "evidence",
+    "record_id": "evidence_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "source_kind": "OPERATOR_CONFIRMATION",
+      "provider": "operator",
+      "source_id": "simulation_fixture",
+      "locator": null,
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "captured_at": "2026-10-13T09:00:00+05:30",
+      "authority_state": "SIMULATION_ONLY",
+      "asserted_actor_role": "BUYER",
+      "verified_subject_id": null,
+      "artifact_reference": null
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "project",
+    "record_id": "project_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "name": "Contract example only",
+      "status": "ACTIVE",
+      "simulation": true,
+      "context": {
+        "description": "Fictional fixtures. No provider actions.",
+        "delivery_location": "Demo warehouse",
+        "delivery_deadline": "2026-11-15",
+        "quote_deadline": "2026-10-14T17:00:00+05:30",
+        "time_zone": "Asia/Kolkata",
+        "comparison_currency": "INR"
+      },
+      "required_item_ids": [
+        "item_demo"
+      ],
+      "resolved_item_ids": [],
+      "excluded_item_ids": [],
+      "scope_change_approval_ids": [],
+      "unresolved_issue_ids": [],
+      "owned_spreadsheet_ids": [
+        "sheet_demo"
+      ],
+      "owned_calendar_event_ids": [],
+      "cleanup_state": "NOT_REQUESTED"
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "boq_item",
+    "record_id": "item_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "ORDERED",
+      "section": "Equipment",
+      "description": "Demo pump",
+      "quantity": "2",
+      "unit": "pieces",
+      "specifications": "Simulation specification only",
+      "delivery_location": "Demo warehouse",
+      "delivery_deadline": "2026-11-15",
+      "source_evidence_ids": [
+        "evidence_demo"
+      ],
+      "group_id": "group_demo",
+      "unresolved_issue_ids": []
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "vendor",
+    "record_id": "vendor_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "ACTIVE",
+      "name": "Demo supplier",
+      "email": "supplier@example.com",
+      "item_categories": [
+        "Equipment"
+      ],
+      "contact_evidence_ids": [
+        "evidence_demo"
+      ]
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "rfq",
+    "record_id": "rfq_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "OPEN",
+      "scope_item_ids": [
+        "item_demo"
+      ],
+      "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vendor_id": "vendor_demo",
+      "recipient": "supplier@example.com",
+      "quote_deadline": "2026-10-14T17:00:00+05:30",
+      "comparison_currency": "INR",
+      "subject_reference": "RFQ-DEMO-001",
+      "gmail_message_id": "gmail_request_demo",
+      "gmail_thread_ids": [
+        "gmail_thread_demo"
+      ],
+      "send_action_id": "action_rfq_demo"
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "quotation",
+    "record_id": "quote_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "QUALIFYING",
+      "rfq_id": "rfq_demo",
+      "rfq_revision": 1,
+      "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vendor_id": "vendor_demo",
+      "sender": "supplier@example.com",
+      "source_message_id": "gmail_quote_demo",
+      "source_thread_id": "gmail_thread_demo",
+      "received_at": "2026-10-13T09:00:00+05:30",
+      "items": [
+        {
+          "item_id": "item_demo",
+          "quantity": "2",
+          "unit": "pieces",
+          "unit_price": "3500",
+          "line_total": "7000"
+        }
+      ],
+      "financials": {
+        "currency": "INR",
+        "subtotal": "7000",
+        "discount": "0",
+        "tax": "1260",
+        "shipping": "300",
+        "other_charges": "0",
+        "total_delivered_cost": "8560"
+      },
+      "delivery_date": "2026-11-10",
+      "valid_until": "2026-10-31",
+      "compliance_state": "SIMULATION_ONLY",
+      "compliance_evidence_ids": [
+        "evidence_demo"
+      ],
+      "unresolved_issue_ids": []
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "approval",
+    "record_id": "approval_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "purpose": "ACTION",
+      "decision": "APPROVED",
+      "workflow_id": "workflow_demo",
+      "workflow_version": 1,
+      "action_id": "action_po_demo",
+      "action_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_revision": 1,
+      "operation": "release_po",
+      "resource_refs": [
+        "sheet_demo"
+      ],
+      "recipient_refs": [
+        "supplier@example.com"
+      ],
+      "expires_at": "2026-10-13T09:30:00+05:30",
+      "decided_at": "2026-10-13T09:00:00+05:30",
+      "approver": {
+        "kind": "HUMAN",
+        "subject_id": "operator_demo",
+        "workspace_id": "workspace_demo",
+        "roles": [
+          "approver"
+        ]
+      },
+      "canonical_approval_reference": "approval_fixture_only"
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "award",
+    "record_id": "award_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "APPROVED",
+      "quotation_id": "quote_demo",
+      "quotation_revision": 1,
+      "scope_item_ids": [
+        "item_demo"
+      ],
+      "vendor_id": "vendor_demo",
+      "selection_basis": "SINGLE_OFFER_EXCEPTION",
+      "justification": "Fictional human-reviewed single-offer example, not a competitive best-price claim.",
+      "total": {
+        "currency": "INR",
+        "amount": "8560"
+      },
+      "approval_id": "approval_award_demo",
+      "gmail_message_id": null
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "purchase_order",
+    "record_id": "po_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "DELIVERED",
+      "po_number": "PO-DEMO-001",
+      "award_id": "award_demo",
+      "vendor_id": "vendor_demo",
+      "items": [
+        {
+          "item_id": "item_demo",
+          "description": "Demo pump",
+          "specifications": "Simulation only",
+          "unit": "pieces",
+          "ordered_quantity": "2",
+          "packed_quantity": "2",
+          "dispatched_quantity": "2",
+          "delivered_quantity": "2",
+          "buyer_accepted_quantity": "0",
+          "unit_price": "3500",
+          "line_total": "7000"
+        }
+      ],
+      "financials": {
+        "currency": "INR",
+        "subtotal": "7000",
+        "discount": "0",
+        "tax": "1260",
+        "shipping": "300",
+        "other_charges": "0",
+        "total_delivered_cost": "8560"
+      },
+      "delivery_location": "Demo warehouse",
+      "required_delivery_date": "2026-11-15",
+      "supplier_expected_delivery_date": "2026-11-10",
+      "payment_terms": null,
+      "release_approval_id": "approval_demo",
+      "gmail_message_id": "gmail_po_demo",
+      "gmail_thread_ids": [
+        "gmail_thread_demo"
+      ],
+      "supplier_acceptance_confirmed": true,
+      "supplier_delivery_reported": true,
+      "buyer_receipt_confirmed": false,
+      "buyer_acceptance_confirmed": false,
+      "resolution_confirmed": false,
+      "buyer_confirmation_evidence_ids": [],
+      "unresolved_exception_ids": [],
+      "tracking_references": [
+        "tracking_demo"
+      ],
+      "resume_status": null
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "fulfilment_event",
+    "record_id": "event_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "purchase_order_id": "po_demo",
+      "event_kind": "DELIVERED",
+      "actor_role": "SUPPLIER",
+      "authority_state": "SIMULATION_ONLY",
+      "source_message_id": "gmail_delivery_demo",
+      "provider_event_id": null,
+      "idempotency_key": "gmail_delivery_demo_po_demo_delivered",
+      "observed_at": "2026-10-13T09:00:00+05:30",
+      "occurred_at": null,
+      "item_quantities": [
+        {
+          "item_id": "item_demo",
+          "quantity": "2",
+          "unit": "pieces"
+        }
+      ],
+      "tracking_reference": "tracking_demo",
+      "note": "Fixture delivery report; buyer acceptance is still required."
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "approval",
+    "record_id": "approval_award_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "purpose": "ACTION",
+      "decision": "APPROVED",
+      "workflow_id": "workflow_demo",
+      "workflow_version": 1,
+      "action_id": "action_award_demo",
+      "action_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "policy_revision": 1,
+      "operation": "send_award",
+      "resource_refs": [
+        "sheet_demo"
+      ],
+      "recipient_refs": [
+        "supplier@example.com"
+      ],
+      "expires_at": "2026-10-13T09:30:00+05:30",
+      "decided_at": "2026-10-13T09:00:00+05:30",
+      "approver": {
+        "kind": "HUMAN",
+        "subject_id": "operator_demo",
+        "workspace_id": "workspace_demo",
+        "roles": [
+          "approver"
+        ]
+      },
+      "canonical_approval_reference": "approval_fixture_only"
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "project",
+    "record_id": "project_draft_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_draft_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "name": "Contract example only",
+      "status": "NEEDS_CLARIFICATION",
+      "simulation": true,
+      "context": {
+        "description": "Fictional fixtures. No provider actions.",
+        "delivery_location": null,
+        "delivery_deadline": null,
+        "quote_deadline": null,
+        "time_zone": "Asia/Kolkata",
+        "comparison_currency": null
+      },
+      "required_item_ids": [],
+      "resolved_item_ids": [],
+      "excluded_item_ids": [],
+      "scope_change_approval_ids": [],
+      "unresolved_issue_ids": [
+        "issue_missing_context"
+      ],
+      "owned_spreadsheet_ids": [
+        "sheet_demo"
+      ],
+      "owned_calendar_event_ids": [],
+      "cleanup_state": "NOT_REQUESTED"
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "boq_item",
+    "record_id": "item_incomplete_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_draft_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "NEEDS_CLARIFICATION",
+      "section": "Equipment",
+      "description": "Demo pump",
+      "quantity": null,
+      "unit": "pieces",
+      "specifications": null,
+      "delivery_location": "Demo warehouse",
+      "delivery_deadline": "2026-11-15",
+      "source_evidence_ids": [],
+      "group_id": "group_demo",
+      "unresolved_issue_ids": [
+        "issue_missing_quantity"
+      ]
+    }
+  },
+  {
+    "schema_version": "procurement-v1",
+    "record_type": "quotation",
+    "record_id": "quote_incomplete_demo",
+    "workspace_id": "workspace_demo",
+    "project_id": "project_demo",
+    "revision": 1,
+    "created_at": "2026-10-13T09:00:00+05:30",
+    "updated_at": "2026-10-13T09:00:00+05:30",
+    "evidence_ids": [],
+    "data": {
+      "status": "NEEDS_CLARIFICATION",
+      "rfq_id": "rfq_demo",
+      "rfq_revision": 1,
+      "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vendor_id": "vendor_demo",
+      "sender": "supplier@example.com",
+      "source_message_id": "gmail_quote_demo",
+      "source_thread_id": "gmail_thread_demo",
+      "received_at": "2026-10-13T09:00:00+05:30",
+      "items": [],
+      "financials": {
+        "currency": null,
+        "subtotal": null,
+        "discount": null,
+        "tax": null,
+        "shipping": null,
+        "other_charges": null,
+        "total_delivered_cost": null
+      },
+      "delivery_date": null,
+      "valid_until": null,
+      "compliance_state": "SIMULATION_ONLY",
+      "compliance_evidence_ids": [
+        "evidence_demo"
+      ],
+      "unresolved_issue_ids": [
+        "issue_missing_prices"
+      ]
+    }
+  }
+]

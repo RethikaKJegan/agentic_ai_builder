@@ -17,6 +17,11 @@ export interface CommunicationEntity {
   parentNodeId?: string | undefined;
 }
 
+export function hasCommunication(workflow: Workflow) {
+  return workflow.nodes.some(node => node.data.kind === "agent" || !!node.data.agentId) ||
+    !!workflow.canonical?.nodes.some(node => !!node.agent_id) || !!workflow.canonical?.metadata["procurement_plan"];
+}
+
 export function communicationGraph(workflow: Workflow, events: RunEvent[] = [], runId?: string) {
   const nodes = [...workflow.nodes];
   if (!runId && workflow.canonical?.metadata?.["dynamic_delegation"]) {
@@ -53,7 +58,7 @@ export function communicationGraph(workflow: Workflow, events: RunEvent[] = [], 
           )?.node_id
         : undefined);
     const role =
-      node.data.kind !== "agent"
+      node.data.kind !== "agent" && (!definition || !canonical?.agent_id)
         ? "Workflow step"
         : node.data.role === "master" || definition?.hierarchy_role === "master"
           ? "Master agent"

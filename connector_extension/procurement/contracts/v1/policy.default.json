@@ -1,0 +1,43 @@
+{
+  "schema_version": "procurement-policy-v1",
+  "policy_id": "reviewed_default",
+  "revision": 1,
+  "activation": "DEFINITION_ONLY",
+  "agents_may_approve": false,
+  "human_approver_roles": [
+    "approver"
+  ],
+  "approval_timeout_seconds": 1800,
+  "actions": {
+    "discover_resources": "AUTOMATIC_AFTER_VALIDATION",
+    "read_sources": "AUTOMATIC_AFTER_VALIDATION",
+    "extract_boq": "AUTOMATIC_AFTER_VALIDATION",
+    "assess_quotes": "AUTOMATIC_AFTER_VALIDATION",
+    "record_evidence": "AUTOMATIC_AFTER_VALIDATION",
+    "transition_case_state": "AUTOMATIC_AFTER_VALIDATION",
+    "create_spreadsheet": "HUMAN_REQUIRED",
+    "create_tabs": "HUMAN_REQUIRED",
+    "write_boq": "HUMAN_REQUIRED",
+    "write_tracking": "HUMAN_REQUIRED",
+    "create_mail_draft": "HUMAN_REQUIRED",
+    "send_rfq": "HUMAN_REQUIRED",
+    "send_followup": "HUMAN_REQUIRED",
+    "send_award": "HUMAN_REQUIRED",
+    "release_po": "HUMAN_REQUIRED",
+    "create_calendar_event": "HUMAN_REQUIRED",
+    "update_calendar_event": "HUMAN_REQUIRED",
+    "delete_owned_calendar_event": "HUMAN_REQUIRED",
+    "change_scope": "HUMAN_REQUIRED",
+    "accept_single_offer": "HUMAN_REQUIRED",
+    "override_evidence_requirement": "DISABLED",
+    "delete_spreadsheet_or_tab": "DISABLED",
+    "make_payment": "DISABLED"
+  },
+  "currency_rule": "MATCH_PROJECT_CURRENCY_OR_STOP",
+  "single_offer_rule": "HUMAN_EXCEPTION_REQUIRED",
+  "closure_rule": "VERIFIED_BUYER_ACCEPTANCE_AND_RESOLVED_SCOPE",
+  "calendar_cleanup_rule": "EXACT_PERSISTED_CASE_OWNED_IDS",
+  "unknown_write_rule": "RECONCILE_BEFORE_RETRY",
+  "source_authority_rule": "PROVIDER_ACCESS_IS_NOT_CLAIM_VERIFICATION",
+  "simulation_rule": "SIMULATION_EVIDENCE_CANNOT_AUTHORIZE_REAL_PROCUREMENT"
+}

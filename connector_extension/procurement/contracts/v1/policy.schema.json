@@ -1,0 +1,178 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "procurement-policy-v1"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "activation": {
+      "const": "DEFINITION_ONLY"
+    },
+    "agents_may_approve": {
+      "const": false
+    },
+    "human_approver_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "minItems": 1,
+      "maxItems": 1000
+    },
+    "approval_timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discover_resources": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "read_sources": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "extract_boq": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "assess_quotes": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "record_evidence": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "transition_case_state": {
+          "const": "AUTOMATIC_AFTER_VALIDATION"
+        },
+        "create_spreadsheet": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "create_tabs": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "write_boq": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "write_tracking": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "create_mail_draft": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "send_rfq": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "send_followup": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "send_award": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "release_po": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "create_calendar_event": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "update_calendar_event": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "delete_owned_calendar_event": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "change_scope": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "accept_single_offer": {
+          "const": "HUMAN_REQUIRED"
+        },
+        "override_evidence_requirement": {
+          "const": "DISABLED"
+        },
+        "delete_spreadsheet_or_tab": {
+          "const": "DISABLED"
+        },
+        "make_payment": {
+          "const": "DISABLED"
+        }
+      },
+      "required": [
+        "discover_resources",
+        "read_sources",
+        "extract_boq",
+        "assess_quotes",
+        "record_evidence",
+        "transition_case_state",
+        "create_spreadsheet",
+        "create_tabs",
+        "write_boq",
+        "write_tracking",
+        "create_mail_draft",
+        "send_rfq",
+        "send_followup",
+        "send_award",
+        "release_po",
+        "create_calendar_event",
+        "update_calendar_event",
+        "delete_owned_calendar_event",
+        "change_scope",
+        "accept_single_offer",
+        "override_evidence_requirement",
+        "delete_spreadsheet_or_tab",
+        "make_payment"
+      ]
+    },
+    "currency_rule": {
+      "const": "MATCH_PROJECT_CURRENCY_OR_STOP"
+    },
+    "single_offer_rule": {
+      "const": "HUMAN_EXCEPTION_REQUIRED"
+    },
+    "closure_rule": {
+      "const": "VERIFIED_BUYER_ACCEPTANCE_AND_RESOLVED_SCOPE"
+    },
+    "calendar_cleanup_rule": {
+      "const": "EXACT_PERSISTED_CASE_OWNED_IDS"
+    },
+    "unknown_write_rule": {
+      "const": "RECONCILE_BEFORE_RETRY"
+    },
+    "source_authority_rule": {
+      "const": "PROVIDER_ACCESS_IS_NOT_CLAIM_VERIFICATION"
+    },
+    "simulation_rule": {
+      "const": "SIMULATION_EVIDENCE_CANNOT_AUTHORIZE_REAL_PROCUREMENT"
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy_id",
+    "revision",
+    "activation",
+    "agents_may_approve",
+    "human_approver_roles",
+    "approval_timeout_seconds",
+    "actions",
+    "currency_rule",
+    "single_offer_rule",
+    "closure_rule",
+    "calendar_cleanup_rule",
+    "unknown_write_rule",
+    "source_authority_rule",
+    "simulation_rule"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/extension/procurement/v1/policy.schema.json"
+}

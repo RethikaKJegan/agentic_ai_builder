@@ -1,0 +1,346 @@
+{
+  "project": {
+    "initial": "DRAFT",
+    "terminal": [
+      "COMPLETED",
+      "CANCELLED"
+    ],
+    "edges": [
+      [
+        "DRAFT",
+        "VALIDATING"
+      ],
+      [
+        "VALIDATING",
+        "NEEDS_CLARIFICATION"
+      ],
+      [
+        "NEEDS_CLARIFICATION",
+        "VALIDATING"
+      ],
+      [
+        "VALIDATING",
+        "ACTIVE"
+      ],
+      [
+        "ACTIVE",
+        "ON_HOLD"
+      ],
+      [
+        "ON_HOLD",
+        "ACTIVE"
+      ],
+      [
+        "ACTIVE",
+        "COMPLETED"
+      ],
+      [
+        "DRAFT",
+        "CANCELLED"
+      ],
+      [
+        "ACTIVE",
+        "CANCELLED"
+      ],
+      [
+        "ON_HOLD",
+        "CANCELLED"
+      ]
+    ]
+  },
+  "rfq": {
+    "initial": "DRAFT",
+    "terminal": [
+      "CLOSED",
+      "CANCELLED"
+    ],
+    "edges": [
+      [
+        "DRAFT",
+        "READY"
+      ],
+      [
+        "READY",
+        "SENT"
+      ],
+      [
+        "SENT",
+        "OPEN"
+      ],
+      [
+        "OPEN",
+        "CLOSED"
+      ],
+      [
+        "DRAFT",
+        "CANCELLED"
+      ],
+      [
+        "READY",
+        "CANCELLED"
+      ],
+      [
+        "OPEN",
+        "CANCELLED"
+      ]
+    ]
+  },
+  "quotation": {
+    "initial": "RECEIVED",
+    "terminal": [
+      "NONQUALIFYING",
+      "SUPERSEDED"
+    ],
+    "edges": [
+      [
+        "RECEIVED",
+        "VALIDATING"
+      ],
+      [
+        "VALIDATING",
+        "NEEDS_CLARIFICATION"
+      ],
+      [
+        "NEEDS_CLARIFICATION",
+        "VALIDATING"
+      ],
+      [
+        "VALIDATING",
+        "QUALIFYING"
+      ],
+      [
+        "VALIDATING",
+        "NONQUALIFYING"
+      ],
+      [
+        "QUALIFYING",
+        "SUPERSEDED"
+      ],
+      [
+        "NEEDS_CLARIFICATION",
+        "SUPERSEDED"
+      ]
+    ]
+  },
+  "award": {
+    "initial": "PROPOSED",
+    "terminal": [
+      "SENT",
+      "CANCELLED"
+    ],
+    "edges": [
+      [
+        "PROPOSED",
+        "APPROVED"
+      ],
+      [
+        "APPROVED",
+        "SENT"
+      ],
+      [
+        "PROPOSED",
+        "CANCELLED"
+      ],
+      [
+        "APPROVED",
+        "CANCELLED"
+      ]
+    ]
+  },
+  "purchase_order": {
+    "initial": "DRAFT",
+    "terminal": [
+      "CLOSED",
+      "CANCELLED"
+    ],
+    "edges": [
+      [
+        "DRAFT",
+        "READY"
+      ],
+      [
+        "READY",
+        "RELEASED"
+      ],
+      [
+        "RELEASED",
+        "ACCEPTED"
+      ],
+      [
+        "ACCEPTED",
+        "PARTIALLY_PACKED"
+      ],
+      [
+        "ACCEPTED",
+        "PACKED"
+      ],
+      [
+        "PARTIALLY_PACKED",
+        "PACKED"
+      ],
+      [
+        "PACKED",
+        "PARTIALLY_DISPATCHED"
+      ],
+      [
+        "PACKED",
+        "DISPATCHED"
+      ],
+      [
+        "PARTIALLY_DISPATCHED",
+        "DISPATCHED"
+      ],
+      [
+        "DISPATCHED",
+        "PARTIALLY_DELIVERED"
+      ],
+      [
+        "DISPATCHED",
+        "DELIVERED"
+      ],
+      [
+        "PARTIALLY_DELIVERED",
+        "DELIVERED"
+      ],
+      [
+        "DELIVERED",
+        "RESOLUTION_PENDING"
+      ],
+      [
+        "RESOLUTION_PENDING",
+        "DELIVERED"
+      ],
+      [
+        "DELIVERED",
+        "CLOSED"
+      ],
+      [
+        "PARTIALLY_PACKED",
+        "PARTIALLY_DISPATCHED"
+      ],
+      [
+        "PARTIALLY_DISPATCHED",
+        "PARTIALLY_DELIVERED"
+      ]
+    ],
+    "hold_from": [
+      "READY",
+      "RELEASED",
+      "ACCEPTED",
+      "PARTIALLY_PACKED",
+      "PACKED",
+      "PARTIALLY_DISPATCHED",
+      "DISPATCHED",
+      "PARTIALLY_DELIVERED",
+      "DELIVERED",
+      "RESOLUTION_PENDING"
+    ],
+    "hold_state": "ON_HOLD",
+    "resume_rule": "Return only to the recorded prior state after resolving the hold; never skip stages.",
+    "cancel_from": [
+      "DRAFT",
+      "READY",
+      "RELEASED",
+      "ACCEPTED",
+      "ON_HOLD"
+    ],
+    "cancellation_rule": "Human review plus verified supplier/receipt reconciliation where released; no new sends or payments.",
+    "same_state_updates": [
+      "ACCEPTED",
+      "PARTIALLY_PACKED",
+      "PACKED",
+      "PARTIALLY_DISPATCHED",
+      "DISPATCHED",
+      "PARTIALLY_DELIVERED",
+      "DELIVERED",
+      "RESOLUTION_PENDING"
+    ],
+    "partial_delivery_rule": "Ship only packed quantities. Derive aggregate state from validated cumulative line quantities; after any delivery remain PARTIALLY_DELIVERED until all quantities are delivered. Later packing/dispatch events may update quantities without regressing aggregate state."
+  },
+  "boq_item": {
+    "initial": "EXTRACTED",
+    "terminal": [
+      "RESOLVED",
+      "EXCLUDED"
+    ],
+    "edges": [
+      [
+        "EXTRACTED",
+        "NEEDS_CLARIFICATION"
+      ],
+      [
+        "NEEDS_CLARIFICATION",
+        "EXTRACTED"
+      ],
+      [
+        "EXTRACTED",
+        "READY"
+      ],
+      [
+        "READY",
+        "ORDERED"
+      ],
+      [
+        "ORDERED",
+        "RESOLVED"
+      ],
+      [
+        "READY",
+        "EXCLUDED"
+      ],
+      [
+        "EXTRACTED",
+        "EXCLUDED"
+      ]
+    ]
+  },
+  "vendor": {
+    "initial": "NEEDS_REVIEW",
+    "terminal": [],
+    "edges": [
+      [
+        "NEEDS_REVIEW",
+        "ACTIVE"
+      ],
+      [
+        "ACTIVE",
+        "BLOCKED"
+      ],
+      [
+        "BLOCKED",
+        "NEEDS_REVIEW"
+      ]
+    ]
+  },
+  "approval": {
+    "state_field": "decision",
+    "initial": "PENDING",
+    "terminal": [
+      "REJECTED",
+      "EXPIRED",
+      "REVOKED"
+    ],
+    "edges": [
+      [
+        "PENDING",
+        "APPROVED"
+      ],
+      [
+        "PENDING",
+        "REJECTED"
+      ],
+      [
+        "PENDING",
+        "EXPIRED"
+      ],
+      [
+        "APPROVED",
+        "EXPIRED"
+      ],
+      [
+        "APPROVED",
+        "REVOKED"
+      ]
+    ]
+  }
+}

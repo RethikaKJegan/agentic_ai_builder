@@ -37,8 +37,18 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (!responseType.includes("text/event-stream")) {
       const body: unknown = await response.json();
       if (!body || typeof body !== "object" || !("request_id" in body) || !("status" in body) || !("data" in body)) {
+        // Older Builder instances return FastAPI's raw 404 for newly added routes.
+        // Check service identity before claiming the upstream is a different app.
+        let builder = false;
+        if (response.status === 404 && path.join("/") !== "session") {
+          const session = await fetch(new URL("session", url.origin + "/"), { headers, cache: "no-store", signal: controller.signal });
+          const identity: unknown = await session.json();
+          builder = !!identity && typeof identity === "object" && "request_id" in identity && "status" in identity && "data" in identity;
+        }
         return NextResponse.json({ request_id: "req_proxy", status: 503, data: { error: {
-          error_code: "API_WRONG_SERVICE", message: "The configured backend is not the Builder API. Start scripts/run_live_backend.py and set BUILDER_API_URL to its port.",
+          error_code: builder ? "API_ROUTE_UNAVAILABLE" : "API_WRONG_SERVICE", message: builder
+            ? "The Builder backend is running without this route. Enable procurement and restart scripts/run_live_backend.py on the configured port."
+            : "The configured backend is not the Builder API. Start scripts/run_live_backend.py and set BUILDER_API_URL to its port.",
           request_id: "req_proxy", retryable: true,
         } } }, { status: 503, headers: { "Cache-Control": "no-store" } });
       }

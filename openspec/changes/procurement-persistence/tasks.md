@@ -1,0 +1,4 @@
+- [x] Implement private scoped SQLite records, history, links and synchronization intents.
+- [x] Enforce schema, references, transitions, financial and closure guards.
+- [x] Verify restarts, retries, rollback, concurrent revisions and isolation.
+- [x] Document service boundary and validate contracts, OpenSpec and original preservation.

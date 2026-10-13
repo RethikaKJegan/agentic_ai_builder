@@ -25,6 +25,7 @@ import type { RunEvent } from "@/api/contracts.generated";
 import { fromCanonical } from "@/api/mapping";
 import {
   communicationGraph,
+  hasCommunication,
   communicationPositions,
   communicationUuid,
   eventsForLink,
@@ -36,6 +37,7 @@ import {
 } from "@/domain/communication";
 import type { Workflow } from "@/domain/types";
 import type { WorkflowTrace } from "./useWorkflowTrace";
+import { ProcurementProjectCommunication } from "./ProcurementProjectCommunication";
 import {
   Dialog,
   DialogContent,
@@ -146,7 +148,9 @@ export function AgentCommunication({
   trace: WorkflowTrace;
 }) {
   const [open, setOpen] = useState(false);
-  if (!workflow.nodes.some((node) => node.data.kind === "agent")) return null;
+  if (!hasCommunication(workflow)) return null;
+  const plan = workflow.canonical?.metadata["procurement_plan"];
+  const projectId = plan && typeof plan === "object" && "project_id" in plan && typeof plan.project_id === "string" ? plan.project_id : null;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs hover:border-primary">
@@ -162,15 +166,15 @@ export function AgentCommunication({
             Inspect master/sub-agent relationships, UUIDs and recorded application handoffs.
           </DialogDescription>
         </div>
-        {open && <CommunicationView workflow={workflow} trace={trace} />}
+        {open && (projectId ? <ProcurementProjectCommunication workflowId={workflow.id} version={workflow.serverVersion ?? 1} /> : <CommunicationView workflow={workflow} trace={trace} />)}
       </DialogContent>
     </Dialog>
   );
 }
 
-function CommunicationView({ workflow, trace }: { workflow: Workflow; trace: WorkflowTrace }) {
+function CommunicationView({ workflow, trace, initialMode }: { workflow: Workflow; trace: WorkflowTrace; initialMode?: "run" | "configured" }) {
   const mobile = useIsMobile();
-  const [mode, setMode] = useState<"configured" | "run">(trace.runId ? "run" : "configured");
+  const [mode, setMode] = useState<"configured" | "run">(initialMode ?? (trace.runId ? "run" : "configured"));
   const [revision, setRevision] = useState<Workflow | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [selection, setSelection] = useState<{ kind: "node" | "link"; id: string } | null>(null);

@@ -2,6 +2,7 @@ import { expect, test, vi, afterEach } from "vitest";
 import { webcrypto } from "node:crypto";
 import {
   communicationGraph,
+  hasCommunication,
   communicationPositions,
   communicationUuid,
   eventsForLink,
@@ -12,6 +13,13 @@ import {
 import type { Workflow } from "./types";
 import type { CanonicalWorkflow, RunEvent } from "@/api/contracts.generated";
 afterEach(() => vi.unstubAllGlobals());
+
+test("tool-backed specialists retain communication access and actual agent identity", () => {
+  const toolWorkflow = { ...workflow, nodes: [{ id: "master", type: "mesh", position: { x: 0, y: 0 },
+    data: { kind: "tool", label: "Read requirements", agentId: "wf_communication::master_agent" } }], edges: [] } as Workflow;
+  expect(hasCommunication(toolWorkflow)).toBe(true);
+  expect(communicationGraph(toolWorkflow).entities[0]?.agentId).toBe("master_agent");
+});
 const workflow: Workflow = {
   id: "wf_communication",
   workspaceId: "ws",

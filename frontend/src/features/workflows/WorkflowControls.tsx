@@ -11,6 +11,7 @@ import { assertWorkflowReferences } from "@/api/control";
 import { ApiFeedback } from "./ApiFeedback";
 import { SheetAccessReview } from "./SheetAccessReview";
 import { CustomerAutomationReview } from "./CustomerAutomationReview";
+import { ProcurementReview } from "./ProcurementReview";
 
 export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   const backend = useBackend();
@@ -71,6 +72,7 @@ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
   const saved = workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
   const totals = test ? runTotals(test.steps) : null;
   return <>
+    <ProcurementReview workflow={workflow} />
     <SheetAccessReview targets={workflow.canonical?.metadata["sheet_write_targets"]} />
     <CustomerAutomationReview policy={workflow.canonical?.metadata["customer_automation"]} emailPolicy={workflow.canonical?.metadata["email_recipient_policy"]} />
     <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">{dirty ? "Unsaved edits" : `Saved ${saved}`}</span>

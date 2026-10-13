@@ -1,0 +1,2660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/extension/procurement/v1/records.schema.json",
+  "title": "Extension procurement domain records v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/project"
+    },
+    {
+      "$ref": "#/$defs/boq_item"
+    },
+    {
+      "$ref": "#/$defs/vendor"
+    },
+    {
+      "$ref": "#/$defs/rfq"
+    },
+    {
+      "$ref": "#/$defs/quotation"
+    },
+    {
+      "$ref": "#/$defs/award"
+    },
+    {
+      "$ref": "#/$defs/purchase_order"
+    },
+    {
+      "$ref": "#/$defs/fulfilment_event"
+    },
+    {
+      "$ref": "#/$defs/approval"
+    },
+    {
+      "$ref": "#/$defs/evidence"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+      },
+      "uniqueItems": true,
+      "maxItems": 1000
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+        }
+      },
+      "required": [
+        "currency",
+        "amount"
+      ]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "project"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "status": {
+              "enum": [
+                "DRAFT",
+                "VALIDATING",
+                "NEEDS_CLARIFICATION",
+                "ACTIVE",
+                "ON_HOLD",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            },
+            "simulation": {
+              "type": "boolean"
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 16000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "delivery_location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "delivery_deadline": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "quote_deadline": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "time_zone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "comparison_currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "description",
+                "delivery_location",
+                "delivery_deadline",
+                "quote_deadline",
+                "time_zone",
+                "comparison_currency"
+              ]
+            },
+            "required_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "resolved_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "excluded_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "scope_change_approval_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "unresolved_issue_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "owned_spreadsheet_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "owned_calendar_event_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "cleanup_state": {
+              "enum": [
+                "NOT_REQUESTED",
+                "PENDING_APPROVAL",
+                "IN_PROGRESS",
+                "COMPLETE",
+                "NEEDS_RECONCILIATION"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "simulation",
+            "context",
+            "required_item_ids",
+            "resolved_item_ids",
+            "excluded_item_ids",
+            "scope_change_approval_ids",
+            "unresolved_issue_ids",
+            "owned_spreadsheet_ids",
+            "owned_calendar_event_ids",
+            "cleanup_state"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETED"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "unresolved_issue_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 0
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "ACTIVE",
+                      "COMPLETED"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 16000
+                      },
+                      "delivery_location": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "delivery_deadline": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "quote_deadline": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+                      },
+                      "time_zone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "comparison_currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    },
+                    "required": [
+                      "description",
+                      "delivery_location",
+                      "delivery_deadline",
+                      "quote_deadline",
+                      "time_zone",
+                      "comparison_currency"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "boq_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "boq_item"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "EXTRACTED",
+                "NEEDS_CLARIFICATION",
+                "READY",
+                "ORDERED",
+                "RESOLVED",
+                "EXCLUDED"
+              ]
+            },
+            "section": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quantity": {
+              "anyOf": [
+                {
+                  "allOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "not": {
+                        "pattern": "^0(?:\\.0+)?$"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unit": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "specifications": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delivery_location": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delivery_deadline": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source_evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unresolved_issue_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            }
+          },
+          "required": [
+            "status",
+            "section",
+            "description",
+            "quantity",
+            "unit",
+            "specifications",
+            "delivery_location",
+            "delivery_deadline",
+            "source_evidence_ids",
+            "group_id",
+            "unresolved_issue_ids"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "READY",
+                      "ORDERED",
+                      "RESOLVED"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "section": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "quantity": {
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      {
+                        "not": {
+                          "pattern": "^0(?:\\.0+)?$"
+                        }
+                      }
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "specifications": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16000
+                  },
+                  "delivery_location": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "delivery_deadline": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "unresolved_issue_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "vendor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "vendor"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "NEEDS_REVIEW",
+                "BLOCKED"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            },
+            "item_categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "minItems": 1,
+              "maxItems": 1000
+            },
+            "contact_evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            }
+          },
+          "required": [
+            "status",
+            "name",
+            "email",
+            "item_categories",
+            "contact_evidence_ids"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "rfq": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "rfq"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "DRAFT",
+                "READY",
+                "SENT",
+                "OPEN",
+                "CLOSED",
+                "CANCELLED"
+              ]
+            },
+            "scope_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000,
+              "minItems": 1
+            },
+            "scope_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "vendor_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "recipient": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            },
+            "quote_deadline": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "comparison_currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "subject_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "gmail_message_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gmail_thread_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "send_action_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "scope_item_ids",
+            "scope_digest",
+            "vendor_id",
+            "recipient",
+            "quote_deadline",
+            "comparison_currency",
+            "subject_reference",
+            "gmail_message_id",
+            "gmail_thread_ids",
+            "send_action_id"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "quotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "quotation"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "RECEIVED",
+                "NEEDS_CLARIFICATION",
+                "VALIDATING",
+                "QUALIFYING",
+                "NONQUALIFYING",
+                "SUPERSEDED"
+              ]
+            },
+            "rfq_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "rfq_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "scope_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "vendor_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "sender": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            },
+            "source_message_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "source_thread_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "received_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                  },
+                  "quantity": {
+                    "anyOf": [
+                      {
+                        "allOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                          },
+                          {
+                            "not": {
+                              "pattern": "^0(?:\\.0+)?$"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "unit_price": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "line_total": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "quantity",
+                  "unit",
+                  "unit_price",
+                  "line_total"
+                ]
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "financials": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtotal": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "discount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tax": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "shipping": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "other_charges": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "total_delivered_cost": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "currency",
+                "subtotal",
+                "discount",
+                "tax",
+                "shipping",
+                "other_charges",
+                "total_delivered_cost"
+              ]
+            },
+            "delivery_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "valid_until": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "compliance_state": {
+              "enum": [
+                "CLAIMED",
+                "NEEDS_VERIFICATION",
+                "VERIFIED",
+                "FAILED",
+                "SIMULATION_ONLY"
+              ]
+            },
+            "compliance_evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "unresolved_issue_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            }
+          },
+          "required": [
+            "status",
+            "rfq_id",
+            "rfq_revision",
+            "scope_digest",
+            "vendor_id",
+            "sender",
+            "source_message_id",
+            "source_thread_id",
+            "received_at",
+            "items",
+            "financials",
+            "delivery_date",
+            "valid_until",
+            "compliance_state",
+            "compliance_evidence_ids",
+            "unresolved_issue_ids"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "QUALIFYING"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "unresolved_issue_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 0
+                  },
+                  "compliance_state": {
+                    "enum": [
+                      "VERIFIED",
+                      "SIMULATION_ONLY"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "item_id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                        },
+                        "quantity": {
+                          "allOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                            },
+                            {
+                              "not": {
+                                "pattern": "^0(?:\\.0+)?$"
+                              }
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "unit_price": {
+                          "type": "string",
+                          "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                        },
+                        "line_total": {
+                          "type": "string",
+                          "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                        }
+                      },
+                      "required": [
+                        "item_id",
+                        "quantity",
+                        "unit",
+                        "unit_price",
+                        "line_total"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  },
+                  "financials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      },
+                      "subtotal": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      "discount": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      "tax": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      "shipping": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      "other_charges": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      "total_delivered_cost": {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      }
+                    },
+                    "required": [
+                      "currency",
+                      "subtotal",
+                      "discount",
+                      "tax",
+                      "shipping",
+                      "other_charges",
+                      "total_delivered_cost"
+                    ]
+                  },
+                  "delivery_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "valid_until": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "award": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "award"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "PROPOSED",
+                "APPROVED",
+                "SENT",
+                "CANCELLED"
+              ]
+            },
+            "quotation_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "quotation_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "scope_item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000,
+              "minItems": 1
+            },
+            "vendor_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "selection_basis": {
+              "enum": [
+                "LOWEST_QUALIFYING_TOTAL",
+                "SINGLE_OFFER_EXCEPTION",
+                "HUMAN_JUSTIFIED_EXCEPTION"
+              ]
+            },
+            "justification": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "total": {
+              "$ref": "#/$defs/money"
+            },
+            "approval_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gmail_message_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "quotation_id",
+            "quotation_revision",
+            "scope_item_ids",
+            "vendor_id",
+            "selection_basis",
+            "justification",
+            "total",
+            "approval_id",
+            "gmail_message_id"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "purchase_order": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "purchase_order"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "DRAFT",
+                "READY",
+                "RELEASED",
+                "ACCEPTED",
+                "PARTIALLY_PACKED",
+                "PACKED",
+                "PARTIALLY_DISPATCHED",
+                "DISPATCHED",
+                "PARTIALLY_DELIVERED",
+                "DELIVERED",
+                "RESOLUTION_PENDING",
+                "ON_HOLD",
+                "CLOSED",
+                "CANCELLED"
+              ]
+            },
+            "po_number": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "award_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "vendor_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "specifications": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16000
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "ordered_quantity": {
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                      },
+                      {
+                        "not": {
+                          "pattern": "^0(?:\\.0+)?$"
+                        }
+                      }
+                    ]
+                  },
+                  "packed_quantity": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "dispatched_quantity": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "delivered_quantity": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "buyer_accepted_quantity": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "unit_price": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "line_total": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "description",
+                  "specifications",
+                  "unit",
+                  "ordered_quantity",
+                  "packed_quantity",
+                  "dispatched_quantity",
+                  "delivered_quantity",
+                  "buyer_accepted_quantity",
+                  "unit_price",
+                  "line_total"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 1000
+            },
+            "financials": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "subtotal": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                },
+                "discount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                },
+                "tax": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                },
+                "shipping": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                },
+                "other_charges": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                },
+                "total_delivered_cost": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                }
+              },
+              "required": [
+                "currency",
+                "subtotal",
+                "discount",
+                "tax",
+                "shipping",
+                "other_charges",
+                "total_delivered_cost"
+              ]
+            },
+            "delivery_location": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "required_delivery_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "supplier_expected_delivery_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "payment_terms": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "release_approval_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gmail_message_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gmail_thread_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "supplier_acceptance_confirmed": {
+              "type": "boolean"
+            },
+            "supplier_delivery_reported": {
+              "type": "boolean"
+            },
+            "buyer_receipt_confirmed": {
+              "type": "boolean"
+            },
+            "buyer_acceptance_confirmed": {
+              "type": "boolean"
+            },
+            "resolution_confirmed": {
+              "type": "boolean"
+            },
+            "buyer_confirmation_evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "unresolved_exception_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+              },
+              "uniqueItems": true,
+              "maxItems": 1000
+            },
+            "tracking_references": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "resume_status": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "READY",
+                    "RELEASED",
+                    "ACCEPTED",
+                    "PARTIALLY_PACKED",
+                    "PACKED",
+                    "PARTIALLY_DISPATCHED",
+                    "DISPATCHED",
+                    "PARTIALLY_DELIVERED",
+                    "DELIVERED",
+                    "RESOLUTION_PENDING"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "po_number",
+            "award_id",
+            "vendor_id",
+            "items",
+            "financials",
+            "delivery_location",
+            "required_delivery_date",
+            "supplier_expected_delivery_date",
+            "payment_terms",
+            "release_approval_id",
+            "gmail_message_id",
+            "gmail_thread_ids",
+            "supplier_acceptance_confirmed",
+            "supplier_delivery_reported",
+            "buyer_receipt_confirmed",
+            "buyer_acceptance_confirmed",
+            "resolution_confirmed",
+            "buyer_confirmation_evidence_ids",
+            "unresolved_exception_ids",
+            "tracking_references",
+            "resume_status"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "CLOSED"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "buyer_receipt_confirmed": {
+                    "const": true
+                  },
+                  "buyer_acceptance_confirmed": {
+                    "const": true
+                  },
+                  "resolution_confirmed": {
+                    "const": true
+                  },
+                  "buyer_confirmation_evidence_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 1000,
+                    "minItems": 1
+                  },
+                  "unresolved_exception_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "fulfilment_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "fulfilment_event"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "purchase_order_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "event_kind": {
+              "enum": [
+                "ACCEPTED",
+                "PACKED",
+                "DISPATCHED",
+                "DELIVERED",
+                "BUYER_RECEIPT_CONFIRMED",
+                "EXCEPTION_RAISED",
+                "EXCEPTION_RESOLVED",
+                "CANCELLED"
+              ]
+            },
+            "actor_role": {
+              "enum": [
+                "SUPPLIER",
+                "BUYER",
+                "OPERATOR"
+              ]
+            },
+            "authority_state": {
+              "enum": [
+                "VERIFIED",
+                "UNVERIFIED",
+                "SIMULATION_ONLY"
+              ]
+            },
+            "source_message_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "provider_event_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "idempotency_key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "observed_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "occurred_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "item_quantities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                  },
+                  "quantity": {
+                    "type": "string",
+                    "pattern": "^(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,6})?$"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "quantity",
+                  "unit"
+                ]
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "tracking_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "purchase_order_id",
+            "event_kind",
+            "actor_role",
+            "authority_state",
+            "source_message_id",
+            "provider_event_id",
+            "idempotency_key",
+            "observed_at",
+            "occurred_at",
+            "item_quantities",
+            "tracking_reference",
+            "note"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "approval"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "purpose": {
+              "enum": [
+                "WORKFLOW_REVIEW",
+                "ACTION",
+                "BOQ_REVIEW",
+                "QUOTE_REVIEW",
+                "SCOPE_CHANGE",
+                "EXCEPTION"
+              ]
+            },
+            "decision": {
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+                "EXPIRED",
+                "REVOKED"
+              ]
+            },
+            "workflow_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "workflow_version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "action_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+            },
+            "action_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "policy_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "operation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "resource_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "recipient_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "decided_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "approver": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "HUMAN"
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "minItems": 1,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "subject_id",
+                    "workspace_id",
+                    "roles"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "canonical_approval_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "purpose",
+            "decision",
+            "workflow_id",
+            "workflow_version",
+            "action_id",
+            "action_digest",
+            "policy_revision",
+            "operation",
+            "resource_refs",
+            "recipient_refs",
+            "expires_at",
+            "decided_at",
+            "approver",
+            "canonical_approval_reference"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "decision": {
+                    "const": "APPROVED"
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "approver": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "HUMAN"
+                      },
+                      "subject_id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                      },
+                      "roles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "minItems": 1,
+                        "maxItems": 1000
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "subject_id",
+                      "workspace_id",
+                      "roles"
+                    ]
+                  },
+                  "decided_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+                  },
+                  "canonical_approval_reference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "procurement-v1"
+        },
+        "record_type": {
+          "const": "evidence"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source_kind": {
+              "enum": [
+                "SHEET_ROW",
+                "GMAIL_MESSAGE",
+                "CALENDAR_EVENT",
+                "DOCUMENT",
+                "OPERATOR_CONFIRMATION",
+                "AGENT_ANALYSIS"
+              ]
+            },
+            "provider": {
+              "enum": [
+                "google_sheets",
+                "gmail",
+                "google_calendar",
+                "upload",
+                "operator",
+                "agent"
+              ]
+            },
+            "source_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "locator": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "content_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "captured_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "authority_state": {
+              "enum": [
+                "VERIFIED_SOURCE",
+                "UNVERIFIED_CLAIM",
+                "SIMULATION_ONLY"
+              ]
+            },
+            "asserted_actor_role": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "BUYER",
+                    "SUPPLIER",
+                    "OPERATOR",
+                    "AGENT"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "verified_subject_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{1,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "artifact_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "source_kind",
+            "provider",
+            "source_id",
+            "locator",
+            "content_sha256",
+            "captured_at",
+            "authority_state",
+            "asserted_actor_role",
+            "verified_subject_id",
+            "artifact_reference"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "record_type",
+        "record_id",
+        "workspace_id",
+        "project_id",
+        "revision",
+        "created_at",
+        "updated_at",
+        "evidence_ids",
+        "data"
+      ]
+    }
+  }
+}

@@ -1,0 +1,4 @@
+- [x] Preserve safe failure categories without replaying uncertain effects.
+- [x] Implement bounded authenticated tracking recovery with archived history and fresh gates.
+- [x] Test error redaction, repeat prevention, returned-ID denial and recovery; validate original preservation.
+- [x] Prepare the operator-reconciled live retry and record its outcome.

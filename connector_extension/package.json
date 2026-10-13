@@ -1,0 +1,5 @@
+{
+  "name": "builder-connector-extension-checks",
+  "private": true,
+  "type": "module"
+}

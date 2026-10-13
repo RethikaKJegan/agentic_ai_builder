@@ -159,6 +159,46 @@ export class WorkflowClient {
     if (!result.success) return fail("INVALID_SESSION", "The session response is invalid.");
     return result.data;
   }
+
+  async procurementCommunication(workflowId: string, version: number) {
+    const result = workflowData.safeParse(await this.read(`procurement/workflows/${encodeURIComponent(workflowId)}/${version}/communication`));
+    if (!result.success) return fail("INVALID_API_DATA", "The procurement communication response is invalid.");
+    return result.data;
+  }
+
+  async procurementStatus(projectId: string) {
+    const schema = z.object({ project_id: z.string(), phase: z.string(), issues: z.array(z.string()),
+      candidates: z.array(z.object({ candidate_id: z.string(), name: z.string(), email: z.string().nullable(),
+        categories: z.array(z.string()), assessment: z.string(), contact_state: z.string(),
+        evidence: z.array(z.object({ url: z.string(), quote: z.string(), content_sha256: z.string() })) })).default([]),
+      shortlist_digest: z.string().nullable().optional(), supplier_mode: z.string().optional(),
+      record_counts: z.record(z.string(), z.number()), resources: z.array(z.object({
+        provider: z.string(), resource_type: z.string(), resource_id: z.string(), metadata: z.record(z.string(), z.unknown()),
+      }).passthrough()), actions: z.record(z.string(), z.object({ workflow_id: z.string(),
+      run_id: z.string().optional(), workflow_version: z.number().int().positive().optional(), state: z.string(), approvals: z.array(approvalRecordSchema).optional(),
+      }).passthrough()).default({}) }).passthrough();
+    const result = schema.safeParse(await this.read(`procurement/projects/${encodeURIComponent(projectId)}`));
+    if (!result.success) return fail("INVALID_API_DATA", "The procurement status response is invalid.");
+    return result.data;
+  }
+
+  async procurementSuppliersReview(projectId: string, decision: "approved" | "rejected", candidateIds: string[], digest: string) {
+    return this.read(`procurement/projects/${encodeURIComponent(projectId)}/suppliers-review`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+        operation: "procurement_suppliers_review", idempotency_key: crypto.randomUUID(),
+        payload: { decision, candidate_ids: candidateIds, expected_digest: digest } }) });
+  }
+
+  async procurementProjectCommunication(workflowId: string, version: number) {
+    const schema = z.object({ project_id: z.string(), phase: z.string(), root_workflow: CanonicalWorkflowSchema,
+      root_run: runData.shape.run.nullable().optional(), root_events: z.array(RunEventSchema).optional(),
+      configured_workflow: CanonicalWorkflowSchema.nullable(), truncated: z.boolean(), actions: z.array(z.object({
+        key: z.string(), workflow: CanonicalWorkflowSchema, run: runData.shape.run, events: z.array(RunEventSchema),
+      })) });
+    const result = schema.safeParse(await this.read(`procurement/workflows/${encodeURIComponent(workflowId)}/${version}/communication-project`));
+    if (!result.success) return fail("INVALID_API_DATA", "The project communication response is invalid.");
+    return result.data;
+  }
   async request<K extends Operation>(operation: K, payload: Payloads[K], idempotencyKey?: string): Promise<z.infer<(typeof responseSchemas)[K]>> {
     if (containsSecret(payload)) return fail("SENSITIVE_DATA_DETECTED", "Remove secret material before submitting.");
     const destination = route(operation, payload);

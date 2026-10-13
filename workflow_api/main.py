@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import json
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from .service import ApiFailure, WorkflowService
 from .storage import WorkflowStore
 from .registry_adapter import load_registry_config
@@ -68,6 +69,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         scheduler.start(); workers.append(scheduler)
     app = FastAPI(title='Agentic AI Builder workflow API', docs_url=None, redoc_url=None)
     app.state.workflow_service = workflow_service
+    app.state.workflow_auth = auth
     app.state.workers = workers
 
     @app.on_event('shutdown')
@@ -78,6 +80,12 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     def error(code, message, status):
         result = workflow_service.failure(f'req_{uuid4().hex}', ApiFailure(code, message, status))
         return JSONResponse(result, status_code=status, headers={'Cache-Control': 'no-store'})
+
+    @app.exception_handler(StarletteHTTPException)
+    async def route_error(request, exc):
+        if exc.status_code == 404 and request.url.path.startswith('/procurement/'):
+            return error('PROCUREMENT_UNAVAILABLE', 'Procurement is unavailable in this backend. Enable BUILDER_PROCUREMENT_ENABLED=1 and restart scripts/run_live_backend.py on the frontend configured port.', 503)
+        return error('API_ROUTE_UNAVAILABLE', 'This API route is unavailable. Restart the configured Builder backend with the current code.', exc.status_code)
 
     @app.middleware('http')
     async def protect(request, call_next):

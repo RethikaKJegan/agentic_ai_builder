@@ -1,0 +1,5 @@
+Use one privately permissioned database under extension state. A central scoped record identity table and entity tables hold current snapshots; immutable revisions and activity preserve history. BEGIN IMMEDIATE, expected revisions and operation fingerprints serialize concurrent updates and make identical transaction retries no-ops. References resolve against the final transaction snapshot within the same workspace/project.
+
+New records start at their defined initial states. State updates validate schema and legal edges. Terminal states cannot be edited. Evidence and fulfilment events are immutable. Admission of verified evidence/approved approvals requires a trusted callback; none is configured by default. A domain approval is audit data, never a Registry grant. Closure verifies explicit buyer evidence, full accepted quantities and no exceptions; completed projects require actual closed-order coverage or reviewed exclusions.
+
+Provider links bind resources to records. Synchronization intents commit with case revisions but cannot invoke connectors. Dispatch and canonical API authentication are later work. Keep existing pilot JSON and live services unchanged.

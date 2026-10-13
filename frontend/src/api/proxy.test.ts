@@ -23,3 +23,12 @@ it("preserves the Builder envelope and development session cookie", async () => 
   expect(await response.json()).toEqual(body);
   expect(response.headers.get("set-cookie")).toContain("builder_dev_session=test-only");
 });
+
+it("distinguishes a missing route on an older Builder backend from an unrelated service", async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Not Found" }), { status: 404 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ request_id: "req_session", status: 200, data: { runtime_available: true } }), { status: 200 }));
+  vi.stubGlobal("fetch", fetch);
+  const response = await GET(new NextRequest("http://127.0.0.1:3001/api/backend/procurement/projects/project_test"), { params: Promise.resolve({ path: ["procurement", "projects", "project_test"] }) });
+  expect(await response.json()).toMatchObject({ data: { error: { error_code: "API_ROUTE_UNAVAILABLE" } } });
+});

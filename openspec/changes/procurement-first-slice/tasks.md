@@ -1,0 +1,5 @@
+- [x] Implement scoped setup, durable coordinator state and internal procurement tools.
+- [x] Add source ingestion, BOQ/context validation and RFQ grouping/draft preparation.
+- [x] Connect approval-gated resource creation, projection dispatch and confirmed result persistence.
+- [x] Add authenticated routes, opt-in startup and bounded worker.
+- [x] Verify the four-item slice, restart/retry/denial/error paths and original isolation; document usage.

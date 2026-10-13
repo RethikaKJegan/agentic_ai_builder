@@ -273,6 +273,16 @@ class RegistryService:
         request_id = request.get('request_id') if isinstance(request, dict) else None
         return self._respond(auth, 'tools.read', operation, request_id)
 
+    def merge_approval_evidence(self, grants, auth, request_id=None):
+        """Add exact reviewed bindings while preserving unrelated unexpired reviews."""
+        with self._lock:
+            retained = {key: deepcopy(value) for key, value in self._policy.approval_grants.items()
+                        if value.get('expires_at', 0) > time.time()}
+            if not isinstance(grants, dict):
+                return self.update_approval_evidence(grants, auth, request_id)
+            retained.update(deepcopy(grants))
+            return self.update_approval_evidence(retained, auth, request_id)
+
     def update_approval_evidence(self, grants, auth, request_id=None):
         """Trusted adapter installs references to approvals decided upstream.
 

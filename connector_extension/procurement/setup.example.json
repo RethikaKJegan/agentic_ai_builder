@@ -1,0 +1,35 @@
+{
+  "project_id": "project_demo",
+  "name": "Procurement pilot",
+  "simulation": true,
+  "context": {
+    "description": "Replace with the supplied project context",
+    "delivery_location": "Replace with the actual delivery location",
+    "delivery_deadline": null,
+    "quote_deadline": null,
+    "time_zone": null,
+    "comparison_currency": null
+  },
+  "requirements": {
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/YOUR_REQUIREMENTS_ID/edit",
+    "range": "Requirements!A1:F101",
+    "columns": {
+      "item_id": "Item ID",
+      "section": "Section",
+      "description": "Description",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "specifications": "Specifications"
+    }
+  },
+  "vendors": {
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/YOUR_VENDOR_ID/edit",
+    "range": "Vendors!A1:D101",
+    "columns": {
+      "vendor_id": "Vendor ID",
+      "name": "Vendor Name",
+      "email": "Email",
+      "item_categories": "Categories"
+    }
+  }
+}

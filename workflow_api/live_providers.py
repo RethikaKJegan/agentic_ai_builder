@@ -257,6 +257,10 @@ class LivePlannerProvider:
 def create_configured_app(env=None, database=None, client=None, model_factory=None):
     env = environment() if env is None else env
     config = registry_configuration(env)
+    from .procurement import configuration as procurement_configuration, extend_registry
+    procurement_settings = procurement_configuration(env)
+    if procurement_settings:
+        extend_registry(config, procurement_settings)
     model, rates, tokenizers = model_configuration(env)
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
@@ -307,6 +311,11 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
     from threading import Event, Thread
     auth = operator_auth(config)
+    if procurement_settings:
+        from .procurement import install
+        procurement_worker = install(app, procurement_settings, env, client, model, auth)
+    else:
+        procurement_worker = None
     def read_case_evidence(case, requests):
         from runtime.service import RuntimeFailure
         from runtime.connectors import google_spreadsheet_id
@@ -355,6 +364,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         service.reply_monitor_health = {'state': 'starting'}
     lookup = lambda workspace, subject: authenticate(service, auth, workspace, subject)
     workers = [TriggerScheduler(service, lookup, interval=1), RuntimeWorker(runner, lookup)]
+    if procurement_worker:
+        workers.append(procurement_worker)
     reply_stop = Event()
     reply_thread = None
     def poll_replies():

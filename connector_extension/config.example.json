@@ -1,0 +1,7 @@
+{
+  "enabled_providers": [],
+  "search_cost_per_call_usd": 0,
+  "sheet_creation_enabled": false,
+  "procurement_enabled": false,
+  "procurement_currency_precision": {}
+}
