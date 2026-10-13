@@ -175,6 +175,14 @@ export class WorkflowClient {
       recommendations: z.array(z.object({ scope_digest: z.string(), item_ids: z.array(z.string()), reason: z.string(),
         quotation_id: z.string().nullable(), amount: z.string().nullable(), currency: z.string() }).passthrough()).optional(),
       calendar_events: z.record(z.string(), z.string()).optional(),
+      fulfilment_policy: z.object({ revision: z.number(), settings: z.object({ enabled: z.literal(true), buyer_email: z.string(),
+        manager_email: z.string(), acceptance_hours: z.number(), reminder_hours: z.number(), allow_delivery_reschedule: z.boolean() }) }).passthrough().nullable().optional(),
+      fulfilment_review: z.record(z.string(), z.object({ po_id: z.string(), reason: z.string() })).optional(),
+      orders: z.array(z.object({ po_id: z.string(), po_number: z.string(), status: z.string(), tracking_references: z.array(z.string()),
+        unresolved_exception_ids: z.array(z.string()), items: z.array(z.object({ item_id: z.string(), unit: z.string(), ordered_quantity: z.string(),
+          packed_quantity: z.string(), dispatched_quantity: z.string(), delivered_quantity: z.string(), buyer_accepted_quantity: z.string() }).passthrough()) }).passthrough()).optional(),
+      activity: z.array(z.object({ event_id: z.string(), purchase_order_id: z.string(), event_kind: z.string(),
+        actor_role: z.string(), note: z.string(), observed_at: z.string() }).passthrough()).optional(),
       record_counts: z.record(z.string(), z.number()), resources: z.array(z.object({
         provider: z.string(), resource_type: z.string(), resource_id: z.string(), metadata: z.record(z.string(), z.unknown()),
       }).passthrough()), actions: z.record(z.string(), z.object({ workflow_id: z.string(),
@@ -190,6 +198,14 @@ export class WorkflowClient {
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
         operation: "procurement_suppliers_review", idempotency_key: crypto.randomUUID(),
         payload: { decision, candidate_ids: candidateIds, expected_digest: digest } }) });
+  }
+
+  async procurementFulfilmentActivate(projectId: string, workflowId: string, version: number, expectedRevision: number,
+    settings: { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean }) {
+    return this.read(`procurement/projects/${encodeURIComponent(projectId)}/fulfilment-activate`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+        operation: "procurement_fulfilment_activate", idempotency_key: crypto.randomUUID(),
+        payload: { settings, expected_revision: expectedRevision, workflow_id: workflowId, workflow_version: version } }) });
   }
 
   async procurementProjectCommunication(workflowId: string, version: number) {

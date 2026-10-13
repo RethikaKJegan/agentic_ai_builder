@@ -6,11 +6,13 @@ import { useMesh } from "@/domain/store";
 import type { Workflow } from "@/domain/types";
 import { ApiFeedback } from "./ApiFeedback";
 
+type FulfilmentSettings = { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean };
 type Plan = { project_id: string; name: string; simulation: boolean;
   context: Record<string, string | null>; requirements: { spreadsheet_url: string; range: string; columns: Record<string, string> };
   vendors: { spreadsheet_url: string; range: string; columns: Record<string, string> } | null;
   supplier_mode?: "supplied" | "discover" | "combined"; search_region?: string; action_mode?: "approval" | "automatic";
-  phase2?: { enabled: true; calendar_id: string; reminder_minutes: number; purchasing_limit: string | null; allow_single_offer: boolean } | null };
+  phase2?: { enabled: true; calendar_id: string; reminder_minutes: number; purchasing_limit: string | null; allow_single_offer: boolean } | null;
+  phase3?: FulfilmentSettings | null };
 export function ProcurementReview({ workflow }: { workflow: Workflow }) {
   const backend = useBackend();
   const raw = workflow.canonical?.metadata["procurement_plan"];
@@ -21,6 +23,7 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [notStarted, setNotStarted] = useState(false);
+  const [fulfilment, setFulfilment] = useState<FulfilmentSettings>({ enabled: true, buyer_email: "", manager_email: "", acceptance_hours: 24, reminder_hours: 24, allow_delivery_reschedule: false });
   useEffect(() => { setDraft(plan); }, [raw]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!plan || !draft) return null;
   const editable = workflow.canonical?.status === "draft" || workflow.canonical?.status === "validated";
@@ -72,6 +75,26 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
     } catch (e) { setError(e instanceof Error ? e : new Error("Supplier selection could not be saved.")); }
     finally { setBusy(false); }
   };
+  const activateFulfilment = async () => {
+    if (busy || !publishedVersion) return;
+    setBusy(true); setError(undefined);
+    try {
+      if (typeof api.procurementFulfilmentActivate !== "function") {
+        throw new Error("The frontend API client is out of date. Restart the frontend and reload this page, then activate fulfilment again.");
+      }
+      await api.procurementFulfilmentActivate(plan.project_id, workflow.id, publishedVersion, status?.fulfilment_policy?.revision ?? 0, fulfilment);
+      setStatus(await api.procurementStatus(plan.project_id));
+    } catch (e) { setError(e instanceof Error ? e : new Error("Could not activate fulfilment.")); }
+    finally { setBusy(false); }
+  };
+  const fulfilmentInputs = (value: FulfilmentSettings, change: (next: FulfilmentSettings) => void, disabled: boolean) => <>
+    {(["buyer_email", "manager_email"] as const).map(field => <label className="block" key={field}>{field === "buyer_email" ? "Buyer receiving email" : "Manager notification email"}
+      <input type="email" disabled={disabled} className="w-full rounded border p-1" value={value[field]} onChange={e => change({ ...value, [field]: e.target.value })} /></label>)}
+    {(["acceptance_hours", "reminder_hours"] as const).map(field => <label className="block" key={field}>{field.replaceAll("_", " ")}
+      <input type="number" min={1} max={720} disabled={disabled} className="w-full rounded border p-1" value={value[field]} onChange={e => change({ ...value, [field]: Number(e.target.value) })} /></label>)}
+    <label className="block"><input type="checkbox" disabled={disabled} checked={value.allow_delivery_reschedule}
+      onChange={e => change({ ...value, allow_delivery_reschedule: e.target.checked })} /> Allow reported delivery dates within the original required deadline</label>
+  </>;
   return <details className="relative">
     <summary className="cursor-pointer rounded-lg border px-2.5 py-1 text-sm">Procurement setup &amp; status</summary>
     <div className="fixed inset-x-3 top-36 z-40 max-h-[70vh] sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:max-h-[75vh] sm:w-[min(30rem,90vw)] space-y-3 overflow-y-auto rounded-xl border bg-background p-4 shadow-lg">
@@ -108,6 +131,10 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
         <label className="block"><input type="checkbox" disabled={!editable} checked={draft.phase2.allow_single_offer}
           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.target.checked } })} /> Permit a sole qualifying offer</label>
       </section>}
+      {editable && draft.phase2 && <section className="space-y-2 rounded border p-2 text-sm">
+        <label><input type="checkbox" checked={!!draft.phase3} onChange={e => setDraft({ ...draft, phase3: e.target.checked ? fulfilment : null })} /> Enable Phase 3 after PO release</label>
+        {draft.phase3 && fulfilmentInputs(draft.phase3, next => setDraft({ ...draft, phase3: next }), busy)}
+      </section>}
       {editable && <button disabled={busy} onClick={() => void save()} className="rounded border px-3 py-1 text-sm">Save project settings</button>}
       <p className="text-sm">This workflow starts manually. No new spreadsheet row is needed. Publish, then start procurement here. Runs, Agent communication and Approvals show the actual actions.</p>
       <button disabled={busy || !publishedVersion || !backend.can("workflow.execute")} onClick={() => void start()} className="rounded border px-3 py-1 text-sm disabled:opacity-40">{busy ? "Working…" : "Start procurement"}</button>
@@ -118,6 +145,22 @@ export function ProcurementReview({ workflow }: { workflow: Workflow }) {
         {status.issues.map(issue => <p key={issue}>{issue}</p>)}
         {(status.recommendations ?? []).map(r => <p key={r.scope_digest}>{r.item_ids.join(", ")}: {r.reason.replaceAll("_", " ")}{r.amount ? ` · ${r.amount} ${r.currency}` : ""}{r.quotation_id ? ` · ${r.quotation_id}` : ""}</p>)}
         {Object.entries(status.calendar_events ?? {}).map(([key, id]) => <p key={key}>Calendar: {key.replaceAll("_", " ")} · {id}</p>)}
+        {status.phase === "PO_RELEASED" && !status.fulfilment_policy && <section className="space-y-2 rounded border p-2">
+          <p className="font-medium">Activate Phase 3 for these existing POs</p>
+          <p>Configure buyer confirmation and manager notifications. Existing POs will be reused.</p>
+          {fulfilmentInputs(fulfilment, setFulfilment, busy)}
+          <button disabled={busy || !backend.can("workflow.approve") || !fulfilment.buyer_email || !fulfilment.manager_email} className="rounded border px-2 py-1"
+            onClick={() => void activateFulfilment()}>Activate fulfilment monitoring</button>
+        </section>}
+        {status.fulfilment_policy && <p>Fulfilment policy v{status.fulfilment_policy.revision} · buyer {status.fulfilment_policy.settings.buyer_email} · manager {status.fulfilment_policy.settings.manager_email}</p>}
+        {(status.orders ?? []).map(po => <section key={po.po_id} className="rounded border p-2">
+          <p className="font-medium">{po.po_number} · {po.status}</p>
+          {po.items.map(i => <p key={i.item_id}>{i.item_id}: ordered {i.ordered_quantity}, packed {i.packed_quantity}, dispatched {i.dispatched_quantity}, delivered {i.delivered_quantity}, accepted {i.buyer_accepted_quantity} {i.unit}</p>)}
+          {po.tracking_references.length > 0 && <p>Tracking: {po.tracking_references.join(", ")}</p>}
+          {po.unresolved_exception_ids.length > 0 && <p>Unresolved exceptions: {po.unresolved_exception_ids.join(", ")}</p>}
+        </section>)}
+        {Object.values(status.fulfilment_review ?? {}).map((item, i) => <p key={i}>Clarification requested: {item.po_id} · {item.reason}</p>)}
+        {(status.activity ?? []).slice(-10).map(event => <p key={event.event_id}>{event.event_kind} · {event.actor_role} · {event.note}</p>)}
         {status.phase === "SHORTLIST_REVIEW" && <section className="space-y-2 rounded border p-2">
           <p className="font-medium">Review supplier shortlist</p>
           <p>Published contacts and product claims require your review. Availability and delivery are not verified quotations.</p>

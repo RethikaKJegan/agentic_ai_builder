@@ -396,7 +396,8 @@ class DelegationSession:
             scheduled={r['agent_id'] for r in results}|{t['agent_id'] for t,_ in pending}
             join_required=bool(required) and required<=scheduled and count>=self.config['max_tasks']
             collect(wait=round_number == self.config['max_rounds'] or join_required)
-            context = {'request': self.inputs, 'final_output_schema': self.master['output_schema'], 'available_agents': [
+            context = {'control_task_input_mode': self.workflow.get('metadata', {}).get('control_task_input_mode'),
+                'request': self.inputs, 'final_output_schema': self.master['output_schema'], 'available_agents': [
                 {k: a[k] for k in ('agent_id', 'role', 'goal', 'input_schema')}
                 for a in self.children.values()], 'results': deepcopy(results),
                 'configured_resources': self.configured_resources(),

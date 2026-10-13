@@ -64,7 +64,7 @@ class SupplierDiscovery:
     def effective_plan(self,plan):
         result=deepcopy(plan)
         if result.get('supplier_mode','supplied')!='supplied':result['vendors']=deepcopy(VIRTUAL)
-        return {k:v for k,v in result.items() if k not in ('supplier_mode','search_region','action_mode','phase2')}
+        return {k:v for k,v in result.items() if k not in ('supplier_mode','search_region','action_mode','phase2','phase3')}
 
     def discovery_ingestion(self,plan,workflow):
         if plan.get('supplier_mode','supplied')=='supplied':return workflow

@@ -39,6 +39,7 @@ class CrewAdapter:
         if protocol is not None:
             from .model_protocol import response_format
             llm.control_format = response_format(protocol, inputs)
+            llm.control_context = deepcopy(inputs)
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'],
                       llm=llm, tools=[], allow_delegation=False, allow_code_execution=False,
                       max_iter=1, max_retry_limit=0, max_execution_time=definition['limits']['timeout_seconds'],

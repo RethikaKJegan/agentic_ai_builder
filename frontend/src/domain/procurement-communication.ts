@@ -59,6 +59,10 @@ export function compactProcurementGraph(project: ProjectCommunication) {
   for (const action of project.actions) {
     const stage = action.key === "ingestion" ? "Master and specialist review" : action.key.startsWith("research_") ? "Supplier research and verification" :
       action.key === "tracking" ? "Create tracking spreadsheet" : action.key.startsWith("sync_") ? "Save tracking records" :
+      action.key.startsWith("ful_extract_") ? "Fulfilment master and specialists" :
+      action.key.startsWith("ful_read_") ? "Monitor PO replies" :
+      action.key.startsWith("ful_notify_") ? "Fulfilment follow-ups and notifications" :
+      action.key.startsWith("ful_calendar_") ? "Fulfilment Calendar updates" :
       action.key.startsWith("calendar_") ? "Calendar deadlines" :
       action.key.startsWith("read_quotes_") || action.key.startsWith("extract_") || action.key.startsWith("clarify_") ? "Read and validate quotations" :
       action.key.startsWith("send_award_") || action.key.startsWith("send_po_") ? "Awards and purchase orders" :
@@ -73,8 +77,8 @@ export function compactProcurementGraph(project: ProjectCommunication) {
       details: { actions: actions.map(a => ({ action: a.key, run_id: a.run.run_id, workflow_id: a.workflow.workflow_id, status: a.run.status,
         events: a.events.filter(e => e.run_id === a.run.run_id && e.workflow_id === a.workflow.workflow_id && e.workflow_version === a.workflow.version) })) } });
     edges.push({ id: `stage:${id}`, source: root.id, target: id, label: "Coordinator stage", recorded: false });
-    if (label === "Master and specialist review") {
-      const action = actions[0];
+    if (label === "Master and specialist review" || label === "Fulfilment master and specialists") {
+      const action = label === "Master and specialist review" ? actions[0] : actions[actions.length - 1];
       if (!action) continue;
       const specialists = full.nodes.filter(n => n.runId === action.run.run_id && ["Master agent", "Sub-agent"].includes(n.role));
       nodes.push(...specialists);

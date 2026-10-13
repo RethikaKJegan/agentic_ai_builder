@@ -23,7 +23,10 @@ def project_communication(service,procurement,workflow_id,version,auth):
         root_run=service.runtime_runner.runtime.get_run(job['root_run_id'],auth)
         require(root_run['workflow_id']==workflow_id and root_run['workflow_version']==version,'PROCUREMENT_RUN_MISMATCH')
         root_events=service.runtime_runner.runtime.events(job['root_run_id'],auth)['items'][:300]
-    for name,action in list(job['actions'].items())[:100]:
+    history=list(job['actions'].items())
+    selected=history if len(history)<=100 else ([('ingestion',job['actions']['ingestion'])] if 'ingestion' in job['actions'] else [])+[
+        item for item in history if item[0]!='ingestion'][-99:]
+    for name,action in selected:
         if not action.get('run_id'):continue
         run=service.runtime_runner.runtime.get_run(action['run_id'],auth)
         require(run['workflow_id']==action['workflow_id'] and run['workflow_version']==action['workflow_version'],'PROCUREMENT_RUN_MISMATCH')

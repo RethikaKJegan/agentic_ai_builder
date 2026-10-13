@@ -29,6 +29,7 @@ class BoundedLLM(BaseLLM):
         self.last_failure = None
         self.actual_usage = {'llm_calls': 0, 'tokens': 0, 'estimated_cost_usd': 0.0}
         self.control_format = None
+        self.control_context = None
 
     def call(self, messages, tools=None, callbacks=None, available_functions=None, **kwargs):
         try:
@@ -129,7 +130,7 @@ class OpenAIModelFactory:
             text = response.output_text
             if bridge.control_format is not None:
                 from .model_protocol import decode_response
-                text = decode_response(text)
+                text = decode_response(text, bridge.control_context)
             return text, response.usage.input_tokens, response.usage.output_tokens
         rates = self.rates[model['model_id']]
         bridge = BoundedLLM(definition, invoke, count, rates['input_per_token'], rates['output_per_token'])

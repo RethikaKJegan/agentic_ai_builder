@@ -38,6 +38,22 @@ it("leaves ordinary workflows without a procurement panel", () => {
   expect(container).toBeEmptyDOMElement();
 });
 
+it("activates existing POs with configured contacts without executing procurement again", async () => {
+  const status = { project_id: "project_demo", phase: "PO_RELEASED", issues: [], candidates: [], record_counts: {}, resources: [], actions: {} };
+  vi.spyOn(api, "procurementStatus").mockResolvedValue(status);
+  const activate = vi.spyOn(api, "procurementFulfilmentActivate").mockResolvedValue({});
+  const execute = vi.spyOn(api, "request");
+  render(<ProcurementReview workflow={workflow} />);
+  fireEvent.click(screen.getByText("Refresh project status"));
+  await waitFor(() => expect(screen.getByText("Activate Phase 3 for these existing POs")).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText("Buyer receiving email"), { target: { value: "buyer@example.com" } });
+  fireEvent.change(screen.getByLabelText("Manager notification email"), { target: { value: "manager@example.com" } });
+  fireEvent.click(screen.getByText("Activate fulfilment monitoring"));
+  await waitFor(() => expect(activate).toHaveBeenCalledWith("project_demo", "workflow_demo", 1, 0,
+    expect.objectContaining({ buyer_email: "buyer@example.com", manager_email: "manager@example.com", enabled: true })));
+  expect(execute).not.toHaveBeenCalled();
+});
+
 it("starts the published revision directly with no spreadsheet trigger input", async () => {
   const request = vi.spyOn(api, "request").mockResolvedValue({ run: { run_id: "run_start", workflow_id: "workflow_demo", workflow_version: 1, status: "completed", approvals: [] } });
   vi.spyOn(api, "procurementStatus").mockResolvedValue({ project_id: "project_demo", phase: "TRACKING", issues: [], candidates: [], record_counts: {}, resources: [], actions: {} });

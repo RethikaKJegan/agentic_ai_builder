@@ -16,6 +16,7 @@ from connector_extension.procurement.store import require, SCHEMA
 from connector_extension.procurement.runtime_tools import PROJECT, TOOLS, ProcurementConnector, ingestion_workflow
 from .supplier_discovery import SupplierDiscovery, CONTACTS, SelectedContacts
 from .procurement_quotes import ProcurementQuotes
+from .procurement_fulfilment import ProcurementFulfilment, SETTINGS as FULFILMENT_SETTINGS, validate_settings
 from runtime.supplier_search import SEARCH, PAGE, SupplierSearchConnector
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,11 +76,14 @@ def extend_registry(config, settings):
 
 def validate_plan(plan, catalogs=None):
     require(isinstance(plan, dict) and {'project_id','name','simulation','context','requirements','vendors'}<=set(plan) and
-            not set(plan)-{'project_id','name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2'}, 'PROCUREMENT_SETUP_INVALID')
+            not set(plan)-{'project_id','name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2','phase3'}, 'PROCUREMENT_SETUP_INVALID')
     require(plan.get('action_mode','approval') in ('approval','automatic'),'PROCUREMENT_ACTION_MODE_INVALID')
     mode=plan.get('supplier_mode','supplied')
     require(mode in ('supplied','discover','combined'),'SUPPLIER_MODE_INVALID')
     phase2=plan.get('phase2')
+    if plan.get('phase3') is not None:
+        validate_settings(plan['phase3'])
+        require(phase2 is not None and plan['simulation'],'FULFILMENT_SIMULATION_REQUIRED')
     if phase2 is not None:
         require(isinstance(phase2,dict) and set(phase2)=={'enabled','calendar_id','reminder_minutes','purchasing_limit','allow_single_offer'} and
                 phase2['enabled'] is True and mode=='supplied' and
@@ -231,9 +235,10 @@ class ProcurementPlanner:
                         'calendar_id':{'type':'string'},'reminder_minutes':{'type':'integer'},
                         'purchasing_limit':{'type':['string','null'],'pattern':r'^[1-9][0-9]{0,15}(?:\.[0-9]{1,2})?$'},'allow_single_offer':{'type':'boolean'}},
                         ['enabled','calendar_id','reminder_minutes','purchasing_limit','allow_single_offer'])]},
+                    'phase3':{'anyOf':[{'type':'null'},FULFILMENT_SETTINGS]},
                     'requirements':source(['item_id',*ITEM_FIELDS]),
                     'vendors':{'anyOf':[source(['vendor_id','name','email','item_categories']),{'type':'null'}]}},
-                   ['name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2'])
+                   ['name','simulation','context','requirements','vendors','supplier_mode','search_region','action_mode','phase2','phase3'])
         supplied={'objective':objective,'catalog':catalog_snapshot(catalogs),'today':__import__('datetime').date.today().isoformat()}
         failures=[]
         for attempt in range(2):
@@ -253,6 +258,9 @@ class ProcurementPlanner:
                     'otherwise null. purchasing_limit must contain decimal digits only, optionally a decimal point; '
                     'never include a currency label, symbol or commas (for example "100000", not "INR 100000"). '
                     'allow_single_offer=false unless the operator explicitly permits selecting a sole qualifying offer. '
+                    'Set phase3=null unless fulfilment monitoring after PO release is requested. Phase 3 requires simulation, Phase 2 and '
+                    'explicit buyer and manager emails. Use acceptance_hours=24 and reminder_hours=24 unless specified, '
+                    'allow_delivery_reschedule=false unless explicitly authorized. Never infer buyer/manager contacts from vendor emails. '
                     'Do not infer vendor contacts, prices or requirements. Return only the strict setup object.'},
                        {'role':'user','content':json.dumps(supplied)}],
                 text={'format':{'type':'json_schema','name':'procurement_setup','schema':schema,'strict':True}})
@@ -276,7 +284,7 @@ class ProcurementPlanner:
                              details={'requirement_codes':list(dict.fromkeys(failures))})
 
 
-class IntegratedProcurement(ProcurementQuotes, SupplierDiscovery, ProcurementService):
+class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDiscovery, ProcurementService):
     """Same canonical workflow store/approvals; only domain ledger is separate."""
     def setup(self, plan, auth, *, owner_workflow=None):
         require(owner_workflow is not None,'PROCUREMENT_PUBLISHED_WORKFLOW_REQUIRED')
@@ -284,11 +292,12 @@ class IntegratedProcurement(ProcurementQuotes, SupplierDiscovery, ProcurementSer
         if plan.get('supplier_mode','supplied')!='supplied':return self.start_discovery(plan,auth,owner_workflow)
         automatic=plan.get('action_mode')=='automatic'
         require(not automatic or self.automatic_enabled,'PROCUREMENT_AUTOMATIC_NOT_ENABLED')
-        phase2=deepcopy(plan.get('phase2'))
-        plan={k:v for k,v in plan.items() if k not in ('supplier_mode','search_region','action_mode','phase2')}
+        phase2=deepcopy(plan.get('phase2'));phase3=deepcopy(plan.get('phase3'))
+        plan={k:v for k,v in plan.items() if k not in ('supplier_mode','search_region','action_mode','phase2','phase3')}
         # Persist reviewed execution policy before any child mutation.
         owner=deepcopy(owner_workflow);owner['automatic_actions']=automatic
         if phase2 is not None:owner['phase2_settings']=phase2
+        if phase3 is not None:owner['phase3_settings']=phase3
         return super().setup(plan,auth,owner_workflow=owner)
     def ingestion_workflow(self, plan, workflow_id, workspace=None):
         # Recovery keeps the exact already-published child revision; new source
@@ -318,14 +327,19 @@ class IntegratedProcurement(ProcurementQuotes, SupplierDiscovery, ProcurementSer
                       shortlist_review=job.get('shortlist_review'),rejected_pages=job.get('rejected_pages',[]))
         result.update(phase2_settings=self.phase2_settings(job),recommendations=job.get('recommendations',[]),
                       calendar_events=job.get('calendar_events',{}))
-        for kind in ('quotation','award','purchase_order'):
+        result.update(fulfilment_policy=job.get('fulfilment_policy'),fulfilment_review=job.get('fulfilment_review',{}),
+            orders=[{'po_id':r['record_id'],**r['data']} for r in result['records'] if r['record_type']=='purchase_order'],
+            activity=[{'event_id':r['record_id'],**r['data']} for r in result['records'] if r['record_type']=='fulfilment_event'])
+        for kind in ('quotation','award','purchase_order','fulfilment_event'):
             result['record_counts'][kind]=sum(r['record_type']==kind for r in result['records'])
         return result
 
     def tick(self):
         with self.store.connection() as db:
             rows=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') "
-                            "NOT IN ('PO_RELEASED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION','STOPPED') "
+                            "NOT IN ('COMPLETED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION') "
+                            "AND (json_extract(body,'$.phase')!='STOPPED' OR json_extract(body,'$.fulfilment_policy.revision')=1) "
+                            "AND (json_extract(body,'$.phase')!='PO_RELEASED' OR json_extract(body,'$.owner_workflow.phase3_settings.enabled')=1) "
                             "AND (json_extract(body,'$.phase')!='RFQS_SENT' OR json_extract(body,'$.owner_workflow.phase2_settings.enabled')=1) ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
         if not rows:self.cursor=0
         for rowid,workspace,project,body in rows:
@@ -360,12 +374,45 @@ class IntegratedProcurement(ProcurementQuotes, SupplierDiscovery, ProcurementSer
             workflow['edges']=edges;workflow['approval_gates']=[]
             for a in workflow['agents']:a['approval_requirements']=[]
             workflow['metadata']['procurement_automatic_actions']=True
-        return super().run_action(workspace,job,name,workflow,auth)
+        result = super().run_action(workspace,job,name,workflow,auth)
+        if result is None:
+            return None
+        runtime = self.workflows.runtime_runner.runtime
+        action = job['actions'][name]
+        with runtime.store.transaction() as db:
+            run = runtime.load(db, action['run_id'], auth)
+        require(run['status'] == 'completed' and run['workflow_id'] == action['workflow_id'] and
+                run['workflow_version'] == action['workflow_version'], 'PROCUREMENT_RUN_RESULT_INVALID')
+        # UI events deliberately shorten messages and arrays. Execution consumes
+        # the complete validated run outputs, never observability snapshots.
+        return deepcopy(run['outputs'])
 
     def advance(self, project, auth):
         workspace=self.authorize(auth)
         if not self.active(workspace,self.job(workspace,project)):return self.status(workspace,project)
         phase=self.job(workspace,project)['phase']
+        if phase=='STOPPED':
+            job=self.job(workspace,project)
+            if self.recover_fulfilment_control(workspace,job,auth):phase=job['phase']
+        if phase=='COMPLETED':return self.status(workspace,project)
+        job=self.job(workspace,project)
+        if phase=='PO_RELEASED' and job.get('owner_workflow',{}).get('phase3_settings') and not job.get('fulfilment_policy'):
+            from connector_extension.procurement.store import ProcurementError
+            try:
+                self.activate_fulfilment(project,{'settings':job['owner_workflow']['phase3_settings'],'expected_revision':0,
+                    'workflow_id':job['owner_workflow']['workflow_id'],'workflow_version':job['owner_workflow']['version']},auth)
+            except ProcurementError as exc:
+                job['issues']=list(dict.fromkeys(job['issues']+[exc.code]));self.save_job(workspace,job)
+                return self.status(workspace,project)
+            phase='FULFILMENT'
+        if phase in ('FULFILMENT','FULFILMENT_REVIEW'):
+            from connector_extension.procurement.store import ProcurementError
+            try:return self.advance_fulfilment(project,auth)
+            except ProcurementError as exc:
+                job=self.job(workspace,project)
+                if job['phase']!='STOPPED':job['phase']='FULFILMENT_REVIEW'
+                job['issues']=list(dict.fromkeys(job['issues']+[exc.code]));self.save_job(workspace,job)
+                return self.status(workspace,project)
         if phase in ('RFQS_SENT','WAITING_FOR_QUOTES','QUOTE_REVIEW_REQUIRED','PO_RELEASED') and self.phase2_settings(self.job(workspace,project)):
             from connector_extension.procurement.store import ProcurementError
             try:return self.advance_phase2(project,auth)
@@ -489,6 +536,7 @@ def install(app, settings, env, client, model, auth):
     procurement.model = model
     procurement.automatic_enabled=bool(settings.get('_automatic_actions'))
     procurement.phase2_initialize()
+    procurement.fulfilment_initialize()
     for tool in definitions(settings):
         provider=tool['provider_id']
         if tool['tool_id']==START_ID:connector=StartConnector(procurement,supplier)
@@ -605,6 +653,25 @@ def install(app, settings, env, client, model, auth):
             return JSONResponse(service.envelope('req_'+uuid4().hex,200,data))
         except ProcurementError as exc:
             return JSONResponse(service.failure('req_'+uuid4().hex,ApiFailure(exc.code,'Supplier selection was stopped. Refresh and review the current shortlist.',409)),status_code=409)
+
+    @app.post('/procurement/projects/{project_id}/fulfilment-activate')
+    async def fulfilment_activate(project_id:str,request:Request):
+        from starlette.concurrency import run_in_threadpool
+        from connector_extension.procurement.store import ProcurementError
+        from runtime.service import RuntimeFailure
+        from registry.safety import reject_secrets
+        try:
+            require(len(await request.body())<=8192,'REQUEST_TOO_LARGE')
+            body=await request.json();reject_secrets(body)
+            require(isinstance(body,dict) and set(body)=={'request_id','operation','idempotency_key','payload'} and
+                    body['operation']=='procurement_fulfilment_activate' and isinstance(body['idempotency_key'],str) and
+                    8<=len(body['idempotency_key'])<=128,'INVALID_REQUEST')
+            data=await run_in_threadpool(procurement.activate_fulfilment,project_id,body['payload'],app.state.workflow_auth)
+            return JSONResponse(service.envelope('req_'+uuid4().hex,200,data))
+        except (ProcurementError,RuntimeFailure) as exc:
+            return JSONResponse(service.failure('req_'+uuid4().hex,ApiFailure(exc.code,'Fulfilment activation stopped. Check project ownership, contacts and settings.',409)),status_code=409)
+        except (ValueError,TypeError,KeyError):
+            return JSONResponse(service.failure('req_'+uuid4().hex,ApiFailure('INVALID_REQUEST','Invalid fulfilment settings.',400)),status_code=400)
 
     app.state.procurement_service=procurement
     return ProcurementWorker(procurement)
