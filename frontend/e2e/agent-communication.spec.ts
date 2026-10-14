@@ -7,6 +7,8 @@ for (const mobile of [false, true]) {
     page,
   }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
     const workflow = JSON.parse(
       fs.readFileSync(
         path.resolve(
@@ -188,57 +190,34 @@ for (const mobile of [false, true]) {
     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_hierarchy_v2");
     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
-    await expect(dialog.getByText("Master agent", { exact: true })).toBeVisible();
-    await expect(dialog.getByText("Sub-agent", { exact: true }).first()).toBeVisible();
-    const clickAgent = async () =>
-      mobile
-        ? dialog.getByRole("button", { name: /Sub-agent Research specialist/ }).click()
-        : dialog.locator('.react-flow__node[data-id="research"]').click();
+    await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
+    await expect(dialog.getByLabel("Agent communication diagram")).toBeVisible();
+    const clickAgent = async () => dialog.locator('.react-flow__node[data-id="run_hierarchy_v2:research"]').click();
     await clickAgent();
-    const inspector = dialog.getByLabel("Communication inspector");
+    const inspector = dialog.getByLabel("Agent details");
+    await expect(inspector.getByRole("heading", { name: "Research specialist", exact: true })).toBeVisible();
+    await expect(inspector.getByText("Result", { exact: true })).toBeVisible();
+    await expect(inspector.getByText(/Evidence collected/).first()).toBeVisible();
+    await inspector.getByText("Technical details", { exact: true }).click();
     await expect(inspector.getByText("research_agent", { exact: true })).toBeVisible();
-    await expect(inspector.getByText(/Evidence collected/).first()).toBeVisible();
-    await expect(inspector.locator("dd").first()).toHaveText(/^[0-9a-f-]{36}$/);
-    const firstUuid = await inspector.locator("dd").first().innerText();
+    const firstUuid = await inspector.locator("details dl dd").first().innerText();
     expect(firstUuid).toMatch(/^[0-9a-f-]{36}$/);
-    await inspector
-      .getByRole("button", { name: mobile ? "Back to diagram" : "Close details" })
-      .click();
-    await page.waitForResponse((response) => response.url().includes("runs/run_hierarchy_v2/events") && response.request().method() === "GET");
-    if (mobile)
-      await dialog
-        .getByRole("button", { name: /Master orchestrator → Research specialist.*Workflow route/ })
-        .click();
-    else await dialog.getByText("Data handoff · 1", { exact: true }).click();
-    await expect(inspector.getByText(/11111111-2222-4333-8444-555555555555/)).toBeVisible();
-    await expect(inspector.getByText("Mapped data handoff", { exact: true })).toBeVisible();
-    await expect(inspector.getByText(/Receiving step: completed/)).toBeVisible();
-    await page.screenshot({ path: path.resolve(import.meta.dirname, `../../.local/agent-communication-${mobile ? "mobile" : "desktop"}.png`), fullPage: true });
-    await expect(inspector.getByText(/Evidence collected/).first()).toBeVisible();
-    await inspector
-      .getByRole("button", { name: mobile ? "Back to diagram" : "Close details" })
-      .click();
+    await inspector.getByRole("button", { name: "Close details" }).click();
+    await dialog.getByRole("button", { name: "Information shared", exact: true }).first().click();
+    await expect(inspector.getByText("Information shared", { exact: true }).last()).toBeVisible();
+    await inspector.getByRole("button", { name: "Close details" }).click();
     await dialog.getByLabel("Communication run").selectOption("run_hierarchy_v1");
     await expect(dialog.getByText("Recorded run · v1", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Analysis specialist", { exact: true })).toHaveCount(0);
-    await clickAgent();
-    await expect(inspector.locator("dd").first()).toHaveText(firstUuid);
-    await inspector
-      .getByRole("button", { name: mobile ? "Back to diagram" : "Close details" })
-      .click();
+    await dialog.locator('.react-flow__node[data-id="run_hierarchy_v1:research"]').click();
+    await inspector.getByText("Technical details", { exact: true }).click();
+    await expect(inspector.locator("details dl dd").first()).toHaveText(firstUuid);
+    await inspector.getByRole("button", { name: "Close details" }).click();
     await dialog.getByLabel("View", { exact: true }).selectOption("configured");
     await expect(dialog.getByText("Analysis specialist", { exact: true })).toBeVisible();
-    if (mobile)
-      await dialog
-        .getByRole("button", {
-          name: /Master orchestrator → Research specialist.*Parent relationship/,
-        })
-        .click();
-    else await dialog.getByText("Parent relationship", { exact: true }).first().click();
-    await expect(inspector.getByText(/Configured parent\/sub-agent relationship/)).toBeVisible();
-    await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: "Agent communication", exact: true }).click();
-    await clickAgent();
-    await expect(inspector.locator("dd").first()).toHaveText(firstUuid);
+    await expect(dialog.getByText(/^Spawned · Task/)).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Available helper", exact: true }).first().click();
+    await expect(inspector.getByText(/No information exchange has been recorded/)).toBeVisible();
+    expect(errors).toEqual([]);
   });
 }

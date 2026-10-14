@@ -1,0 +1,8 @@
+- [x] Add a workflow-independent diagram model with exact-run spawned agents, readable links and honest active/completed states.
+- [x] Replace the step-by-step UI with a shared clickable diagram and readable node/connection inspector for workflows and projects.
+- [x] Verify repeated helpers, polling, historical revisions, missing evidence and desktop/mobile canvas interaction.
+- [x] Restrict SVG edge props and verify development-mode rendering without React DOM warnings.
+
+Verification: 109 frontend tests, production build/type checking, lint, strict scoped OpenSpec validation and diff checks pass. Ten desktop/mobile browser scenarios cover recorded helper spawning, working/completed connections, repeated task instances, node and connection inspectors, polling with an open inspector, historical revision selection, configured previews, delegated tool evidence and the whole-project diagram. Checks use intercepted API responses and recorded runtime fixtures; no live workflow or provider action was executed. The running UI and API proxy both returned HTTP 200.
+
+Development warning repair: BaseEdge receives only SVG-safe ID, path, style and marker props. A regression test renders the real BaseEdge with the full React Flow prop set and asserts that no internal attributes or console errors reach the DOM. The focused test, type checking and lint pass. Four desktop/mobile browser scenarios pass against the running Next.js development server on 3001, including console-error checks, live connections and node/connection inspection. Earlier production-mode browser checks did not exercise React’s development DOM warnings.

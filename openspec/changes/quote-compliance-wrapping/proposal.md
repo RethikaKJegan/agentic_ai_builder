@@ -1,0 +1,2 @@
+# Preserve compliance across email wrapping
+All four current simulation quotations contain exact compliance words split across Gmail line wraps. Literal substring validation rejects them. Apply existing whitespace-aware grounded matching, retain rejection of invented statements, and revalidate existing evidence-only failures using full authenticated source inputs/results and the original source hash.

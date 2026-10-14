@@ -32,30 +32,31 @@ for (const mobile of [false, true]) {
     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
-    await expect(dialog.getByLabel("View", { exact: true })).toHaveValue("run");
-    await expect(dialog.getByText("Sub-agent", { exact: true })).toHaveCount(3);
-    const inspector = dialog.getByLabel("Communication inspector");
+    await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
+    await expect(dialog.getByText(/^Spawned · Task/)).toHaveCount(3);
+    await expect(dialog.getByRole("button", { name: "Task assigned", exact: true })).toHaveCount(3);
+    await expect(dialog.getByRole("button", { name: "Result returned", exact: true })).toHaveCount(3);
+    await expect(dialog.locator(".react-flow__edge.animated")).toHaveCount(0);
+    const inspector = dialog.getByLabel("Agent details");
     for (const event of spawned) {
       const details = event.details!;
-      if (mobile) await dialog.getByLabel("Communication agents").getByRole("button").filter({ hasText: String(details["invocation_id"]) }).click();
-      else await dialog.locator(`.react-flow__node[data-id="${details["node_id"]}"]`).click();
+      await dialog.locator(`.react-flow__node[data-id="${run.run_id}:${details["node_id"]}"]`).click();
+      await expect(inspector.getByText(/This helper was started for a separate task/)).toBeVisible();
+      await expect(inspector.getByText("Information received", { exact: true })).toBeVisible();
+      await expect(inspector.getByText("Result", { exact: true })).toBeVisible();
+      await expect(inspector.getByText("Technical details", { exact: true }).locator("..")).not.toHaveAttribute("open", "");
+      await inspector.getByText("Technical details", { exact: true }).click();
       await expect(inspector.getByText(String(details["invocation_id"]), { exact: true })).toBeVisible();
-      await expect(inspector.getByText(String(details["agent_id"]), { exact: true })).toBeVisible();
-      await expect(inspector.getByText(/^success$/i)).toBeVisible();
-      await inspector.getByRole("button", { name: mobile ? "Back to diagram" : "Close details" }).click();
+      await inspector.getByRole("button", { name: "Close details" }).click();
     }
-    for (const kind of ["delegated_task", "delegated_result"]) {
-      const handoffs = events.filter((event) => event.event_type === "node.handoff" && event.details?.["transfer_kind"] === kind);
-      expect(handoffs).toHaveLength(3);
-      for (const [index, event] of handoffs.entries()) {
-        const label = kind === "delegated_task" ? "Delegated task" : "Returned result";
-        if (mobile) await dialog.getByRole("button", { name: new RegExp(`${label} · 1 recorded handoffs`) }).nth(index).click();
-        else await dialog.getByText(`${label} handoff · 1`, { exact: true }).nth(index).click();
-        await expect(inspector.getByText(new RegExp(String(event.details!["handoff_id"])))).toBeVisible();
-        await expect(inspector.getByText(/Receiving step: completed/)).toBeVisible();
-        await inspector.getByRole("button", { name: mobile ? "Back to diagram" : "Close details" }).click();
+    for (const label of ["Task assigned", "Result returned"]) {
+      for (let index = 0; index < 3; index++) {
+        await dialog.getByRole("button", { name: label, exact: true }).nth(index).click();
+        await expect(inspector.getByText(label === "Task assigned" ? "Information shared" : "Result returned", { exact: true }).last()).toBeVisible();
+        await inspector.getByRole("button", { name: "Close details" }).click();
       }
     }
+    await page.screenshot({ path: path.resolve(import.meta.dirname, `../../.local/communication-diagram-${mobile ? "mobile" : "desktop"}.png`), fullPage: true });
     expect(errors).toEqual([]);
   });
 }

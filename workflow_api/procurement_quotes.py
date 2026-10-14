@@ -71,7 +71,7 @@ def quote_issues(output,text,items,currency):
             datetime.strptime(output[field],'%Y-%m-%d')
             if output[field] not in supported:issues.append('UNSUPPORTED_'+field)
         except (ValueError,TypeError):issues.append('MISSING_OR_INVALID_'+field)
-    if not output['compliance_statement'] or output['compliance_statement'] not in text:issues.append('COMPLIANCE_STATEMENT_REQUIRED')
+    if not grounded_evidence(output['compliance_statement'],text):issues.append('COMPLIANCE_STATEMENT_REQUIRED')
     return sorted(set(issues))
 
 
@@ -82,17 +82,23 @@ class ProcurementQuotes:
         project=job['plan']['project_id']
         for quote in self.store.list_records(workspace,project,'quotation'):
             d=quote['data']
-            if d['status'] not in ('NEEDS_CLARIFICATION','VALIDATING') or d['unresolved_issue_ids']!=['QUOTE_EVIDENCE_REQUIRED']:continue
+            if (d['status'] not in ('NEEDS_CLARIFICATION','VALIDATING') or not d['unresolved_issue_ids'] or
+                not set(d['unresolved_issue_ids']) <= {'QUOTE_EVIDENCE_REQUIRED','COMPLIANCE_STATEMENT_REQUIRED'}):continue
             if any(other['record_id']!=quote['record_id'] and other['data']['rfq_id']==d['rfq_id'] and
                    timestamp(other['data']['received_at'])>timestamp(d['received_at']) and other['data']['status']!='SUPERSEDED'
                    for other in self.store.list_records(workspace,project,'quotation')):continue
             key='extract_'+stable(d['source_message_id'])[:20];action=job['actions'].get(key,{})
             if action.get('state')!='completed' or not action.get('run_id'):continue
-            events=self.workflows.runtime_runner.runtime.events(action['run_id'],auth)['items']
-            text=next((e['details'].get('observation',{}).get('email_text') for e in events
-                if e['event_type']=='node.observed' and e['details'].get('node_id')=='action'),None)
-            output=next((e['details'].get('output') for e in events
-                if e['event_type']=='node.completed' and e['details'].get('node_id')=='action'),None)
+            runtime=self.workflows.runtime_runner.runtime
+            with runtime.store.transaction() as db:
+                run=runtime.load(db,action['run_id'],auth)
+                row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                    (workspace,action['workflow_id'],action['workflow_version'])).fetchone()
+            if not row or run['status']!='completed' or run['workflow_id']!=action['workflow_id'] or run['workflow_version']!=action['workflow_version']:continue
+            workflow=json.loads(row[0])
+            node=next((n for n in workflow['nodes'] if n['node_id']=='action'),{})
+            text=node.get('configuration',{}).get('input',{}).get('email_text')
+            output=run.get('outputs',{}).get('action')
             if not isinstance(text,str) or not isinstance(output,dict) or not output.get('is_quotation'):continue
             evidence=[self.store.get(workspace,project,e) for e in quote['evidence_ids']]
             if not any(e and e['data']['source_id']==d['source_message_id'] and e['data']['content_sha256']==stable(text) for e in evidence):continue
@@ -260,7 +266,7 @@ class ProcurementQuotes:
                 'Return is_quotation=false for acknowledgements/status messages. Exclude quoted history. '
                 'Map item IDs only to the supplied BOQ; do not invent or change quantities, units, prices, dates or currency. '
                 'Return null for absent charges, dates, payment terms or compliance statements; zero must be explicit. '
-                'Dates must be ISO dates. Include verbatim evidence spans supporting the quoted items, monetary figures and compliance statement.')
+                'Dates must be ISO dates. Copy compliance_statement verbatim from the fresh email; preserve its words, never paraphrase it. Include verbatim evidence spans supporting the quoted items, monetary figures and compliance statement.')
         a['model']={'provider':'openai','model_id':self.model,'temperature':0.1}
         a['limits'].update(max_llm_calls=1,max_tokens=14000,max_tool_calls=0,max_estimated_cost_usd=1)
         w['execution_policy']['limits'].update(max_llm_calls=1,max_tokens=16000,max_estimated_cost_usd=1)
