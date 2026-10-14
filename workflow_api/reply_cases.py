@@ -341,7 +341,7 @@ class ReplyCases:
 
     def list_cases(self, workspace):
         self.sync_sent_runs(workspace)
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             cases = [json.loads(r[0]) for r in db.execute(
                 'SELECT document FROM customer_cases WHERE workspace=? ORDER BY rowid DESC LIMIT 100', (workspace,))]
             for case in cases:

@@ -11,7 +11,7 @@ class RuntimeWorker:
 
     def drain(self):
         runtime = self.runner.runtime
-        with runtime.store.transaction() as db:
+        with runtime.store.transaction(write=False) as db:
             rows = db.execute('SELECT document FROM runtime_runs ORDER BY rowid').fetchall()
         advanced = []
         for row in rows:

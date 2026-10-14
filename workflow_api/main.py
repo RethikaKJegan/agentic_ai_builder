@@ -333,7 +333,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             if workflow_service.runtime_runner is None:
                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
             workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
-            data = workflow_service.runtime_runner.runtime.monitoring(auth)
+            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth)
             return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, data))
         except Exception:
             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)

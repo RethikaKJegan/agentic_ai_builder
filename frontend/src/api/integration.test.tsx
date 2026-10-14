@@ -298,32 +298,40 @@ describe("Overview creation recovery", () => {
     const current = { ...planned, name: "Existing reviewed inventory", status: "validated" as const, version: 3 };
     const transport = vi.fn()
       .mockResolvedValueOnce(envelope({ workflow: planned }))
+      .mockResolvedValueOnce(envelope({ error: { error_code: "WORKFLOW_NOT_FOUND", message: "This workflow revision was not found.",
+        request_id: "req_test", retryable: false } }, 404))
       .mockResolvedValueOnce(conflict())
       .mockResolvedValueOnce(envelope({ workflow: current }));
     const result = await createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport));
     expect(result.existing).toBe(true);
     expect(result.workflow).toEqual(current);
-    expect(transport).toHaveBeenCalledTimes(3);
-    expect(transport.mock.calls[2]![0]).toMatch(new RegExp(`/api/backend/workflows/${planned.workflow_id}\\?request_id=`));
-    expect(transport.mock.calls[2]![1].method).toBe("GET");
+    expect(transport).toHaveBeenCalledTimes(4);
+    expect(transport.mock.calls[3]![0]).toMatch(new RegExp(`/api/backend/workflows/${planned.workflow_id}\\?request_id=`));
+    expect(transport.mock.calls[3]![1].method).toBe("GET");
   });
 
   it("returns a newly saved draft without fetching an existing workflow", async () => {
     const planned = { ...document(), status: "draft" as const, version: 1 };
-    const transport = vi.fn().mockImplementation(async () => envelope({ workflow: planned }));
+    const transport = vi.fn()
+      .mockResolvedValueOnce(envelope({ workflow: planned }))
+      .mockResolvedValueOnce(envelope({ error: { error_code: "WORKFLOW_NOT_FOUND", message: "This workflow revision was not found.",
+        request_id: "req_test", retryable: false } }, 404))
+      .mockResolvedValueOnce(envelope({ workflow: planned }));
     const result = await createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport));
     expect(result.existing).toBe(false);
     expect(result.workflow).toEqual(planned);
-    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport).toHaveBeenCalledTimes(3);
   });
 
   it("surfaces unrelated save failures without loading or replacing another revision", async () => {
     const transport = vi.fn()
       .mockResolvedValueOnce(envelope({ workflow: document() }))
+      .mockResolvedValueOnce(envelope({ error: { error_code: "WORKFLOW_NOT_FOUND", message: "This workflow revision was not found.",
+        request_id: "req_test", retryable: false } }, 404))
       .mockResolvedValueOnce(envelope({ error: { error_code: "UNTRUSTED_ASSIGNMENT", message: "Assignment denied.",
         request_id: "req_test", retryable: false } }, 403));
     await expect(createWorkflow({ objective: "Monitor inventory" }, new WorkflowClient(transport)))
       .rejects.toMatchObject({ error: { error_code: "UNTRUSTED_ASSIGNMENT" } });
-    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport).toHaveBeenCalledTimes(3);
   });
 });

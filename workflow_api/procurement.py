@@ -350,7 +350,7 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
     def active(self, workspace, job):
         owner=job.get('owner_workflow')
         if not owner:return True
-        with self.workflows.store.transaction() as db:
+        with self.workflows.store.transaction(write=False) as db:
             row=db.execute('SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON a.release_id=r.release_id '
                            'WHERE a.workspace=? AND a.workflow_id=?',(workspace,owner['workflow_id'])).fetchone()
         return bool(row and json.loads(row[0])['state']=='active' and

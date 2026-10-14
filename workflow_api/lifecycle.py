@@ -86,7 +86,7 @@ class LifecycleService:
         self.workflows, self.store, self.clock = workflows, workflows.store, clock
         self.adapter = adapter or TriggerAdapter()
         self.trigger_secrets = dict(trigger_secrets or {})
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))")
@@ -139,7 +139,7 @@ class LifecycleService:
         if not workspace:
             return
         fingerprint = json_digest({"kind": kind, "payload": payload})
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             operation, replay = self.operation(db, workspace, auth, kind, key, workflow_id,
                                                payload.get("expected_release_id"), fingerprint)
             if not replay or operation["state"] == "preparing":
@@ -170,7 +170,7 @@ class LifecycleService:
         workspace = auth["subject"]["workspace_id"]
         fingerprint = json_digest({"kind": "activate_release", "payload": payload})
         prepared = []
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             operation, replay = self.operation(db, workspace, auth, "activate_release", key, workflow_id, expected, fingerprint)
             if replay:
                 return {"operation": operation, "release": self._release_for_operation(db, operation)}

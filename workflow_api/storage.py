@@ -9,6 +9,8 @@ class WorkflowStore:
     def __init__(self, path):
         self.path = str(path)
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.path, timeout=30) as db:
+            db.execute('PRAGMA journal_mode=WAL')
         with self.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))')
             db.execute('CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))')
@@ -17,10 +19,10 @@ class WorkflowStore:
             db.execute('CREATE TABLE IF NOT EXISTS governance_policies (workspace TEXT, policy_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)')
 
     @contextmanager
-    def transaction(self):
-        db = sqlite3.connect(self.path, timeout=10)
+    def transaction(self, *, write=True):
+        db = sqlite3.connect(self.path, timeout=30)
         try:
-            db.execute('BEGIN IMMEDIATE')
+            db.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
             yield db
             db.commit()
         except Exception:

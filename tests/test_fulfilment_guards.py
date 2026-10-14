@@ -60,3 +60,21 @@ class FulfilmentGuardTests(unittest.TestCase):
         self.assertEqual(self.fixture.get('po_demo')['data']['items'][0]['packed_quantity'],'1')
         self.assertEqual(len(calls),1);self.assertEqual(len(notices),1)
 
+
+    def test_item_identity_can_be_grounded_outside_evidence_subset(self):
+        self.apply('PACKED','2');self.apply('DISPATCHED','2')
+        po,message,output=self.packet('DELIVERED','2')
+        item=output['items'][0]['item_id']
+        message['text']='Item ID: '+item+'\nCumulative delivered quantity: 2\nUnit: '+output['items'][0]['unit']
+        output['evidence']=['Cumulative delivered quantity: 2','Unit: '+output['items'][0]['unit']]
+        self.service.apply_fulfilment('workspace_demo',self.job,po,message,'SUPPLIER',output)
+        self.assertEqual(self.fixture.get('po_demo')['data']['status'],'DELIVERED')
+
+    def test_absent_or_partial_item_identity_remains_rejected(self):
+        po,message,output=self.packet('PACKED','2')
+        item=output['items'][0]['item_id']
+        output['evidence']=['Cumulative packed quantity: 2']
+        for source in ('No item ID.','Item ID: '+item+'EXTRA'):
+            message['text']=source+'\nCumulative packed quantity: 2'
+            with self.subTest(source=source),self.assertRaises(ProcurementError):
+                self.service.apply_fulfilment('workspace_demo',self.job,po,message,'SUPPLIER',output)

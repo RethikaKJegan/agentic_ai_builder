@@ -25,7 +25,7 @@ class TriggerScheduler:
             return {"polled": 0, "queued": 0, "dispatched": 0}
         polled = queued = dispatched = 0
         # Poll bindings are workspace scoped and the worker uses fresh auth.
-        with lifecycle.store.transaction() as db:
+        with lifecycle.store.transaction(write=False) as db:
             workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers WHERE state='ready'").fetchall()}
         for workspace in workspaces:
             auth = self.authenticate(workspace, "local-builder")
@@ -36,7 +36,7 @@ class TriggerScheduler:
                 now = time.time()
                 if now - self.last_polled.get(binding_id, 0) < binding.get("poll_interval_seconds", self.interval):
                     continue
-                with lifecycle.store.transaction() as db:
+                with lifecycle.store.transaction(write=False) as db:
                     row = db.execute("SELECT cursor FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?", (workspace, binding_id)).fetchone()
                 cursor = row[0] if row else None
                 try:

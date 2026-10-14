@@ -143,7 +143,7 @@ class ProcurementFulfilment:
         for line in output['items']:
             require(line['item_id'] in items and line['unit'] == items[line['item_id']]['unit'], 'EVENT_SCOPE_MISMATCH')
             require(re.fullmatch(r'(?:0|[1-9][0-9]{0,17})(?:\.[0-9]{1,6})?', line['quantity']) is not None, 'FULFILMENT_QUANTITY_INVALID')
-            require(line['item_id'] in supported and re.search(r'(?<![\d.])'+re.escape(line['quantity'])+r'(?![\d.])', supported), 'FULFILMENT_EVIDENCE_REQUIRED')
+            require(grounded_evidence(line['item_id'], text) and re.search(r'(?<![\d.])'+re.escape(line['quantity'])+r'(?![\d.])', supported), 'FULFILMENT_EVIDENCE_REQUIRED')
         if field:
             require(output['items'] and output['quantity_mode'] != 'unknown', 'FULFILMENT_QUANTITIES_REQUIRED')
             if role == 'BUYER': require(output['receipt_confirmed'] and output['acceptance_confirmed'], 'BUYER_ACCEPTANCE_REQUIRED')

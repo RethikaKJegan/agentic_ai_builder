@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import logging
 import re
 import time
 from uuid import uuid4
@@ -154,7 +155,7 @@ class WorkflowService:
                 else:
                     run = self.runtime_runner.decide(request, auth)
                     if run['status'] == 'running':
-                        with self.store.transaction() as db:
+                        with self.store.transaction(write=False) as db:
                             execution_subject = db.execute(
                                 'SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?',
                                 (auth['subject']['workspace_id'], run['run_id'])).fetchone()
@@ -201,7 +202,7 @@ class WorkflowService:
                 return self.envelope(result['request_id'], 200, result['data'])
             workspace = auth['subject']['workspace_id']
             if operation in {'get_workflow', 'list_workflows'}:
-                with self.store.transaction() as db:
+                with self.store.transaction(write=False) as db:
                     if operation == 'list_workflows':
                         items = self.store.list(db, workspace)
                         return self.envelope(request_id, 200, dict(items=items, total=len(items), has_more=False, next_cursor=None))
@@ -232,6 +233,7 @@ class WorkflowService:
         except PlannerFailure as exc:
             return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow fields before continuing.', 400, exc.field))
         except Exception:
+            logging.exception("Unhandled workflow API error request_id=%s", request_id)
             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The API could not process valid, safe data.', 400))
 
     def document_data(self, workflow, auth=None):
@@ -286,7 +288,7 @@ class WorkflowService:
     def replace_deleted_plan(self, workflow, workspace):
         """Keep tombstoned history immutable; the same prompt can start a new draft."""
         previous = workflow['workflow_id']
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             while True:
                 deleted = db.execute('SELECT deleted_at FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',
                     (workspace, workflow['workflow_id'])).fetchone()

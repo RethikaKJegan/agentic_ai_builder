@@ -88,7 +88,7 @@ def authenticate(service, auth, workspace, subject):
         return deepcopy(auth)
     if not subject.startswith('automation:'):
         return None
-    with service.store.transaction() as db:
+    with service.store.transaction(write=False) as db:
         rows = db.execute('SELECT document, authority FROM lifecycle_identities WHERE workspace=?', (workspace,)).fetchall()
     for document, authority in rows:
         identity, previous = json.loads(document), json.loads(authority)

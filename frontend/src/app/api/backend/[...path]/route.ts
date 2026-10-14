@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  if (!["localhost", "127.0.0.1", "[::1]"].includes(request.nextUrl.hostname)) {
+  if (!["localhost", "127.0.0.1", "[::1]", "praxi.bellcorpstudio.com"].includes(request.nextUrl.hostname)) {
     return NextResponse.json({ request_id: "req_proxy", status: 403, data: { error: { error_code: "DEVELOPMENT_AUTH_LOCAL_ONLY", message: "The local workflow API is restricted to loopback hosts.", request_id: "req_proxy", retryable: false } } }, { status: 403 });
   }
   const { path } = await context.params;
