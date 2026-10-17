@@ -1,0 +1,164 @@
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -397,8 +397,8 @@
+             if not workflow or digest(workflow) != run['workflow_digest'] or workflow['status'] not in {'approved', 'published'}:
+                 raise RuntimeFailure('REVISION_CHANGED', 'The reviewed approval revision is no longer current.')
+             gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == run['approval_context']['gate_id'])
+-            # Run actions can be approved by any authenticated member of this
+-            # workspace. Publication and execution keep their own permissions.
++            runtime.authorize(approver, 'workflow.approve', set(gate['approver_roles']))
++            # The exact persisted revision gate determines decision authority.
+             approval = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
+             decision = payload.get('decision')
+             if decision not in {'approved', 'rejected'}:
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -171,17 +171,12 @@
+ 
+     def get_run(self, run_id, auth):
+         with self.store.transaction(write=False) as db:
+-            return self.public(self.load(db, run_id, auth))
+-
+-    def list_runs(self, auth, limit=100, status=None):
+-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-        workspace = auth['subject']['workspace_id']
+-        with self.store.transaction(write=False) as db:
+-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+-        items = [self.public(json.loads(row[0])) for row in rows]
+-        if status:
+-            items = [item for item in items if item['status'] == status]
+-        return {'items': items, 'total': len(items), 'has_more': len(items) >= min(max(int(limit), 1), 500), 'next_cursor': None}
++            from .history import public_run
++            return public_run(self, db, self.load(db, run_id, auth), auth)
++
++    def list_runs(self, auth, limit=100, status=None, **filters):
++        from .history import runs
++        return runs(self, auth, limit=limit, status=status, **filters)
+ 
+     def list_approvals(self, auth, pending_only=False, limit=100):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+@@ -196,56 +191,13 @@
+                     items.append({**approval, 'run_id': run['run_id']})
+         return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
+ 
+-    def events(self, run_id, auth):
+-        with self.store.transaction(write=False) as db:
+-            self.load(db, run_id, auth)
+-            rows = db.execute('SELECT sequence, document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id)).fetchall()
+-            items = []
+-            for sequence, document in rows:
+-                event = json.loads(document)
+-                event['details'] = {**event.get('details', {}), 'recorded_sequence': sequence}
+-                items.append(event)
+-            return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+-
+-    def monitoring(self, auth):
+-        """Return workspace-scoped counters and safe trace references."""
+-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-        workspace = auth['subject']['workspace_id']
+-        with self.store.transaction(write=False) as db:
+-            runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
+-            event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+-            audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+-            sources = []
+-            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
+-                for workflow_id, state, document in db.execute('SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?', (workspace,)):
+-                    trigger = json.loads(document)
+-                    checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
+-                    sources.append(dict(workflow_id=workflow_id, binding_id=trigger['binding_id'], provider_id=trigger['provider_id'],
+-                                        state=state, health=trigger.get('health', state), error_code=trigger.get('last_error_code'),
+-                                        baseline_ready=checkpoint is not None, last_successful_poll=checkpoint[0] if checkpoint else None))
+-            policies = []
+-            for workflow in self.store.list(db, workspace):
+-                if workflow['status'] not in {'approved', 'published'}:
+-                    continue
+-                policies.append(dict(workflow_id=workflow['workflow_id'], version=workflow['version'],
+-                                     action_approval_required=bool(workflow.get('approval_gates')),
+-                                     agents=[{key: agent.get(key) for key in ('agent_id', 'guardrails', 'limits', 'approval_requirements')}
+-                                             for agent in workflow['agents']]))
+-        usage = {'llm_calls': 0, 'tool_calls': 0, 'tokens': 0, 'retries': 0, 'estimated_cost_usd': 0}
+-        for run in runs:
+-            # Workflow counters already include each per-agent reservation.
+-            counters = run.get('usage', {}).get('workflow', {})
+-            for key in usage:
+-                usage[key] += counters.get(key, 0)
+-        by_status = {status: sum(r['status'] == status for r in runs) for status in ('queued', 'running', 'paused_for_approval', 'completed', 'failed', 'blocked', 'rejected', 'cancelled')}
+-        durations = [max(0, (r.get('finished_at', r.get('created_at', self.clock())) - r.get('created_at', self.clock()))) for r in runs if isinstance(r.get('finished_at'), (int, float))]
+-        return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
+-                         'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
+-                'status_breakdown': by_status, 'duration_seconds': {'count': len(durations), 'avg': sum(durations) / len(durations) if durations else 0},
+-                'events': event_count, 'usage': usage,
+-                'sources': sources, 'policies': policies,
+-                'audit': [{key: event.get(key) for key in ('event_id', 'event_type', 'run_id', 'timestamp')} for event in audit],
+-                'latest': [self.public(run) for run in runs[:20]]}
++    def events(self, run_id, auth, limit=100, after_sequence=0):
++        from .history import events
++        return events(self, run_id, auth, limit, after_sequence)
++
++    def monitoring(self, auth, **options):
++        from .history import monitoring
++        return monitoring(self, auth, **options)
+ 
+     def export_traces(self, observer_id='default', limit=100):
+         """Export committed events. Export failure never permits a side effect.
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -283,7 +283,7 @@
+                         yield f"id: {item['sequence']}\ndata: {json.dumps(item, separators=(',', ':'))}\n\n"
+                     if not events['items']:
+                         yield ': keepalive\n\n'
+-                return StreamingResponse(stream(), media_type='text/event-stream', headers={'X-Accel-Buffering': 'no'})
++                return StreamingResponse(stream(), media_type='text/event-stream', headers={'X-Accel-Buffering': 'no', 'X-Builder-Update-Strategy': 'bounded-polling', 'Cache-Control': 'no-store'})
+             except (ValueError, TypeError):
+                 return error('INVALID_REQUEST', 'Use a non-negative event sequence.', 400)
+         return await lifecycle_dispatch(request, 'subscribe_workflow_overview')
+@@ -333,13 +333,30 @@
+     async def capabilities(request: Request):
+         return await dispatch(request, 'list_capabilities')
+ 
++    async def runtime_history(request, kind, run_id=None):
++        from runtime.history import query_options
++        from runtime.service import RuntimeFailure
++        try:
++            if workflow_service.runtime_runner is None:
++                return error('SERVICE_UNAVAILABLE', 'The runtime is not connected.', 503)
++            runtime = workflow_service.runtime_runner.runtime
++            options = query_options(dict(request.query_params), kind)
++            function = runtime.events if kind == 'events' else runtime.list_runs
++            args = (run_id, auth) if kind == 'events' else (auth,)
++            data = await run_in_threadpool(function, *args, **options)
++            return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
++        except RuntimeFailure as exc:
++            return error(exc.code, str(exc), exc.status)
++        except (ValueError, TypeError):
++            return error('INVALID_REQUEST', 'Use valid history filters and cursors.', 400)
++
+     @app.get('/runs/{run_id}')
+     async def run(run_id: str, request: Request):
+         return await dispatch(request, 'get_run', {'run_id': run_id})
+ 
+     @app.get('/runs')
+     async def runs(request: Request):
+-        return await dispatch(request, 'list_runs')
++        return await runtime_history(request, 'runs')
+ 
+     @app.get('/cases')
+     async def cases(request: Request):
+@@ -383,7 +400,7 @@
+ 
+     @app.get('/runs/{run_id}/events')
+     async def events(run_id: str, request: Request):
+-        return await dispatch(request, 'list_run_events', {'run_id': run_id})
++        return await runtime_history(request, 'events', run_id)
+ 
+     @app.get('/monitoring')
+     async def monitoring(request: Request):
+@@ -391,7 +408,7 @@
+             if workflow_service.runtime_runner is None:
+                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+             workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth)
++            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth, **__import__('runtime.history', fromlist=['query_options']).query_options(dict(request.query_params), 'monitoring'))
+             return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)

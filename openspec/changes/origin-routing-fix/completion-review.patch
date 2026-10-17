@@ -1,0 +1,11 @@
+--- a/openspec/changes/origin-routing-fix/tasks.md
++++ b/openspec/changes/origin-routing-fix/tasks.md
+@@ -1,5 +1,5 @@
+ # Tasks
+ 
+-- [ ] 1. Remove temporary password/access-screen changes with exact review evidence.
+-- [ ] 2. Verify shared public routing, secure cookies, foreign-origin and CSRF rejection.
+-- [ ] 3. Verify all six affected pages on desktop/mobile and record live results.
++- [x] 1. Remove temporary password/access-screen changes with exact review evidence.
++- [x] 2. Verify shared public routing, secure cookies, foreign-origin and CSRF rejection.
++- [x] 3. Verify all six affected pages on desktop/mobile and record live results.

@@ -1,3 +1,4 @@
+import { safeError } from "./feedback";
 import { z } from "zod";
 import { assertWorkflowReferences } from "./control";
 import {
@@ -6,6 +7,11 @@ import {
   type CanonicalWorkflow, type Operation, type SafeError,
 } from "./contracts.generated";
 
+function queryString(filters:Record<string, unknown>) {
+  const query=new URLSearchParams();
+  for(const [key,value] of Object.entries(filters))if(value!==undefined && value!=="")query.set(key,String(value));
+  return query.size?`?${query}`:"";
+}
 const metadata = { correlation_id: z.string().optional(), contract_versions: z.record(z.string()).optional() };
 export const registryReviewSchema = z.object({ workflow_id: z.string(), workflow_version: z.number().int().positive(),
   ready: z.boolean(), reason_codes: z.array(z.string()), items: z.array(z.object({
@@ -22,19 +28,19 @@ const toolsData = CollectionSchema.extend({ items: z.array(z.object({
 const capabilitiesData = CollectionSchema.extend({ items: z.array(z.object({ capability: z.string(), registered_tool_ids: z.array(z.string()) })), ...metadata });
 const workflowsData = CollectionSchema.extend({ items: z.array(CanonicalWorkflowSchema), ...metadata });
 export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(),
-  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().optional(),
-  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]) });
+  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().nullable().optional(),
+  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
 const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
-const sessionData = z.object({ auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+const sessionData = z.object({ planning_jobs_available: z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
 export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
   published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
   active_run_count: z.number().int().nonnegative(), latest_run_id: z.string().nullable(),
   latest_run_status: RunStatusSchema.nullable(), pending_approval_count: z.number().int().nonnegative(), updated_at: z.string() }).strict();
-const overviewCollectionSchema = z.object({ items: z.array(workflowOverviewSchema), next_sequence: z.number().int().nonnegative(), has_more: z.boolean(), ...metadata });
+const overviewCollectionSchema = z.object({ items: z.array(workflowOverviewSchema), next_sequence: z.number().int().nonnegative(), has_more: z.boolean(), next_cursor: z.string().nullable().optional(), total: z.number().int().nonnegative().optional(), ...metadata });
 const lifecycleOperationSchema = z.object({ operation_id: z.string(), workspace_id: z.string(), workflow_id: z.string(), subject_id: z.string(),
   idempotency_key: z.string(), expected_release_id: z.string().nullable(), kind: z.enum(["activate_release", "disable_release", "delete_workflow"]),
   state: z.enum(["preparing", "succeeded", "failed", "cleanup_pending"]), error_code: z.string().nullable() }).strict();
@@ -65,6 +71,8 @@ const responseSchemas = { plan_workflow: workflowData, list_workflows: workflows
   save_workflow_version: workflowData, validate_workflow: workflowData, approve_workflow: workflowData,
   execute_workflow: runData, get_run: runData, list_run_events: eventsData, list_tools: toolsData,
   list_capabilities: capabilitiesData, decide_approval: approvalData };
+const planningJobSchema = z.object({ job_id: z.string(), state: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]), result: ApiResponseSchema.nullable() });
+export type PlanningJob = z.infer<typeof planningJobSchema>;
 export type Session = z.infer<typeof sessionData>;
 export type ToolRecord = z.infer<typeof toolsData>["items"][number];
 export type RegistryReview = z.infer<typeof registryReviewSchema>;
@@ -72,10 +80,12 @@ export type ApprovalRecord = z.infer<typeof approvalRecordSchema>;
 export type RunRecord = z.infer<typeof runData>["run"];
 
 export class ApiError extends Error {
-  constructor(public readonly error: SafeError, public readonly correlationId?: string) { super(error.message); }
+  public readonly error: SafeError;
+  constructor(error: SafeError, public readonly correlationId?: string, public readonly context: {httpStatus?:number;outcome?:"unknown"|"rejected"} = {}) { const sanitized=safeError(error);super(sanitized.message);this.error=sanitized; }
+
 }
 function fail(code: string, message: string, requestId = "req_client", retryable = false): never {
-  throw new ApiError({ error_code: code, message, request_id: requestId, retryable });
+  throw new ApiError({ error_code: code, message, request_id: requestId, retryable },undefined, /setting save|approval submission|release activation|release disable|workflow deletion/.test(message)?{outcome:"unknown"}:{});
 }
 export function containsSecret(value: unknown): boolean {
   if (typeof value === "string") return /\bsk-[\w-]{8,}|Bearer\s+[\w.-]+|:\/\/[^/\s:@]+:[^/\s@]+@|-----BEGIN .*PRIVATE KEY|(?:api[_-]?key|password|secret|token)\s*[:=]\s*\S+/i.test(value);
@@ -103,11 +113,12 @@ function route(operation: Operation, payload: Payloads[Operation]): [string, str
   }
 }
 
-async function retryKey(operation: string, payload: unknown): Promise<string> {
+async function retryKey(operation: string, payload: unknown, reset = false): Promise<string> {
   // Store only a digest and retry key, never workflow documents, prompts or credentials.
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ operation, payload })));
   const slot = "mesh-api-retry-v1:" + Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
   try {
+    if (reset) localStorage.removeItem(slot);
     const existing = localStorage.getItem(slot);
     if (existing) return existing;
     const key = crypto.randomUUID();
@@ -119,7 +130,25 @@ async function retryKey(operation: string, payload: unknown): Promise<string> {
 export class WorkflowClient {
   private sessionRecovery: Promise<boolean> | null = null;
   private sessionGeneration = 0;
-  constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {}
+  private sessionMode: string | null = null;
+  private planningJobsAvailable = false;
+  private planningListeners = new Set<(job: PlanningJob) => void>();
+  subscribePlanning(listener: (job: PlanningJob) => void) {
+    this.planningListeners.add(listener);
+    return () => { this.planningListeners.delete(listener); };
+  }
+  private reportPlanning(job: PlanningJob) {
+    for (const listener of this.planningListeners) listener(job);
+  }
+  async cancelPlanning(jobId: string) {
+    const job = planningJobSchema.safeParse(await this.read(`planning-jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" }));
+    if (!job.success) return fail("INVALID_API_DATA", "The cancellation response is invalid.");
+    this.reportPlanning(job.data);
+    return job.data;
+  }
+  constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {
+    if (base !== "/api/backend/") throw new Error("Use the relative same-origin workflow API path.");
+  }
   private async renewLocalSession() {
     if (!this.sessionRecovery) {
       this.sessionRecovery = this.session().then((session) => {
@@ -131,10 +160,29 @@ export class WorkflowClient {
     return this.sessionRecovery;
   }
   private async read(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
+    const headers=new Headers(options.headers);
+    let reference=headers.get("X-Request-ID") ?? new URLSearchParams(path.split("?")[1]).get("request_id");
+    if(!reference&&typeof options.body==="string"){try{const parsed=JSON.parse(options.body);if(typeof parsed.request_id==="string")reference=parsed.request_id;}catch{/* Non-JSON bodies never become references. */}}
+    if(!reference||!/^[\w-]{1,128}$/.test(reference))reference=crypto.randomUUID();
+    headers.set("X-Request-ID",reference);options={...options,headers};
+    const mutation=!!options.method && !["GET","HEAD"].includes(options.method.toUpperCase());
+    for(let attempt=0;;attempt++){
+      try{return await this.readOnce(path,options,recoverSession);}
+      catch(error){
+        if(!(error instanceof ApiError))throw error;
+        if(!mutation && attempt===0 && error.error.retryable && [502,503,504].includes(error.context.httpStatus??0) && ["DATABASE_BUSY","API_DATABASE_BUSY","API_DATABASE_SERIALIZATION_RETRY","API_DATABASE_DEADLOCK","API_DATABASE_UNAVAILABLE","API_TIMEOUT","API_UNAVAILABLE","UPSTREAM_UNAVAILABLE","BACKEND_UNAVAILABLE","PROXY_TIMEOUT","SERVICE_UNAVAILABLE"].includes(error.error.error_code)){
+          await new Promise(resolve=>setTimeout(resolve,200));continue;
+        }
+        if(mutation)throw new ApiError(error.error,error.correlationId,{...error.context,outcome:[400,401,403,404,409,422].includes(error.context.httpStatus??0)?"rejected":"unknown"});
+        throw error;
+      }
+    }
+  }
+  private async readOnce(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
     const generation = this.sessionGeneration;
     let response: Response;
     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
-    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", "req_client", true); }
+    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", new Headers(options.headers).get("X-Request-ID") ?? "req_client", true); }
     let raw: unknown;
     try { raw = await response.json(); } catch { return fail("INVALID_API_RESPONSE", "The API returned an unusable response."); }
     if (containsSecret(raw)) return fail("UNSAFE_API_RESPONSE", "The API returned unsafe data. Nothing was displayed.");
@@ -146,18 +194,65 @@ export class WorkflowClient {
       if (!error.success) return fail("INVALID_API_ERROR", "The API did not return a safe error.", envelope.data.request_id);
       // The local middleware rejects an expired cookie before executing actions.
       // Retry only that explicit rejection, preserving the exact original body/key.
-      if (recoverSession && path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
-        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
+      if (recoverSession && (this.sessionMode === null || this.sessionMode === "local-development") &&
+          (typeof window === "undefined" || ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) &&
+          path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
+        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.readOnce(path, options, false);
       }
       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
-      throw new ApiError(error.data, correlation);
+      throw new ApiError(error.data, correlation, {httpStatus:response.status});
     }
     return data;
   }
   async session(): Promise<Session> {
     const result = sessionData.safeParse(await this.read("session"));
     if (!result.success) return fail("INVALID_SESSION", "The session response is invalid.");
+    this.sessionMode = result.data.mode;
+    this.planningJobsAvailable = result.data.planning_jobs_available === true;
     return result.data;
+  }
+
+  async monitoring(cursors:{source_cursor?:string|undefined;policy_cursor?:string|undefined}={}) {
+    const count=z.number().finite().nonnegative();
+    const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+      usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional(),state:z.string().optional(),release_state:z.string().optional(),workflow_version:z.number().optional(),delivery:z.string().optional(),event_type:z.string().optional(),source:z.string().optional(),schedule:z.string().nullable().optional(),timezone:z.string().nullable().optional(),preparation_succeeded:z.boolean().optional()})).optional(),
+      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+      source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+    const result=schema.safeParse(await this.read(`monitoring${queryString(cursors)}`));
+    if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+    return result.data;
+  }
+
+  async knowledge() {
+    const parsed = z.object({ items: z.array(z.record(z.string(), z.unknown())), total: z.number() }).safeParse(await this.read("workspace/knowledge"));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The knowledge response is invalid.");
+    return parsed.data;
+  }
+  async settings() {
+    const parsed = z.object({ items: z.array(z.object({ key: z.string(), value: z.unknown(), updated_at: z.string() })), total: z.number() }).safeParse(await this.read("workspace/settings"));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The settings response is invalid.");
+    return parsed.data;
+  }
+  async saveNotification(value: string) {
+    if (containsSecret(value)) return fail("SENSITIVE_DATA_DETECTED", "Keep credentials in server configuration.");
+    const parsed = z.object({ key: z.literal("notifications"), value: z.string(), updated_at: z.string() }).safeParse(await this.read("workspace/settings/notifications", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value }),
+    }));
+    if (!parsed.success || parsed.data.value !== value) return fail("INVALID_API_DATA", "The setting save was not confirmed.");
+    return parsed.data;
+  }
+  async integrationCheck(provider: string, mode: "configuration" | "connection" = "configuration") {
+    const parsed = z.object({ provider: z.string(), configured: z.boolean(), verified: z.boolean(), tested: z.boolean(),
+      state: z.enum(["not_configured", "configured", "verified", "connection_failed"]), live_test_supported: z.boolean(), message: z.string() })
+      .safeParse(await this.read(`integrations/${encodeURIComponent(provider)}/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) }));
+    if (!parsed.success || parsed.data.provider !== provider || parsed.data.verified !== (parsed.data.state === "verified") || parsed.data.tested !== parsed.data.verified) return fail("INVALID_API_DATA", "The integration check response is invalid.");
+    return parsed.data;
+  }
+  async submitApproval(payload: Ref) {
+    const parsed = workflowData.safeParse(await this.lifecycle("submit_workflow_for_approval", `workflows/${encodeURIComponent(payload.workflow_id)}/submit-for-approval`, payload));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The approval submission was not confirmed.");
+    return parsed.data;
   }
 
   async procurementCommunication(workflowId: string, version: number) {
@@ -183,6 +278,7 @@ export class WorkflowClient {
           packed_quantity: z.string(), dispatched_quantity: z.string(), delivered_quantity: z.string(), buyer_accepted_quantity: z.string() }).passthrough()) }).passthrough()).optional(),
       activity: z.array(z.object({ event_id: z.string(), purchase_order_id: z.string(), event_kind: z.string(),
         actor_role: z.string(), note: z.string(), observed_at: z.string() }).passthrough()).optional(),
+      records: z.array(z.object({ record_id:z.string(), record_type:z.string(), data:z.record(z.unknown()) }).passthrough()).optional(),
       record_counts: z.record(z.string(), z.number()), resources: z.array(z.object({
         provider: z.string(), resource_type: z.string(), resource_id: z.string(), metadata: z.record(z.string(), z.unknown()),
       }).passthrough()), actions: z.record(z.string(), z.object({ workflow_id: z.string(),
@@ -196,7 +292,7 @@ export class WorkflowClient {
   async procurementSuppliersReview(projectId: string, decision: "approved" | "rejected", candidateIds: string[], digest: string) {
     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/suppliers-review`, { method: "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
-        operation: "procurement_suppliers_review", idempotency_key: crypto.randomUUID(),
+        operation: "procurement_suppliers_review", idempotency_key: await retryKey("procurement_suppliers_review",{projectId,decision,candidateIds,digest}),
         payload: { decision, candidate_ids: candidateIds, expected_digest: digest } }) });
   }
 
@@ -204,7 +300,7 @@ export class WorkflowClient {
     settings: { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean }) {
     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/fulfilment-activate`, { method: "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
-        operation: "procurement_fulfilment_activate", idempotency_key: crypto.randomUUID(),
+        operation: "procurement_fulfilment_activate", idempotency_key: await retryKey("procurement_fulfilment_activate",{projectId,workflowId,version,expectedRevision,settings}),
         payload: { settings, expected_revision: expectedRevision, workflow_id: workflowId, workflow_version: version } }) });
   }
 
@@ -231,8 +327,9 @@ export class WorkflowClient {
     } else {
       path += `${path.includes("?") ? "&" : "?"}request_id=${encodeURIComponent(requestId)}`;
     }
-    const result = responseSchemas[operation].safeParse(await this.read(path, options));
-    if (!result.success) return fail("INVALID_API_DATA", "The returned data does not match the accepted contract.", requestId);
+    const result = responseSchemas[operation].safeParse(operation === "plan_workflow" && this.planningJobsAvailable
+      ? await this.planJob(options) : await this.read(path, options));
+    if (!result.success) throw new ApiError({error_code:"INVALID_API_DATA",message:"The returned data does not match the accepted contract.",request_id:requestId,retryable:false},undefined,method!=="GET"?{outcome:"unknown"}:{});
     if ("registry_review" in result.data && result.data.registry_review && "workflow" in result.data) {
       const review = result.data.registry_review as RegistryReview;
       const workflow = result.data.workflow as CanonicalWorkflow;
@@ -259,15 +356,67 @@ export class WorkflowClient {
     return result.data as z.infer<(typeof responseSchemas)[K]>;
   }
 
-  async runs() {
+  private async planJob(options: RequestInit) {
+    let job = planningJobSchema.parse(await this.read("planning-jobs", options));
+    this.reportPlanning(job);
+    const until = Date.now() + 45 * 60_000;
+    while (job.state === "queued" || job.state === "running") {
+      if (Date.now() > until) return fail("PLANNING_PENDING", `Planning is still pending. Job reference: ${job.job_id}. Check its status before starting another request.`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try { job = planningJobSchema.parse(await this.read(`planning-jobs/${encodeURIComponent(job.job_id)}`)); }
+      catch (error) {
+        if (error instanceof ApiError) throw new ApiError({ ...error.error,
+          message: `${error.message} Planning job: ${job.job_id}. Reconnect and check its status before starting another request.`,
+          details: { ...error.error.details, planning_job_id: job.job_id } }, error.correlationId);
+        return fail("INVALID_API_DATA", "The planning status response is invalid.");
+      }
+      this.reportPlanning(job);
+    }
+    // A confirmed terminal failure/cancellation permits the next explicit user retry
+    // to create a new job. Unknown transport outcomes keep the existing retry key.
+    if (job.state === "failed" || job.state === "cancelled") {
+      const request = JSON.parse(String(options.body)) as { payload: unknown };
+      await retryKey("plan_workflow", request.payload, true);
+    }
+    if (job.state === "cancelled") return fail("PLANNING_CANCELLED", "Workflow generation was cancelled. Your prompt was preserved.");
+    if (!job.result) return fail("INVALID_API_DATA", "The planning job has no confirmed result.");
+    if (job.result.status >= 400) {
+      const data = job.result.data;
+      const error = SafeErrorSchema.safeParse(data && !Array.isArray(data) ? data["error"] : null);
+      if (!error.success) return fail("INVALID_API_ERROR", "The planning job returned an invalid error.");
+      throw new ApiError(error.data);
+    }
+    return job.result.data;
+  }
+
+  async runs(filters: {limit?:number;cursor?:string|undefined;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
-    const result = schema.safeParse(await this.read("runs"));
+    const result = schema.safeParse(await this.read(`runs${queryString(filters)}`));
     if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");
     return result.data;
   }
 
-  async overview(afterSequence?: number) {
-    const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
+  async eventPage(runId:string, afterSequence=0, limit=100) {
+    const parsed=eventsData.safeParse(await this.read(`runs/${encodeURIComponent(runId)}/events${queryString({after_sequence:afterSequence,limit})}`));
+    if(!parsed.success)return fail("INVALID_API_DATA","The run event response is invalid.");
+    return parsed.data;
+  }
+
+  async releaseState(workflowId: string) {
+    const schema = z.object({ workflow_id: z.string(), release: z.object({ release_id: z.string(), workflow_version: z.number().int().positive(), state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]), trigger_binding_count: z.number().int().nonnegative() }).nullable(), ...metadata });
+    const result = schema.safeParse(await this.read(`workflows/${encodeURIComponent(workflowId)}/release-state`));
+    if (!result.success || result.data.workflow_id !== workflowId) return fail("INVALID_API_DATA", "The release state response is invalid.");
+    return result.data;
+  }
+
+  async workflowsPage(cursor: string | null = null) {
+    const result = workflowsData.safeParse(await this.read("workflows" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : "")));
+    if (!result.success) return fail("INVALID_API_DATA", "The workflow page is invalid.");
+    return result.data;
+  }
+
+  async overview(afterSequence?: number, cursor: string | null = null) {
+    const path = afterSequence === undefined ? "workflow-overview" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : "") : `workflow-overview/events?after_sequence=${afterSequence}`;
     const result = overviewCollectionSchema.safeParse(await this.read(path));
     if (!result.success) return fail("INVALID_API_DATA", "The workflow overview response is invalid.");
     return result.data;

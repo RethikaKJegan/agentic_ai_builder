@@ -1,0 +1,481 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -119,7 +119,10 @@
+ export class WorkflowClient {
+   private sessionRecovery: Promise<boolean> | null = null;
+   private sessionGeneration = 0;
+-  constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {}
++  private sessionMode: string | null = null;
++  constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {
++    if (base !== "/api/backend/") throw new Error("Use the relative same-origin workflow API path.");
++  }
+   private async renewLocalSession() {
+     if (!this.sessionRecovery) {
+       this.sessionRecovery = this.session().then((session) => {
+@@ -146,7 +149,9 @@
+       if (!error.success) return fail("INVALID_API_ERROR", "The API did not return a safe error.", envelope.data.request_id);
+       // The local middleware rejects an expired cookie before executing actions.
+       // Retry only that explicit rejection, preserving the exact original body/key.
+-      if (recoverSession && path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
++      if (recoverSession && (this.sessionMode === null || this.sessionMode === "local-development") &&
++          (typeof window === "undefined" || ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) &&
++          path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
+         if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
+       }
+       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
+@@ -157,6 +162,7 @@
+   async session(): Promise<Session> {
+     const result = sessionData.safeParse(await this.read("session"));
+     if (!result.success) return fail("INVALID_SESSION", "The session response is invalid.");
++    this.sessionMode = result.data.mode;
+     return result.data;
+   }
+ 
+--- a/frontend/src/api/proxy.test.ts
++++ b/frontend/src/api/proxy.test.ts
+@@ -10,7 +10,7 @@
+   })));
+   const response = await GET(new NextRequest("http://127.0.0.1:3001/api/backend/session"), { params: Promise.resolve({ path: ["session"] }) });
+   expect(response.status).toBe(503);
+-  expect(await response.json()).toMatchObject({ request_id: "req_proxy", status: 503,
++  expect(await response.json()).toMatchObject({ status: 503,
+     data: { error: { error_code: "API_WRONG_SERVICE", retryable: true } } });
+ });
+ 
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -30,7 +30,9 @@
+       set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
+         error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" ? null : get().error });
+     } catch (error) {
+-      set({ liveStatus: "stale", error: error instanceof ApiError ? error : get().error });
++      const failure = error instanceof ApiError ? error : get().error;
++      set({ liveStatus: "stale", error: failure,
++        ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, status: "unavailable", tools: [], reviews: {} } : {}) });
+     }
+   },
+   initialize: () => {
+--- a/frontend/src/app/api/backend/[...path]/route.ts
++++ b/frontend/src/app/api/backend/[...path]/route.ts
+@@ -1,71 +1,130 @@
+ import { NextRequest, NextResponse } from "next/server";
++import { backendConfig } from "@/lib/backend-config";
++import { ApiResponseSchema, SafeErrorSchema } from "@/api/contracts.generated";
++import { containsSecret } from "@/api/client";
+ 
+ export const dynamic = "force-dynamic";
++const safeId = (value: string | null) => value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
++const cookieNames = new Set(["builder_dev_session", "__Secure-builder_session", "__Secure-builder_login"]);
+ async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+-  if (!["localhost", "127.0.0.1", "[::1]", "praxi.bellcorpstudio.com"].includes(request.nextUrl.hostname)) {
+-    return NextResponse.json({ request_id: "req_proxy", status: 403, data: { error: { error_code: "DEVELOPMENT_AUTH_LOCAL_ONLY", message: "The local workflow API is restricted to loopback hosts.", request_id: "req_proxy", retryable: false } } }, { status: 403 });
+-  }
++  let reference = safeId(request.headers.get("x-request-id")) || `req_${crypto.randomUUID()}`;
++  const correlation = safeId(request.headers.get("x-correlation-id")) || reference;
++  const error = (code: string, message: string, status: number, retryable = false) => NextResponse.json({ request_id: reference, status,
++    data: { correlation_id: correlation, error: { error_code: code, message, request_id: reference, retryable } } },
++    { status, headers: { "Cache-Control": "no-store", "X-Request-ID": reference, "X-Correlation-ID": correlation } });
++  let config: ReturnType<typeof backendConfig>;
++  try { config = backendConfig(); } catch { return error("API_CONFIGURATION_INVALID", "The server API configuration is invalid. Contact the administrator.", 503); }
+   const { path } = await context.params;
+-  if (path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) {
+-    return NextResponse.json({ request_id: "req_proxy", status: 400, data: { error: { error_code: "INVALID_ROUTE", message: "Use a supported API route.", request_id: "req_proxy", retryable: false } } }, { status: 400 });
++  if (!path.length || path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) return error("INVALID_ROUTE", "Use a supported API route.", 400);
++  const route = path.join("/");
++  const webhook = route.startsWith("webhooks/");
++  const origin = request.headers.get("origin");
++  if (!config.origins.includes(request.nextUrl.origin) || (origin && (!config.origins.includes(origin) || origin !== request.nextUrl.origin)) ||
++      (!webhook && request.headers.get("sec-fetch-site") === "cross-site")) return error("ORIGIN_NOT_AUTHORIZED", "This request origin is not authorized.", 403);
++  if (process.env['BUILDER_ENVIRONMENT'] === 'production' && !webhook && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !origin)
++    return error("ORIGIN_NOT_AUTHORIZED", "An authorized same-origin request is required.", 403);
++  const declared = request.headers.get("content-length");
++  if (declared && (!/^\d+$/.test(declared) || Number(declared) > config.maxBody)) return error("REQUEST_TOO_LARGE", "The request exceeds the 2 MiB limit.", 413);
++  let body: Uint8Array | undefined;
++  if (request.body && !['GET', 'HEAD'].includes(request.method)) {
++    const reader = request.body.getReader();
++    const chunks: Uint8Array[] = [];
++    let size = 0;
++    try {
++      while (true) {
++        const chunk = await reader.read();
++        if (chunk.done) break;
++        size += chunk.value.byteLength;
++        if (size > config.maxBody) { await reader.cancel(); return error("REQUEST_TOO_LARGE", "The request exceeds the 2 MiB limit.", 413); }
++        chunks.push(chunk.value);
++      }
++    } catch { return error("INVALID_REQUEST", "The request body could not be read.", 400); }
++    body = new Uint8Array(size);
++    let offset = 0;
++    for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
++    // Webhook signatures cover exact bytes; never parse or rewrite them.
++    if (!webhook && request.headers.get('content-type')?.includes('application/json')) {
++      try {
++        const parsed = JSON.parse(new TextDecoder().decode(body)) as { request_id?: unknown };
++        if (parsed && typeof parsed.request_id === 'string') reference = safeId(parsed.request_id) || reference;
++      } catch { return error("INVALID_REQUEST", "The request must contain valid JSON.", 400); }
++    }
+   }
+   const controller = new AbortController();
+-  const timeout = setTimeout(() => controller.abort(), 120000);
++  const abort = () => controller.abort();
++  request.signal.addEventListener('abort', abort, { once: true });
++  const timeout = setTimeout(abort, route === 'workflows/plan' ? config.plannerTimeout : config.normalTimeout);
++  let streaming = false;
++  const cleanup = () => { clearTimeout(timeout); request.signal.removeEventListener('abort', abort); };
+   try {
+-    // The repository-local development API started by
+-    // scripts/serve_ui_test_api.py listens on 8011. Using 8000 here can
+-    // silently proxy to an unrelated project running on the same machine.
+-    const url = new URL(path.map(encodeURIComponent).join("/") + request.nextUrl.search, (process.env["BUILDER_API_URL"] || "http://127.0.0.1:8011") + "/");
+-    const headers: Record<string, string> = {};
+-    const contentType = request.headers.get("content-type");
+-    const accept = request.headers.get("accept");
+-    const lastEventId = request.headers.get("last-event-id");
+-    const signature = request.headers.get("x-builder-signature");
+-    const timestamp = request.headers.get("x-builder-timestamp");
+-    if (contentType) headers["content-type"] = contentType;
+-    if (accept) headers["accept"] = accept;
+-    if (lastEventId) headers["last-event-id"] = lastEventId;
+-    if (signature) headers["x-builder-signature"] = signature;
+-    if (timestamp) headers["x-builder-timestamp"] = timestamp;
+-    const cookie = request.headers.get("cookie");
+-    const origin = request.headers.get("origin");
+-    if (cookie) headers["cookie"] = cookie;
+-    if (origin) headers["origin"] = origin;
+-    const response = await fetch(url, { method: request.method, headers, cache: "no-store", signal: controller.signal,
+-      ...(request.method === "GET" ? {} : { body: await request.text() }) });
+-    const responseType = response.headers.get("content-type") || "";
+-    if (!responseType.includes("text/event-stream")) {
+-      const body: unknown = await response.json();
+-      if (!body || typeof body !== "object" || !("request_id" in body) || !("status" in body) || !("data" in body)) {
+-        // Older Builder instances return FastAPI's raw 404 for newly added routes.
+-        // Check service identity before claiming the upstream is a different app.
+-        let builder = false;
+-        if (response.status === 404 && path.join("/") !== "session") {
+-          const session = await fetch(new URL("session", url.origin + "/"), { headers, cache: "no-store", signal: controller.signal });
+-          const identity: unknown = await session.json();
+-          builder = !!identity && typeof identity === "object" && "request_id" in identity && "status" in identity && "data" in identity;
+-        }
+-        return NextResponse.json({ request_id: "req_proxy", status: 503, data: { error: {
+-          error_code: builder ? "API_ROUTE_UNAVAILABLE" : "API_WRONG_SERVICE", message: builder
+-            ? "The Builder backend is running without this route. Enable procurement and restart scripts/run_live_backend.py on the configured port."
+-            : "The configured backend is not the Builder API. Start scripts/run_live_backend.py and set BUILDER_API_URL to its port.",
+-          request_id: "req_proxy", retryable: true,
+-        } } }, { status: 503, headers: { "Cache-Control": "no-store" } });
++    const url = new URL(path.map(encodeURIComponent).join('/') + request.nextUrl.search, config.upstream);
++    const headers = new Headers({ 'x-request-id': reference, 'x-correlation-id': correlation });
++    for (const key of ['content-type', 'accept', 'last-event-id', 'origin', 'sec-fetch-site', 'x-builder-signature', 'x-builder-timestamp',
++      'x-hub-signature-256', 'x-slack-signature', 'x-slack-request-timestamp']) {
++      const value = request.headers.get(key);
++      if (value) headers.set(key, value);
++    }
++    const cookies = request.cookies.getAll().filter((cookie) => cookieNames.has(cookie.name));
++    if (cookies.length) headers.set('cookie', cookies.map((c) => `${c.name}=${c.value}`).join('; '));
++    const response = await fetch(url, { method: request.method, headers, cache: 'no-store', redirect: 'manual', signal: controller.signal,
++      ...(body ? { body: body as BodyInit } : {}) });
++    const resultHeaders = new Headers({ 'Cache-Control': 'no-store', 'X-Request-ID': reference, 'X-Correlation-ID': correlation });
++    for (const cookie of response.headers.getSetCookie()) {
++      const name = cookie.split('=', 1)[0];
++      if (name && cookieNames.has(name)) resultHeaders.append('set-cookie', cookie);
++    }
++    if ([302, 303].includes(response.status) && ['auth/login', 'auth/callback'].includes(route)) {
++      const location = response.headers.get('location');
++      if (!location) return error('API_INVALID_CONTRACT', 'The login response is invalid.', 502);
++      const target = new URL(location);
++      if (!(route === 'auth/login' && target.origin === 'https://accounts.google.com' && target.pathname === '/o/oauth2/v2/auth') &&
++          !(route === 'auth/callback' && config.origins.includes(target.origin) && target.pathname === '/app')) return error('API_INVALID_CONTRACT', 'The login destination is invalid.', 502);
++      resultHeaders.set('location', location);
++      return new NextResponse(null, { status: response.status, headers: resultHeaders });
++    }
++    if (response.headers.get('content-type')?.includes('text/event-stream')) {
++      if (!response.ok || !response.body) return error('API_INVALID_CONTRACT', 'The event stream response is invalid.', 502);
++      streaming = true;
++      resultHeaders.set('Content-Type', 'text/event-stream');
++      resultHeaders.set('X-Accel-Buffering', 'no');
++      const reader = response.body.getReader();
++      // Deadline bounds establishing the stream; disconnect/cancel ends the live body.
++      clearTimeout(timeout);
++      return new NextResponse(new ReadableStream({
++        async pull(stream) {
++          try { const chunk = await reader.read(); if (chunk.done) { cleanup(); stream.close(); } else stream.enqueue(chunk.value); }
++          catch (failure) { cleanup(); stream.error(failure); }
++        },
++        async cancel() { controller.abort(); cleanup(); await reader.cancel(); },
++      }), { status: response.status, headers: resultHeaders });
++    }
++    let raw: unknown;
++    try { raw = await response.json(); } catch {
++      if (controller.signal.aborted) throw new Error('aborted');
++      return error('API_MALFORMED_JSON', 'The backend returned malformed JSON.', 502);
++    }
++    // Google's signed webhook verification challenge is intentionally not a Builder envelope.
++    if (webhook && response.ok && raw && typeof raw === 'object' && Object.keys(raw).length === 1 && 'challenge' in raw && typeof raw.challenge === 'string')
++      return NextResponse.json(raw, { status: response.status, headers: resultHeaders });
++    const parsed = ApiResponseSchema.safeParse(raw);
++    if (!parsed.success || parsed.data.status !== response.status || containsSecret(raw)) {
++      if (response.status === 404 && response.headers.get('x-builder-service') !== 'workflow-api') {
++        const identity = await fetch(new URL('session', config.upstream), { headers, cache: 'no-store', redirect: 'manual', signal: controller.signal });
++        const builder = identity.headers.get('x-builder-service') === 'workflow-api' || ApiResponseSchema.safeParse(await identity.json()).success;
++        return error(builder ? 'API_ROUTE_UNAVAILABLE' : 'API_WRONG_SERVICE', builder ? 'This route is unavailable on the configured Builder backend.' : 'The configured upstream is not the Builder API. Check its service and port.', 503, true);
+       }
+-      const result = NextResponse.json(body, { status: response.status, headers: { "Cache-Control": "no-store" } });
+-      const sessionCookie = response.headers.get("set-cookie");
+-      if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
+-      return result;
++      return error('API_INVALID_CONTRACT', 'The backend response does not match the API contract.', 502);
+     }
+-    const result = new NextResponse(response.body, { status: response.status, headers: { "Cache-Control": "no-store", "Content-Type": "text/event-stream", "X-Accel-Buffering": "no" } });
+-    const sessionCookie = response.headers.get("set-cookie");
+-    if (sessionCookie) result.headers.set("set-cookie", sessionCookie);
+-    return result;
++    if (!response.ok) {
++      const data = parsed.data.data;
++      if (!SafeErrorSchema.safeParse(data && !Array.isArray(data) ? data['error'] : null).success) return error('API_INVALID_CONTRACT', 'The backend returned an invalid error contract.', 502);
++    }
++    resultHeaders.set('X-Request-ID', parsed.data.request_id);
++    return NextResponse.json(raw, { status: response.status, headers: resultHeaders });
+   } catch {
+-    return NextResponse.json({ request_id: "req_proxy", status: 503, data: { error: { error_code: "API_UNAVAILABLE", message: "The workflow API is unavailable. Start the local API and retry.", request_id: "req_proxy", retryable: true } } }, { status: 503, headers: { "Cache-Control": "no-store" } });
+-  } finally {
+-    clearTimeout(timeout);
+-  }
++    if (controller.signal.aborted) return error('API_TIMEOUT', 'The API request timed out. Check the current state before retrying an action.', 504, request.method === 'GET');
++    return error('API_UNAVAILABLE', 'The workflow backend cannot be reached. Check its service and configured port.', 503, request.method === 'GET');
++  } finally { if (!streaming) cleanup(); }
+ }
+ export const GET = proxy;
+ export const POST = proxy;
+--- a/frontend/src/features/workflows/ApiFeedback.tsx
++++ b/frontend/src/features/workflows/ApiFeedback.tsx
+@@ -4,7 +4,11 @@
+     ? error.error.details["requirements"].filter((item): item is string => typeof item === "string") : [];
+   return <>
+     {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+-      {error.message}
++      {error instanceof ApiError && error.error.error_code === "AUTHENTICATION_REQUIRED"
++        ? "Your session is unavailable or expired. Reconnect the local workspace to recover your session."
++        : error instanceof ApiError && error.error.error_code === "OPERATION_NOT_AUTHORIZED"
++          ? "Your account does not have permission for this action. Contact your workspace administrator."
++          : error.message}
+       {requirements.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">
+         {requirements.map((requirement, index) => <li key={index}>{requirement}</li>)}
+       </ul>}
+--- a/scripts/run_live_backend.py
++++ b/scripts/run_live_backend.py
+@@ -68,7 +68,7 @@
+             raise SystemExit(1 if check(env, args.sheet, args.range) else 0)
+         app = create_configured_app(env)
+     except ValueError:
+-        raise SystemExit('Provider configuration is incomplete or invalid. See docs/sheets-gmail.md and run --check.') from None
++        raise SystemExit('Local authentication or provider configuration is invalid. See docs/phase1-deployment.md; Google Workspace production login is deferred.') from None
+     import uvicorn
+     uvicorn.run(app, host='127.0.0.1', port=args.port)
+ 
+--- a/tests/test_customer_pipeline.py
++++ b/tests/test_customer_pipeline.py
+@@ -108,7 +108,7 @@
+                  'BUILDER_EMAIL_RECIPIENTS':'owner@example.com','BUILDER_EMAIL_DIRECT_SEND':'1','BUILDER_REPLY_MONITOR':'1'}
+             client=SimpleNamespace(responses=SimpleNamespace(create=plan))
+             with patch('workflow_api.live_providers.REGISTRY',path/'registry.json'), patch('runtime.connectors._google_credentials',return_value=SimpleNamespace(token='test-only')), patch('runtime.connectors.urlopen',side_effect=http):
+-                app=create_configured_app(env,path/'workflows.sqlite3',client=client,model_factory=factory)
++                app=create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'},path/'workflows.sqlite3',client=client,model_factory=factory)
+                 service=app.state.workflow_service;auth=app.state.live_operator_auth
+                 service.runtime_runner.connectors['smtp_send_email'].transport=FakeSMTP
+                 service.reply_cases.smtp_factory=FakeSMTP;FakeSMTP.messages=[]
+--- a/tests/test_integrated_procurement.py
++++ b/tests/test_integrated_procurement.py
+@@ -74,7 +74,7 @@
+         return BoundedLLM(definition, provider, lambda messages:1000, 0, 0)
+ 
+     def start(self):
+-        self.app=create_configured_app(self.env,self.path/'workflows.sqlite3',client=self.sdk,model_factory=self.model_factory)
++        self.app=create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'},self.path/'workflows.sqlite3',client=self.sdk,model_factory=self.model_factory)
+         self.service=self.app.state.workflow_service;self.auth=self.app.state.live_operator_auth
+         self.service.planner.provider.discoverer=lambda ref:next(c for c in self.catalogs if c['spreadsheet_id']==ref)
+         self.procurement=self.app.state.procurement_service
+--- a/tests/test_live_providers.py
++++ b/tests/test_live_providers.py
+@@ -169,7 +169,7 @@
+                 output = {'summary': 'Analysed synthetic record'} if definition['agent_id'] == 'analysis' else {'subject': 'Notification', 'body': 'Composed from Analysed synthetic record'}
+                 return json.dumps(output), 20, 20
+             return BoundedLLM(definition, provider, lambda messages: 100, .0000002, .0000012)
+-        app = create_configured_app(self.env, database or self.path / 'workflows.sqlite3', client=SimpleNamespace(), model_factory=factory)
++        app = create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, database or self.path / 'workflows.sqlite3', client=SimpleNamespace(), model_factory=factory)
+         runner = app.state.workflow_service.runtime_runner
+         runner.connectors['google_sheets_read_rows'].invoke = lambda *args: {'rows': deepcopy(self.rows)}
+         runner.connectors['smtp_send_email'].transport = FakeSMTP
+@@ -310,7 +310,7 @@
+         self.assertEqual(FakeSMTP.messages, [])
+ 
+     def test_generic_launcher_does_not_create_workflows(self):
+-        app = create_configured_app(self.env, self.path / 'empty.sqlite3', client=SimpleNamespace(), model_factory=lambda definition: None)
++        app = create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, self.path / 'empty.sqlite3', client=SimpleNamespace(), model_factory=lambda definition: None)
+         with app.state.workflow_service.store.transaction() as db:
+             self.assertEqual(app.state.workflow_service.store.list(db, 'local-workspace'), [])
+ 
+--- a/tests/test_sheet_records.py
++++ b/tests/test_sheet_records.py
+@@ -385,7 +385,7 @@
+             with (patch('workflow_api.live_providers.REGISTRY', path / 'registry.json'),
+                   patch('runtime.connectors._google_credentials', return_value=SimpleNamespace(token='offline-only', scopes=['https://www.googleapis.com/auth/spreadsheets'])),
+                   patch('runtime.connectors.urlopen', side_effect=transport)):
+-                app = create_configured_app(env, path / 'runs.sqlite3', client=client, model_factory=factory)
++                app = create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, path / 'runs.sqlite3', client=client, model_factory=factory)
+                 service, auth = app.state.workflow_service, app.state.live_operator_auth
+                 def call(operation, payload, key):
+                     response = service.handle(dict(request_id=key, idempotency_key=key, operation=operation, payload=payload), auth)
+@@ -448,7 +448,7 @@
+                 self.assertEqual(context['sheet_record_tool']['availability'], 'enabled')
+                 self.assertEqual(context['sheet_record_tool']['approval_required'], action_approval)
+                 # Reconstruct Registry/auth and checkpoint from durable storage.
+-                restarted = create_configured_app(env, path / 'runs.sqlite3', client=client, model_factory=factory)
++                restarted = create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, path / 'runs.sqlite3', client=client, model_factory=factory)
+                 restarted.state.live_workers[0].tick()
+                 with restarted.state.workflow_service.store.transaction() as db:
+                     self.assertEqual(db.execute('SELECT COUNT(*) FROM runtime_runs').fetchone()[0], 1)
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -6,6 +6,7 @@
+ 
+ from scripts.integration_config import ROOT, load_env, private_write
+ from .main import create_app, ROLE_PERMISSIONS
++from .security import origins, deployment_mode
+ 
+ REGISTRY = ROOT / '.local/live-provider-registry.json'
+ 
+@@ -256,6 +257,10 @@
+ 
+ def create_configured_app(env=None, database=None, client=None, model_factory=None):
+     env = environment() if env is None else env
++    mode = deployment_mode(env.get('BUILDER_ENVIRONMENT', 'production'))
++    if env.get('BUILDER_DEV_AUTH') != '1':
++        raise ValueError('Explicitly enable development authentication for the local live launcher.')
++    allowed_origins = origins(env.get('BUILDER_UI_ORIGINS'))
+     config = registry_configuration(env)
+     from .procurement import configuration as procurement_configuration, extend_registry
+     procurement_settings = procurement_configuration(env)
+@@ -265,7 +270,8 @@
+     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
+     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
+-                     registry_config=REGISTRY, database=database, start_workers=False, planning_available=True)
++                     registry_config=REGISTRY, database=database, start_workers=False, planning_available=True,
++                     environment_name=mode, ui_origins=allowed_origins)
+     service = app.state.workflow_service
+     from openai import OpenAI
+     from planner import PlannerService
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -13,6 +13,10 @@
+ from .service import ApiFailure, WorkflowService
+ from .storage import WorkflowStore
+ from .registry_adapter import load_registry_config
++from .security import origins, deployment_mode
++from contextvars import ContextVar
++
++request_reference = ContextVar("builder_request_reference", default=None)
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ COOKIE = 'builder_dev_session'
+@@ -25,8 +29,11 @@
+ 
+ 
+ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
+-               runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True):
++               runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True,
++               ui_origins=None, environment_name=None):
+     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
++    mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
++    allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
+     configured_roles = roles or os.getenv('BUILDER_DEV_ROLES', 'builder').split(',')
+     if any(role not in ROLE_PERMISSIONS for role in configured_roles):
+         raise ValueError('Configure known development roles only.')
+@@ -71,6 +78,8 @@
+     app.state.workflow_service = workflow_service
+     app.state.workflow_auth = auth
+     app.state.workers = workers
++    app.state.allowed_origins = allowed_origins
++    app.state.environment_name = mode
+ 
+     @app.on_event('shutdown')
+     async def stop_workers():
+@@ -78,7 +87,7 @@
+             worker.stop()
+ 
+     def error(code, message, status):
+-        result = workflow_service.failure(f'req_{uuid4().hex}', ApiFailure(code, message, status))
++        result = workflow_service.failure(request_reference.get() or f'req_{uuid4().hex}', ApiFailure(code, message, status))
+         return JSONResponse(result, status_code=status, headers={'Cache-Control': 'no-store'})
+ 
+     @app.exception_handler(StarletteHTTPException)
+@@ -89,36 +98,36 @@
+ 
+     @app.middleware('http')
+     async def protect(request, call_next):
+-        host = request.url.hostname
+-        if not enabled:
+-            return error('AUTHENTICATION_REQUIRED', 'Configure a trusted session adapter or enable local development authentication.', 401)
+-        if host not in {'localhost', '127.0.0.1', '::1', 'testserver'}:
+-            return error('DEVELOPMENT_AUTH_LOCAL_ONLY', 'Development sessions are restricted to loopback hosts.', 403)
+-        origin = request.headers.get('origin')
+-        # Keep the local development ports used by Next.js and the UI test
+-        # harness in the default allowlist. An explicit BUILDER_UI_ORIGINS
+-        # value still overrides this list for deployed environments.
+-        allowed_origins = os.getenv(
+-            'BUILDER_UI_ORIGINS',
+-            ','.join((
+-                'http://localhost:3000', 'http://127.0.0.1:3000',
+-                'http://localhost:3001', 'http://127.0.0.1:3001',
+-                'http://localhost:3100', 'http://127.0.0.1:3100',
+-            )),
+-        ).split(',')
+-        if origin and origin not in allowed_origins:
+-            return error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
+-        if request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
+-            return error('AUTHENTICATION_REQUIRED', 'Open the workspace to establish your local session.', 401)
+-        response = await call_next(request)
+-        response.headers['Cache-Control'] = 'no-store'
+-        return response
++        candidate = request.headers.get('x-request-id', '')
++        reference = candidate if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', candidate) else f'req_{uuid4().hex}'
++        reference_token = request_reference.set(reference)
++        try:
++            host = request.url.hostname
++            origin = request.headers.get('origin')
++            if origin and origin not in allowed_origins:
++                response = error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
++            elif not enabled:
++                response = error('AUTHENTICATION_REQUIRED', 'Authentication is not configured. Enable development authentication only for local use.', 401)
++            elif host not in {'localhost', '127.0.0.1', '::1', 'testserver'} or request.headers.get('sec-fetch-site') == 'cross-site':
++                response = error('DEVELOPMENT_AUTH_LOCAL_ONLY', 'Development sessions are restricted to loopback hosts and origins.', 403)
++            elif request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
++                response = error('AUTHENTICATION_REQUIRED', 'Your local session expired or is invalid. Reopen the workspace to recover it.', 401)
++            else:
++                response = await call_next(request)
++            response.headers['Cache-Control'] = 'no-store'
++            response.headers['X-Builder-Service'] = 'workflow-api'
++            response.headers['X-Request-ID'] = reference
++            correlation = request.headers.get('x-correlation-id', reference)
++            response.headers['X-Correlation-ID'] = correlation if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', correlation) else reference
++            return response
++        finally:
++            request_reference.reset(reference_token)
+ 
+     @app.get('/session')
+     def get_session():
+         data = dict(auth=auth, mode='local-development', planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
+                     runtime_available=workflow_service.runtime_runner is not None, approval_service_available=workflow_service.runtime_runner is not None)
+-        response = JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, data))
++        response = JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
+         response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)
+         return response
+ 
+@@ -334,7 +343,7 @@
+                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+             workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+             data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth)
+-            return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, data))
++            return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+ 

@@ -5,7 +5,7 @@ import { LiveRuntimePanel } from "./app.monitoring";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it("shows pre-run source failures and server guardrails in the shared live panel", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ request_id:"req_monitoring_test", status:200, data: {
     runs: { total: 0, active: 0, completed: 0, failed: 0 }, events: 0,
     usage: { llm_calls: 0, tool_calls: 0, tokens: 0, retries: 0, estimated_cost_usd: 0 }, latest: [],
     sources: [{ binding_id: "bind_test", workflow_id: "wf_test", provider_id: "google_sheets", health: "error", error_code: "EVENT_MAPPING_FAILED", baseline_ready: true }],

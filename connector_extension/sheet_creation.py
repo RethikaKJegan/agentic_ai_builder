@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+from workflow_api.auxiliary_database import connection as database_connection
 import time
 from urllib.parse import quote, urlencode
 from jsonschema import Draft202012Validator
@@ -43,24 +44,25 @@ def setup_inputs(inputs):
 
 class SheetResourceStore:
     """Resource ownership only; this is not the future procurement case database."""
-    def __init__(self, root):
+    def __init__(self, root, database_url=None):
+        self.database_url=database_url
         self.path = Path(root) / 'sheet-resources.sqlite3'
         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'Resource state cannot be a symlink.')
-        with sqlite3.connect(self.path) as db:
+        with database_connection(self.path,database_url=self.database_url) as db:
             db.execute('CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, spreadsheet TEXT, '
                        'sheet INTEGER, spreadsheet_owned INTEGER, tab_owned INTEGER, manifest TEXT, '
                        'workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,spreadsheet,sheet))')
             db.execute('CREATE TABLE IF NOT EXISTS observations (workspace TEXT, project TEXT, marker TEXT, '
                        'spreadsheet TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,marker))')
-        os.chmod(self.path, 0o600)
+        if self.path.exists():os.chmod(self.path, 0o600)
 
     def observe(self, namespace, project, marker, identifier):
-        with sqlite3.connect(self.path) as db:
+        with database_connection(self.path,database_url=self.database_url) as db:
             db.execute('INSERT OR IGNORE INTO observations VALUES (?,?,?,?,?,?)',
                        (namespace[0], project, marker, identifier, namespace[1], namespace[2]))
 
     def remember(self, namespace, receipt):
-        with sqlite3.connect(self.path) as db:
+        with database_connection(self.path,database_url=self.database_url) as db:
             for table in receipt['tabs']:
                 db.execute('INSERT INTO resources VALUES (?,?,?,?,?,?,?,?,?) '
                            'ON CONFLICT(workspace,project,spreadsheet,sheet) DO UPDATE SET '
@@ -97,7 +99,7 @@ class SheetsSetup(Connector):
 
     def journal_row(self, value):
         key = digest([self.definition['tool_id'], self.stable_effect(value)])
-        with sqlite3.connect(self.journal.path) as db:
+        with self.journal.connection(write=False) as db:
             row = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
         if row and row[0] != digest(value):
             denied('EFFECT_REFERENCE_MISMATCH', 'This project creation key belongs to different reviewed inputs.')
@@ -265,7 +267,7 @@ class SheetsSetup(Connector):
         result = self.receipt(value, self.metadata(identifier, deadline), deadline, require_owned=create)
         if list(Draft202012Validator(self.definition['output_schema']).iter_errors(result)):
             denied('SHEETS_SETUP_INVALID_RESULT', 'Reconciled setup does not match the output schema.')
-        with sqlite3.connect(self.journal.path) as db:
+        with self.journal.connection() as db:
             db.execute('BEGIN IMMEDIATE')
             current = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
             if not current or current[0] != digest(value): denied('EFFECT_REFERENCE_MISMATCH', 'The setup intent changed.')

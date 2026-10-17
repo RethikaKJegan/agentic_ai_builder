@@ -50,7 +50,7 @@ class ProcurementFulfilment:
             events=self.workflows.runtime_runner.runtime.events(action['run_id'],auth)['items']
             codes={e['details'].get('error_code') for e in events if e['event_type']=='node.failed'}
             if codes!={'MODEL_OUTPUT_SCHEMA_INVALID'}:return False
-            with self.workflows.store.transaction() as db:
+            with self.workflows.store.transaction(write=False) as db:
                 row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
                     (workspace,action['workflow_id'],action['workflow_version'])).fetchone()
             if not row:return False
@@ -207,7 +207,7 @@ class ProcurementFulfilment:
         # change a previously submitted/approved notification's fingerprint.
         action_key = 'ful_notify_'+key; existing = job['actions'].get(action_key)
         if existing:
-            with self.workflows.store.transaction() as db:
+            with self.workflows.store.transaction(write=False) as db:
                 row = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
                     (workspace, existing['workflow_id'], existing['workflow_version'])).fetchone()
             require(row is not None, 'FULFILMENT_ACTION_MISSING')
@@ -226,7 +226,7 @@ class ProcurementFulfilment:
 
     def process_fulfilment_message(self, workspace, job, po, message, role, auth):
         project = job['plan']['project_id']; mid = message['message_id']
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             row = db.execute('SELECT body FROM procurement_fulfilment_messages WHERE workspace=? AND project=? AND po=? AND message=?', (workspace, project, po['record_id'], mid)).fetchone()
         if row: state = json.loads(row[0])
         else:
@@ -241,7 +241,7 @@ class ProcurementFulfilment:
                     key+='_structured_control1';workflow['workflow_id']+='_structured_control1'
                 previous = job['actions'].get(key)
                 if previous:
-                    with self.workflows.store.transaction() as db:
+                    with self.workflows.store.transaction(write=False) as db:
                         saved = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
                             (workspace, previous['workflow_id'], previous['workflow_version'])).fetchone()
                     if saved: workflow = json.loads(saved[0])

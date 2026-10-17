@@ -17,6 +17,7 @@ class TriggerScheduler:
         self.stop_event = Event()
         self.thread = None
         self.last_polled = {}
+        self.health={"state":"starting","last_success":None,"last_error":None}
 
     def tick(self):
         lifecycle = self.service.lifecycle
@@ -26,12 +27,15 @@ class TriggerScheduler:
         polled = queued = dispatched = 0
         # Poll bindings are workspace scoped and the worker uses fresh auth.
         with lifecycle.store.transaction(write=False) as db:
-            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers WHERE state='ready'").fetchall()}
+            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations").fetchall()}
         for workspace in workspaces:
+            if self.stop_event.is_set():break
+            lifecycle.reconcile_cleanup(workspace)
             auth = self.authenticate(workspace, "local-builder")
             if not auth:
                 continue
             for binding in lifecycle.poll_bindings(workspace):
+                if self.stop_event.is_set():break
                 binding_id = binding["binding_id"]
                 now = time.time()
                 if now - self.last_polled.get(binding_id, 0) < binding.get("poll_interval_seconds", self.interval):
@@ -76,9 +80,13 @@ class TriggerScheduler:
                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
                     self.last_polled[binding_id] = now
                     continue
-            for job in lifecycle.lease(workspace):
-                lifecycle.execute_job(job["job_id"], runner)
+            for _ in range(10):
+                if self.stop_event.is_set():break
+                jobs=lifecycle.lease(workspace,limit=1,seconds=120)
+                if not jobs:break
+                lifecycle.execute_job(jobs[0]["job_id"], runner)
                 dispatched += 1
+        self.health={"state":"ready","last_success":time.time(),"last_error":None}
         return {"polled": polled, "queued": queued, "dispatched": dispatched}
 
     def start(self):
@@ -90,7 +98,11 @@ class TriggerScheduler:
 
     def _loop(self):
         while not self.stop_event.is_set():
-            self.tick()
+            try:self.tick()
+            except Exception:
+                import logging
+                self.health['state'],self.health['last_error']='error','TRIGGER_WORKER_FAILED'
+                logging.getLogger(__name__).warning('Trigger worker failed; durable jobs retained.')
             self.stop_event.wait(self.interval)
 
     def stop(self):

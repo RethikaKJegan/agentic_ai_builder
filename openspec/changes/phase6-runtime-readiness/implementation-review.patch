@@ -1,0 +1,965 @@
+--- a/frontend/e2e/session-recovery.spec.ts
++++ b/frontend/e2e/session-recovery.spec.ts
+@@ -1,4 +1,7 @@
+ import { test, expect } from "@playwright/test";
++
++// Recovery may span two documented 15-second polling cycles.
++test.setTimeout(60000);
+ 
+ for (const mobile of [false, true]) {
+   test(`open workflows recover a stale session on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
+@@ -21,13 +24,13 @@
+       await route.fulfill({ status: denied ? 401 : 200, json: { request_id: "req_recovery", status: denied ? 401 : 200, data } });
+     });
+     await page.goto("/app/workflows");
+-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
++    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
+     expired = true;
+     const authenticationError = page.getByRole("alert").filter({ hasText: "AUTHENTICATION_REQUIRED" });
+-    await expect(authenticationError).toContainText("Expired local session", { timeout: 12000 });
++    await expect(authenticationError).toContainText("Expired local session", { timeout: 25000 });
+     renewalBlocked = false;
+-    await expect(authenticationError).toHaveCount(0, { timeout: 12000 });
+-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
++    await expect(authenticationError).toHaveCount(0, { timeout: 25000 });
++    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
+     expect(renewals).toBe(1);
+     expect(errors).toEqual([]);
+   });
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -7,6 +7,11 @@
+   type CanonicalWorkflow, type Operation, type SafeError,
+ } from "./contracts.generated";
+ 
++function queryString(filters:Record<string, unknown>) {
++  const query=new URLSearchParams();
++  for(const [key,value] of Object.entries(filters))if(value!==undefined && value!=="")query.set(key,String(value));
++  return query.size?`?${query}`:"";
++}
+ const metadata = { correlation_id: z.string().optional(), contract_versions: z.record(z.string()).optional() };
+ export const registryReviewSchema = z.object({ workflow_id: z.string(), workflow_version: z.number().int().positive(),
+   ready: z.boolean(), reason_codes: z.array(z.string()), items: z.array(z.object({
+@@ -23,8 +28,8 @@
+ const capabilitiesData = CollectionSchema.extend({ items: z.array(z.object({ capability: z.string(), registered_tool_ids: z.array(z.string()) })), ...metadata });
+ const workflowsData = CollectionSchema.extend({ items: z.array(CanonicalWorkflowSchema), ...metadata });
+ export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(),
+-  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().optional(),
+-  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]) });
++  status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().nullable().optional(),
++  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
+ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
+   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
+ const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
+@@ -207,14 +212,14 @@
+     return result.data;
+   }
+ 
+-  async monitoring() {
++  async monitoring(cursors:{source_cursor?:string|undefined;policy_cursor?:string|undefined}={}) {
+     const count=z.number().finite().nonnegative();
+     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+-      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional()})).optional(),
+-      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+-      audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+-    const result=schema.safeParse(await this.read("monitoring"));
++      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional(),state:z.string().optional(),release_state:z.string().optional(),workflow_version:z.number().optional(),delivery:z.string().optional(),event_type:z.string().optional(),source:z.string().optional(),schedule:z.string().nullable().optional(),timezone:z.string().nullable().optional(),preparation_succeeded:z.boolean().optional()})).optional(),
++      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
++      source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
++    const result=schema.safeParse(await this.read(`monitoring${queryString(cursors)}`));
+     if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+     return result.data;
+   }
+@@ -383,11 +388,17 @@
+     return job.result.data;
+   }
+ 
+-  async runs() {
++  async runs(filters: {limit?:number;cursor?:string|undefined;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
+     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
+-    const result = schema.safeParse(await this.read("runs"));
++    const result = schema.safeParse(await this.read(`runs${queryString(filters)}`));
+     if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");
+     return result.data;
++  }
++
++  async eventPage(runId:string, afterSequence=0, limit=100) {
++    const parsed=eventsData.safeParse(await this.read(`runs/${encodeURIComponent(runId)}/events${queryString({after_sequence:afterSequence,limit})}`));
++    if(!parsed.success)return fail("INVALID_API_DATA","The run event response is invalid.");
++    return parsed.data;
+   }
+ 
+   async releaseState(workflowId: string) {
+--- a/frontend/src/api/integration.test.tsx
++++ b/frontend/src/api/integration.test.tsx
+@@ -268,7 +268,7 @@
+     expect(screen.getByText(/runtime API is not connected/)).toBeVisible();
+     expect(screen.queryByRole("button", { name: "Load run" })).toBeNull();
+     const event = fixture("api-control-fixtures.json").valid_run_event as RunEvent;
+-    act(() => useBackend.setState({ session: { ...session(), runtime_available: true } }));
++    act(() => useBackend.setState({ status:"connected",session: { ...session(["runs.view"]), runtime_available: true } }));
+     vi.spyOn(api, "request").mockImplementation(async (operation) => operation === "get_run" ? ({ run: { run_id: event.run_id, workflow_id: event.workflow_id, workflow_version: event.workflow_version, status: "paused_for_approval", approvals: [] } }) as never : ({ items: [event], has_more: false }) as never);
+     view.rerender(<ServerRunView />);
+     fireEvent.change(screen.getByLabelText("Run ID"), { target: { value: event.run_id } });
+@@ -284,7 +284,7 @@
+       approvals: [{ approval_id: "approval_dm", workflow_id: "slack-dm-gmail", workflow_version: 1,
+         status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] }] };
+     const spy = vi.spyOn(api, "runs").mockResolvedValue({ items: [{ ...record, run_id: "run_dm_1" }, { ...record, run_id: "run_dm_2" }], total: 2, has_more: false, next_cursor: null });
+-    useBackend.setState({ session: { ...session(["workflow.approve"]), runtime_available: true, approval_service_available: true } });
++    useBackend.setState({ status:"connected",session: { ...session(["workflow.approve","runs.view"]), runtime_available: true, approval_service_available: true } });
+     render(<ServerRunView approvalsOnly />);
+     await waitFor(() => expect(screen.getByRole("button", { name: /run_dm_1/ })).toBeVisible());
+     expect(screen.getByRole("button", { name: /run_dm_2/ })).toBeVisible();
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -19,12 +19,15 @@
+   can: (permission: string) => boolean;
+ }
+ let initialization: Promise<void> | null = null;
++let overviewRefresh: Promise<void> | null = null;
+ export const useBackend = create<BackendState>((set, get) => ({
+   status: "loading", session: null, tools: [], error: null, reviews: {}, overview: {}, overviewSequence: 0,
+   liveStatus: "connecting", lastOverviewUpdate: null, overviewError: null,
+   acceptReview: (review) => set((s) => ({ reviews: { ...s.reviews, [review.workflow_id]: review } })),
+   can: (permission) => get().session?.auth.decision === "allow" && !!get().session?.auth.permissions.includes(permission),
+-  refreshOverview: async () => {
++  refreshOverview: () => {
++    if(overviewRefresh)return overviewRefresh;
++    overviewRefresh=(async()=>{
+     try {
+       const snapshot = await api.overview();
+       if ((get().status === "connected" || get().status === "unavailable") && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
+@@ -40,6 +43,8 @@
+       set({ liveStatus: "stale", error: failure, overviewError: failure,
+         ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, tools: [], reviews: {} } : {}) });
+     }
++    })().finally(()=>{overviewRefresh=null;});
++    return overviewRefresh;
+   },
+   initialize: () => {
+     if (initialization) return initialization;
+--- a/frontend/src/features/builder/ExecutionView.tsx
++++ b/frontend/src/features/builder/ExecutionView.tsx
+@@ -70,6 +70,8 @@
+             </option>
+           ))}
+         </select>
++        {trace.hasMoreRuns && <button type="button" onClick={trace.loadMoreRuns} className="rounded-lg border px-3 py-2">Older workflow runs</button>}
++        {trace.hasMoreEvents && <span role="status">Loading more recorded events…</span>}
+         <button
+           type="button"
+           onClick={trace.retry}
+--- a/frontend/src/features/builder/NodeTrace.test.tsx
++++ b/frontend/src/features/builder/NodeTrace.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(cleanup);
+ const node = { id: "choose", type: "mesh" as const, position: { x: 0, y: 0 }, data: { kind: "condition" as const, label: "Choose" } };
+ const run = { run_id: "run_one", workflow_id: "workflow", workflow_version: 1, status: "completed" as const, approvals: [] };
+-const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
++const trace = { available: true,hasMoreRuns:false,loadMoreRuns:()=>{},hasMoreEvents:false,loadMoreEvents:()=>{}, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
+ test("historical missing evidence is explicit and unrelated nodes are excluded", () => {
+   render(<NodeTrace node={node} trace={{ ...trace, events: [{ event_id: "evt", run_id: run.run_id, workflow_id: "workflow", workflow_version: 1, timestamp: "2026-10-11T09:00:00Z", source: "runtime", event_type: "node.completed", details: { node_id: "other", output: "unrelated private data" } }] }} />);
+   expect(screen.getAllByText("Not captured for this run.").length).toBeGreaterThan(0);
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -1,8 +1,7 @@
+ import { useEffect, useMemo, useState } from "react";
+ import { api, type RunRecord } from "@/api/client";
+ import { useBackend } from "@/api/state";
+-import { reconcileEvents } from "@/api/control";
+-import type { RunEvent } from "@/api/contracts.generated";
++import { useRunFeed } from "@/features/runs/useRunFeed";
+ import { fromCanonical } from "@/api/mapping";
+ import type { StepStatus } from "@/domain/types";
+ 
+@@ -11,9 +10,10 @@
+   const available = enabled && backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
+   const [runs, setRuns] = useState<RunRecord[]>([]);
+   const [selection, setSelection] = useState("");
+-  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[]; revision: ReturnType<typeof fromCanonical> } | null>(null);
++  const [revision, setRevision] = useState<{runId:string;value:ReturnType<typeof fromCanonical>}|null>(null);
+   const [error, setError] = useState<Error | null>(null);
+-  const [loading, setLoading] = useState(false);
++  const [cursor,setCursor]=useState<string|null>(null);
++  const [historyPage,setHistoryPage]=useState<string|undefined>();
+   const [attempt, setAttempt] = useState(0);
+   const runId = selection || runs[0]?.run_id || "";
+   useEffect(() => {
+@@ -22,40 +22,28 @@
+     let timer: ReturnType<typeof setTimeout>;
+     const refresh = async () => {
+       try {
+-        const collection = await api.runs();
+-        if (!disposed) setRuns(collection.items.filter((run) => run.workflow_id === workflowId));
++        const collection = await api.runs({workflow_id:workflowId,limit:50,cursor:historyPage});
++        if (!disposed) {setRuns(current=>historyPage?[...new Map([...current,...collection.items].map(run=>[run.run_id,run])).values()]:collection.items);setCursor(collection.next_cursor??null);setError(null);}
+       } catch (caught) {
+         if (!disposed) setError(caught instanceof Error ? caught : new Error("Run history could not be loaded."));
+       } finally { if (!disposed) timer = setTimeout(() => void refresh(), 5000); }
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, workflowId, attempt]);
+-  useEffect(() => {
+-    if (!available || !runId) return;
+-    let disposed = false;
+-    let timer: ReturnType<typeof setTimeout>;
+-    const refresh = async () => {
+-      setLoading(true);
+-      let terminal = false;
+-      try {
+-        const result = await api.request("get_run", { run_id: runId });
+-        terminal = ["completed", "failed", "blocked", "rejected", "cancelled"].includes(result.run.status);
+-        if (result.run.workflow_id !== workflowId) throw new Error("This run belongs to another workflow.");
+-        const [timeline, historical] = await Promise.all([api.request("list_run_events", { run_id: runId }), api.request("get_workflow", { workflow_id: workflowId, workflow_version: result.run.workflow_version })]);
+-        if (historical.workflow.workflow_id !== workflowId || historical.workflow.version !== result.run.workflow_version) throw new Error("The server returned a different historical revision.");
+-        const events = reconcileEvents([], timeline.items, result.run);
+-        if (!disposed) { setRecord({ run: result.run, events, revision: fromCanonical(historical.workflow) }); setError(null); }
+-      } catch (caught) {
+-        if (!disposed) { setRecord(null); setError(caught instanceof Error ? caught : new Error("Trace loading failed.")); }
+-      } finally {
+-        if (!disposed) { setLoading(false); if (!terminal) timer = setTimeout(() => void refresh(), 3000); }
+-      }
+-    };
+-    void refresh();
+-    return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, runId, workflowId, attempt]);
+-  const current = available && record?.run.run_id === runId && record.run.workflow_id === workflowId ? record : null;
++  }, [available, workflowId, attempt,historyPage]);
++  const feed=useRunFeed(runId,available,attempt);
++  const historicalRunId=feed.run?.workflow_id===workflowId?feed.run.run_id:undefined;
++  const historicalVersion=feed.run?.workflow_id===workflowId?feed.run.workflow_version:undefined;
++  useEffect(()=>{
++    if(!historicalRunId || !historicalVersion)return;
++    let disposed=false;
++    void api.request("get_workflow",{workflow_id:workflowId,workflow_version:historicalVersion}).then(result=>{
++      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==historicalVersion)throw new Error("The server returned a different historical revision.");
++      if(!disposed){setRevision({runId:historicalRunId,value:fromCanonical(result.workflow)});setError(null);}
++    }).catch(caught=>{if(!disposed)setError(caught instanceof Error?caught:new Error("Historical revision is unavailable."));});
++    return()=>{disposed=true;};
++  },[historicalRunId,historicalVersion,workflowId,attempt]);
++  const current=useMemo(()=>available && feed.run?.workflow_id===workflowId && revision?.runId===runId?{run:feed.run,events:feed.events,revision:revision.value}:null,[available,feed.run,feed.events,workflowId,revision,runId]);
+   const events = useMemo(() => current?.events ?? [], [current]);
+   const runState = useMemo(() => {
+     const states: Record<string, StepStatus | "running"> = {};
+@@ -74,6 +62,6 @@
+     return states;
+   }, [events]);
+   const activeEdges = useMemo(() => new Set(events.flatMap((event) => Array.isArray(event.details?.["selected_edges"]) ? event.details["selected_edges"].filter((id): id is string => typeof id === "string") : [])), [events]);
+-  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error, loading, retry: () => setAttempt(n => n + 1) };
++  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error:error??feed.error, loading:feed.loading, hasMoreRuns:!!cursor, loadMoreRuns:()=>setHistoryPage(cursor??undefined), hasMoreEvents:feed.hasMore, loadMoreEvents:feed.refresh, retry: () => setAttempt(n => n + 1) };
+ }
+ export type WorkflowTrace = ReturnType<typeof useWorkflowTrace>;
+--- a/frontend/src/features/governance/AgentControlTab.tsx
++++ b/frontend/src/features/governance/AgentControlTab.tsx
+@@ -1,7 +1,8 @@
+ import { useMemo } from "react";
+ import { Switch } from "@/components/ui/switch";
++import { useBackend } from "@/api/state";
+ import { useMesh } from "@/domain/store";
+-import { can, resolveControls, SENSITIVE_TOOLS, usageFrom, type AgentControls } from "@/domain/governance";
++import { resolveControls, SENSITIVE_TOOLS, usageFrom, type AgentControls } from "@/domain/governance";
+ import { MODELS, TOOL_CATALOG } from "@/domain/models";
+ import { toast } from "sonner";
+ 
+@@ -15,8 +16,9 @@
+ ];
+ 
+ export function AgentControlTab() {
+-  const { controls, setControls, role, agents, runs, workflows } = useMesh();
+-  const allowed = can(role, "policy.manage");
++  const { controls, setControls, agents, runs, workflows } = useMesh();
++  const backend=useBackend();
++  const allowed=backend.status==="connected" && backend.session?.auth.decision==="allow" && backend.session.auth.roles.includes("admin");
+   const eff = resolveControls(controls.organization, controls.workspace);
+   const usage = useMemo(() => usageFrom(runs), [runs]);
+   const totalCost = runs.reduce((a, r) => a + r.steps.reduce((b, s) => b + s.cost, 0), 0);
+@@ -103,12 +105,12 @@
+         {meter("Spend today vs limit", usage.spendToday, eff.maxSpendUsd, (n) => `$${n.toFixed(2)}`)}
+       </div>
+       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-canvas px-4 py-2.5 text-xs">
+-        <span className="font-medium">Effective:</span>
++        <span className="font-medium">Effective browser draft:</span>
+         <span className={eff.executionEnabled ? "text-success" : "text-destructive"}>{eff.executionEnabled ? "Execution on" : "Execution off"}</span>
+         <span className="text-muted-foreground">· ≤{eff.maxAgentsPerWorkflow} agents/workflow · depth ≤{eff.maxDepth} · ≤{eff.maxChildren} children · {eff.allowedTools ? `${eff.allowedTools.length} tools` : "all tools"} · {eff.blockedModels.length} models restricted{eff.approvalForSensitive ? " · approval on sensitive actions" : ""}</span>
+         <span className="ml-auto text-muted-foreground">Workflows over limit: {workflows.filter((w) => w.nodes.filter((n) => n.data.kind === "agent").length > eff.maxAgentsPerWorkflow).length}</span>
+       </div>
+-      {!allowed && <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: only Organization Admins can change agent controls.</p>}
++      {!allowed && <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: a server-authenticated administrator is required to edit browser draft controls.</p>}
+       <div className="grid gap-4 lg:grid-cols-2">
+         <Column scope="organization" />
+         <Column scope="workspace" />
+--- a/frontend/src/features/runs/ServerRunView.tsx
++++ b/frontend/src/features/runs/ServerRunView.tsx
+@@ -2,8 +2,8 @@
+ import { useEffect, useRef, useState } from "react";
+ import { api, ApiError, type ApprovalRecord, type RunRecord } from "@/api/client";
+ import { useBackend } from "@/api/state";
+-import type { RunEvent } from "@/api/contracts.generated";
+-import { assertRunTransition, reconcileEvents } from "@/api/control";
++import { useRunFeed } from "./useRunFeed";
++import { unsafeText } from "@/api/feedback";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ import { StatusPill } from "@/features/shell/StatusPill";
+ 
+@@ -14,7 +14,7 @@
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState<Error | null>(null);
+   const decide = async (decision: "approved" | "rejected") => {
+-    if (decisionPending.current || !backend.can("workflow.approve")) return;
++    if (decisionPending.current || !backend.can("workflow.approve") || !record.allowed_decisions.includes(decision)) return;
+     decisionPending.current = true; setBusy(true); setError(null);
+     try {
+       const result = await api.request("decide_approval", { approval_id: record.approval_id, workflow_id: record.workflow_id,
+@@ -25,10 +25,11 @@
+   };
+   return <div className="space-y-2 rounded-lg border border-border p-3">
+     <p className="text-sm">Approval {record.approval_id} · {record.status} · v{record.workflow_version}</p>
++    <p className="text-xs text-muted-foreground">Required roles: {record.required_roles?.join(", ") || "Determined by the server gate"}</p>
+     <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
+     {emailPreview != null && <pre aria-label="Email awaiting approval" className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{JSON.stringify(emailPreview, null, 2)}</pre>}
+     {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
+-    {record.status === "pending" && !backend.can("workflow.approve") && <p className="text-xs text-muted-foreground">workflow.approve permission is required to decide this approval.</p>}
++    {record.status === "pending" && (!backend.can("workflow.approve") || !record.allowed_decisions.length) && <p className="text-xs text-muted-foreground">The exact gate role, workflow.approve permission and workspace membership are required to decide this approval.</p>}
+     {record.status === "unmatched" && <p className="text-xs text-muted-foreground">This approval does not match the current workflow revision.</p>}
+     <ApiFeedback error={error} />
+   </div>;
+@@ -37,28 +38,17 @@
+ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boolean }) {
+   const backend = useBackend();
+   const [runId, setRunId] = useState("");
+-  const [run, setRun] = useState<RunRecord | null>(null);
+-  const [availableRuns, setAvailableRuns] = useState<RunRecord[]>([]);
+-  const loadPending = useRef(false);
+-  const [events, setEvents] = useState<RunEvent[]>([]);
+-  const [busy, setBusy] = useState(false);
+-  const [error, setError] = useState<Error | null>(null);
+-  const loadRun = async (selectedRunId: string) => {
+-    if (!selectedRunId.trim() || loadPending.current) return;
+-    loadPending.current = true; setBusy(true); setError(null);
+-    try {
+-      const result = await api.request("get_run", { run_id: selectedRunId.trim() });
+-      if (run?.run_id === result.run.run_id) {
+-        if (run.workflow_id !== result.run.workflow_id || run.workflow_version !== result.run.workflow_version) throw new Error("The runtime changed the workflow revision for an existing run.");
+-        assertRunTransition(run.status, result.run.status);
+-      }
+-      const timeline = await api.request("list_run_events", { run_id: result.run.run_id });
+-      const incoming = reconcileEvents(run?.run_id === result.run.run_id ? events : [], timeline.items, result.run);
+-      setRun(result.run); setEvents(incoming);
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("Run loading failed.")); }
+-    finally { loadPending.current = false; setBusy(false); }
+-  };
+-  const load = async () => loadRun(runId);
++  const [selected,setSelected]=useState("");
++  const feed=useRunFeed(selected,backend.status==="connected" && !!backend.session?.runtime_available && backend.can("runs.view"));
++  const {run,events}=feed;
++  const busy=feed.loading;
++  const [availableRuns,setAvailableRuns]=useState<RunRecord[]>([]);
++  const [error,setError]=useState<Error|null>(null);
++  const [filters,setFilters]=useState({workflow_id:"",status:"",from_date:"",to_date:""});
++  const [cursor,setCursor]=useState<string|undefined>();
++  const [next,setNext]=useState<string|null>(null);
++  const loadRun=async(id:string)=>{setRunId(id);if(id===selected)feed.refresh();else setSelected(id);};
++  const load=async()=>loadRun(runId.trim());
+   useEffect(() => {
+     if (backend.status !== "connected" || !backend.session?.runtime_available) return;
+     const selected = new URL(window.location.href).searchParams.get("run");
+@@ -66,30 +56,28 @@
+     // Load the explicit run link once after the session becomes available.
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [backend.status, backend.session?.runtime_available]);
++  const canViewRuns=backend.can("runs.view");
+   useEffect(() => {
+-    // AppShell establishes the local development session asynchronously.  Do
+-    // not race its /session call from a protected route: a 401 is expected
+-    // until that cookie has been received and should never become a sticky UI
+-    // error on the Runs or Approvals pages.
+-    if (backend.status !== "connected") return;
+-    let cancelled = false;
+-    const refresh = async () => {
+-      try {
+-        const collection = await api.runs();
+-        if (!cancelled) {
+-          setAvailableRuns(collection.items.filter((item) => !approvalsOnly || item.approvals.some((approval) => approval.status === "pending")));
+-          setError(null);
+-        }
+-      } catch (caught) {
+-        if (!cancelled) setError(caught instanceof ApiError ? caught : new Error("Unable to load server runs."));
+-      }
++    if(backend.status!=="connected" || !canViewRuns)return;
++    let cancelled=false;let timer:ReturnType<typeof setTimeout>;
++    const refresh=async()=>{
++      try{
++        const collection=await api.runs({...filters,limit:50,cursor,pending_only:approvalsOnly});
++        if(!cancelled){setAvailableRuns(collection.items);setNext(collection.next_cursor??null);setError(null);}
++      }catch(caught){if(!cancelled)setError(caught instanceof ApiError?caught:new Error("Unable to load server runs."));}
++      finally{if(!cancelled)timer=setTimeout(()=>void refresh(),15000);}
+     };
+-    void refresh();
+-    const timer = window.setInterval(() => void refresh(), 5000);
+-    return () => { cancelled = true; window.clearInterval(timer); };
+-  }, [approvalsOnly, backend.status]);
++    void refresh();return()=>{cancelled=true;clearTimeout(timer);};
++  },[approvalsOnly,backend.status,canViewRuns,filters,cursor]);
+   if (!backend.session?.runtime_available) return <p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">The runtime API is not connected. No {approvalsOnly ? "approval requests" : "execution records"} are available.</p>;
+   return <div className="space-y-4">
++    <p className="text-xs text-muted-foreground">Persisted events update every 3 seconds while a run is active. Interrupted reads retry with bounded backoff; terminal runs stop refreshing. Run history refreshes every 15 seconds.</p>
++    <div className="flex flex-wrap gap-2" aria-label="Run filters">
++      <label className="text-xs">Workflow<input aria-label="Filter workflow" value={filters.workflow_id} onChange={e=>{setCursor(undefined);setFilters({...filters,workflow_id:e.target.value});}} className="block rounded border bg-background p-2" /></label>
++      <label className="text-xs">Status<select aria-label="Filter status" value={filters.status} onChange={e=>{setCursor(undefined);setFilters({...filters,status:e.target.value});}} className="block rounded border bg-background p-2"><option value="">All statuses</option>{["queued","running","paused_for_approval","completed","failed","blocked","rejected","cancelled"].map(status=><option key={status} value={status}>{status}</option>)}</select></label>
++      <label className="text-xs">From<input aria-label="Filter from date" type="date" value={filters.from_date} onChange={e=>{setCursor(undefined);setFilters({...filters,from_date:e.target.value});}} className="block rounded border bg-background p-2" /></label>
++      <label className="text-xs">Until<input aria-label="Filter to date" type="date" value={filters.to_date.slice(0,10)} onChange={e=>{setCursor(undefined);setFilters({...filters,to_date:e.target.value?e.target.value+"T23:59:59.999Z":""});}} className="block rounded border bg-background p-2" /></label>
++    </div>
+     <div className="space-y-2" aria-label={approvalsOnly ? "Pending approvals" : "Recent runs"}>
+       {availableRuns.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">{approvalsOnly ? "No pending approvals." : "No runs yet."}</p>}
+       {availableRuns.map((item) => <button key={item.run_id} type="button" disabled={busy} onClick={() => void loadRun(item.run_id)} className="block w-full rounded-xl border border-border p-3 text-left hover:border-primary">
+@@ -97,11 +85,12 @@
+         <p className="text-xs text-muted-foreground">{item.workflow_id} · revision v{item.workflow_version} · {item.approvals.filter((approval) => approval.status === "pending").length} pending approval(s)</p>
+       </button>)}
+     </div>
++    <div className="flex gap-2"><button type="button" disabled={!cursor} onClick={()=>setCursor(undefined)} className="rounded border px-3 py-2 text-xs disabled:opacity-40">Newest runs</button><button type="button" disabled={!next} onClick={()=>setCursor(next??undefined)} className="rounded border px-3 py-2 text-xs disabled:opacity-40">Older runs</button></div>
+     <form onSubmit={(event) => { event.preventDefault(); void load(); }} className="flex gap-2">
+       <input aria-label="Run ID" disabled={busy} value={runId} onChange={(event) => setRunId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm" placeholder="Run ID from an execution response" />
+       <button disabled={busy || !runId.trim()} className="rounded-lg border border-border px-4 text-sm disabled:opacity-40">{busy ? "Loading…" : "Load run"}</button>
+     </form>
+-    <ApiFeedback error={error} />
++    <ApiFeedback error={error??feed.error} />
+     {run && <><p className="text-sm">{run.run_id} · {run.workflow_id} · v{run.workflow_version} <StatusPill status={run.status} /></p>
+       {run.approvals.map((approval) => {
+         const matched = approval.workflow_id === run.workflow_id && approval.workflow_version === run.workflow_version;
+@@ -109,6 +98,8 @@
+         const preview = events.find((event) => event.event_type === "approval.pending" && event.details?.["approval_id"] === record.approval_id)?.details?.["email_preview"];
+         return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} emailPreview={preview} onUpdated={() => void loadRun(run.run_id)} />;
+       })}
++      {events.filter(event=>event.event_type==="node.failed").map(event=><p key={event.event_id} className="text-sm text-destructive">Failed node: {String(event.details?.["node_id"]??"unknown")} · {typeof event.details?.["error_code"]==="string" && !unsafeText(event.details["error_code"])?event.details["error_code"]:"Inspect the recorded failure reference"}</p>)}
++      {feed.hasMore && <p role="status" className="text-xs">Loading the next recorded event page…</p>}
+       {!approvalsOnly && <ol className="divide-y divide-border rounded-xl border border-border" aria-label="Run events">{events.map((event) => <li key={event.event_id} className="p-3"><p className="text-sm">{event.event_type}</p><p className="text-xs text-muted-foreground">{event.timestamp} · {event.source} · {event.event_id} · v{event.workflow_version}</p></li>)}</ol>}
+     </>}
+   </div>;
+--- a/frontend/src/features/runs/useRunFeed.ts
++++ b/frontend/src/features/runs/useRunFeed.ts
+@@ -27,6 +27,7 @@
+       setLoading(true);let done=false;let more=false;
+       try{
+         const result=await sharedRead(`run:${runId}`,()=>api.request("get_run",{run_id:runId}));
++        if(result.run.run_id!==runId)throw new Error("The runtime returned a different run.");
+         if(previous){
+           if(previous.run.workflow_id!==result.run.workflow_id || previous.run.workflow_version!==result.run.workflow_version)throw new Error("Run revision changed.");
+           assertRunTransition(previous.run.status,result.run.status);
+--- a/frontend/src/screens/app.governance.tsx
++++ b/frontend/src/screens/app.governance.tsx
+@@ -2,8 +2,9 @@
+ import { useState } from "react";
+ import { Plus, Trash2 } from "lucide-react";
+ import { toast } from "sonner";
++import { useBackend } from "@/api/state";
+ import { useMesh } from "@/domain/store";
+-import { can, effectivePolicy, roleLabel, type GuardrailKey, type Policy, type PolicyRule } from "@/domain/governance";
++import { effectivePolicy, roleLabel, type GuardrailKey, type Policy, type PolicyRule } from "@/domain/governance";
+ import { MODELS, getModel } from "@/domain/models";
+ import { uid } from "@/domain/ids";
+ import { PageHeader } from "@/features/runs/RunTrace";
+@@ -23,8 +24,9 @@
+ }
+ 
+ export default function Governance() {
+-  const { policies, role, upsertPolicy, removePolicy, audit } = useMesh();
+-  const allowed = can(role, "policy.manage");
++  const { policies, upsertPolicy, removePolicy, audit } = useMesh();
++  const backend=useBackend();
++  const allowed=backend.status==="connected" && backend.session?.auth.decision==="allow" && backend.session.auth.roles.includes("admin");
+   const eff = effectivePolicy(policies);
+   const [type, setType] = useState<PolicyRule["type"]>("block-model");
+   const [modelId, setModelId] = useState("gpt-5");
+@@ -32,6 +34,7 @@
+   const [usd, setUsd] = useState("0.5");
+ 
+   const add = () => {
++    if(!allowed)return;
+     const rule: PolicyRule = type === "block-model" ? { type, modelId } : type === "require-guardrail" ? { type, guardrail: guard } : { type, usd: Math.max(0.001, Number(usd) || 0.5) };
+     const p: Policy = { id: uid("pol"), scope: "workspace", name: describe(rule), description: "Added by workspace admin.", rule, enabled: true };
+     upsertPolicy(p);
+@@ -59,13 +62,13 @@
+   return (
+     <div className="mx-auto max-w-5xl p-6 md:p-10">
+       <PageHeader title="Governance" sub="Live server guardrails and audit records, alongside local policy drafts." />
+-      {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: only Organization Admins can change policies.</p>}
++      {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: a server-authenticated administrator is required to edit these browser drafts. Enforced production rules are read-only.</p>}
+       <Tabs defaultValue="usage">
+-        <TabsList className="flex-wrap"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Live governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
++        <TabsList className="h-auto flex-wrap justify-start gap-1"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Enforced governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
+         <TabsContent value="control" className="mt-4"><AgentControlTab /></TabsContent>
+         <TabsContent value="usage" className="mt-4"><LiveRuntimePanel /></TabsContent>
+         <TabsContent value="policies" className="mt-4 space-y-4">
+-          <p className="text-sm text-muted-foreground">These policy drafts are stored in this browser and do not enforce server policy.</p>
++          <p className="text-sm text-muted-foreground">Browser-only policy drafts. These changes do not enforce server policy. Production policy editing is unavailable until authenticated backend persistence and validation are implemented.</p>
+           <Section scope="organization" />
+           <Section scope="workspace" />
+           {allowed && (
+--- a/frontend/src/screens/app.integrations.tsx
++++ b/frontend/src/screens/app.integrations.tsx
+@@ -22,6 +22,7 @@
+   };
+   return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1>
+     <p className="mt-2 text-sm text-muted-foreground">Configuration and verified connectivity are separate. Credentials remain on the server. Read-only checks never send email or modify provider resources.</p>
++    <p className="mt-3 rounded-lg border p-3 text-sm">Setup: register each required tool, configure its server credential and source resource, review exact revision grants, then activate the published release. A configured or verified connection alone does not activate a trigger. See Monitoring for preparation, release and poll health.</p>
+     <ApiFeedback error={backend.error} />
+     {backend.status !== "connected" && <p role="status" className="mt-4 text-sm text-muted-foreground">Connect to the backend to inspect registered integrations.</p>}
+     <div className="mt-8 grid gap-4 md:grid-cols-2">{tools.map(tool => {
+@@ -34,6 +35,7 @@
+         {result?.live_test_supported && <button type="button" disabled={pending[provider] || !admin || !result.configured} className="ml-2 mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "connection")}>Verify connection</button>}
+         {!backend.can("tools.read") && <p className="mt-2 text-xs">tools.read permission is required.</p>}
+         {result?.live_test_supported && !admin && <p className="mt-2 text-xs">An administrator must verify connections.</p>}
++        {!configured && <p className="mt-2 text-xs">Required setup: configure enabled server tools and their credentials, then check configuration again.</p>}
+         {result && <p role="status" className="mt-2 text-xs text-muted-foreground">{result.message}</p>}
+         <ApiFeedback error={errors[provider]} />
+       </section>;
+--- a/frontend/src/screens/app.monitoring.tsx
++++ b/frontend/src/screens/app.monitoring.tsx
+@@ -2,6 +2,7 @@
+ import { useEffect, useState } from "react";
+ import { api } from "@/api/client";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
++import { ServerRunView } from "@/features/runs/ServerRunView";
+ import { PageHeader } from "@/features/runs/RunTrace";
+ 
+ type Monitoring=Awaited<ReturnType<typeof api.monitoring>>;
+@@ -9,33 +10,36 @@
+ export function LiveRuntimePanel() {
+   const [data, setData] = useState<Monitoring | null>(null);
+   const [error, setError] = useState<Error | null>(null);
++  const [cursor,setCursor]=useState<{source_cursor?:string|undefined;policy_cursor?:string|undefined}>({});
+   useEffect(() => {
+     let cancelled = false;
+     let timer:ReturnType<typeof setTimeout>;
+     const load = async () => {
+       try {
+-        const result=await api.monitoring();
++        const result=await api.monitoring(cursor);
+         if (!cancelled) { setData(result); setError(null); }
+       } catch (caught) { if (!cancelled) setError(caught instanceof Error ? caught : new Error("Monitoring is unavailable.")); }
+       finally {if(!cancelled)timer=setTimeout(()=>void load(),5000);}
+     };
+     void load();
+     return () => { cancelled = true; clearTimeout(timer); };
+-  }, []);
++  }, [cursor]);
+   return <div className="space-y-6">
++    <p className="text-xs text-muted-foreground">Bounded polling every 15 seconds; persisted records remain authoritative. Enforced policies are read-only and scoped to the displayed revision.</p>
+     <ApiFeedback error={error} />
+     {!error && !data && <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Loading monitoring data…</p>}
+     {data && <><div className="grid gap-3 md:grid-cols-4">{[["Runs", data.runs.total], ["Active", data.runs.active], ["Completed", data.runs.completed], ["Failed", data.runs.failed]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-border p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>)}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime usage</p><p className="mt-2 text-sm text-muted-foreground">{data.events} events · {data.usage.tool_calls} tool calls · {data.usage.llm_calls} model calls · {data.usage.tokens} tokens · ${Number(data.usage.estimated_cost_usd).toFixed(4)} estimated</p></div>
+-      <div className="rounded-xl border border-border p-4"><p className="font-medium">Live trigger health</p>{(data.sources ?? []).map(source => <div key={source.binding_id} className="mt-3 text-sm"><p>{source.workflow_id} · {source.provider_id} · {source.health}</p>{source.error_code && <p className="text-destructive">{source.error_code}: polling failed before dispatch. The checkpoint is retained for retry.</p>}<p className="text-xs text-muted-foreground">{source.baseline_ready ? "Baseline established" : "Waiting for baseline"} · Last successful poll: {source.last_successful_poll ?? "none"}</p></div>)}{!data.sources?.length && <p className="mt-2 text-sm text-muted-foreground">No registered triggers.</p>}</div>
+-      <div className="rounded-xl border border-border p-4"><p className="font-medium">Reviewed workflow guardrails</p>{(data.policies ?? []).map(policy => <div key={policy.workflow_id} className="mt-3 text-sm"><p>{policy.workflow_id} · v{policy.version} · {policy.action_approval_required ? "Action approval required" : "No workflow action approval gate"}</p>{policy.agents.map(agent => <div key={agent.agent_id} className="mt-2 text-xs text-muted-foreground"><p>{agent.agent_id}</p><p>{Object.entries(agent.guardrails ?? {}).map(([key, enabled]) => `${key}: ${enabled ? "on" : "off"}`).join(" · ")}</p><p>Model calls ≤ {agent.limits.max_llm_calls} · Tool calls ≤ {agent.limits.max_tool_calls} · Retries ≤ {agent.limits.max_retries}</p></div>)}</div>)}</div>
++      <div className="rounded-xl border border-border p-4"><p className="font-medium">Live trigger health</p>{(data.sources ?? []).map(source => <div key={source.binding_id} className="mt-3 text-sm"><p>{source.workflow_id} · {source.provider_id} · {source.health}</p><p className="text-xs text-muted-foreground">Release: {source.release_state ?? "unknown"} · v{source.workflow_version ?? "unknown"} · Trigger: {source.delivery ?? "unknown"} / {source.event_type ?? "unknown"} · Source: {source.source ?? "not provided"}</p><p className="text-xs text-muted-foreground">Preparation: {source.preparation_succeeded ? "succeeded" : "not ready"}{source.schedule ? ` · Schedule: ${source.schedule} (${source.timezone ?? "timezone missing"})` : ""}</p>{source.release_state !== "active" && <p className="text-xs">This release cannot receive active automation events.</p>}{source.error_code && <p className="text-destructive">{source.error_code}: polling failed before dispatch. The checkpoint is retained for retry.</p>}<p className="text-xs text-muted-foreground">{source.baseline_ready ? "Baseline established" : "Waiting for baseline"} · Last successful poll: {source.last_successful_poll ?? "none"}</p></div>)}{!data.sources?.length && <p className="mt-2 text-sm text-muted-foreground">No registered triggers.</p>}</div>
++      <div className="rounded-xl border border-border p-4"><p className="font-medium">Backend-enforced revision guardrails</p>{(data.policies ?? []).map(policy => <div key={policy.workflow_id} className="mt-3 text-sm"><p>{policy.workflow_id} · v{policy.version} · {policy.scope ?? "current workspace"} · {policy.enforcement ?? "approved revision"} · Policy version {policy.policy_version ?? "revision-bound"} · {policy.action_approval_required ? "Action approval required" : "No workflow action approval gate"}</p>{policy.agents.map(agent => <div key={agent.agent_id} className="mt-2 text-xs text-muted-foreground"><p>{agent.agent_id}</p><p>{Object.entries(agent.guardrails ?? {}).map(([key, enabled]) => `${key}: ${enabled ? "on" : "off"}`).join(" · ")}</p><p>Model calls ≤ {agent.limits.max_llm_calls} · Tool calls ≤ {agent.limits.max_tool_calls} · Retries ≤ {agent.limits.max_retries}</p></div>)}</div>)}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime audit</p>{(data.audit ?? []).map(event => <p key={event.event_id} className="mt-2 text-xs text-muted-foreground">{event.timestamp} · {event.event_type} · {event.run_id}</p>)}{!data.audit?.length && <p className="mt-2 text-sm text-muted-foreground">No runtime audit events yet.</p>}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Run status distribution</p><div className="mt-4 space-y-2">{Object.entries(data.status_breakdown ?? {}).map(([status, count]) => <div key={status} className="flex items-center gap-3 text-xs"><span className="w-32 text-muted-foreground">{status}</span><div className="h-2 flex-1 rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${data.runs.total ? Math.max(2, (count / data.runs.total) * 100) : 0}%` }} /></div><span>{count}</span></div>)}</div><p className="mt-4 text-xs text-muted-foreground">Average completed duration: {Number(data.duration_seconds?.avg ?? 0).toFixed(2)}s</p></div>
+       <div className="rounded-xl border border-border"><p className="border-b border-border p-4 font-medium">Recent traces</p>{data.latest.length === 0 ? <p className="p-6 text-sm text-muted-foreground">No runtime traces yet.</p> : data.latest.map((run) => <div key={run.run_id} className="border-b border-border p-4 last:border-0"><p className="text-sm font-medium">{run.run_id} · {run.status}</p><p className="mt-1 text-xs text-muted-foreground">{run.correlation_id} · {run.trace_reference}</p></div>)}</div>
++      <div className="flex flex-wrap gap-2"><button type="button" disabled={!cursor.source_cursor && !cursor.policy_cursor} onClick={()=>setCursor({})} className="rounded border px-3 py-2 text-xs disabled:opacity-40">First readiness page</button>{data.source_next_cursor && <button type="button" onClick={()=>setCursor({...cursor,source_cursor:data.source_next_cursor??undefined})} className="rounded border px-3 py-2 text-xs">More triggers</button>}{data.policy_next_cursor && <button type="button" onClick={()=>setCursor({...cursor,policy_cursor:data.policy_next_cursor??undefined})} className="rounded border px-3 py-2 text-xs">More enforced revisions</button>}</div>
+     </>}
+   </div>;
+ }
+ 
+ export default function Screen() {
+-  return <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-10"><PageHeader title="Monitoring" sub="Workspace-scoped runtime usage, source health, guardrails and audit events." /><LiveRuntimePanel /></div>;
++  return <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-10"><PageHeader title="Monitoring" sub="Workspace-scoped runtime usage, source health, guardrails and audit events." /><LiveRuntimePanel /><section className="space-y-4"><h2 className="text-lg font-medium">Filtered run history</h2><ServerRunView /></section></div>;
+ }
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -32,20 +32,13 @@
+   const [actionError, setActionError] = useState<Error | null>(null);
+   useEffect(() => {
+     if (backendStatus !== "connected") return;
+-    void refreshOverview();
+-    const timer = window.setInterval(() => void useBackend.getState().refreshOverview(), 5000);
+-    const source = typeof EventSource === "undefined" ? null : new EventSource(`/api/backend/workflow-overview/events?after_sequence=${useBackend.getState().overviewSequence}`);
+-    if (source) {
+-      source.onopen = () => useBackend.setState({ liveStatus: "live" });
+-      source.onmessage = (message) => {
+-        const sequence = Number(message.lastEventId);
+-        if (!Number.isSafeInteger(sequence) || sequence <= useBackend.getState().overviewSequence) return;
+-        useBackend.setState({ overviewSequence: sequence });
+-        void useBackend.getState().refreshOverview();
+-      };
+-      source.onerror = () => useBackend.setState({ liveStatus: "stale" });
+-    }
+-    return () => { window.clearInterval(timer); source?.close(); };
++    let stopped=false;let timer:ReturnType<typeof setTimeout>;
++    const refresh=async()=>{
++      await refreshOverview();
++      if(!stopped)timer=setTimeout(()=>void refresh(),15000);
++    };
++    void refresh();
++    return()=>{stopped=true;clearTimeout(timer);};
+   }, [backendStatus, refreshOverview]);
+ 
+   const run = async (workflowId: string) => {
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -387,7 +387,7 @@
+         if not isinstance(key, str) or not 8 <= len(key) <= 128:
+             raise RuntimeFailure('INVALID_IDEMPOTENCY_KEY', 'An approval retry key is required.', 400)
+         with runtime.store.transaction() as db:
+-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=?', (approver['subject']['workspace_id'],)).fetchall()
++            rows = db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND EXISTS (SELECT 1 FROM json_each(runtime_runs.document,'$.approvals') a WHERE json_extract(a.value,'$.approval_id')=?) LIMIT 1", (approver['subject']['workspace_id'], payload.get('approval_id'))).fetchall()
+             run = next((json.loads(row[0]) for row in rows if any(a['approval_id'] == payload.get('approval_id') for a in json.loads(row[0])['approvals'])), None)
+             if run is None:
+                 raise RuntimeFailure('APPROVAL_NOT_FOUND', 'The approval was not found in this workspace.', 404)
+@@ -396,9 +396,14 @@
+             workflow = runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version'])
+             if not workflow or digest(workflow) != run['workflow_digest'] or workflow['status'] not in {'approved', 'published'}:
+                 raise RuntimeFailure('REVISION_CHANGED', 'The reviewed approval revision is no longer current.')
+-            gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == run['approval_context']['gate_id'])
+-            # Run actions can be approved by any authenticated member of this
+-            # workspace. Publication and execution keep their own permissions.
++            evidence = db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' AND json_extract(document,'$.details.approval_id')=? ORDER BY sequence LIMIT 1", (run['workspace_id'], run['run_id'], payload.get('approval_id'))).fetchone()
++            node_id = json.loads(evidence[0]).get('details', {}).get('node_id') if evidence else None
++            policy_node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), None)
++            gate = next((g for g in workflow['approval_gates'] if policy_node and g['approval_gate_id'] == policy_node.get('approval_gate_id')), None)
++            if gate is None:
++                raise RuntimeFailure('APPROVAL_POLICY_UNAVAILABLE', 'The exact recorded approval policy is unavailable.')
++            runtime.authorize(approver, 'workflow.approve', set(gate['approver_roles']))
++            # The exact persisted revision gate determines decision authority.
+             approval = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
+             decision = payload.get('decision')
+             if decision not in {'approved', 'rejected'}:
+--- a/runtime/history.py
++++ b/runtime/history.py
+@@ -20,11 +20,11 @@
+ def query_options(query, kind):
+     allowed = {'limit', 'after_sequence'} if kind == 'events' else {'limit', 'cursor', 'workflow_id', 'status', 'from_date', 'to_date', 'pending_only'}
+     if kind == 'monitoring':
+-        allowed = {'limit', 'cursor'}
++        allowed = {'limit', 'source_cursor', 'policy_cursor'}
+     if set(query) - allowed - {'request_id'}:
+         raise RuntimeFailure('INVALID_REQUEST', 'This history filter is unsupported.', 400)
+     result = {key: value for key, value in query.items() if key in allowed}
+-    for name in {'limit', 'cursor', 'after_sequence'} & result.keys():
++    for name in {'limit', 'cursor', 'after_sequence', 'source_cursor', 'policy_cursor'} & result.keys():
+         result[name] = integer(result[name], 1 if name == 'limit' else 0, 500 if name == 'limit' else 9223372036854775807)
+     if 'pending_only' in result:
+         if result['pending_only'] not in {'true', 'false'}:
+@@ -39,16 +39,24 @@
+         if isinstance(run.get(key), (int, float)):
+             result[key] = run[key]
+     workflow = None
++    gates_by_approval = {}
++    if result['approvals']:
++        for encoded, in db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' ORDER BY sequence", (run['workspace_id'], run['run_id'])):
++            details = json.loads(encoded).get('details', {})
++            gates_by_approval[details.get('approval_id')] = details.get('node_id')
+     for approval in result['approvals']:
+         if workflow is None:
+             workflow = runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {}
+         context = run.get('approval_context', {})
+-        gate = next((g for g in workflow.get('approval_gates', []) if g['approval_gate_id'] == context.get('gate_id')), None)
++        node_id = gates_by_approval.get(approval['approval_id'])
++        node = next((n for n in workflow.get('nodes', []) if n['node_id'] == node_id), None)
++        gate_id = node.get('approval_gate_id') if node else context.get('gate_id') if approval['status'] == 'pending' else None
++        gate = next((g for g in workflow.get('approval_gates', []) if g['approval_gate_id'] == gate_id), None)
+         roles = gate['approver_roles'] if gate else []
+         approval['required_roles'] = roles
+         eligible = (gate and auth.get('decision') == 'allow' and 'workflow.approve' in auth.get('permissions', [])
+                     and bool(set(auth.get('roles', [])) & set(roles))
+-                    and bool(set(auth.get('scopes', [])) & {'workspace:read', 'workspace:write'})
++                    and bool(set(auth.get('scopes', [])) & {'workspace:read', 'workspace:write'}))
+         if not eligible or approval['status'] != 'pending':
+             approval['allowed_decisions'] = []
+     return result
+@@ -114,10 +122,11 @@
+     return dict(items=items, total=total, has_more=more, next_cursor=str(rows[limit - 1][0]) if more else None)
+ 
+ 
+-def monitoring(runtime, auth, limit=50, cursor=None):
++def monitoring(runtime, auth, limit=50, source_cursor=None, policy_cursor=None):
+     runtime.authorize(auth, 'runs.view', ROLES)
+     workspace = auth['subject']['workspace_id']; limit = integer(limit, 1, 500)
+-    after = integer(cursor or 0)
++    source_after = integer(source_cursor or 0)
++    policy_after = integer(policy_cursor or 0)
+     usage_keys = ['llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd']
+     with runtime.store.transaction(write=False) as db:
+         counts = db.execute("SELECT json_extract(document,'$.status'),COUNT(*) FROM runtime_runs WHERE workspace=? GROUP BY json_extract(document,'$.status')", (workspace,)).fetchall()
+@@ -130,7 +139,7 @@
+         audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+         sources, policies = [], []
+         if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
+-            rows = db.execute('SELECT t.rowid,t.workflow_id,t.state,t.document,r.document FROM lifecycle_triggers t JOIN lifecycle_releases r ON r.release_id=t.release_id AND r.workspace=t.workspace WHERE t.workspace=? AND t.rowid>? ORDER BY t.rowid LIMIT ?', (workspace, after, limit + 1)).fetchall()
++            rows = db.execute('SELECT t.rowid,t.workflow_id,t.state,t.document,r.document FROM lifecycle_triggers t JOIN lifecycle_releases r ON r.release_id=t.release_id AND r.workspace=t.workspace WHERE t.workspace=? AND t.rowid>? ORDER BY t.rowid LIMIT ?', (workspace, source_after, limit + 1)).fetchall()
+             for position, workflow_id, state, encoded, release_doc in rows[:limit]:
+                 trigger, release = json.loads(encoded), json.loads(release_doc)
+                 checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
+@@ -146,7 +155,7 @@
+             source_more, source_cursor = False, None
+         # Only approved/published revisions are enforced candidates. Drafts are
+         # explicitly excluded. Read a bounded page, never all workflow documents.
+-        rows = db.execute("SELECT r.rowid,r.document FROM revisions r WHERE r.workspace=? AND r.rowid>? AND json_extract(r.document,'$.status') IN ('approved','published') AND r.version=(SELECT MAX(x.version) FROM revisions x WHERE x.workspace=r.workspace AND x.workflow_id=r.workflow_id AND json_extract(x.document,'$.status') IN ('approved','published')) ORDER BY r.rowid LIMIT ?", (workspace, after, limit + 1)).fetchall()
++        rows = db.execute("SELECT r.rowid,r.document FROM revisions r WHERE r.workspace=? AND r.rowid>? AND json_extract(r.document,'$.status') IN ('approved','published') AND r.version=(SELECT MAX(x.version) FROM revisions x WHERE x.workspace=r.workspace AND x.workflow_id=r.workflow_id AND json_extract(x.document,'$.status') IN ('approved','published')) ORDER BY r.rowid LIMIT ?", (workspace, policy_after, limit + 1)).fetchall()
+         for position, encoded in rows[:limit]:
+             workflow = json.loads(encoded)
+             active = None
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -171,17 +171,12 @@
+ 
+     def get_run(self, run_id, auth):
+         with self.store.transaction(write=False) as db:
+-            return self.public(self.load(db, run_id, auth))
+-
+-    def list_runs(self, auth, limit=100, status=None):
+-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-        workspace = auth['subject']['workspace_id']
+-        with self.store.transaction(write=False) as db:
+-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+-        items = [self.public(json.loads(row[0])) for row in rows]
+-        if status:
+-            items = [item for item in items if item['status'] == status]
+-        return {'items': items, 'total': len(items), 'has_more': len(items) >= min(max(int(limit), 1), 500), 'next_cursor': None}
++            from .history import public_run
++            return public_run(self, db, self.load(db, run_id, auth), auth)
++
++    def list_runs(self, auth, limit=100, status=None, **filters):
++        from .history import runs
++        return runs(self, auth, limit=limit, status=status, **filters)
+ 
+     def list_approvals(self, auth, pending_only=False, limit=100):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+@@ -196,56 +191,13 @@
+                     items.append({**approval, 'run_id': run['run_id']})
+         return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
+ 
+-    def events(self, run_id, auth):
+-        with self.store.transaction(write=False) as db:
+-            self.load(db, run_id, auth)
+-            rows = db.execute('SELECT sequence, document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id)).fetchall()
+-            items = []
+-            for sequence, document in rows:
+-                event = json.loads(document)
+-                event['details'] = {**event.get('details', {}), 'recorded_sequence': sequence}
+-                items.append(event)
+-            return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+-
+-    def monitoring(self, auth):
+-        """Return workspace-scoped counters and safe trace references."""
+-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-        workspace = auth['subject']['workspace_id']
+-        with self.store.transaction(write=False) as db:
+-            runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
+-            event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+-            audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+-            sources = []
+-            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
+-                for workflow_id, state, document in db.execute('SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?', (workspace,)):
+-                    trigger = json.loads(document)
+-                    checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
+-                    sources.append(dict(workflow_id=workflow_id, binding_id=trigger['binding_id'], provider_id=trigger['provider_id'],
+-                                        state=state, health=trigger.get('health', state), error_code=trigger.get('last_error_code'),
+-                                        baseline_ready=checkpoint is not None, last_successful_poll=checkpoint[0] if checkpoint else None))
+-            policies = []
+-            for workflow in self.store.list(db, workspace):
+-                if workflow['status'] not in {'approved', 'published'}:
+-                    continue
+-                policies.append(dict(workflow_id=workflow['workflow_id'], version=workflow['version'],
+-                                     action_approval_required=bool(workflow.get('approval_gates')),
+-                                     agents=[{key: agent.get(key) for key in ('agent_id', 'guardrails', 'limits', 'approval_requirements')}
+-                                             for agent in workflow['agents']]))
+-        usage = {'llm_calls': 0, 'tool_calls': 0, 'tokens': 0, 'retries': 0, 'estimated_cost_usd': 0}
+-        for run in runs:
+-            # Workflow counters already include each per-agent reservation.
+-            counters = run.get('usage', {}).get('workflow', {})
+-            for key in usage:
+-                usage[key] += counters.get(key, 0)
+-        by_status = {status: sum(r['status'] == status for r in runs) for status in ('queued', 'running', 'paused_for_approval', 'completed', 'failed', 'blocked', 'rejected', 'cancelled')}
+-        durations = [max(0, (r.get('finished_at', r.get('created_at', self.clock())) - r.get('created_at', self.clock()))) for r in runs if isinstance(r.get('finished_at'), (int, float))]
+-        return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
+-                         'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
+-                'status_breakdown': by_status, 'duration_seconds': {'count': len(durations), 'avg': sum(durations) / len(durations) if durations else 0},
+-                'events': event_count, 'usage': usage,
+-                'sources': sources, 'policies': policies,
+-                'audit': [{key: event.get(key) for key in ('event_id', 'event_type', 'run_id', 'timestamp')} for event in audit],
+-                'latest': [self.public(run) for run in runs[:20]]}
++    def events(self, run_id, auth, limit=100, after_sequence=0):
++        from .history import events
++        return events(self, run_id, auth, limit, after_sequence)
++
++    def monitoring(self, auth, **options):
++        from .history import monitoring
++        return monitoring(self, auth, **options)
+ 
+     def export_traces(self, observer_id='default', limit=100):
+         """Export committed events. Export failure never permits a side effect.
+--- a/tests/test_phase6_runtime.py
++++ b/tests/test_phase6_runtime.py
+@@ -176,4 +176,6 @@
+         projected=f.runtime.get_run(second['run_id'],f.approver())['approvals']
+         assert projected[0]['required_roles']==['approver'] and projected[0]['status']=='approved'
+         assert projected[1]['required_roles']==['admin'] and projected[1]['allowed_decisions']==[]
++        replay=runner.decide(f.decision(first,'approved'),f.approver())
++        assert replay['status']=='paused_for_approval' and replay['approvals'][-1]['status']=='pending'
+     finally:f.doCleanups()
+--- a/tests/test_runtime.py
++++ b/tests/test_runtime.py
+@@ -318,7 +318,7 @@
+         self.assertEqual(runner.decide(request, self.approver()), approved)
+         self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
+ 
+-    def test_workspace_members_can_approve_a_gate_with_an_unknown_role(self):
++    def test_workspace_members_cannot_approve_a_gate_with_an_unknown_role(self):
+         self.approval_graph()
+         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+         self.put()
+@@ -331,10 +331,11 @@
+                 paused = runner.advance(run['run_id'], self.auth)
+                 member = dict(subject=dict(subject_id='member-' + str(index), workspace_id='local-workspace'),
+                     roles=[role], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+-                approved = runner.decide(self.decision(paused, 'approved'), member)
+-                self.assertEqual(approved['status'], 'running')
+-
+-    def test_viewer_can_approve_through_api_without_execution_permission(self):
++                with self.assertRaises(RuntimeFailure):
++                    runner.decide(self.decision(paused, 'approved'), member)
++                self.assertEqual(self.runtime.get_run(run['run_id'], self.auth)['status'], 'paused_for_approval')
++
++    def test_viewer_cannot_approve_through_api_without_gate_permission(self):
+         self.approval_graph()
+         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+         self.put()
+@@ -344,8 +345,8 @@
+         member = dict(subject=dict(subject_id='viewer-member', workspace_id='local-workspace'),
+             roles=['viewer'], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+         result = self.workflows.handle(self.decision(paused, 'approved'), member)
+-        self.assertEqual(result['status'], 200, result)
+-        self.assertEqual(result['data']['status'], 'approved')
++        self.assertEqual(result['status'], 403, result)
++        self.assertEqual(self.runtime.get_run(paused['run_id'], self.auth)['status'], 'paused_for_approval')
+ 
+     def test_members_cannot_approve_another_workspace_or_without_authentication(self):
+         self.approval_graph()
+--- a/workflow_api/activation.py
++++ b/workflow_api/activation.py
+@@ -142,6 +142,11 @@
+         db.execute('INSERT INTO lifecycle_preparations VALUES (?,?,?)', (operation['operation_id'],workspace,json.dumps(preparation)))
+     try:
+         for binding in bindings:
++            trigger_validator = getattr(lifecycle.workflows, 'trigger_configuration_validator', None)
++            if trigger_validator:
++                trigger_validator(binding, workflow, auth)
++            if binding['provider_id'] == 'generic_hmac_webhook' and not lifecycle.trigger_secrets.get(binding.get('credential_reference')):
++                raise Failure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure the server webhook signing secret before activation.', 400)
+             reference = lifecycle.adapter.prepare(deepcopy(binding))
+             with lifecycle.store.transaction() as db:
+                 current = _read_preparation(lifecycle,db,preparation['operation_id'])
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -318,7 +318,9 @@
+     if direct_write:
+         runner.direct_write_tools |= {'google_sheets_upsert_record'}
+     runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(rates, client, tokenizers))
+-    service.trigger_poller = ProviderTriggerSource(service, runner.connectors).poll
++    source = ProviderTriggerSource(service, runner.connectors)
++    service.trigger_poller = source.poll
++    service.trigger_configuration_validator = source.validate_configuration
+     service.planner = PlannerService(provider=LivePlannerProvider(model, recipients(env), client, direct_send,
+         targets, direct_write, planner_timeout, runner.connectors['google_sheets_read_rows'].discover,
+         env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -283,7 +283,7 @@
+                         yield f"id: {item['sequence']}\ndata: {json.dumps(item, separators=(',', ':'))}\n\n"
+                     if not events['items']:
+                         yield ': keepalive\n\n'
+-                return StreamingResponse(stream(), media_type='text/event-stream', headers={'X-Accel-Buffering': 'no'})
++                return StreamingResponse(stream(), media_type='text/event-stream', headers={'X-Accel-Buffering': 'no', 'X-Builder-Update-Strategy': 'bounded-polling', 'Cache-Control': 'no-store'})
+             except (ValueError, TypeError):
+                 return error('INVALID_REQUEST', 'Use a non-negative event sequence.', 400)
+         return await lifecycle_dispatch(request, 'subscribe_workflow_overview')
+@@ -333,13 +333,30 @@
+     async def capabilities(request: Request):
+         return await dispatch(request, 'list_capabilities')
+ 
++    async def runtime_history(request, kind, run_id=None):
++        from runtime.history import query_options
++        from runtime.service import RuntimeFailure
++        try:
++            if workflow_service.runtime_runner is None:
++                return error('SERVICE_UNAVAILABLE', 'The runtime is not connected.', 503)
++            runtime = workflow_service.runtime_runner.runtime
++            options = query_options(dict(request.query_params), kind)
++            function = runtime.events if kind == 'events' else runtime.list_runs
++            args = (run_id, auth) if kind == 'events' else (auth,)
++            data = await run_in_threadpool(function, *args, **options)
++            return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
++        except RuntimeFailure as exc:
++            return error(exc.code, str(exc), exc.status)
++        except (ValueError, TypeError):
++            return error('INVALID_REQUEST', 'Use valid history filters and cursors.', 400)
++
+     @app.get('/runs/{run_id}')
+     async def run(run_id: str, request: Request):
+         return await dispatch(request, 'get_run', {'run_id': run_id})
+ 
+     @app.get('/runs')
+     async def runs(request: Request):
+-        return await dispatch(request, 'list_runs')
++        return await runtime_history(request, 'runs')
+ 
+     @app.get('/cases')
+     async def cases(request: Request):
+@@ -383,16 +400,20 @@
+ 
+     @app.get('/runs/{run_id}/events')
+     async def events(run_id: str, request: Request):
+-        return await dispatch(request, 'list_run_events', {'run_id': run_id})
++        return await runtime_history(request, 'events', run_id)
+ 
+     @app.get('/monitoring')
+     async def monitoring(request: Request):
++        from runtime.service import RuntimeFailure
+         try:
+             if workflow_service.runtime_runner is None:
+                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+             workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth)
++            from runtime.history import query_options
++            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth, **query_options(dict(request.query_params), 'monitoring'))
+             return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
++        except RuntimeFailure as exc:
++            return error(exc.code, str(exc), exc.status)
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+ 
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -20,6 +20,29 @@
+     def __init__(self, service, connectors, default_resources=None):
+         self.service, self.connectors = service, connectors
+         self.default_resources = dict(default_resources or {})
++
++    def validate_configuration(self, binding, workflow, auth):
++        """Local readiness only; never poll, subscribe, or call a provider."""
++        from .lifecycle import LifecycleFailure
++        provider = binding['provider_id']
++        if binding['delivery'] != 'poll':
++            if provider == 'generic_hmac_webhook':
++                return
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Install and configure the incoming provider adapter before activation.', 400)
++        tool_id = self.TOOL_BY_PROVIDER.get(provider)
++        if not tool_id or tool_id not in self.connectors:
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure the provider polling connector before activation.', 400)
++        grants = self.service.registry_adapter.execution_assignments(workflow, auth)
++        if not any(grant['tool_id'] == tool_id for grant in grants):
++            raise LifecycleFailure('ASSIGNMENT_REVALIDATION_FAILED', 'Review current registry authorization for the trigger polling tool.', 403)
++        resource = binding['resource_id']
++        if resource == 'configured_default':
++            resource = self.default_resources.get(provider)
++        if not isinstance(resource, str) or not resource:
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure an explicit trigger source resource before activation.', 400)
++        if provider == 'google_sheets':
++            from runtime.connectors import google_spreadsheet_id
++            google_spreadsheet_id(resource)
+ 
+     def _authority(self, binding):
+         with self.service.store.transaction(write=False) as db:

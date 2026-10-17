@@ -1,0 +1,104 @@
+--- a/etc/nginx/sites-available/praxi.bellcorpstudio.com
++++ b/etc/nginx/sites-available/praxi.bellcorpstudio.com
+@@ -1,4 +1,4 @@
+-# Builder private-preview gateway. Validate browser origin before trusted forwarding.
++# Builder shared-site gateway. Validate browser origin before trusted forwarding.
+ map $http_origin $builder_preview_origin_ok {
+     default 0;
+     "" 1;
+@@ -14,9 +14,6 @@
+ }
+ server {
+     server_name praxi.bellcorpstudio.com;
+-
+-    auth_basic "MESH private workspace";
+-    auth_basic_user_file /etc/nginx/builder-preview.htpasswd;
+ 
+     location /api/backend/ {
+         if ($builder_preview_origin_ok = 0) { return 403; }
+--- a/frontend/src/screens/app.tsx
++++ b/frontend/src/screens/app.tsx
+@@ -12,7 +12,6 @@
+ import { useMeshHydrated } from "@/features/shell/useHydrated";
+ import { useMesh } from "@/domain/store";
+ import { useBackend } from "@/api/state";
+-import { WorkspaceAccess } from "@/features/shell/WorkspaceAccess";
+ import { roleLabel } from "@/domain/governance";
+ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+@@ -149,7 +148,7 @@
+           </DropdownMenu>
+         </header>
+         <main key={ready ? "r" : "l"} className={`page-enter min-h-0 flex-1 ${inBuilder ? "overflow-hidden" : "overflow-y-auto"}`}>
+-          {ready ? <WorkspaceAccess>{children}</WorkspaceAccess> : <div className="mx-auto max-w-5xl space-y-4 p-6 md:p-10" aria-label="Loading workspace"><Skeleton className="h-9 w-72" /><Skeleton className="h-4 w-96 max-w-full" /><div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}
++          {ready ? children : <div className="mx-auto max-w-5xl space-y-4 p-6 md:p-10" aria-label="Loading workspace"><Skeleton className="h-9 w-72" /><Skeleton className="h-4 w-96 max-w-full" /><div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}
+         </main>
+         <nav className="flex border-t border-border md:hidden">
+           {NAV.flatMap((g) => [...g.items]).filter((it) => ["/app", "/app/workflows", "/app/agents", "/app/approvals", "/app/monitoring"].includes(it.to)).map((it) => (
+--- a/frontend/src/features/shell/WorkspaceAccess.tsx
++++ /dev/null
+@@ -1,18 +0,0 @@
+-"use client";
+-import type { ReactNode } from "react";
+-import { useBackend } from "@/api/state";
+-export function WorkspaceAccess({ children }: { children: ReactNode }) {
+-  const backend = useBackend();
+-  if (!backend.session && backend.status === "loading") return <p role="status" className="p-6">Connecting to your workspace…</p>;
+-  const code = backend.error?.error.error_code;
+-  if (!backend.session && ["ORIGIN_NOT_AUTHORIZED", "AUTHENTICATION_REQUIRED", "DEVELOPMENT_AUTH_LOCAL_ONLY"].includes(code ?? "")) {
+-    return <section aria-label="Workspace access" className="mx-auto max-w-2xl space-y-4 p-6 md:py-16">
+-      <h1 className="text-2xl font-semibold">Workspace access unavailable</h1>
+-      <p className="text-muted-foreground">Your workspace data has not been loaded. Your saved workflows and knowledge have not been deleted.</p>
+-      <p>{code === "AUTHENTICATION_REQUIRED" ? "Your session is unavailable. Sign in through the website’s configured access method, then reconnect." : "This website is not connected to an authorized workspace session. Its sign-in and server routing need to be configured."}</p>
+-      <button type="button" onClick={() => void backend.initialize()} className="rounded-lg border border-border px-4 py-2 text-sm">Reconnect workspace</button>
+-      <p className="font-mono text-xs text-muted-foreground">Reference: {backend.error?.error.request_id}</p>
+-    </section>;
+-  }
+-  return children;
+-}
+--- a/frontend/src/api/workspace-access.test.tsx
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+-import { afterEach, expect, it, vi } from "vitest";
+-import { WorkspaceAccess } from "@/features/shell/WorkspaceAccess";
+-import { useBackend } from "./state";
+-import { ApiError } from "./client";
+-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+-it.each(["ORIGIN_NOT_AUTHORIZED", "AUTHENTICATION_REQUIRED", "DEVELOPMENT_AUTH_LOCAL_ONLY"])("shows one access state instead of empty/loading pages for %s", code => {
+- useBackend.setState({status:"unavailable",session:null,error:new ApiError({error_code:code,message:"Access denied",request_id:"req_access",retryable:false})});
+- const initialize=vi.spyOn(useBackend.getState(),"initialize").mockResolvedValue(undefined);
+- render(<WorkspaceAccess><div>0 server workflows</div><div>Loading sources…</div></WorkspaceAccess>);
+- expect(screen.getByRole("region",{name:"Workspace access"})).toBeVisible();
+- expect(screen.queryByText("0 server workflows")).not.toBeInTheDocument();
+- expect(screen.queryByText("Loading sources…")).not.toBeInTheDocument();
+- fireEvent.click(screen.getByRole("button",{name:"Reconnect workspace"}));expect(initialize).toHaveBeenCalledOnce();
+-});
+-it("does not call an uninitialized workspace empty",()=>{
+- useBackend.setState({status:"loading",session:null,error:null});
+- render(<WorkspaceAccess><p>No workflows yet.</p></WorkspaceAccess>);
+- expect(screen.getByRole("status")).toHaveTextContent("Connecting to your workspace");expect(screen.queryByText("No workflows yet.")).not.toBeInTheDocument();
+-});
+-it("preserves access to local work during a network outage",()=>{
+- useBackend.setState({status:"unavailable",session:null,error:new ApiError({error_code:"API_UNAVAILABLE",message:"Unavailable",request_id:"req_offline",retryable:true})});
+- render(<WorkspaceAccess><p>Local working draft</p></WorkspaceAccess>);expect(screen.getByText("Local working draft")).toBeVisible();
+-});
+--- a/frontend/e2e/workspace-access.spec.ts
++++ /dev/null
+@@ -1,16 +0,0 @@
+-import { test, expect } from "@playwright/test";
+-for (const mobile of [false,true]) {
+- test(`denied workspace is never shown as empty or still loading on ${mobile?'mobile':'desktop'}`,async({page})=>{
+-  if(mobile)await page.setViewportSize({width:390,height:844});
+-  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+-  await page.route('**/api/backend/**',route=>route.fulfill({status:403,json:{request_id:'req_access_test',status:403,data:{error:{error_code:'ORIGIN_NOT_AUTHORIZED',message:'This request origin is not authorized.',request_id:'req_access_test',retryable:false}}}}));
+-  for(const path of ['workflows','integrations','knowledge','monitoring','governance','settings']){
+-   await page.goto('/app/'+path);
+-   await expect(page.getByRole('region',{name:'Workspace access'})).toBeVisible();
+-   await expect(page.getByText('0 server workflows',{exact:false})).toHaveCount(0);
+-   await expect(page.getByText('Loading sources…',{exact:true})).toHaveCount(0);
+-   await expect(page.getByText('No workflows yet.',{exact:false})).toHaveCount(0);
+-  }
+-  expect(errors).toEqual([]);
+- });
+-}

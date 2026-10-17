@@ -1,0 +1,25 @@
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -396,7 +396,12 @@
+             workflow = runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version'])
+             if not workflow or digest(workflow) != run['workflow_digest'] or workflow['status'] not in {'approved', 'published'}:
+                 raise RuntimeFailure('REVISION_CHANGED', 'The reviewed approval revision is no longer current.')
+-            gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == run['approval_context']['gate_id'])
++            evidence = db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' AND json_extract(document,'$.details.approval_id')=? ORDER BY sequence LIMIT 1", (run['workspace_id'], run['run_id'], payload.get('approval_id'))).fetchone()
++            node_id = json.loads(evidence[0]).get('details', {}).get('node_id') if evidence else None
++            policy_node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), None)
++            gate = next((g for g in workflow['approval_gates'] if policy_node and g['approval_gate_id'] == policy_node.get('approval_gate_id')), None)
++            if gate is None:
++                raise RuntimeFailure('APPROVAL_POLICY_UNAVAILABLE', 'The exact recorded approval policy is unavailable.')
+             runtime.authorize(approver, 'workflow.approve', set(gate['approver_roles']))
+             # The exact persisted revision gate determines decision authority.
+             approval = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
+--- a/tests/test_phase6_runtime.py
++++ b/tests/test_phase6_runtime.py
+@@ -176,4 +176,6 @@
+         projected=f.runtime.get_run(second['run_id'],f.approver())['approvals']
+         assert projected[0]['required_roles']==['approver'] and projected[0]['status']=='approved'
+         assert projected[1]['required_roles']==['admin'] and projected[1]['allowed_decisions']==[]
++        replay=runner.decide(f.decision(first,'approved'),f.approver())
++        assert replay['status']=='paused_for_approval' and replay['approvals'][-1]['status']=='pending'
+     finally:f.doCleanups()

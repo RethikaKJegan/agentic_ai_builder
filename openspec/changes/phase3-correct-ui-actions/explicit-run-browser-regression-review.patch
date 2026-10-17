@@ -1,0 +1,15 @@
+--- a/frontend/e2e/prompt-only.spec.ts
++++ b/frontend/e2e/prompt-only.spec.ts
+@@ -58,10 +58,11 @@
+         await page.getByRole("button", { name: `Actions for ${published.name}` }).click();
+         await page.getByRole("menuitem", { name: "Run published" }).click();
+         if (mode === "manual") {
++          await page.getByRole("button", { name: "Start run", exact: true }).click();
+           await expect.poll(() => calls.filter((call) => call.operation === "execute_workflow").length).toBe(1);
+           expect(calls.find((call) => call.operation === "execute_workflow")?.payload).toMatchObject({ workflow_version: 1, inputs: {} });
+         } else {
+-          await expect(page.getByText(/This workflow starts automatically/)).toBeVisible();
++          await expect(page.getByText(/This workflow waits for its configured event/)).toBeVisible();
+           expect(calls.filter((call) => call.operation === "execute_workflow")).toHaveLength(0);
+         }
+       }

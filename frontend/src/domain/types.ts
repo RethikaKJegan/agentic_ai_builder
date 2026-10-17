@@ -52,6 +52,8 @@ export type WorkflowStatus = "draft" | "validated" | "approved" | "published" | 
 export interface Workflow {
   canonical?: import("@/api/contracts.generated").CanonicalWorkflow | undefined;
   serverVersion?: number | undefined;
+  remote?: import("@/api/contracts.generated").CanonicalWorkflow | undefined;
+  tabConflict?: boolean | undefined;
   id: string;
   workspaceId: string;
   name: string;

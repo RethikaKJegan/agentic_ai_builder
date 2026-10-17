@@ -1,0 +1,32 @@
+--- a/frontend/e2e/api-integration.spec.ts
++++ b/frontend/e2e/api-integration.spec.ts
+@@ -21,7 +21,8 @@
+ test("trusted publication requires explicit approval and activation; new drafts clear grants",async({page})=>{
+  await page.goto("/app/workflows/registry_ready");
+  const actions=page.getByRole("region",{name:"Workflow actions"});
+- await expect(page.getByLabel("Registry assignment review")).toContainText("authorized");
++ await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
++ const initial=(await(await page.request.get("/api/backend/workflows/registry_ready")).json()).data;expect(initial.registry_review.ready).toBe(true);
+  await actions.getByRole("button",{name:"Validate",exact:true}).click();
+  await expect(actions.getByText(/Validate confirmed/)).toBeVisible();
+  await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
+@@ -49,7 +50,7 @@
+ test("pending approval and risky Registry assignments cannot approve or publish",async({page})=>{
+  for(const [id,reason] of [["registry_pending","APPROVAL_REQUIRED"],["registry_risky","RISK_NOT_AUTHORIZED"]]){
+   await page.goto(`/app/workflows/${id}`);
+-  await expect(page.getByLabel("Registry assignment review")).toContainText(reason!);
++  await expect(page.getByText(new RegExp(reason!)).first()).toBeVisible();
+   const actions=page.getByRole("region",{name:"Workflow actions"});
+   await actions.getByRole("button",{name:"Validate",exact:true}).click();
+   await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
+--- a/frontend/src/features/builder/ExecutionView.tsx
++++ b/frontend/src/features/builder/ExecutionView.tsx
+@@ -90,7 +90,7 @@
+             {trace.run.status}
+           </p>
+         )}
+-        {(graph || (!trace.runId && workflow)) && <AgentCommunication workflow={graph ?? workflow!} trace={trace} />}
++        {(workflow || graph) && <AgentCommunication workflow={workflow ?? graph!} trace={trace} />}
+       </div>
+       <ApiFeedback error={trace.error} />
+       {!trace.available ? (

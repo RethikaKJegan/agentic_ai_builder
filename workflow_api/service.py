@@ -1,8 +1,11 @@
 """Workflow transport/revision lifecycle and delegation to an explicit runtime."""
 from copy import deepcopy
+from datetime import datetime, timezone
+from .security import request_correlation
 import hashlib
 import json
 import logging
+import sqlite3
 import re
 import time
 from uuid import uuid4
@@ -14,7 +17,8 @@ from planner.validation import validate_workflow
 from registry import RegistryService, WorkspacePolicy
 from registry.contracts import RegistryError, VERSIONS, schema, validate
 from registry.safety import reject_secrets
-from .storage import WorkflowStore
+from .storage import WorkflowStore, sqlite_category
+from .postgres import DatabaseFailure
 from .registry_adapter import RegistryAdapter
 from runtime.service import RuntimeFailure
 from .lifecycle import LifecycleService, LifecycleFailure
@@ -70,7 +74,7 @@ class WorkflowService:
             elif operation == 'delete_workflow':
                 data = self.lifecycle.delete(request, auth)
             elif operation == 'list_workflow_overview':
-                data = self.lifecycle.overview(auth)
+                data = self.lifecycle.overview(auth, cursor=context.get("workflow_cursor"))
             elif operation == 'subscribe_workflow_overview':
                 data = self.lifecycle.overview(auth, context.get('after_sequence', 0))
             elif operation == 'get_lifecycle_operation':
@@ -87,6 +91,20 @@ class WorkflowService:
             else:
                 raise LifecycleFailure('INVALID_OPERATION', 'The lifecycle operation is not supported.', 400)
             return self.envelope(request_id, 200, data)
+        except DatabaseFailure as exc:
+            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
+            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
+                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+        except sqlite3.OperationalError as exc:
+            if sqlite_category(exc)=='contention':
+                return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                    'The workflow database is busy. Retry shortly.', 503, retryable=True))
+            if sqlite_category(exc)=='transaction_state':
+                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
+            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+            return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
+        except ApiFailure as exc:
+            return self.failure(request_id, exc)
         except LifecycleFailure as exc:
             if operation in {'activate_release', 'disable_release', 'delete_workflow'}:
                 try:
@@ -98,7 +116,7 @@ class WorkflowService:
     @staticmethod
     def envelope(request_id, status, data):
         result = dict(request_id=request_id, status=status, data={
-            'correlation_id': f'corr_{uuid4().hex}', 'contract_versions': deepcopy(VERSIONS), **data})
+            'correlation_id': request_correlation.get() or f'corr_{uuid4().hex}', 'contract_versions': deepcopy(VERSIONS), **data})
         Draft202012Validator(schema('api')['properties']['response_envelope']).validate(result)
         reject_secrets(result)
         return result
@@ -124,7 +142,7 @@ class WorkflowService:
                 permission not in auth['permissions']):
             raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Your session cannot perform this operation.', 403)
 
-    def handle(self, request, auth):
+    def handle(self, request, auth, read_cursor=None):
         request_id = f'req_{uuid4().hex}'
         try:
             reject_secrets(request)
@@ -146,7 +164,8 @@ class WorkflowService:
                 runtime = self.runtime_runner.runtime
                 if operation == 'execute_workflow':
                     run = runtime.create_run(request, auth)
-                    run = self.runtime_runner.advance(run['run_id'], auth)
+                    if not getattr(self,'background_execution',False):
+                        run = self.runtime_runner.advance(run['run_id'], auth)
                     data = {'run': run}
                 elif operation == 'get_run':
                     data = {'run': runtime.get_run(payload.get('run_id'), auth)}
@@ -154,7 +173,7 @@ class WorkflowService:
                     data = runtime.events(payload.get('run_id'), auth)
                 else:
                     run = self.runtime_runner.decide(request, auth)
-                    if run['status'] == 'running':
+                    if run['status'] == 'running' and not getattr(self,'background_execution',False):
                         with self.store.transaction(write=False) as db:
                             execution_subject = db.execute(
                                 'SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?',
@@ -180,7 +199,8 @@ class WorkflowService:
                 trusted = deepcopy(request)
                 trusted['payload']['auth_context'] = {
                     **auth['subject'], 'roles': auth['roles'], 'permissions': auth['permissions']}
-                result = self.planner.plan(trusted)
+                from .source_context import planning_context
+                result = self.planner.plan(trusted, context_resolver=lambda context: planning_context(self.store, auth, context))
                 if result['status'] >= 400:
                     error = result.get('error') or (result.get('data') or {}).get('error') or {}
                     code = error.get('error_code', 'PLANNER_PROVIDER_FAILED')
@@ -188,6 +208,7 @@ class WorkflowService:
                             'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
                             'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
+                    safe['PROCUREMENT_SOURCE_REQUIRED'] = 'No accessible requirements spreadsheet was identified. Include its link or save it as a workspace source. To start from an idea, ask to generate a new BOQ first.'
                     safe.update(PLANNER_PROVIDER_TIMEOUT='Workflow generation timed out. Retry generation.',
                                 PLANNER_PROVIDER_UNAVAILABLE='The model connection is unavailable. Retry generation.',
                                 PLANNER_RATE_LIMITED='The model provider rate limit was reached. Retry later.',
@@ -204,9 +225,12 @@ class WorkflowService:
             if operation in {'get_workflow', 'list_workflows'}:
                 with self.store.transaction(write=False) as db:
                     if operation == 'list_workflows':
-                        items = self.store.list(db, workspace)
-                        return self.envelope(request_id, 200, dict(items=items, total=len(items), has_more=False, next_cursor=None))
-                    workflow = self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version'))
+                        from .workflow_pages import read_page
+                        return self.envelope(request_id, 200, read_page(self.store, workspace, read_cursor, connection=db))
+                    deleted = db.execute('SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',
+                                         (workspace, payload.get('workflow_id'))).fetchone()
+                    workflow = (None if deleted and payload.get('workflow_version') is None else
+                                self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version')))
                     if not workflow:
                         raise ApiFailure('WORKFLOW_NOT_FOUND', 'This workflow revision was not found.', 404)
                     return self.envelope(request_id, 200, self.document_data(workflow, auth))
@@ -232,6 +256,18 @@ class WorkflowService:
             return self.failure(request_id, ApiFailure(exc.code, 'The request does not meet the authorization or data contract.', exc.status, exc.field))
         except PlannerFailure as exc:
             return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow fields before continuing.', 400, exc.field))
+        except DatabaseFailure as exc:
+            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
+            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
+                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+        except sqlite3.OperationalError as exc:
+            if sqlite_category(exc)=='contention':
+                return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                    'The workflow database is busy. Retry shortly.', 503, retryable=True))
+            if sqlite_category(exc)=='transaction_state':
+                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
+            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+            return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
         except Exception:
             logging.exception("Unhandled workflow API error request_id=%s", request_id)
             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The API could not process valid, safe data.', 400))
@@ -317,6 +353,8 @@ class WorkflowService:
                 raise ApiFailure('UNTRUSTED_ASSIGNMENT', 'Executable assignments must be supplied by the trusted registry.', 403)
             workflow['metadata'].pop('validation_state', None)
             workflow['metadata'].pop('approved_by', None)
+            workflow['metadata'].pop('approval_submission', None)
+            workflow['metadata']['updated_at'] = datetime.fromtimestamp(self.lifecycle.clock(),timezone.utc).isoformat()
             workflow['metadata'].pop('registry_review', None)
             workflow['metadata']['workspace_id'] = workspace
             workflow['metadata']['validation_state'] = 'not_validated'

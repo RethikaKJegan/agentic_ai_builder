@@ -1,0 +1,100 @@
+--- a/frontend/e2e/api-integration.spec.ts
++++ b/frontend/e2e/api-integration.spec.ts
+@@ -50,7 +50,7 @@
+ test("pending approval and risky Registry assignments cannot approve or publish",async({page})=>{
+  for(const [id,reason] of [["registry_pending","APPROVAL_REQUIRED"],["registry_risky","RISK_NOT_AUTHORIZED"]]){
+   await page.goto(`/app/workflows/${id}`);
+-  await expect(page.getByText(new RegExp(reason!)).first()).toBeVisible();
++  await expect(page.getByRole("region",{name:"Workflow actions"}).getByText(new RegExp(reason!))).toBeVisible();
+   const actions=page.getByRole("region",{name:"Workflow actions"});
+   await actions.getByRole("button",{name:"Validate",exact:true}).click();
+   await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
+--- a/frontend/e2e/phase7.spec.ts
++++ b/frontend/e2e/phase7.spec.ts
+@@ -33,6 +33,9 @@
+   await page.getByText('Workflow lifecycle · 14 stages',{exact:true}).click();
+   await expect(page.getByText(/no supported side-effect-free runtime simulation/)).toBeVisible();
+   expect((await(await page.request.get(`/api/backend/runs?workflow_id=${id}`)).json()).data.total).toBe(0);
++  // Changed executable agent definitions require an explicit trusted operator
++  // Registry review. The fixture invokes the real registration/validation API.
++  const review=await page.request.post(`/api/backend/__test__/registry-review/${id}/2`);expect(review.status(),await review.text()).toBe(200);expect((await review.json()).tool_grants_issued).toBe(false);
+   await actions.getByRole('button',{name:'Submit for approval',exact:true}).click();await expect(actions.getByText(/Submit for approval confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Approve',exact:true}).click();await expect(actions.getByText(/Approve confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Publish',exact:true}).click();await expect(actions.getByText(/Publish confirmed/)).toBeVisible();
+@@ -69,7 +72,7 @@
+   if(failed)await route.fulfill({status:503,json:{request_id:'req_phase7_settings',status:503,data:{error:{error_code:'SERVICE_UNAVAILABLE',message:'Settings temporarily unavailable.',request_id:'req_phase7_settings',retryable:false}}}});
+   else await route.continue();
+  });
+- await page.goto('/app/settings');await expect(page.getByRole('alert')).toContainText('SERVICE_UNAVAILABLE');await expect(page.getByLabel('Notification preference')).toBeDisabled();
++ await page.goto('/app/settings');await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toContainText('Settings temporarily unavailable');await expect(page.getByLabel('Notification preference')).toBeDisabled();
+  failed=false;await page.getByRole('button',{name:'Reload settings',exact:true}).click();await expect(page.getByLabel('Notification preference')).toBeEnabled();await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toHaveCount(0);
+  let rejected=true;
+  await page.route('**/api/backend/integrations/*/test',async route=>{
+@@ -77,7 +80,7 @@
+   else await route.continue();
+  });
+  await page.goto('/app/integrations');await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+- await expect(page.getByRole('alert')).toContainText('OPERATION_NOT_AUTHORIZED');await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
++ await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toContainText('Provider checks are not authorized');await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
+  rejected=false;await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+  await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toHaveCount(0);await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
+ });
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -15,7 +15,7 @@
+     url: "http://127.0.0.1:8011/session",
+     reuseExistingServer: false,
+     timeout: 60000,
+-    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0", BUILDER_TEST_FRESH_DATABASE: "1",
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0", BUILDER_TEST_FRESH_DATABASE: "1", BUILDER_TEST_OPERATOR_REVIEW: "1",
+       BUILDER_TEST_DATABASE_DIR: process.env["BUILDER_E2E_DATABASE_DIR"] ?? path.join(repository, ".local/browser-phase7"),
+       BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }, {
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -110,7 +110,8 @@
+                 tools=[dict(tool_id=definition['tool_id'], capability='read_spreadsheet')],
+                 nodes=[dict(node_id='start', kind='trigger', label='Start'), dict(node_id='read_rows', kind='agent', label='Read rows', agent_id=agent['agent_id']), dict(node_id='finish', kind='output', label='Finish')],
+                 edges=[dict(edge_id='start_read', source='start', target='read_rows'), dict(edge_id='read_finish', source='read_rows', target='finish')],
+-                conditions=[], approval_gates=[], metadata={})
++                conditions=[], approval_gates=[], metadata={'execution_input_mode':'manual'})
++            workflow['inputs'] = [dict(name='request_text',type='string',required=True), dict(name='spreadsheet_id',type='string',required=True), dict(name='range',type='string',required=True)]
+             workflow['execution_policy']['allow_external_writes'] = False
+             documents.append(workflow)
+         source = Path(directory) / 'registry.json'
+@@ -177,4 +178,35 @@
+                 workflow_version=1, base_version=0, workflow=document)), auth)
+             if result['status'] != 200:
+                 raise RuntimeError('Browser-only registry setup failed.')
++        # Explicit test control-plane checkpoint. This does not exist in the
++        # production launcher and never grants tools or changes live resources.
++        if os.getenv('BUILDER_TEST_OPERATOR_REVIEW') == '1' and os.getenv('BUILDER_ENVIRONMENT') == 'test' and os.getenv('BUILDER_REAL_CONNECTORS') != '1':
++            from fastapi import Request
++            from fastapi.responses import JSONResponse
++            @app.post('/__test__/registry-review/{workflow_id}/{version}')
++            async def review_fixture_agents(workflow_id: str, version: int, request: Request):
++                authority = app.state.workflow_auth
++                if ('admin' not in authority['roles'] or 'tools.manage' not in authority['permissions'] or
++                        'workspace:write' not in authority['scopes'] or authority['decision'] != 'allow'):
++                    return JSONResponse({'error':'OPERATOR_REVIEW_NOT_AUTHORIZED'},status_code=403)
++                workspace = authority['subject']['workspace_id']
++                with service.store.transaction(write=False) as db:
++                    workflow = service.store.get(db, workspace, workflow_id, version)
++                    latest = service.store.get(db, workspace, workflow_id)
++                    active = db.execute('SELECT 1 FROM lifecycle_active WHERE workspace=? AND workflow_id=?',(workspace,workflow_id)).fetchone()
++                if not workflow or not latest or latest['version'] != version or workflow['status'] not in {'draft','validated'} or active:
++                    return JSONResponse({'error':'REVIEW_REQUIRES_EXACT_UNRELEASED_DRAFT'},status_code=409)
++                reviewed=[]
++                for candidate in workflow['agents']:
++                    previous = service.registry_adapter.agents.get(candidate['agent_id'])
++                    old = previous['definition'] if previous else {}
++                    definition = {**deepcopy(candidate),'allowed_tool_ids':[],
++                        'name':old.get('name',candidate['agent_id']),
++                        'retry_policy':{'max_retries':candidate['limits']['max_retries'],'backoff_seconds':1},
++                        'guardrails':deepcopy(old.get('guardrails',{'pii_redaction':True,'prompt_injection_detection':True,'output_validation':True}))}
++                    response = service.registry_adapter.service.register_agent(definition,authority)
++                    if response['status'] != 200:return JSONResponse(response,status_code=response['status'])
++                    service.registry_adapter.agents[candidate['agent_id']] = response['data']['agent']
++                    reviewed.append(candidate['agent_id'])
++                return {'reviewed_agent_ids':reviewed,'tool_grants_issued':False}
+         uvicorn.run(app, host='127.0.0.1', port=int(os.getenv('BUILDER_TEST_API_PORT', '8011')), log_level='warning')

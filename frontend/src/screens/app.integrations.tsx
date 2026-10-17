@@ -1,14 +1,43 @@
 "use client";
-import { useState } from "react";
-import { SEED_CONNECTORS } from "@/domain/catalog";
+import { useRef, useState } from "react";
+import { api } from "@/api/client";
 import { useBackend } from "@/api/state";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+type Check = Awaited<ReturnType<typeof api.integrationCheck>>;
 export default function Integrations() {
-  const backend = useBackend();
-  const [tested, setTested] = useState<Record<string, string>>({});
-  const test = async (provider: string) => { try { const response = await fetch(`/api/backend/integrations/${encodeURIComponent(provider)}/test`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: "{}" }); const body = await response.json(); setTested((current) => ({ ...current, [provider]: body?.data?.message ?? "Test complete" })); } catch { setTested((current) => ({ ...current, [provider]: "Connection test unavailable" })); } };
-  if (backend.status === "connected") return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 text-sm text-muted-foreground">Server-owned connector readiness. Secrets and credential values never enter the browser.</p><ApiFeedback error={backend.error} /><div className="mt-8 grid gap-4 md:grid-cols-2">{backend.tools.length ? backend.tools.map((t) => { const configured = t.credential_configured && t.definition.availability === "enabled"; const status = configured ? "Configured" : t.definition.availability === "disabled" ? "Disabled" : "Needs configuration"; const provider = t.definition.provider_id; return <div key={t.tool_id} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{provider}</p><p className="text-xs text-muted-foreground">{t.tool_id} · v{t.version}</p></div><span className={`rounded-full px-2 py-1 text-[11px] ${configured ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{status}</span></div><p className="mt-3 text-sm text-muted-foreground">{t.definition.description}</p><p className="mt-3 text-xs">Capability: {t.definition.capability} · {t.definition.risk_level} risk · {t.authorization_state}</p><p className="mt-1 text-xs text-muted-foreground">Scopes: {t.definition.authentication.scopes?.join(", ") || "none"}{t.definition.approval_required ? " · approval required" : ""}</p><button className="mt-4 rounded-lg border border-border px-3 py-2 text-xs" onClick={() => void test(provider)}>Test server connection</button>{tested[provider] && <p className="mt-2 text-xs text-muted-foreground">{tested[provider]}</p>}</div>; }) : <p className="p-8 text-sm text-muted-foreground">No registered tools are visible to this session. Connector configuration is managed by the backend owner.</p>}</div></div>;
-  return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 max-w-xl text-sm text-muted-foreground">Connector catalog preview. Registry discovery and secure configuration are awaiting backend integration.</p>
-    <div className="mt-8 divide-y divide-border rounded-xl border border-border">{SEED_CONNECTORS.map((c) => <div key={c.id} className="flex items-center gap-4 px-4 py-4"><span className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-canvas font-display text-sm font-semibold">{c.name.slice(0, 2)}</span><div className="min-w-0 flex-1"><p className="font-medium">{c.name}</p><p className="text-xs text-muted-foreground">{c.description}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">Not configured</span></div>)}</div>
-  </div>;
+  const backend = useBackend(); const [checks, setChecks] = useState<Record<string, Check>>({});
+  const [errors, setErrors] = useState<Record<string, Error>>({}); const [pending, setPending] = useState<Record<string, boolean>>({}); const locks = useRef(new Set<string>());
+  const tools = [...new Map(backend.tools.map(tool => [tool.definition.provider_id, tool])).values()];
+  const admin = backend.session?.auth.roles.includes("admin") && backend.session.auth.decision === "allow";
+  const check = async (provider: string, mode: "configuration" | "connection") => {
+    if (locks.current.has(provider) || !backend.can("tools.read") || (mode === "connection" && !admin)) return;
+    locks.current.add(provider); setPending(current => ({ ...current, [provider]: true }));
+    setErrors(current => { const next = { ...current }; delete next[provider]; return next; });
+    if (mode === "connection") setChecks(current => { const next = { ...current }; delete next[provider]; return next; });
+    try { const result = await api.integrationCheck(provider, mode); setChecks(current => ({ ...current, [provider]: result })); }
+    catch (caught) {
+      setChecks(current => { const next = { ...current }; delete next[provider]; return next; });
+      setErrors(current => ({ ...current, [provider]: caught instanceof Error ? caught : new Error("The check could not be completed.") }));
+    } finally { locks.current.delete(provider); setPending(current => ({ ...current, [provider]: false })); }
+  };
+  return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1>
+    <p className="mt-2 text-sm text-muted-foreground">Configuration and verified connectivity are separate. Credentials remain on the server. Read-only checks never send email or modify provider resources.</p>
+    <p className="mt-3 rounded-lg border p-3 text-sm">Setup: register each required tool, configure its server credential and source resource, review exact revision grants, then activate the published release. A configured or verified connection alone does not activate a trigger. See Monitoring for preparation, release and poll health.</p>
+    <ApiFeedback error={backend.error} />
+    {backend.status !== "connected" && <p role="status" className="mt-4 text-sm text-muted-foreground">Connect to the backend to inspect registered integrations.</p>}
+    <div className="mt-8 grid gap-4 md:grid-cols-2">{tools.map(tool => {
+      const provider = tool.definition.provider_id; const result = checks[provider];
+      const configured = tool.definition.availability === "enabled" && (tool.credential_configured || tool.definition.authentication.mode === "none");
+      const label = result?.state === "verified" ? "Verified" : result?.state === "connection_failed" ? "Connection failed" : (result ? result.configured : configured) ? "Configured · not verified" : "Not configured";
+      return <section key={provider} aria-label={`${provider} integration`} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><h2 className="font-medium">{provider}</h2><span className={`rounded-full px-2 py-1 text-xs ${result?.verified ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{label}</span></div>
+        <p className="mt-3 text-sm text-muted-foreground">{tool.definition.description}</p><p className="mt-2 text-xs">{backend.tools.filter(item => item.definition.provider_id === provider).map(item => item.tool_id).join(", ")}</p>
+        <button type="button" disabled={pending[provider] || !backend.can("tools.read")} className="mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "configuration")}>{pending[provider] ? "Checking…" : "Check configuration"}</button>
+        {result?.live_test_supported && <button type="button" disabled={pending[provider] || !admin || !result.configured} className="ml-2 mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "connection")}>Verify connection</button>}
+        {!backend.can("tools.read") && <p className="mt-2 text-xs">tools.read permission is required.</p>}
+        {result?.live_test_supported && !admin && <p className="mt-2 text-xs">An administrator must verify connections.</p>}
+        {!configured && <p className="mt-2 text-xs">Required setup: configure enabled server tools and their credentials, then check configuration again.</p>}
+        {result && <p role="status" className="mt-2 text-xs text-muted-foreground">{result.message}</p>}
+        <ApiFeedback error={errors[provider]} />
+      </section>;
+    })}{backend.status === "connected" && !tools.length && <p className="text-sm text-muted-foreground">No registered integrations are visible to your account.</p>}</div></div>;
 }

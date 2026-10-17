@@ -19,7 +19,7 @@ class PlannerService:
         self.provider = provider or OpenAIStructuredOutputProvider()
         self.idempotency = idempotency or IdempotencyStore()
 
-    def plan(self, request: dict[str, Any]) -> dict[str, Any]:
+    def plan(self, request: dict[str, Any], context_resolver=None) -> dict[str, Any]:
         request_id = str(request.get("request_id") or f"req_{uuid.uuid4().hex}")
         try:
             if request.get("operation") != "plan_workflow":
@@ -44,9 +44,13 @@ class PlannerService:
                     raise PlannerFailure("IDEMPOTENCY_KEY_REUSED", "The idempotency key was already used for a different request.", field="idempotency_key")
                 return existing.response
             reject_sensitive(payload)
-            workflow = self.provider.generate(objective.strip(), payload.get("context", {}))
+            context = payload.get('context', {})
+            if context_resolver is not None:
+                context = context_resolver(context)
+            reject_sensitive(context)
+            workflow = self.provider.generate(objective.strip(), context)
             reject_sensitive(workflow)
-            mark_automatic_inputs(workflow, payload.get('context', {}))
+            mark_automatic_inputs(workflow, context)
             self._clear_proposed_assignments(workflow)
             identity_objective = objective + '\n[dynamic-delegation-v1]' if workflow.get('metadata', {}).get('dynamic_delegation') else objective
             if workflow.get('metadata', {}).get('execution_input_mode') == 'automatic':

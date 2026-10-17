@@ -1,0 +1,69 @@
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -19,12 +19,15 @@
+   can: (permission: string) => boolean;
+ }
+ let initialization: Promise<void> | null = null;
++let overviewRefresh: Promise<void> | null = null;
+ export const useBackend = create<BackendState>((set, get) => ({
+   status: "loading", session: null, tools: [], error: null, reviews: {}, overview: {}, overviewSequence: 0,
+   liveStatus: "connecting", lastOverviewUpdate: null, overviewError: null,
+   acceptReview: (review) => set((s) => ({ reviews: { ...s.reviews, [review.workflow_id]: review } })),
+   can: (permission) => get().session?.auth.decision === "allow" && !!get().session?.auth.permissions.includes(permission),
+-  refreshOverview: async () => {
++  refreshOverview: () => {
++    if(overviewRefresh)return overviewRefresh;
++    overviewRefresh=(async()=>{
+     try {
+       const snapshot = await api.overview();
+       if ((get().status === "connected" || get().status === "unavailable") && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
+@@ -40,6 +43,8 @@
+       set({ liveStatus: "stale", error: failure, overviewError: failure,
+         ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, tools: [], reviews: {} } : {}) });
+     }
++    })().finally(()=>{overviewRefresh=null;});
++    return overviewRefresh;
+   },
+   initialize: () => {
+     if (initialization) return initialization;
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -32,20 +32,13 @@
+   const [actionError, setActionError] = useState<Error | null>(null);
+   useEffect(() => {
+     if (backendStatus !== "connected") return;
+-    void refreshOverview();
+-    const timer = window.setInterval(() => void useBackend.getState().refreshOverview(), 5000);
+-    const source = typeof EventSource === "undefined" ? null : new EventSource(`/api/backend/workflow-overview/events?after_sequence=${useBackend.getState().overviewSequence}`);
+-    if (source) {
+-      source.onopen = () => useBackend.setState({ liveStatus: "live" });
+-      source.onmessage = (message) => {
+-        const sequence = Number(message.lastEventId);
+-        if (!Number.isSafeInteger(sequence) || sequence <= useBackend.getState().overviewSequence) return;
+-        useBackend.setState({ overviewSequence: sequence });
+-        void useBackend.getState().refreshOverview();
+-      };
+-      source.onerror = () => useBackend.setState({ liveStatus: "stale" });
+-    }
+-    return () => { window.clearInterval(timer); source?.close(); };
++    let stopped=false;let timer:ReturnType<typeof setTimeout>;
++    const refresh=async()=>{
++      await refreshOverview();
++      if(!stopped)timer=setTimeout(()=>void refresh(),15000);
++    };
++    void refresh();
++    return()=>{stopped=true;clearTimeout(timer);};
+   }, [backendStatus, refreshOverview]);
+ 
+   const run = async (workflowId: string) => {
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -26,7 +26,7 @@
+         from .lifecycle import LifecycleFailure
+         provider = binding['provider_id']
+         if binding['delivery'] != 'poll':
+-            if provider in {'generic_hmac_webhook', 'slack_events'}:
++            if provider == 'generic_hmac_webhook':
+                 return
+             raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Install and configure the incoming provider adapter before activation.', 400)
+         tool_id = self.TOOL_BY_PROVIDER.get(provider)

@@ -1,0 +1,19 @@
+--- a/frontend/src/screens/app.tsx
++++ b/frontend/src/screens/app.tsx
+@@ -12,6 +12,7 @@
+ import { useMeshHydrated } from "@/features/shell/useHydrated";
+ import { useMesh } from "@/domain/store";
+ import { useBackend } from "@/api/state";
++import { WorkspaceAccess } from "@/features/shell/WorkspaceAccess";
+ import { roleLabel } from "@/domain/governance";
+ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+@@ -148,7 +149,7 @@
+           </DropdownMenu>
+         </header>
+         <main key={ready ? "r" : "l"} className={`page-enter min-h-0 flex-1 ${inBuilder ? "overflow-hidden" : "overflow-y-auto"}`}>
+-          {ready ? children : <div className="mx-auto max-w-5xl space-y-4 p-6 md:p-10" aria-label="Loading workspace"><Skeleton className="h-9 w-72" /><Skeleton className="h-4 w-96 max-w-full" /><div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}
++          {ready ? <WorkspaceAccess>{children}</WorkspaceAccess> : <div className="mx-auto max-w-5xl space-y-4 p-6 md:p-10" aria-label="Loading workspace"><Skeleton className="h-9 w-72" /><Skeleton className="h-4 w-96 max-w-full" /><div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}
+         </main>
+         <nav className="flex border-t border-border md:hidden">
+           {NAV.flatMap((g) => [...g.items]).filter((it) => ["/app", "/app/workflows", "/app/agents", "/app/approvals", "/app/monitoring"].includes(it.to)).map((it) => (

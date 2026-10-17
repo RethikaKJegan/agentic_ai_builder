@@ -1,0 +1,7 @@
+- [x] Add truthful lifecycle guidance and clear revision/release status with prerequisites.
+- [x] Add structured generated-plan review, explicit opening, failure/retry and original-prompt preservation.
+- [x] Separate editable Design, presentation hierarchy and persisted Execution views.
+- [x] Load exact historical revisions read-only, reconcile recorded event identity/order and preserve dirty drafts.
+- [x] Improve graph diagnostics, outline/dependency order, keyboard connections, selection, layout and undo/redo.
+- [x] Add focused regression and desktop/mobile browser coverage; run frontend/backend/contracts checks.
+- [x] Safely load tested changes into running services, verify live reads and record exact evidence/limits.

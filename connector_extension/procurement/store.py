@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+from workflow_api.auxiliary_database import connection as database_connection
 from zoneinfo import ZoneInfo
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -58,11 +59,12 @@ class ProcurementStore:
     Currency precision is operator supplied; unsupported currencies stop actions.
     """
     def __init__(self, state_dir=None, *, authority_check=None, approval_check=None,
-                 currency_precision=None, clock=None):
+                 currency_precision=None, clock=None, database_url=None):
         root = Path(state_dir or STATE_ROOT).absolute()
         require(root.resolve().is_relative_to(STATE_ROOT.resolve()), 'STATE_PATH_INVALID')
         require(not root.is_symlink(), 'STATE_PATH_INVALID')
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.database_url=database_url
         self.path = root/'procurement.sqlite3'
         require(not self.path.is_symlink(), 'STATE_PATH_INVALID')
         self.authority_check, self.approval_check = authority_check, approval_check
@@ -100,15 +102,12 @@ class ProcurementStore:
                        'PRIMARY KEY(workspace,project,key), FOREIGN KEY(workspace,project,record_id,record_revision) '
                        'REFERENCES revisions(workspace,project,id,revision))')
             db.execute('PRAGMA user_version=1')
-        os.chmod(self.path, 0o600)
+        if self.path.exists():os.chmod(self.path, 0o600)
 
     @contextmanager
-    def connection(self):
-        db = sqlite3.connect(self.path, timeout=15)
-        db.execute('PRAGMA foreign_keys=ON')
-        try:
-            with db: yield db
-        finally: db.close()
+    def connection(self,write=True):
+        with database_connection(self.path,write=write,database_url=self.database_url) as db:
+            yield db
 
     @staticmethod
     def scope(workspace, project):
@@ -117,7 +116,7 @@ class ProcurementStore:
 
     def get(self, workspace, project, record_id, revision=None):
         self.scope(workspace, project)
-        with self.connection() as db:
+        with self.connection(write=False) as db:
             if revision is None:
                 row=db.execute('SELECT body FROM records WHERE workspace=? AND project=? AND id=?',
                                (workspace,project,record_id)).fetchone()
@@ -137,21 +136,21 @@ class ProcurementStore:
 
     def history(self, workspace, project):
         self.scope(workspace,project)
-        with self.connection() as db:
+        with self.connection(write=False) as db:
             rows=db.execute('SELECT transaction_key,record_id,revision,recorded_at FROM activity '
                             'WHERE workspace=? AND project=? ORDER BY sequence',(workspace,project)).fetchall()
         return [dict(zip(('transaction_key','record_id','revision','recorded_at'),r)) for r in rows]
 
     def resources(self, workspace, project):
         self.scope(workspace,project)
-        with self.connection() as db:
+        with self.connection(write=False) as db:
             rows=db.execute('SELECT record_id,provider,resource_type,resource_id,metadata FROM resources '
                             'WHERE workspace=? AND project=?',(workspace,project)).fetchall()
         return [dict(record_id=r[0],provider=r[1],resource_type=r[2],resource_id=r[3],metadata=json.loads(r[4])) for r in rows]
 
     def pending_sync(self, workspace, project):
         self.scope(workspace,project)
-        with self.connection() as db:
+        with self.connection(write=False) as db:
             rows=db.execute("SELECT key,record_id,record_revision,target,payload,status FROM sync_intents "
                             "WHERE workspace=? AND project=? ORDER BY key",(workspace,project)).fetchall()
         return [dict(key=r[0],record_id=r[1],record_revision=r[2],target=r[3],payload=json.loads(r[4]),status=r[5]) for r in rows]

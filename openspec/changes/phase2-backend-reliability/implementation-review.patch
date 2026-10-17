@@ -1,0 +1,1422 @@
+--- a/connector_extension/common.py
++++ b/connector_extension/common.py
+@@ -7,6 +7,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import time
+ from urllib.parse import urlparse
+ from urllib.request import Request, build_opener, HTTPRedirectHandler
+@@ -71,16 +72,20 @@
+ 
+ class EffectJournal:
+     """Commit intent before writes; unknown results can never be replayed silently."""
+-    def __init__(self, root):
++    def __init__(self, root, database_url=None):
++        self.database_url=database_url
+         self.path = Path(root) / 'effects.sqlite3'
+         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'The effect journal cannot be a symlink.')
+-        with sqlite3.connect(self.path) as db:
++        with self.connection() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT)')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
++
++    def connection(self,write=True):
++        return database_connection(self.path,write=write,database_url=self.database_url)
+ 
+     def perform(self, tool_id, effect_id, inputs, action):
+         key = digest([tool_id, effect_id]); fingerprint = digest(inputs)
+-        with sqlite3.connect(self.path, timeout=10) as db:
++        with self.connection() as db:
+             db.execute('BEGIN IMMEDIATE')
+             old = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+             if old:
+@@ -96,11 +101,11 @@
+             category=exc.code if isinstance(exc,RuntimeFailure) and isinstance(exc.code,str) and re.fullmatch(r'[A-Z][A-Z0-9_]{1,99}',exc.code) else 'PROVIDER_ACTION_FAILED'
+             diagnostic={'failure_category':category}
+             if isinstance(exc,RuntimeFailure) and hasattr(exc,'provider_diagnostic'):diagnostic['provider_diagnostic']=exc.provider_diagnostic
+-            with sqlite3.connect(self.path) as db:
++            with self.connection() as db:
+                 db.execute("UPDATE effects SET result=? WHERE key=? AND state='started'",
+                            (json.dumps(diagnostic),key))
+             denied('UNKNOWN_INVOCATION_RESULT', 'The external write result is uncertain; no automatic replay is permitted.', 502)
+-        with sqlite3.connect(self.path) as db:
++        with self.connection() as db:
+             db.execute("UPDATE effects SET state='completed',result=? WHERE key=?", (json.dumps(result), key))
+         return result
+ 
+--- a/connector_extension/procurement/routes.py
++++ b/connector_extension/procurement/routes.py
+@@ -69,12 +69,18 @@
+     def __init__(self, service):
+         import threading
+         self.service=service;self.stop_event=threading.Event();self.thread=None
++        self.health={'state':'starting','last_success':None,'last_error':None}
+     def start(self):
+-        import threading
++        import threading,time
++        if self.thread and self.thread.is_alive():return
++        self.stop_event.clear()
+         def run():
+             while not self.stop_event.wait(3):
+-                try:self.service.tick()
++                try:
++                    self.service.tick()
++                    self.health={'state':'ready','last_success':time.time(),'last_error':None}
+                 except Exception:
++                    self.health['state'],self.health['last_error']='error','PROCUREMENT_WORKER_FAILED'
+                     import logging
+                     logging.getLogger(__name__).warning('Procurement worker tick failed; durable state retained.')
+         self.thread=threading.Thread(target=run,daemon=True,name='extension-procurement');self.thread.start()
+--- a/connector_extension/procurement/service.py
++++ b/connector_extension/procurement/service.py
+@@ -6,7 +6,8 @@
+ import json
+ import re
+ import threading
+-import sqlite3
++import os
++from workflow_api.auxiliary_database import connection as database_connection
+ from uuid import uuid4
+ from jsonschema import Draft202012Validator
+ from runtime.connectors import google_spreadsheet_id
+@@ -26,7 +27,7 @@
+ class ProcurementService:
+     def __init__(self, workflows, state, currency_precision, auth_supplier):
+         self.workflows,self.auth_supplier=workflows,auth_supplier
+-        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority)
++        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority,database_url=getattr(workflows,'auxiliary_database_url',None))
+         self.lock=threading.RLock()
+         self.restored=set()
+         self.cursor=0
+@@ -40,7 +41,7 @@
+ 
+     def job(self, workspace, project):
+         self.store.scope(workspace,project)
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_jobs WHERE workspace=? AND project=?',(workspace,project)).fetchone()
+         require(row is not None,'PROCUREMENT_PROJECT_NOT_FOUND');return json.loads(row[0])
+ 
+@@ -53,7 +54,7 @@
+         # Source accessibility attests only the selected input table, never buyer,
+         # supplier, compliance or canonical human approval.
+         if role!='OPERATOR' or evidence['data']['provider']!='google_sheets':return False
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_source_proofs WHERE workspace=? AND project=? AND id=?',
+                            (evidence['workspace_id'],evidence['project_id'],evidence['record_id'])).fetchone()
+         return bool(row and json.loads(row[0])==evidence)
+@@ -297,8 +298,8 @@
+                     failed['state'] in ('blocked','failed') and not job.get('tracking'), 'TRACKING_RETRY_NOT_ALLOWED')
+             require(len(job.get('recovery_history',[]))<2,'TRACKING_RETRY_LIMIT')
+             path=self.store.path.parent/'sheet-resources.sqlite3'
+-            if path.exists():
+-                with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
++            if path.exists() or self.store.database_url or os.getenv('BUILDER_AUXILIARY_DATABASE_URL'):
++                with database_connection(path,write=False,database_url=self.store.database_url) as db:
+                     found=db.execute('SELECT 1 FROM observations WHERE workspace=? AND project=?',(workspace,project)).fetchone()
+                 require(not found,'TRACKING_RESOURCE_RECONCILIATION_REQUIRED')
+             known_rejection=False
+@@ -309,7 +310,7 @@
+                 published=self.call('get_workflow',ref,auth,failed['workflow_id']+'_recovery_read')['workflow']
+                 inputs=setup_inputs(next(n['configuration']['input'] for n in published['nodes'] if n.get('tool_id')=='extension_sheets_create'))
+                 effect='sheet_setup_'+effect_digest([workspace,project,inputs['creation_key']])
+-                with sqlite3.connect('file:'+str(self.store.path.parent/'effects.sqlite3')+'?mode=ro',uri=True) as db:
++                with database_connection(self.store.path.parent/'effects.sqlite3',write=False,database_url=self.store.database_url) as db:
+                     prior=db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?',
+                                      (effect_digest(['extension_sheets_create',effect]),)).fetchone()
+                 known_rejection=bool(prior and prior[0]==effect_digest(inputs) and prior[1]=='started' and prior[2] and
+@@ -435,7 +436,7 @@
+             db.execute("UPDATE sync_intents SET status='CONFIRMED' WHERE workspace=? AND project=? AND key=?",(workspace,project,key))
+ 
+     def tick(self):
+-        with self.store.connection() as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
++        with self.store.connection(write=False) as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
+             "json_extract(body,'$.phase') NOT IN ('DRAFTS_READY','NEEDS_CLARIFICATION','STOPPED') ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
+         if not jobs:self.cursor=0
+         for rowid,workspace,project,body in jobs:
+--- a/connector_extension/procurement/store.py
++++ b/connector_extension/procurement/store.py
+@@ -9,6 +9,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ from zoneinfo import ZoneInfo
+ from jsonschema import Draft202012Validator, FormatChecker
+ 
+@@ -58,11 +59,12 @@
+     Currency precision is operator supplied; unsupported currencies stop actions.
+     """
+     def __init__(self, state_dir=None, *, authority_check=None, approval_check=None,
+-                 currency_precision=None, clock=None):
++                 currency_precision=None, clock=None, database_url=None):
+         root = Path(state_dir or STATE_ROOT).absolute()
+         require(root.resolve().is_relative_to(STATE_ROOT.resolve()), 'STATE_PATH_INVALID')
+         require(not root.is_symlink(), 'STATE_PATH_INVALID')
+         root.mkdir(parents=True, exist_ok=True, mode=0o700)
++        self.database_url=database_url
+         self.path = root/'procurement.sqlite3'
+         require(not self.path.is_symlink(), 'STATE_PATH_INVALID')
+         self.authority_check, self.approval_check = authority_check, approval_check
+@@ -100,15 +102,12 @@
+                        'PRIMARY KEY(workspace,project,key), FOREIGN KEY(workspace,project,record_id,record_revision) '
+                        'REFERENCES revisions(workspace,project,id,revision))')
+             db.execute('PRAGMA user_version=1')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
+ 
+     @contextmanager
+-    def connection(self):
+-        db = sqlite3.connect(self.path, timeout=15)
+-        db.execute('PRAGMA foreign_keys=ON')
+-        try:
+-            with db: yield db
+-        finally: db.close()
++    def connection(self,write=True):
++        with database_connection(self.path,write=write,database_url=self.database_url) as db:
++            yield db
+ 
+     @staticmethod
+     def scope(workspace, project):
+@@ -117,7 +116,7 @@
+ 
+     def get(self, workspace, project, record_id, revision=None):
+         self.scope(workspace, project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             if revision is None:
+                 row=db.execute('SELECT body FROM records WHERE workspace=? AND project=? AND id=?',
+                                (workspace,project,record_id)).fetchone()
+@@ -137,21 +136,21 @@
+ 
+     def history(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute('SELECT transaction_key,record_id,revision,recorded_at FROM activity '
+                             'WHERE workspace=? AND project=? ORDER BY sequence',(workspace,project)).fetchall()
+         return [dict(zip(('transaction_key','record_id','revision','recorded_at'),r)) for r in rows]
+ 
+     def resources(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute('SELECT record_id,provider,resource_type,resource_id,metadata FROM resources '
+                             'WHERE workspace=? AND project=?',(workspace,project)).fetchall()
+         return [dict(record_id=r[0],provider=r[1],resource_type=r[2],resource_id=r[3],metadata=json.loads(r[4])) for r in rows]
+ 
+     def pending_sync(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute("SELECT key,record_id,record_revision,target,payload,status FROM sync_intents "
+                             "WHERE workspace=? AND project=? ORDER BY key",(workspace,project)).fetchall()
+         return [dict(key=r[0],record_id=r[1],record_revision=r[2],target=r[3],payload=json.loads(r[4]),status=r[5]) for r in rows]
+--- a/connector_extension/sheet_creation.py
++++ b/connector_extension/sheet_creation.py
+@@ -5,6 +5,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import time
+ from urllib.parse import quote, urlencode
+ from jsonschema import Draft202012Validator
+@@ -43,24 +44,25 @@
+ 
+ class SheetResourceStore:
+     """Resource ownership only; this is not the future procurement case database."""
+-    def __init__(self, root):
++    def __init__(self, root, database_url=None):
++        self.database_url=database_url
+         self.path = Path(root) / 'sheet-resources.sqlite3'
+         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'Resource state cannot be a symlink.')
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             db.execute('CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, spreadsheet TEXT, '
+                        'sheet INTEGER, spreadsheet_owned INTEGER, tab_owned INTEGER, manifest TEXT, '
+                        'workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,spreadsheet,sheet))')
+             db.execute('CREATE TABLE IF NOT EXISTS observations (workspace TEXT, project TEXT, marker TEXT, '
+                        'spreadsheet TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,marker))')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
+ 
+     def observe(self, namespace, project, marker, identifier):
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             db.execute('INSERT OR IGNORE INTO observations VALUES (?,?,?,?,?,?)',
+                        (namespace[0], project, marker, identifier, namespace[1], namespace[2]))
+ 
+     def remember(self, namespace, receipt):
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             for table in receipt['tabs']:
+                 db.execute('INSERT INTO resources VALUES (?,?,?,?,?,?,?,?,?) '
+                            'ON CONFLICT(workspace,project,spreadsheet,sheet) DO UPDATE SET '
+@@ -97,7 +99,7 @@
+ 
+     def journal_row(self, value):
+         key = digest([self.definition['tool_id'], self.stable_effect(value)])
+-        with sqlite3.connect(self.journal.path) as db:
++        with self.journal.connection(write=False) as db:
+             row = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+         if row and row[0] != digest(value):
+             denied('EFFECT_REFERENCE_MISMATCH', 'This project creation key belongs to different reviewed inputs.')
+@@ -265,7 +267,7 @@
+         result = self.receipt(value, self.metadata(identifier, deadline), deadline, require_owned=create)
+         if list(Draft202012Validator(self.definition['output_schema']).iter_errors(result)):
+             denied('SHEETS_SETUP_INVALID_RESULT', 'Reconciled setup does not match the output schema.')
+-        with sqlite3.connect(self.journal.path) as db:
++        with self.journal.connection() as db:
+             db.execute('BEGIN IMMEDIATE')
+             current = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+             if not current or current[0] != digest(value): denied('EFFECT_REFERENCE_MISMATCH', 'The setup intent changed.')
+--- a/connector_extension/tests/test_sheet_creation.py
++++ b/connector_extension/tests/test_sheet_creation.py
+@@ -4,6 +4,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import tempfile
+ import unittest
+ from urllib.parse import urlparse, parse_qs, unquote
+@@ -104,7 +105,7 @@
+         body=self.http.calls[0]['body'];self.assertEqual(body['sheets'][0]['data'][0]['rowData'][0]['values'][-1],
+                                                      {'userEnteredValue':{'stringValue':'=literal_header'}})
+         self.assertEqual(len(write_targets(result['proposed_write_targets'])),1)
+-        with sqlite3.connect(self.resources.path) as db:
++        with database_connection(self.resources.path,write=False) as db:
+             row=db.execute('SELECT project,spreadsheet_owned,tab_owned FROM resources').fetchone()
+         self.assertEqual(row,('project_demo',1,1))
+ 
+@@ -145,7 +146,7 @@
+     def test_verification_failure_retains_creation_observation_and_never_recreates(self):
+         self.http.fail_verification=True
+         with self.assertRaises(RuntimeFailure):self.invoke()
+-        with sqlite3.connect(self.resources.path) as db:
++        with database_connection(self.resources.path,write=False) as db:
+             self.assertEqual(db.execute('SELECT spreadsheet FROM observations').fetchone()[0],'created_1')
+         with self.assertRaises(RuntimeFailure):self.invoke(effect='retry')
+         self.http.fail_verification=False;self.connector().reconcile(self.inputs,'created_1')
+@@ -183,7 +184,7 @@
+         connector=SheetsSetup(CATALOG['extension_sheets_create'],GoogleAPI(token,self.http),self.journal,self.resources).bind_workflow(self.workflow)
+         with self.assertRaises(RuntimeFailure):connector.invoke(grant('extension_sheets_create'),self.inputs,'scope')
+         self.assertFalse(self.http.calls)
+-        with sqlite3.connect(self.journal.path) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
++        with self.journal.connection(write=False) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
+ 
+     def test_add_tabs_preserves_existing_business_data_and_reuses_matching_headers(self):
+         self.http.add_book('original',{'Legacy':['id','value'],'Items':['item_id','quantity']})
+@@ -202,7 +203,7 @@
+         self.http.add_book('original',{'Items':['id','other']});data={k:v for k,v in self.inputs.items() if k!='title'};data['spreadsheet_id']='original'
+         with self.assertRaises(RuntimeFailure) as caught:self.invoke(data,'extension_sheets_add_tabs')
+         self.assertEqual(caught.exception.code,'SHEETS_TAB_CONFLICT');self.assertEqual(self.http.write_count,0)
+-        with sqlite3.connect(self.journal.path) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
++        with self.journal.connection(write=False) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
+ 
+     def test_all_existing_tables_do_not_write_or_claim_ownership(self):
+         self.http.add_book('original',{'Items':['item_id','quantity']});data={k:v for k,v in self.inputs.items() if k!='title'};data['spreadsheet_id']='original'
+--- a/connector_extension/tests/test_tracking_recovery.py
++++ b/connector_extension/tests/test_tracking_recovery.py
+@@ -1,6 +1,6 @@
+ import io
+ import json
+-import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import tempfile
+ import unittest
+ from urllib.error import HTTPError
+@@ -22,7 +22,7 @@
+             with self.assertRaises(RuntimeFailure) as caught:
+                 journal.perform('tool_test','effect_test',{},lambda:transport.request('POST','https://example.com/create',{},{}))
+             self.assertEqual(caught.exception.code,'UNKNOWN_INVOCATION_RESULT')
+-            with sqlite3.connect(journal.path) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
++            with journal.connection(write=False) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
+             self.assertEqual(state,'started');self.assertNotIn('other_private_field',result)
+             self.assertEqual(json.loads(result)['provider_diagnostic']['http_status'],400)
+             self.assertIn('Metadata IDs',json.loads(result)['provider_diagnostic']['message'])
+@@ -48,7 +48,7 @@
+         self.assertEqual(state['recovery_history'][0]['previous_run_id'],old['run_id'])
+         self.service.retry_tracking(self.plan['project_id'],old['run_id'],True,self.auth)
+         self.assertEqual(self.http.write_count,writes)
+-        with sqlite3.connect(self.service.store.path.parent/'effects.sqlite3') as db:
++        with database_connection(self.service.store.path.parent/'effects.sqlite3',write=False) as db:
+             self.assertEqual(db.execute("SELECT COUNT(*) FROM effects WHERE state='started'").fetchone()[0],1)
+     def test_missing_operator_confirmation_is_rejected(self):
+         state=self.setup();old=state['actions']['tracking'];self.http.lose_write_response=True;self.approve(state);self.advance()
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -179,8 +179,23 @@
+         return connector, grant, agent, params, reservation
+ 
+     def advance(self, run_id, auth):
++        import os
++        from workflow_api.worker_control import LeaseHeartbeat
++        seconds=int(os.getenv('BUILDER_RUNTIME_LEASE_SECONDS','120'))
++        if not 30<=seconds<=3600:raise ValueError('Runtime lease must be 30-3600 seconds.')
++        worker='worker_'+uuid4().hex
++        def renew():
++            with self.runtime.store.transaction() as db:
++                run=self.runtime.load(db,run_id,auth,'workflow.execute')
++                if run.get('worker')!=worker or run['status']!='running':return False
++                run['lease_until']=self.runtime.clock()+seconds
++                self.runtime.save(db,run)
++            return True
++        with LeaseHeartbeat(renew,interval=max(1,seconds/3)):
++            return self._advance(run_id,auth,worker,seconds)
++
++    def _advance(self, run_id, auth, worker, lease_seconds):
+         runtime = self.runtime
+-        worker = 'worker_' + uuid4().hex
+         with runtime.store.transaction() as db:
+             run = runtime.load(db, run_id, auth, 'workflow.execute')
+             if run['subject_id'] != auth['subject']['subject_id']:
+@@ -197,7 +212,7 @@
+                 self.fail(db, run, 'UNKNOWN_INVOCATION_RESULT', blocked=True)
+                 return runtime.public(run)
+             run['worker'] = worker
+-            run['lease_until'] = runtime.clock() + 3600
++            run['lease_until'] = runtime.clock() + lease_seconds
+             if run['status'] == 'queued':
+                 runtime.transition(db, run, 'running')
+             runtime.save(db, run)
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -38,8 +38,10 @@
+         with self.store.transaction() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))')
+             db.execute('CREATE INDEX IF NOT EXISTS runtime_runs_workspace_workflow ON runtime_runs(workspace, workflow_id)')
++            db.execute("CREATE INDEX IF NOT EXISTS runtime_runs_pending ON runtime_runs(json_extract(document,'$.status')) WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval')")
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))')
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)')
++            db.execute('CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)')
+ 
+     @staticmethod
+     def authorize(auth, permission, roles):
+@@ -141,7 +143,7 @@
+ 
+     def load(self, db, run_id, auth, permission='runs.view'):
+         self.authorize(auth, permission, {'admin', 'builder', 'viewer', 'approver'} if permission == 'runs.view' else {'admin', 'builder'})
+-        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (auth['subject']['workspace_id'], run_id)).fetchone()
++        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?' + (' FOR UPDATE' if getattr(db,'write',False) else ''), (auth['subject']['workspace_id'], run_id)).fetchone()
+         if row is None:
+             raise RuntimeFailure('RUN_NOT_FOUND', 'The run was not found in this workspace.', 404)
+         return json.loads(row[0])
+@@ -168,13 +170,13 @@
+         db.execute('UPDATE runtime_runs SET document=? WHERE run_id=? AND workspace=?', (json.dumps(run), run['run_id'], run['workspace_id']))
+ 
+     def get_run(self, run_id, auth):
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             return self.public(self.load(db, run_id, auth))
+ 
+     def list_runs(self, auth, limit=100, status=None):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+         items = [self.public(json.loads(row[0])) for row in rows]
+         if status:
+@@ -184,7 +186,7 @@
+     def list_approvals(self, auth, pending_only=False, limit=100):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+         items = []
+         for row in rows:
+@@ -195,7 +197,7 @@
+         return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
+ 
+     def events(self, run_id, auth):
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             self.load(db, run_id, auth)
+             items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
+             return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+@@ -204,7 +206,7 @@
+         """Return workspace-scoped counters and safe trace references."""
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
+             event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+             audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+@@ -248,7 +250,7 @@
+         """
+         if self.observer is None:
+             return 0
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT sequence, document FROM runtime_events WHERE sequence NOT IN (SELECT sequence FROM runtime_trace_exports WHERE observer=?) ORDER BY sequence LIMIT ?', (observer_id, limit)).fetchall()
+         exported = 0
+         for sequence, document in rows:
+--- a/runtime/worker.py
++++ b/runtime/worker.py
+@@ -4,18 +4,26 @@
+ 
+ 
+ class RuntimeWorker:
+-    def __init__(self, runner, authenticate, interval=1):
++    def __init__(self, runner, authenticate, interval=1, batch_size=100):
+         self.runner, self.authenticate, self.interval = runner, authenticate, interval
++        self.batch_size = min(max(int(batch_size),1),1000)
++        self.health = {"state":"starting","last_success":None,"last_error":None}
++        self.cursor = 0
+         self.stop_event = Event()
+         self.thread = None
+ 
+     def drain(self):
+         runtime = self.runner.runtime
+         with runtime.store.transaction(write=False) as db:
+-            rows = db.execute('SELECT document FROM runtime_runs ORDER BY rowid').fetchall()
++            rows = db.execute("SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.cursor,self.batch_size)).fetchall()
++            if not rows:
++                self.cursor=0
++                rows = db.execute("SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.cursor,self.batch_size)).fetchall()
+         advanced = []
+         for row in rows:
+-            run = json.loads(row[0])
++            if self.stop_event.is_set():break
++            self.cursor=row[0]
++            run = json.loads(row[1])
+             if run['status'] not in {'queued', 'running', 'paused_for_approval'}:
+                 continue
+             # Authentication adapters may reject expired/revoked identities. The
+@@ -28,6 +36,8 @@
+             except Exception:
+                 continue
+         runtime.export_traces()
++        import time
++        self.health={"state":"ready","last_success":time.time(),"last_error":None}
+         return advanced
+ 
+     def start(self):
+@@ -36,7 +46,11 @@
+         self.stop_event.clear()
+         def loop():
+             while not self.stop_event.is_set():
+-                self.drain()
++                try:self.drain()
++                except Exception:
++                    import logging
++                    self.health['state'],self.health['last_error']='error','RUNTIME_WORKER_FAILED'
++                    logging.getLogger(__name__).warning('Runtime worker failed; durable runs retained.')
+                 self.stop_event.wait(self.interval)
+         self.thread = Thread(target=loop, name='builder-runtime-worker', daemon=True)
+         self.thread.start()
+--- a/tests/test_fulfilment_recovery.py
++++ b/tests/test_fulfilment_recovery.py
+@@ -9,6 +9,7 @@
+         self.workflow={'tools':[],'nodes':[{'kind':'trigger'},{'kind':'agent'},{'kind':'output'}]}
+         owner=self
+         class DB:
++            def __init__(self,*,write=True):owner.assertFalse(write)
+             def __enter__(self):return self
+             def __exit__(self,*args):pass
+             def execute(self,*args):return SimpleNamespace(fetchone=lambda:(json.dumps(owner.workflow),))
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -86,7 +86,8 @@
+         self.workflows, self.store, self.clock = workflows, workflows.store, clock
+         self.adapter = adapter or TriggerAdapter()
+         self.trigger_secrets = dict(trigger_secrets or {})
+-        with self.store.transaction(write=False) as db:
++        self.leased_tokens = {}
++        with self.store.transaction(write=True) as db:
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))")
+@@ -97,9 +98,12 @@
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_checkpoints (workspace TEXT, binding_id TEXT, cursor TEXT, updated_at TEXT, PRIMARY KEY(workspace, binding_id))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_overview_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, workflow_id TEXT, document TEXT NOT NULL)")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_tombstones (workspace TEXT, workflow_id TEXT, deleted_at TEXT, cleanup_state TEXT, PRIMARY KEY(workspace, workflow_id))")
+-            # A crash during preparation cannot authorize dispatch. Reconciliation
+-            # deterministically fails the incomplete release and preserves the pointer.
+-            db.execute("UPDATE lifecycle_releases SET state='failed', document=json_set(document, '$.state', 'failed') WHERE state='preparing'")
++            db.execute('CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)')
++            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_preparations_workspace ON lifecycle_preparations(workspace)')
++            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_jobs_ready ON lifecycle_jobs(workspace,state,available_at,lease_until)')
++            db.execute('CREATE TABLE IF NOT EXISTS lifecycle_job_claims (job_id TEXT PRIMARY KEY, token TEXT NOT NULL)')
++            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_triggers_active ON lifecycle_triggers(workspace,state,workflow_id)')
++            # Recovery is lease-aware; another API instance may still be preparing.
+ 
+     @staticmethod
+     def authorize(auth, permission, roles=("admin",)):
+@@ -139,7 +143,7 @@
+         if not workspace:
+             return
+         fingerprint = json_digest({"kind": kind, "payload": payload})
+-        with self.store.transaction(write=False) as db:
++        with self.store.transaction(write=True) as db:
+             operation, replay = self.operation(db, workspace, auth, kind, key, workflow_id,
+                                                payload.get("expected_release_id"), fingerprint)
+             if not replay or operation["state"] == "preparing":
+@@ -159,91 +163,17 @@
+         return event
+ 
+     def activate(self, request, auth):
+-        self.authorize(auth, "workflow.publish")
+-        payload, key = request.get("payload", {}), request.get("idempotency_key")
+-        workflow_id, version = payload.get("workflow_id"), payload.get("workflow_version")
+-        expected = payload.get("expected_release_id")
+-        triggers = payload.get("triggers", [])
+-        if not isinstance(workflow_id, str) or type(version) is not int or not isinstance(triggers, list):
+-            raise LifecycleFailure("INVALID_REQUEST", "Activation requires an exact workflow revision and trigger list.", 400)
+-        reject_secrets(payload)
+-        workspace = auth["subject"]["workspace_id"]
+-        fingerprint = json_digest({"kind": "activate_release", "payload": payload})
+-        prepared = []
+-        with self.store.transaction(write=False) as db:
+-            operation, replay = self.operation(db, workspace, auth, "activate_release", key, workflow_id, expected, fingerprint)
+-            if replay:
+-                return {"operation": operation, "release": self._release_for_operation(db, operation)}
+-            if db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone():
+-                raise LifecycleFailure("WORKFLOW_DELETED", "A deleted workflow cannot be published.", 410)
+-            active = db.execute("SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()
+-            active_id = active[0] if active else None
+-            if expected != active_id:
+-                raise LifecycleFailure("RELEASE_CONFLICT", "The active release changed. Reload before publishing.")
+-            workflow = self.store.get(db, workspace, workflow_id, version)
+-            if not workflow or workflow.get("status") != "published" or workflow.get("metadata", {}).get("validation_state") != "validated":
+-                raise LifecycleFailure("REVISION_NOT_PUBLISHED", "Activate a validated, approved, published revision.")
+-            if getattr(self.workflows, 'configuration_validator', None):
+-                self.workflows.configuration_validator(workflow)
+-            if not triggers:
+-                triggers = deepcopy(workflow.get("metadata", {}).get("trigger_templates", []))
+-            review = self.workflows.registry_adapter.review(workflow, auth)
+-            if not review["ready"]:
+-                raise LifecycleFailure("ASSIGNMENT_REVALIDATION_FAILED", "Registry grants are not currently authorized.", 403)
+-            grants = self.workflows.registry_adapter.execution_assignments(workflow, auth)
+-            generation = (db.execute("SELECT COALESCE(MAX(generation), 0) FROM lifecycle_releases WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()[0] + 1)
+-            release_id, identity_id = identifier("rel_"), identifier("auto_")
+-            identity = dict(identity_id=identity_id, subject_id="automation:" + workflow_id,
+-                            workspace_id=workspace, scopes=["workflow.execute", "trigger.dispatch"],
+-                            policy_version=max([g.get("policy_version", 1) for g in grants] or [1]), active=True)
+-            authority = deepcopy(auth)
+-            authority["subject"] = {"subject_id": identity["subject_id"], "workspace_id": workspace}
+-            if grants:
+-                authority["_registry_assignment_subject"] = deepcopy(auth["subject"])
+-                authority["_registry_approval_auth"] = deepcopy(auth)
+-            authority["roles"] = ["admin"]
+-            authority["permissions"] = sorted(set(authority["permissions"]) | {"workflow.execute", "runs.view"})
+-            binding_ids = []
+-            created_at = now_iso(self.clock)
+-            try:
+-                for index, raw in enumerate(triggers):
+-                    trigger = self._normalize_trigger(workspace, release_id, workflow_id, raw, index)
+-                    reference = self.adapter.prepare(trigger)
+-                    trigger["health"] = "ready"
+-                    prepared.append((trigger, reference))
+-                    binding_ids.append(trigger["binding_id"])
+-            except Exception:
+-                for trigger, _reference in reversed(prepared):
+-                    try:
+-                        self.adapter.cleanup(trigger)
+-                    except Exception:
+-                        pass
+-                raise
+-            release = dict(release_id=release_id, workspace_id=workspace,
+-                           revision=dict(workflow_id=workflow_id, workflow_version=version), state="preparing",
+-                           generation=generation, automation_identity_id=identity_id,
+-                           agent_versions={item["agent_id"]: item.get("agent_version", 1) for item in review["items"]},
+-                           tool_versions={item["tool_id"]: item.get("tool_version", 1) for item in review["items"] if item.get("tool_id")},
+-                           policy_version=identity["policy_version"], trigger_binding_ids=binding_ids, created_at=created_at)
+-            db.execute("INSERT INTO lifecycle_releases VALUES (?, ?, ?, ?, ?, ?, ?)",
+-                       (workspace, release_id, workflow_id, version, generation, "preparing", json.dumps(release)))
+-            db.execute("INSERT INTO lifecycle_identities VALUES (?, ?, ?, ?)", (workspace, identity_id, json.dumps(authority), json.dumps(identity)))
+-            for trigger, reference in prepared:
+-                db.execute("INSERT INTO lifecycle_triggers VALUES (?, ?, ?, ?, ?, ?, ?)",
+-                           (workspace, trigger["binding_id"], release_id, workflow_id, "ready", reference, json.dumps(trigger)))
+-            release["state"] = "active"
+-            db.execute("UPDATE lifecycle_releases SET state='active', document=? WHERE release_id=?", (json.dumps(release), release_id))
+-            db.execute("INSERT INTO lifecycle_active VALUES (?, ?, ?) ON CONFLICT(workspace, workflow_id) DO UPDATE SET release_id=excluded.release_id", (workspace, workflow_id, release_id))
+-            if active_id:
+-                db.execute("UPDATE lifecycle_releases SET state='disabled', document=json_set(document, '$.state', 'disabled') WHERE release_id=?", (active_id,))
+-                db.execute("UPDATE lifecycle_triggers SET state='disabled', document=json_set(document, '$.health', 'disabled') WHERE release_id=?", (active_id,))
+-            operation["state"] = "succeeded"
+-            self.save_operation(db, operation)
+-            self.emit(db, workspace, workflow_id, "release.activated")
+-            return {"operation": operation, "release": release}
++        from .activation import activate
++        return activate(self, request, auth)
+ 
+     def _release_for_operation(self, db, operation):
+-        row = db.execute("SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (operation["workspace_id"], operation["workflow_id"])).fetchone()
++        prepared = db.execute('SELECT document FROM lifecycle_preparations WHERE operation_id=?', (operation['operation_id'],)).fetchone()
++        if prepared:
++            release_id = json.loads(prepared[0])['release_id']
++            row = db.execute('SELECT document FROM lifecycle_releases WHERE workspace=? AND release_id=?', (operation['workspace_id'], release_id)).fetchone()
++        else:
++            # Compatibility for operations persisted before the preparation ledger.
++            row = db.execute("SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (operation["workspace_id"], operation["workflow_id"])).fetchone()
+         return json.loads(row[0]) if row else None
+ 
+     def _normalize_trigger(self, workspace, release_id, workflow_id, raw, index):
+@@ -323,7 +253,7 @@
+ 
+     def verify_webhook(self, binding_id, provider_id, raw_body, signature, timestamp=None):
+         """Verify provider delivery before parsing or dispatching its event."""
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+         if not row or row[0] != "ready":
+             raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This trigger binding is not active.", 404)
+@@ -388,7 +318,7 @@
+                 raise ValueError()
+         except Exception:
+             raise LifecycleFailure("INVALID_SCHEDULE_TICK", "A schedule tick requires a timezone-aware instant.", 400) from None
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+             if not row or row[0] != "ready":
+                 raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This schedule binding is not active.", 404)
+@@ -455,16 +385,35 @@
+                 job["state"], job["attempt"] = "leased", job["attempt"] + 1
+                 job["lease_until"] = (datetime.fromtimestamp(self.clock(), timezone.utc) + timedelta(seconds=seconds)).isoformat()
+                 db.execute("UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?", (job["lease_until"], job["attempt"], json.dumps(job), job_id))
++                token=uuid4().hex
++                db.execute('INSERT INTO lifecycle_job_claims VALUES (?,?) ON CONFLICT(job_id) DO UPDATE SET token=excluded.token',(job_id,token))
++                self.leased_tokens[job_id]=token
+                 jobs.append(job)
+             return jobs
+ 
+     def poll_bindings(self, workspace):
+         """Return active polling bindings without credential material."""
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'", (workspace,)).fetchall()
+         return [json.loads(encoded) for _binding, encoded in rows if json.loads(encoded).get('delivery') == 'poll']
+ 
+-    def execute_job(self, job_id, runner, max_attempts=3):
++    def execute_job(self, job_id, runner, max_attempts=3, claim=None):
++        from .worker_control import LeaseHeartbeat
++        claim=claim or self.leased_tokens.get(job_id)
++        def renew():
++            with self.store.transaction() as db:
++                row=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++                current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
++                if not row or row[0]!=claim or not current:return False
++                job=json.loads(current[0])
++                if job['state']!='leased':return False
++                job['lease_until']=(datetime.fromtimestamp(self.clock(),timezone.utc)+timedelta(seconds=120)).isoformat()
++                db.execute('UPDATE lifecycle_jobs SET lease_until=?,document=? WHERE job_id=?',(job['lease_until'],json.dumps(job),job_id))
++            return True
++        with LeaseHeartbeat(renew,interval=10):
++            return self._execute_claimed_job(job_id,runner,max_attempts,claim)
++
++    def _execute_claimed_job(self, job_id, runner, max_attempts, claim):
+         with self.store.transaction() as db:
+             row = db.execute("SELECT document FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()
+             if not row:
+@@ -472,28 +421,47 @@
+             job = json.loads(row[0])
+             if job["state"] == "completed":
+                 return job
++            current_claim=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++            if not claim or not current_claim or current_claim[0]!=claim:
++                raise LifecycleFailure('JOB_LEASE_LOST','This worker no longer owns the dispatch job.')
++            if job['state']!='leased':return job
++            if not job.get('lease_until') or job['lease_until']<=now_iso(self.clock):
++                raise LifecycleFailure('JOB_LEASE_EXPIRED','The dispatch lease expired before execution.')
+             release_row = db.execute("SELECT state, document FROM lifecycle_releases WHERE release_id=?", (job["release_id"],)).fetchone()
+             identity_row = db.execute("SELECT authority, document FROM lifecycle_identities WHERE identity_id=?", (job["automation_identity_id"],)).fetchone()
+             tombstoned = db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (job["workspace_id"], self._job_workflow(db, job_id))).fetchone()
+             if not release_row or not identity_row or json.loads(identity_row[1])["active"] is not True or tombstoned:
+-                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED")
++                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED",claim)
+             release, auth = json.loads(release_row[1]), json.loads(identity_row[0])
+             workflow = self.store.get(db, job["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
+             if not workflow or not self.workflows.registry_adapter.review(workflow, auth)["ready"]:
+-                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED")
++                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED",claim)
++        resolver=getattr(self.workflows,'worker_authenticate',None)
++        if resolver:
++            fresh=resolver(job['workspace_id'],auth['subject']['subject_id'])
++            if fresh is None:
++                with self.store.transaction() as db:return self._finish_job(db,job,'cancelled','EXECUTION_AUTHORITY_REVOKED',claim)
++            auth=fresh
+         request = dict(request_id="req_" + job_id, operation="execute_workflow", idempotency_key=job["deduplication_key"],
+                        payload={**release["revision"], "inputs": job["inputs"]})
++        run=None
+         try:
+             run = runner.runtime.create_automation_run(request, auth)
+             run = runner.advance(run["run_id"], auth)
+             with self.store.transaction() as db:
+                 job["run_id"] = run["run_id"]
+-                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None)
+-        except Exception:
++                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None,claim)
++        except Exception as exc:
+             with self.store.transaction() as db:
+-                state = "dead_letter" if job["attempt"] >= max_attempts else "queued"
++                token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++                stored=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
++                if not token or token[0]!=claim or json.loads(stored[0])['state']!='leased':return json.loads(stored[0])
++                from .postgres import DatabaseFailure
++                import sqlite3
++                transient=isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
++                state='queued' if run is None and transient and job['attempt']<max_attempts else 'dead_letter'
+                 job["lease_until"] = None
+-                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED"
++                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED" if transient else "RUNTIME_DISPATCH_UNCERTAIN"
+                 db.execute("UPDATE lifecycle_jobs SET state=?, lease_until=NULL, available_at=?, document=? WHERE job_id=?",
+                            (state, now_iso(self.clock), json.dumps({**job, "state": state}), job_id))
+                 return {**job, "state": state}
+@@ -501,7 +469,11 @@
+     def _job_workflow(self, db, job_id):
+         return db.execute("SELECT workflow_id FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()[0]
+ 
+-    def _finish_job(self, db, job, state, error):
++    def _finish_job(self, db, job, state, error, claim=None):
++        if claim:
++            current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job['job_id'],)).fetchone()
++            token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job['job_id'],)).fetchone()
++            if not token or token[0]!=claim or json.loads(current[0])['state']!='leased':return json.loads(current[0])
+         job["state"], job["lease_until"] = state, None
+         if error:
+             job["last_error_code"] = error
+@@ -530,73 +502,13 @@
+         return self._stop(request, auth, deleting=True)
+ 
+     def _stop(self, request, auth, deleting):
+-        permission, kind = ("workflow.delete", "delete_workflow") if deleting else ("workflow.publish", "disable_release")
+-        self.authorize(auth, permission)
+-        payload, key = request.get("payload", {}), request.get("idempotency_key")
+-        workflow_id, expected = payload.get("workflow_id"), payload.get("expected_release_id")
+-        if deleting and payload.get("confirmed") is not True:
+-            raise LifecycleFailure("DELETE_CONFIRMATION_REQUIRED", "Confirm deletion explicitly.", 400)
+-        workspace = auth["subject"]["workspace_id"]
+-        fingerprint = json_digest({"kind": kind, "payload": payload})
+-        with self.store.transaction() as db:
+-            operation, replayed = self.operation(db, workspace, auth, kind, key, workflow_id, expected, fingerprint)
+-            if replayed:
+-                return {"operation": operation}
+-            active = db.execute("SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()
+-            active_id = active[0] if active else None
+-            if deleting and active_id is None and expected is not None:
+-                latest = db.execute("SELECT release_id FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (workspace, workflow_id)).fetchone()
+-                active_id = latest[0] if latest else None
+-            if expected != active_id:
+-                raise LifecycleFailure("RELEASE_CONFLICT", "The active release changed. Reload before continuing.")
+-            if active_id:
+-                target_state = "deleting" if deleting else "disabled"
+-                db.execute("UPDATE lifecycle_releases SET state=?, document=json_set(document, '$.state', ?) WHERE release_id=?", (target_state, target_state, active_id))
+-                bindings = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE release_id=?", (active_id,)).fetchall()
+-                cleanup_pending = False
+-                for binding_id, encoded in bindings:
+-                    trigger = json.loads(encoded)
+-                    try:
+-                        cleaned = self.adapter.cleanup(trigger)
+-                    except Exception:
+-                        cleaned = False
+-                    health = "disabled" if cleaned else "cleanup_pending"
+-                    cleanup_pending = cleanup_pending or not cleaned
+-                    db.execute("UPDATE lifecycle_triggers SET state=?, document=json_set(document, '$.health', ?) WHERE binding_id=?", (health, health, binding_id))
+-                db.execute("DELETE FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id))
+-            db.execute("UPDATE lifecycle_jobs SET state='cancelled', lease_until=NULL, document=json_set(document, '$.state', 'cancelled', '$.lease_until', NULL) WHERE workspace=? AND workflow_id=? AND state IN ('queued','leased')", (workspace, workflow_id))
+-            if deleting:
+-                cleanup_state = "pending" if active_id and cleanup_pending else "complete"
+-                db.execute("INSERT INTO lifecycle_tombstones VALUES (?, ?, ?, ?) ON CONFLICT(workspace, workflow_id) DO UPDATE SET cleanup_state=excluded.cleanup_state", (workspace, workflow_id, now_iso(self.clock), cleanup_state))
+-                db.execute("UPDATE lifecycle_identities SET document=json_set(document, '$.active', false) WHERE identity_id IN (SELECT json_extract(document, '$.automation_identity_id') FROM lifecycle_releases WHERE workspace=? AND workflow_id=?)", (workspace, workflow_id))
+-                if self.workflows.runtime_runner is not None and self._table(db, "runtime_runs"):
+-                    runtime = self.workflows.runtime_runner.runtime
+-                    rows = db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchall()
+-                    for row in rows:
+-                        run = json.loads(row[0])
+-                        if run["status"] in ACTIVE_RUN_STATES:
+-                            runtime.transition(db, run, "cancelled")
+-            operation["state"] = "cleanup_pending" if active_id and cleanup_pending else "succeeded"
+-            self.save_operation(db, operation)
+-            self.emit(db, workspace, workflow_id, "workflow.deleted" if deleting else "release.disabled")
+-            return {"operation": operation}
++        from .activation import stop
++        return stop(self, request, auth, deleting)
+ 
+     def reconcile_cleanup(self, workspace):
+-        """Retry provider cleanup while local dispatch remains denied."""
+-        completed = []
+-        with self.store.transaction() as db:
+-            rows = db.execute("SELECT binding_id, workflow_id, document FROM lifecycle_triggers WHERE workspace=? AND state='cleanup_pending'", (workspace,)).fetchall()
+-            for binding_id, workflow_id, encoded in rows:
+-                try:
+-                    cleaned = self.adapter.cleanup(json.loads(encoded))
+-                except Exception:
+-                    cleaned = False
+-                if cleaned:
+-                    db.execute("UPDATE lifecycle_triggers SET state='disabled', document=json_set(document, '$.health', 'disabled') WHERE binding_id=?", (binding_id,))
+-                    completed.append(binding_id)
+-                    if not db.execute("SELECT 1 FROM lifecycle_triggers WHERE workspace=? AND workflow_id=? AND state='cleanup_pending'", (workspace, workflow_id)).fetchone():
+-                        db.execute("UPDATE lifecycle_tombstones SET cleanup_state='complete' WHERE workspace=? AND workflow_id=?", (workspace, workflow_id))
+-            return completed
++        from .activation import reconcile, reconcile_cleanup
++        reconcile(self, workspace)
++        return reconcile_cleanup(self, workspace)
+ 
+     def overview(self, auth, after_sequence=None):
+         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
+@@ -646,7 +558,7 @@
+ 
+     def get_operation(self, operation_id, auth):
+         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT document FROM lifecycle_operations WHERE workspace=? AND operation_id=?", (auth["subject"]["workspace_id"], operation_id)).fetchone()
+             if not row:
+                 raise LifecycleFailure("OPERATION_NOT_FOUND", "The lifecycle operation was not found.", 404)
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -258,6 +258,8 @@
+ def create_configured_app(env=None, database=None, client=None, model_factory=None):
+     env = environment() if env is None else env
+     mode = deployment_mode(env.get('BUILDER_ENVIRONMENT', 'production'))
++    process_role=env.get('BUILDER_PROCESS_ROLE','combined')
++    if process_role not in {'api','worker','combined'}:raise ValueError('Use api, worker or combined process role.')
+     if env.get('BUILDER_DEV_AUTH') != '1':
+         raise ValueError('Explicitly enable development authentication for the local live launcher.')
+     allowed_origins = origins(env.get('BUILDER_UI_ORIGINS'))
+@@ -270,10 +272,12 @@
+     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
+     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
+-                     registry_config=REGISTRY, database=database, start_workers=False, planning_available=True,
++                     registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
+                      environment_name=mode, ui_origins=allowed_origins,
+-                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')))
++                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+     service = app.state.workflow_service
++    service.background_execution=process_role=='api'
++    service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
+     from openai import OpenAI
+     from planner import PlannerService
+     from runtime.connectors import SMTPConnector, GoogleSheetsConnector
+@@ -326,7 +330,7 @@
+     def read_case_evidence(case, requests):
+         from runtime.service import RuntimeFailure
+         from runtime.connectors import google_spreadsheet_id
+-        with service.store.transaction() as db:
++        with service.store.transaction(write=False) as db:
+             stored = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?',
+                                 (auth['subject']['workspace_id'], case['run_id'])).fetchone()
+             original_run = json.loads(stored[0]) if stored else None
+@@ -335,7 +339,7 @@
+         authority = authenticate(service, auth, auth['subject']['workspace_id'], original_run['subject_id'])
+         if authority is None:
+             raise RuntimeFailure('EXECUTION_AUTHORITY_REVOKED', 'The case workflow is no longer active.')
+-        with service.store.transaction() as db:
++        with service.store.transaction(write=False) as db:
+             workflow, grants = runner.runtime.revision(db, case['workflow_id'], case['workflow_version'], authority, True)
+         permitted = {(google_spreadsheet_id(t['spreadsheet_id']), t['range']) for t in workflow['metadata'].get('sheet_read_targets', [])}
+         read_grant = next((g for g in grants if g['tool_id'] == 'google_sheets_read_rows'), None)
+@@ -370,6 +374,7 @@
+                                         allowed_managers=recipients(env), model_rates=rates[model])
+         service.reply_monitor_health = {'state': 'starting'}
+     lookup = lambda workspace, subject: authenticate(service, auth, workspace, subject)
++    service.worker_authenticate=lookup
+     workers = [TriggerScheduler(service, lookup, interval=1), RuntimeWorker(runner, lookup)]
+     if procurement_worker:
+         workers.append(procurement_worker)
+@@ -388,27 +393,33 @@
+     app.state.live_operator_auth = auth
+     app.state.live_workers = workers
+ 
++    class ReplyWorker:
++        def __init__(self):self.stop_event=reply_stop;self.thread=None
++        @property
++        def health(self):
++            state=service.reply_monitor_health
++            return {'state':state.get('state','starting'),'last_success':state.get('last_success'),'last_error':state.get('error_code')}
++        def start(self):
++            nonlocal reply_thread
++            if reply_thread and reply_thread.is_alive():return
++            reply_stop.clear()
++            reply_thread=Thread(target=poll_replies,name='builder-reply-monitor',daemon=True)
++            self.thread=reply_thread
++            reply_thread.start()
++        def stop(self):
++            reply_stop.set()
++            if reply_thread:reply_thread.join(timeout=5)
++    from .worker_control import WorkerSupervisor
++    components=[*workers,app.state.planning_jobs]
++    if hasattr(service,'reply_cases'):components.append(ReplyWorker())
++    supervisor=WorkerSupervisor(service.store,components,role=process_role)
++    app.state.worker_supervisor=supervisor
++    app.state.process_role=process_role
++
+     @app.on_event('startup')
+-    def start():
+-        nonlocal reply_thread
+-        try:
+-            for worker in workers:
+-                worker.start()
+-            if hasattr(service, 'reply_cases'):
+-                reply_stop.clear()
+-                reply_thread = Thread(target=poll_replies, name='builder-reply-monitor', daemon=True)
+-                reply_thread.start()
+-        except Exception:
+-            for worker in workers:
+-                worker.stop()
+-            raise
++    def start():supervisor.start()
+ 
+     @app.on_event('shutdown')
+-    def stop():
+-        reply_stop.set()
+-        if reply_thread:
+-            reply_thread.join(timeout=5)
+-        for worker in workers:
+-            worker.stop()
++    def stop():supervisor.stop()
+ 
+     return app
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -30,7 +30,7 @@
+ 
+ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
+                runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True,
+-               ui_origins=None, environment_name=None, planner_timeout_seconds=180):
++               ui_origins=None, environment_name=None, planner_timeout_seconds=180, planning_worker_enabled=True):
+     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
+     mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
+     allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
+@@ -41,7 +41,7 @@
+     configuration = registry_config or os.getenv('BUILDER_REGISTRY_CONFIG')
+     if service is None and configuration:
+         adapter, extra_permissions, extra_scopes = load_registry_config(configuration)
+-    workflow_service = service or WorkflowService(WorkflowStore(database or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
++    workflow_service = service or WorkflowService(WorkflowStore(database or os.getenv('BUILDER_DATABASE_URL') or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
+                                                   lifecycle_adapter=lifecycle_adapter, trigger_secrets=trigger_secrets)
+     connect_runtime = runtime_enabled if runtime_enabled is not None else os.getenv('BUILDER_RUNTIME_ENABLED') == '1'
+     if connect_runtime:
+@@ -82,13 +82,15 @@
+         lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
+         deadline=planning_deadline(planner_timeout_seconds))
+     app.state.planning_jobs = planning_jobs
++    from .worker_control import WorkerSupervisor
++    app.state.worker_registration = WorkerSupervisor(workflow_service.store,[],role='api')
+     app.state.workers = workers
+     app.state.allowed_origins = allowed_origins
+     app.state.environment_name = mode
+ 
+     @app.on_event('startup')
+     def start_planning():
+-        planning_jobs.start()
++        if planning_worker_enabled:planning_jobs.start()
+ 
+     @app.on_event('shutdown')
+     async def stop_workers():
+@@ -386,13 +388,21 @@
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+ 
++    @app.get('/worker-health')
++    async def worker_health():
++        if 'runs.view' not in auth['permissions']:
++            return error('OPERATION_NOT_AUTHORIZED','Worker monitoring access is required.',403)
++        from .worker_control import health
++        data = await run_in_threadpool(health,workflow_service.store,auth['subject']['workspace_id'])
++        return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
++
+     @app.get('/workspace/{collection}')
+     async def workspace_collection(collection: str, request: Request):
+         if collection not in {'settings', 'knowledge', 'governance'}:
+             return error('NOT_FOUND', 'The workspace collection was not found.', 404)
+         table = {'settings': 'workspace_settings', 'knowledge': 'knowledge_sources', 'governance': 'governance_policies'}[collection]
+         try:
+-            with workflow_service.store.transaction() as db:
++            with workflow_service.store.transaction(write=False) as db:
+                 if collection == 'settings':
+                     rows = db.execute('SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key', (auth['subject']['workspace_id'],)).fetchall()
+                     items = [{'key': k, 'value': json.loads(v), 'updated_at': t} for k, v, t in rows]
+--- a/workflow_api/procurement.py
++++ b/workflow_api/procurement.py
+@@ -335,7 +335,7 @@
+         return result
+ 
+     def tick(self):
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             rows=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') "
+                             "NOT IN ('COMPLETED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION') "
+                             "AND (json_extract(body,'$.phase')!='STOPPED' OR json_extract(body,'$.fulfilment_policy.revision')=1) "
+@@ -525,7 +525,7 @@
+     from connector_extension.app import state_directory
+     state=state_directory(ROOT/env.get('BUILDER_PROCUREMENT_STATE','.local/connector-extension/native-procurement'))
+     token_file=ROOT/env.get('BUILDER_PROCUREMENT_GOOGLE_TOKEN','.local/connector-extension/google-token.json')
+-    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state);artifacts=ArtifactStore(state);resources=SheetResourceStore(state)
++    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'));artifacts=ArtifactStore(state);resources=SheetResourceStore(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'))
+     # Approval review adds grants for each exact child action without revoking other reviewed workflows.
+     registry=service.registry_adapter.service
+     old=service.registry_adapter
+--- a/workflow_api/procurement_fulfilment.py
++++ b/workflow_api/procurement_fulfilment.py
+@@ -50,7 +50,7 @@
+             events=self.workflows.runtime_runner.runtime.events(action['run_id'],auth)['items']
+             codes={e['details'].get('error_code') for e in events if e['event_type']=='node.failed'}
+             if codes!={'MODEL_OUTPUT_SCHEMA_INVALID'}:return False
+-            with self.workflows.store.transaction() as db:
++            with self.workflows.store.transaction(write=False) as db:
+                 row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                     (workspace,action['workflow_id'],action['workflow_version'])).fetchone()
+             if not row:return False
+@@ -207,7 +207,7 @@
+         # change a previously submitted/approved notification's fingerprint.
+         action_key = 'ful_notify_'+key; existing = job['actions'].get(action_key)
+         if existing:
+-            with self.workflows.store.transaction() as db:
++            with self.workflows.store.transaction(write=False) as db:
+                 row = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                     (workspace, existing['workflow_id'], existing['workflow_version'])).fetchone()
+             require(row is not None, 'FULFILMENT_ACTION_MISSING')
+@@ -226,7 +226,7 @@
+ 
+     def process_fulfilment_message(self, workspace, job, po, message, role, auth):
+         project = job['plan']['project_id']; mid = message['message_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row = db.execute('SELECT body FROM procurement_fulfilment_messages WHERE workspace=? AND project=? AND po=? AND message=?', (workspace, project, po['record_id'], mid)).fetchone()
+         if row: state = json.loads(row[0])
+         else:
+@@ -241,7 +241,7 @@
+                     key+='_structured_control1';workflow['workflow_id']+='_structured_control1'
+                 previous = job['actions'].get(key)
+                 if previous:
+-                    with self.workflows.store.transaction() as db:
++                    with self.workflows.store.transaction(write=False) as db:
+                         saved = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                             (workspace, previous['workflow_id'], previous['workflow_version'])).fetchone()
+                     if saved: workflow = json.loads(saved[0])
+--- a/workflow_api/procurement_quotes.py
++++ b/workflow_api/procurement_quotes.py
+@@ -143,7 +143,7 @@
+ 
+     def purchase_authority(self,approval,target,operation):
+         workspace,project=target['workspace_id'],target['project_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_policy_proofs WHERE workspace=? AND project=? AND id=?',
+                            (workspace,project,approval['record_id'])).fetchone()
+         if not row:return False
+@@ -163,7 +163,7 @@
+             return run['status']=='completed' and any(a['status']=='approved' for a in run['approvals'])
+         if proof['mode']!='published_simulation_policy' or not job['plan']['simulation'] or not self.automatic(job):return False
+         if not settings.get('purchasing_limit'):return False
+-        with self.workflows.store.transaction() as db:
++        with self.workflows.store.transaction(write=False) as db:
+             row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                            (workspace,owner['workflow_id'],owner['version'])).fetchone()
+         workflow=json.loads(row[0]) if row else {}
+@@ -243,7 +243,7 @@
+ 
+     def process_quote(self,workspace,job,rfq,message,auth):
+         project=job['plan']['project_id'];mid=message['message_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             existing=db.execute('SELECT body FROM procurement_quote_messages WHERE workspace=? AND project=? AND message=?',(workspace,project,mid)).fetchone()
+         if existing:return
+         text=fresh_text(message.get('text',''))
+--- a/workflow_api/reply_cases.py
++++ b/workflow_api/reply_cases.py
+@@ -282,7 +282,7 @@
+                     actions = [k for k in actions if k != 'manager_notice'] + ['confirm_closure']
+                 uncertain = False
+                 for kind in actions:
+-                    with self.store.transaction() as db:
++                    with self.store.transaction(write=False) as db:
+                         existing = db.execute('SELECT state FROM customer_case_actions WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?',
+                                               (workspace,case_id,reply_id,kind)).fetchone()
+                     if existing:
+@@ -315,7 +315,7 @@
+                 raise RuntimeError('IMAP_INBOX_UNAVAILABLE')
+             typ, response = imap.response('UIDVALIDITY')
+             uidvalidity = str(response[0].decode() if isinstance(response[0], bytes) else response[0]) if typ == 'OK' and response and response[0] else 'unknown'
+-            with self.store.transaction() as db:
++            with self.store.transaction(write=False) as db:
+                 row = db.execute('SELECT uidvalidity,last_uid FROM customer_mail_cursor WHERE workspace=? AND mailbox_id=?', (workspace, mailbox_id)).fetchone()
+             last = row[1] if row and row[0] == uidvalidity else 0
+             if last:
+--- a/workflow_api/scheduler.py
++++ b/workflow_api/scheduler.py
+@@ -17,6 +17,7 @@
+         self.stop_event = Event()
+         self.thread = None
+         self.last_polled = {}
++        self.health={"state":"starting","last_success":None,"last_error":None}
+ 
+     def tick(self):
+         lifecycle = self.service.lifecycle
+@@ -26,12 +27,15 @@
+         polled = queued = dispatched = 0
+         # Poll bindings are workspace scoped and the worker uses fresh auth.
+         with lifecycle.store.transaction(write=False) as db:
+-            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers WHERE state='ready'").fetchall()}
++            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations").fetchall()}
+         for workspace in workspaces:
++            if self.stop_event.is_set():break
++            lifecycle.reconcile_cleanup(workspace)
+             auth = self.authenticate(workspace, "local-builder")
+             if not auth:
+                 continue
+             for binding in lifecycle.poll_bindings(workspace):
++                if self.stop_event.is_set():break
+                 binding_id = binding["binding_id"]
+                 now = time.time()
+                 if now - self.last_polled.get(binding_id, 0) < binding.get("poll_interval_seconds", self.interval):
+@@ -76,9 +80,13 @@
+                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
+                     self.last_polled[binding_id] = now
+                     continue
+-            for job in lifecycle.lease(workspace):
+-                lifecycle.execute_job(job["job_id"], runner)
++            for _ in range(10):
++                if self.stop_event.is_set():break
++                jobs=lifecycle.lease(workspace,limit=1,seconds=120)
++                if not jobs:break
++                lifecycle.execute_job(jobs[0]["job_id"], runner)
+                 dispatched += 1
++        self.health={"state":"ready","last_success":time.time(),"last_error":None}
+         return {"polled": polled, "queued": queued, "dispatched": dispatched}
+ 
+     def start(self):
+@@ -90,7 +98,11 @@
+ 
+     def _loop(self):
+         while not self.stop_event.is_set():
+-            self.tick()
++            try:self.tick()
++            except Exception:
++                import logging
++                self.health['state'],self.health['last_error']='error','TRIGGER_WORKER_FAILED'
++                logging.getLogger(__name__).warning('Trigger worker failed; durable jobs retained.')
+             self.stop_event.wait(self.interval)
+ 
+     def stop(self):
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -16,7 +16,8 @@
+ from registry import RegistryService, WorkspacePolicy
+ from registry.contracts import RegistryError, VERSIONS, schema, validate
+ from registry.safety import reject_secrets
+-from .storage import WorkflowStore
++from .storage import WorkflowStore, sqlite_category
++from .postgres import DatabaseFailure
+ from .registry_adapter import RegistryAdapter
+ from runtime.service import RuntimeFailure
+ from .lifecycle import LifecycleService, LifecycleFailure
+@@ -89,11 +90,17 @@
+             else:
+                 raise LifecycleFailure('INVALID_OPERATION', 'The lifecycle operation is not supported.', 400)
+             return self.envelope(request_id, 200, data)
++        except DatabaseFailure as exc:
++            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
++            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
++                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+-            if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
++            if sqlite_category(exc)=='contention':
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                     'The workflow database is busy. Retry shortly.', 503, retryable=True))
+-            logging.exception("Workflow database error request_id=%s", request_id)
++            if sqlite_category(exc)=='transaction_state':
++                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
++            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
+         except LifecycleFailure as exc:
+             if operation in {'activate_release', 'disable_release', 'delete_workflow'}:
+@@ -154,7 +161,8 @@
+                 runtime = self.runtime_runner.runtime
+                 if operation == 'execute_workflow':
+                     run = runtime.create_run(request, auth)
+-                    run = self.runtime_runner.advance(run['run_id'], auth)
++                    if not getattr(self,'background_execution',False):
++                        run = self.runtime_runner.advance(run['run_id'], auth)
+                     data = {'run': run}
+                 elif operation == 'get_run':
+                     data = {'run': runtime.get_run(payload.get('run_id'), auth)}
+@@ -162,7 +170,7 @@
+                     data = runtime.events(payload.get('run_id'), auth)
+                 else:
+                     run = self.runtime_runner.decide(request, auth)
+-                    if run['status'] == 'running':
++                    if run['status'] == 'running' and not getattr(self,'background_execution',False):
+                         with self.store.transaction(write=False) as db:
+                             execution_subject = db.execute(
+                                 'SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?',
+@@ -240,11 +248,17 @@
+             return self.failure(request_id, ApiFailure(exc.code, 'The request does not meet the authorization or data contract.', exc.status, exc.field))
+         except PlannerFailure as exc:
+             return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow fields before continuing.', 400, exc.field))
++        except DatabaseFailure as exc:
++            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
++            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
++                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+-            if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
++            if sqlite_category(exc)=='contention':
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                     'The workflow database is busy. Retry shortly.', 503, retryable=True))
+-            logging.exception("Workflow database error request_id=%s", request_id)
++            if sqlite_category(exc)=='transaction_state':
++                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
++            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
+         except Exception:
+             logging.exception("Unhandled workflow API error request_id=%s", request_id)
+--- a/workflow_api/slack_socket.py
++++ b/workflow_api/slack_socket.py
+@@ -29,7 +29,7 @@
+                           event_type='message.im', text=event['text'], body=event['text'],
+                           timestamp=event.get('ts', ''))
+         lifecycle = self.service.lifecycle
+-        with lifecycle.store.transaction() as db:
++        with lifecycle.store.transaction(write=False) as db:
+             rows = db.execute("SELECT document FROM lifecycle_triggers WHERE workspace='local-workspace' AND state='ready'").fetchall()
+         routed = 0
+         for row in rows:
+--- a/workflow_api/storage.py
++++ b/workflow_api/storage.py
+@@ -1,17 +1,44 @@
+ """Transactional local POC revision/idempotency store; no runtime state."""
+ import json
+ import sqlite3
++import logging
++import os
++import time
++from threading import Lock
+ from contextlib import contextmanager
+ from pathlib import Path
+ 
+ 
++def sqlite_category(exc):
++    code=getattr(exc,'sqlite_errorcode',0)&255
++    if code in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED):return 'contention'
++    if code==sqlite3.SQLITE_MISUSE or str(exc).lower() in {
++            'cannot start a transaction within a transaction','cannot commit - no transaction is active',
++            'cannot rollback - no transaction is active'}:return 'transaction_state'
++    return 'database_failure'
++
++
+ class WorkflowStore:
+-    def __init__(self, path):
++    def __init__(self, path, *, busy_timeout_ms=None):
++        self.busy_timeout_ms = int(os.getenv('BUILDER_DATABASE_BUSY_TIMEOUT_MS', '3000')) if busy_timeout_ms is None else busy_timeout_ms
++        if type(self.busy_timeout_ms) is not int or not 0 <= self.busy_timeout_ms <= 30000:
++            raise ValueError('Database busy timeout must be between 0 and 30000 milliseconds.')
++        self.metrics = {'reads': 0, 'writes': 0, 'contention': 0, 'failures': 0, 'slow_transactions': 0}
++        self.metrics_lock = Lock()
+         self.path = str(path)
+-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+-        with sqlite3.connect(self.path, timeout=30) as db:
+-            db.execute('PRAGMA journal_mode=WAL')
++        self.database = None
++        if self.path.startswith(('postgresql://','postgres://')):
++            from .postgres import PostgresDatabase
++            self.database = PostgresDatabase(self.path,self.busy_timeout_ms)
++        else:
++            Path(path).parent.mkdir(parents=True, exist_ok=True)
++            with sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000) as db:
++                db.execute('PRAGMA journal_mode=WAL')
+         with self.transaction() as db:
++            db.execute('CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
++            version=db.execute('SELECT COALESCE(MAX(version),0) FROM builder_schema_migrations').fetchone()[0]
++            if version>1:raise ValueError('The database schema is newer than this application.')
++            db.execute('INSERT INTO builder_schema_migrations(version) VALUES (1) ON CONFLICT DO NOTHING')
+             db.execute('CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))')
+             db.execute('CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))')
+             db.execute('CREATE TABLE IF NOT EXISTS workspace_settings (workspace TEXT, key TEXT, value TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace, key))')
+@@ -20,15 +47,50 @@
+ 
+     @contextmanager
+     def transaction(self, *, write=True):
+-        db = sqlite3.connect(self.path, timeout=30)
++        if self.database is not None:
++            started=time.monotonic()
++            try:
++                with self.database.transaction(write=write) as connection:
++                    yield connection
++            except Exception as exc:
++                from .postgres import DatabaseFailure
++                if isinstance(exc,DatabaseFailure):
++                    with self.metrics_lock:self.metrics['contention' if exc.category=='contention' else 'failures']+=1
++                raise
++            finally:
++                with self.metrics_lock:
++                    self.metrics['writes' if write else 'reads']+=1
++                    if time.monotonic()-started>=1:self.metrics['slow_transactions']+=1
++            return
++        db = sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000)
++        started = time.monotonic()
++        category = None
+         try:
++            db.execute(f'PRAGMA busy_timeout={self.busy_timeout_ms}')
++            if not write:
++                db.execute('PRAGMA query_only=ON')
+             db.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
+             yield db
+             db.commit()
+-        except Exception:
++        except Exception as exc:
+             db.rollback()
++            code = getattr(exc, 'sqlite_errorcode', 0) & 255
++            category = sqlite_category(exc) if isinstance(exc,sqlite3.DatabaseError) else None
++            logging.getLogger(__name__).warning('Database transaction failed', extra={
++                'database_category': category, 'database_code': code, 'transaction_write': write,
++                'transaction_seconds': round(time.monotonic() - started, 4)})
+             raise
+         finally:
++            elapsed = time.monotonic() - started
++            with self.metrics_lock:
++                self.metrics['writes' if write else 'reads'] += 1
++                if category:
++                    self.metrics['contention' if category == 'contention' else 'failures'] += 1
++                if elapsed >= 1:
++                    self.metrics['slow_transactions'] += 1
++            if elapsed >= 1:
++                logging.getLogger(__name__).info('Slow database transaction', extra={
++                    'transaction_write': write, 'transaction_seconds': round(elapsed, 4)})
+             db.close()
+ 
+     @staticmethod
+@@ -38,7 +100,7 @@
+         if version is not None:
+             query += ' AND version=?'
+             args.append(version)
+-        row = db.execute(query + ' ORDER BY version DESC LIMIT 1', args).fetchone()
++        row = db.execute(query + ' ORDER BY version DESC LIMIT 1' + (' FOR UPDATE' if getattr(db,'write',False) else ''), args).fetchone()
+         return json.loads(row[0]) if row else None
+ 
+     @staticmethod
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -22,7 +22,7 @@
+         self.default_resources = dict(default_resources or {})
+ 
+     def _authority(self, binding):
+-        with self.service.store.transaction() as db:
++        with self.service.store.transaction(write=False) as db:
+             row = db.execute("SELECT r.document FROM lifecycle_releases r JOIN lifecycle_triggers t ON t.release_id=r.release_id WHERE t.binding_id=? AND t.workspace=?",
+                              (binding['binding_id'], binding['workspace_id'])).fetchone()
+             if not row:
+@@ -32,7 +32,12 @@
+             if not identity:
+                 raise ValueError("identity missing")
+             workflow = self.service.store.get(db, binding["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
+-        return workflow, json.loads(identity[0])
++        authority=json.loads(identity[0])
++        resolver=getattr(self.service,'worker_authenticate',None)
++        if resolver:
++            authority=resolver(binding['workspace_id'],authority['subject']['subject_id'])
++            if authority is None:raise ValueError('Trigger execution authority was revoked.')
++        return workflow, authority
+ 
+     def poll(self, binding, previous_cursor):
+         provider = binding["provider_id"]

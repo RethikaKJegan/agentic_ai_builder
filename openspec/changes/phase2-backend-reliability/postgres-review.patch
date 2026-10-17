@@ -1,0 +1,105 @@
+--- a/workflow_api/storage.py
++++ b/workflow_api/storage.py
+@@ -17,10 +17,19 @@
+         self.metrics = {'reads': 0, 'writes': 0, 'contention': 0, 'failures': 0, 'slow_transactions': 0}
+         self.metrics_lock = Lock()
+         self.path = str(path)
+-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+-        with sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000) as db:
+-            db.execute('PRAGMA journal_mode=WAL')
++        self.database = None
++        if self.path.startswith(('postgresql://','postgres://')):
++            from .postgres import PostgresDatabase
++            self.database = PostgresDatabase(self.path,self.busy_timeout_ms)
++        else:
++            Path(path).parent.mkdir(parents=True, exist_ok=True)
++            with sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000) as db:
++                db.execute('PRAGMA journal_mode=WAL')
+         with self.transaction() as db:
++            db.execute('CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
++            version=db.execute('SELECT COALESCE(MAX(version),0) FROM builder_schema_migrations').fetchone()[0]
++            if version>1:raise ValueError('The database schema is newer than this application.')
++            db.execute('INSERT INTO builder_schema_migrations(version) VALUES (1) ON CONFLICT DO NOTHING')
+             db.execute('CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))')
+             db.execute('CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))')
+             db.execute('CREATE TABLE IF NOT EXISTS workspace_settings (workspace TEXT, key TEXT, value TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace, key))')
+@@ -29,6 +38,16 @@
+ 
+     @contextmanager
+     def transaction(self, *, write=True):
++        if self.database is not None:
++            started=time.monotonic()
++            try:
++                with self.database.transaction(write=write) as connection:
++                    yield connection
++            finally:
++                with self.metrics_lock:
++                    self.metrics['writes' if write else 'reads']+=1
++                    if time.monotonic()-started>=1:self.metrics['slow_transactions']+=1
++            return
+         db = sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000)
+         started = time.monotonic()
+         category = None
+@@ -67,7 +86,7 @@
+         if version is not None:
+             query += ' AND version=?'
+             args.append(version)
+-        row = db.execute(query + ' ORDER BY version DESC LIMIT 1', args).fetchone()
++        row = db.execute(query + ' ORDER BY version DESC LIMIT 1' + (' FOR UPDATE' if getattr(db,'write',False) else ''), args).fetchone()
+         return json.loads(row[0]) if row else None
+ 
+     @staticmethod
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -17,6 +17,7 @@
+ from registry.contracts import RegistryError, VERSIONS, schema, validate
+ from registry.safety import reject_secrets
+ from .storage import WorkflowStore
++from .postgres import DatabaseFailure
+ from .registry_adapter import RegistryAdapter
+ from runtime.service import RuntimeFailure
+ from .lifecycle import LifecycleService, LifecycleFailure
+@@ -89,6 +90,10 @@
+             else:
+                 raise LifecycleFailure('INVALID_OPERATION', 'The lifecycle operation is not supported.', 400)
+             return self.envelope(request_id, 200, data)
++        except DatabaseFailure as exc:
++            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
++            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
++                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+             if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+@@ -240,6 +245,10 @@
+             return self.failure(request_id, ApiFailure(exc.code, 'The request does not meet the authorization or data contract.', exc.status, exc.field))
+         except PlannerFailure as exc:
+             return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow fields before continuing.', 400, exc.field))
++        except DatabaseFailure as exc:
++            codes={'contention':'API_DATABASE_BUSY','serialization':'API_DATABASE_SERIALIZATION_RETRY','deadlock':'API_DATABASE_DEADLOCK','transaction_state':'API_DATABASE_TRANSACTION_INVALID','unavailable':'API_DATABASE_UNAVAILABLE'}
++            return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
++                'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+             if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -41,7 +41,7 @@
+     configuration = registry_config or os.getenv('BUILDER_REGISTRY_CONFIG')
+     if service is None and configuration:
+         adapter, extra_permissions, extra_scopes = load_registry_config(configuration)
+-    workflow_service = service or WorkflowService(WorkflowStore(database or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
++    workflow_service = service or WorkflowService(WorkflowStore(database or os.getenv('BUILDER_DATABASE_URL') or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
+                                                   lifecycle_adapter=lifecycle_adapter, trigger_secrets=trigger_secrets)
+     connect_runtime = runtime_enabled if runtime_enabled is not None else os.getenv('BUILDER_RUNTIME_ENABLED') == '1'
+     if connect_runtime:
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -270,7 +270,7 @@
+     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
+     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
+-                     registry_config=REGISTRY, database=database, start_workers=False, planning_available=True,
++                     registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
+                      environment_name=mode, ui_origins=allowed_origins,
+                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')))
+     service = app.state.workflow_service

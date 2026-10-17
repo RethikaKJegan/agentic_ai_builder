@@ -1,0 +1,151 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -7,6 +7,11 @@
+   type CanonicalWorkflow, type Operation, type SafeError,
+ } from "./contracts.generated";
+ 
++function queryString(filters:Record<string, unknown>) {
++  const query=new URLSearchParams();
++  for(const [key,value] of Object.entries(filters))if(value!==undefined && value!=="")query.set(key,String(value));
++  return query.size?`?${query}`:"";
++}
+ const metadata = { correlation_id: z.string().optional(), contract_versions: z.record(z.string()).optional() };
+ export const registryReviewSchema = z.object({ workflow_id: z.string(), workflow_version: z.number().int().positive(),
+   ready: z.boolean(), reason_codes: z.array(z.string()), items: z.array(z.object({
+@@ -24,7 +29,7 @@
+ const workflowsData = CollectionSchema.extend({ items: z.array(CanonicalWorkflowSchema), ...metadata });
+ export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(),
+   status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().optional(),
+-  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]) });
++  allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
+ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
+   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
+ const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
+@@ -207,14 +212,14 @@
+     return result.data;
+   }
+ 
+-  async monitoring() {
++  async monitoring(cursor?:string) {
+     const count=z.number().finite().nonnegative();
+     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+-      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional()})).optional(),
+-      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+-      audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+-    const result=schema.safeParse(await this.read("monitoring"));
++      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional(),state:z.string().optional(),release_state:z.string().optional(),workflow_version:z.number().optional(),delivery:z.string().optional(),event_type:z.string().optional(),source:z.string().optional(),schedule:z.string().nullable().optional(),timezone:z.string().nullable().optional(),preparation_succeeded:z.boolean().optional()})).optional(),
++      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
++      source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
++    const result=schema.safeParse(await this.read(`monitoring${queryString({cursor})}`));
+     if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+     return result.data;
+   }
+@@ -383,11 +388,17 @@
+     return job.result.data;
+   }
+ 
+-  async runs() {
++  async runs(filters: {limit?:number;cursor?:string;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
+     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
+-    const result = schema.safeParse(await this.read("runs"));
++    const result = schema.safeParse(await this.read(`runs${queryString(filters)}`));
+     if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");
+     return result.data;
++  }
++
++  async eventPage(runId:string, afterSequence=0, limit=100) {
++    const parsed=eventsData.safeParse(await this.read(`runs/${encodeURIComponent(runId)}/events${queryString({after_sequence:afterSequence,limit})}`));
++    if(!parsed.success)return fail("INVALID_API_DATA","The run event response is invalid.");
++    return parsed.data;
+   }
+ 
+   async releaseState(workflowId: string) {
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -1,8 +1,7 @@
+ import { useEffect, useMemo, useState } from "react";
+ import { api, type RunRecord } from "@/api/client";
+ import { useBackend } from "@/api/state";
+-import { reconcileEvents } from "@/api/control";
+-import type { RunEvent } from "@/api/contracts.generated";
++import { useRunFeed } from "@/features/runs/useRunFeed";
+ import { fromCanonical } from "@/api/mapping";
+ import type { StepStatus } from "@/domain/types";
+ 
+@@ -11,9 +10,10 @@
+   const available = enabled && backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
+   const [runs, setRuns] = useState<RunRecord[]>([]);
+   const [selection, setSelection] = useState("");
+-  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[]; revision: ReturnType<typeof fromCanonical> } | null>(null);
++  const [revision, setRevision] = useState<{runId:string;value:ReturnType<typeof fromCanonical>}|null>(null);
+   const [error, setError] = useState<Error | null>(null);
+-  const [loading, setLoading] = useState(false);
++  const [cursor,setCursor]=useState<string|null>(null);
++  const [historyPage,setHistoryPage]=useState<string|undefined>();
+   const [attempt, setAttempt] = useState(0);
+   const runId = selection || runs[0]?.run_id || "";
+   useEffect(() => {
+@@ -22,40 +22,26 @@
+     let timer: ReturnType<typeof setTimeout>;
+     const refresh = async () => {
+       try {
+-        const collection = await api.runs();
+-        if (!disposed) setRuns(collection.items.filter((run) => run.workflow_id === workflowId));
++        const collection = await api.runs({workflow_id:workflowId,limit:50,cursor:historyPage});
++        if (!disposed) {setRuns(current=>historyPage?[...new Map([...current,...collection.items].map(run=>[run.run_id,run])).values()]:collection.items);setCursor(collection.next_cursor);setError(null);}
+       } catch (caught) {
+         if (!disposed) setError(caught instanceof Error ? caught : new Error("Run history could not be loaded."));
+       } finally { if (!disposed) timer = setTimeout(() => void refresh(), 5000); }
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, workflowId, attempt]);
+-  useEffect(() => {
+-    if (!available || !runId) return;
+-    let disposed = false;
+-    let timer: ReturnType<typeof setTimeout>;
+-    const refresh = async () => {
+-      setLoading(true);
+-      let terminal = false;
+-      try {
+-        const result = await api.request("get_run", { run_id: runId });
+-        terminal = ["completed", "failed", "blocked", "rejected", "cancelled"].includes(result.run.status);
+-        if (result.run.workflow_id !== workflowId) throw new Error("This run belongs to another workflow.");
+-        const [timeline, historical] = await Promise.all([api.request("list_run_events", { run_id: runId }), api.request("get_workflow", { workflow_id: workflowId, workflow_version: result.run.workflow_version })]);
+-        if (historical.workflow.workflow_id !== workflowId || historical.workflow.version !== result.run.workflow_version) throw new Error("The server returned a different historical revision.");
+-        const events = reconcileEvents([], timeline.items, result.run);
+-        if (!disposed) { setRecord({ run: result.run, events, revision: fromCanonical(historical.workflow) }); setError(null); }
+-      } catch (caught) {
+-        if (!disposed) { setRecord(null); setError(caught instanceof Error ? caught : new Error("Trace loading failed.")); }
+-      } finally {
+-        if (!disposed) { setLoading(false); if (!terminal) timer = setTimeout(() => void refresh(), 3000); }
+-      }
+-    };
+-    void refresh();
+-    return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, runId, workflowId, attempt]);
+-  const current = available && record?.run.run_id === runId && record.run.workflow_id === workflowId ? record : null;
++  }, [available, workflowId, attempt,historyPage]);
++  const feed=useRunFeed(runId,available,attempt);
++  useEffect(()=>{
++    if(!feed.run || feed.run.workflow_id!==workflowId)return;
++    let disposed=false;
++    void api.request("get_workflow",{workflow_id:workflowId,workflow_version:feed.run.workflow_version}).then(result=>{
++      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==feed.run!.workflow_version)throw new Error("Historical revision mismatch.");
++      if(!disposed){setRevision({runId:feed.run!.run_id,value:fromCanonical(result.workflow)});setError(null);}
++    }).catch(caught=>{if(!disposed)setError(caught instanceof Error?caught:new Error("Historical revision is unavailable."));});
++    return()=>{disposed=true;};
++  },[feed.run?.run_id,feed.run?.workflow_version,workflowId,attempt]);
++  const current=available && feed.run?.workflow_id===workflowId && revision?.runId===runId?{run:feed.run,events:feed.events,revision:revision.value}:null;
+   const events = useMemo(() => current?.events ?? [], [current]);
+   const runState = useMemo(() => {
+     const states: Record<string, StepStatus | "running"> = {};
+@@ -74,6 +60,6 @@
+     return states;
+   }, [events]);
+   const activeEdges = useMemo(() => new Set(events.flatMap((event) => Array.isArray(event.details?.["selected_edges"]) ? event.details["selected_edges"].filter((id): id is string => typeof id === "string") : [])), [events]);
+-  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error, loading, retry: () => setAttempt(n => n + 1) };
++  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error:error??feed.error, loading:feed.loading, hasMoreRuns:!!cursor, loadMoreRuns:()=>setHistoryPage(cursor??undefined), hasMoreEvents:feed.hasMore, loadMoreEvents:feed.refresh, retry: () => setAttempt(n => n + 1) };
+ }
+ export type WorkflowTrace = ReturnType<typeof useWorkflowTrace>;

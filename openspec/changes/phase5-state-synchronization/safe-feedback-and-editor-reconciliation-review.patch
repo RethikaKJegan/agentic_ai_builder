@@ -1,0 +1,243 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -1,3 +1,4 @@
++import { safeError } from "./feedback";
+ import { z } from "zod";
+ import { assertWorkflowReferences } from "./control";
+ import {
+@@ -74,7 +75,9 @@
+ export type RunRecord = z.infer<typeof runData>["run"];
+ 
+ export class ApiError extends Error {
+-  constructor(public readonly error: SafeError, public readonly correlationId?: string) { super(error.message); }
++  public readonly error: SafeError;
++  constructor(error: SafeError, public readonly correlationId?: string, public readonly context: {httpStatus?:number;outcome?:"unknown"|"rejected"} = {}) { const sanitized=safeError(error);super(sanitized.message);this.error=sanitized; }
++
+ }
+ function fail(code: string, message: string, requestId = "req_client", retryable = false): never {
+   throw new ApiError({ error_code: code, message, request_id: requestId, retryable });
+@@ -152,6 +155,20 @@
+     return this.sessionRecovery;
+   }
+   private async read(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
++    const mutation=!!options.method && !["GET","HEAD"].includes(options.method.toUpperCase());
++    for(let attempt=0;;attempt++){
++      try{return await this.readOnce(path,options,recoverSession);}
++      catch(error){
++        if(!(error instanceof ApiError))throw error;
++        if(!mutation && attempt===0 && error.error.retryable && [502,503,504].includes(error.context.httpStatus??0) && ["DATABASE_BUSY","UPSTREAM_UNAVAILABLE","BACKEND_UNAVAILABLE","PROXY_TIMEOUT","SERVICE_UNAVAILABLE"].includes(error.error.error_code)){
++          await new Promise(resolve=>setTimeout(resolve,200));continue;
++        }
++        if(mutation)throw new ApiError(error.error,error.correlationId,{...error.context,outcome:[400,401,403,404,409,422].includes(error.context.httpStatus??0)?"rejected":"unknown"});
++        throw error;
++      }
++    }
++  }
++  private async readOnce(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
+     const generation = this.sessionGeneration;
+     let response: Response;
+     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
+@@ -173,7 +190,7 @@
+         if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
+       }
+       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
+-      throw new ApiError(error.data, correlation);
++      throw new ApiError(error.data, correlation, {httpStatus:response.status});
+     }
+     return data;
+   }
+@@ -289,7 +306,7 @@
+     }
+     const result = responseSchemas[operation].safeParse(operation === "plan_workflow" && this.planningJobsAvailable
+       ? await this.planJob(options) : await this.read(path, options));
+-    if (!result.success) return fail("INVALID_API_DATA", "The returned data does not match the accepted contract.", requestId);
++    if (!result.success) throw new ApiError({error_code:"INVALID_API_DATA",message:"The returned data does not match the accepted contract.",request_id:requestId,retryable:false},undefined,method!=="GET"?{outcome:"unknown"}:{});
+     if ("registry_review" in result.data && result.data.registry_review && "workflow" in result.data) {
+       const review = result.data.registry_review as RegistryReview;
+       const workflow = result.data.workflow as CanonicalWorkflow;
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -74,6 +74,10 @@
+ import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
+ import { PlanReview } from "@/features/workflows/PlanReview";
+ 
++import { useDraftSync } from "@/features/workflows/useDraftSync";
++import { DraftConflict } from "@/features/workflows/DraftConflict";
++import { useUnsavedWorkflow } from "@/features/workflows/unsaved";
++import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ const nodeTypes = { mesh: MeshNode };
+ type Graph = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+ 
+@@ -94,6 +98,8 @@
+ }
+ 
+ function Builder({ workflow }: { workflow: Workflow }) {
++  const sync=useDraftSync(workflow.id);
++  useUnsavedWorkflow(workflow.id);
+   const navigate = useNavigate();
+   const { fitView, screenToFlowPosition } = useReactFlow();
+   const store = useMesh();
+@@ -444,6 +450,9 @@
+   return (
+     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+       <LifecycleJourney workflow={current} />
++      <DraftConflict workflow={current} />
++      <ApiFeedback error={sync.error} />
++      {sync.storageFailed&&<p role="alert" className="border-b p-3 text-xs text-destructive">A browser draft backup could not be written. Keep this tab open and export your working draft before leaving.</p>}
+       <div role="tablist" aria-label="Workflow view" className="flex shrink-0 flex-wrap gap-2 border-b border-border px-4 py-2">
+         {(["design", "hierarchy", "execution"] as const).map(view => <button type="button" role="tab" key={view} aria-selected={mode === view} onClick={() => { setMode(view); setPanel(null); }} className={`rounded-lg px-3 py-2 text-sm ${mode === view ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{view === "design" ? "Design" : view === "hierarchy" ? "Agent hierarchy" : "Execution"}</button>)}
+       </div>
+--- a/frontend/src/features/workflows/ApiFeedback.tsx
++++ b/frontend/src/features/workflows/ApiFeedback.tsx
+@@ -1,19 +1,25 @@
+ import { ApiError } from "@/api/client";
+-export function ApiFeedback({ error, correlationId }: { error?: Error | null | undefined; correlationId?: string | undefined }) {
+-  const requirements = error instanceof ApiError && Array.isArray(error.error.details?.["requirements"])
+-    ? error.error.details["requirements"].filter((item): item is string => typeof item === "string") : [];
++import { InputError, unsafeText, type FeedbackKind } from "@/api/feedback";
++export function ApiFeedback({ error, correlationId, onRetry, retrying = false }: { error?: Error | null | undefined; correlationId?: string | undefined; onRetry?: (()=>void) | undefined; retrying?: boolean | undefined }) {
++  const apiError=error instanceof ApiError?error:undefined;
++  const code=apiError?.error.error_code;
++  const kind:FeedbackKind=apiError?.context.outcome==="unknown"?"uncertain":code==="AUTHENTICATION_REQUIRED"?"unauthorized":code==="OPERATION_NOT_AUTHORIZED"||code==="ORIGIN_NOT_AUTHORIZED"?"forbidden":code?.includes("CONFLICT")?"conflict":apiError?.error.retryable?"retryable":"error";
++  const message=apiError?.message??(error instanceof InputError&&!unsafeText(error.message)?error.message:"This action could not be confirmed. Keep your edits and use a safe read to check the current state.");
++  const requirements=apiError&&Array.isArray(apiError.error.details?.["requirements"])?apiError.error.details["requirements"].filter((item):item is string=>typeof item==="string"&&!unsafeText(item)):[];
+   return <>
+-    {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+-      {error.message}
+-      {error instanceof ApiError && error.error.error_code === "AUTHENTICATION_REQUIRED" &&
+-        <p className="mt-1">Reconnect the local workspace to recover your session.</p>}
+-      {error instanceof ApiError && error.error.error_code === "OPERATION_NOT_AUTHORIZED" &&
+-        <p className="mt-1">Your account lacks permission for this action. Contact your workspace administrator.</p>}
+-      {requirements.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">
+-        {requirements.map((requirement, index) => <li key={index}>{requirement}</li>)}
+-      </ul>}
+-      {error instanceof ApiError && <p className="mt-1 font-mono text-[11px]">{error.error.error_code}{error.error.field ? ` · ${error.error.field}` : ""} · {error.correlationId ?? error.error.request_id}</p>}
++    {error&&<div role="alert" data-feedback-state={kind} className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
++      <p>{message}</p>
++      {kind==="uncertain"&&<p className="mt-1">Outcome unknown. The server may have accepted this action. Check its current revision, operation or run before repeating it. No automatic mutation retry was submitted.</p>}
++      {kind==="unauthorized"&&<p className="mt-1">Your session is unavailable. Reconnect the local workspace to recover it; production login remains separately configured.</p>}
++      {kind==="forbidden"&&<p className="mt-1">Your account or origin lacks access. Contact your workspace administrator; repeating the action will not grant permission.</p>}
++      {kind==="conflict"&&<p className="mt-1">The server state changed. Keep your working draft and compare or reload the latest revision before continuing.</p>}
++      {apiError?.error.field&&<p className="mt-1" aria-label="Validation field">Field: {apiError.error.field}</p>}
++      {error instanceof InputError&&error.field&&<p className="mt-1" aria-label="Validation field">Field: {error.field}</p>}
++      {!!apiError?.error.related_errors?.length&&<ul aria-label="Field errors" className="mt-2 list-disc pl-5">{apiError.error.related_errors.map((item,index)=><li key={index}>{item.field?`${item.field}: `:""}{item.message} · {item.error_code}</li>)}</ul>}
++      {requirements.length>0&&<ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">{requirements.map((item,index)=><li key={index}>{item}</li>)}</ul>}
++      {apiError&&<p className="mt-1 font-mono text-[11px]">{code} · Request {apiError.error.request_id}{apiError.correlationId&&/^[\w-]{1,128}$/.test(apiError.correlationId)?` · Correlation ${apiError.correlationId}`:""}</p>}
++      {onRetry&&kind!=="uncertain"&&kind!=="forbidden"&&<button type="button" disabled={retrying} onClick={onRetry} className="mt-2 rounded border px-3 py-1 text-sm disabled:opacity-40">{retrying?"Loading…":"Retry read"}</button>}
+     </div>}
+-    {correlationId && <p className="text-[11px] text-muted-foreground">Request reference: {correlationId}</p>}
++    {correlationId&&/^[\w-]{1,128}$/.test(correlationId)&&<p className="text-[11px] text-muted-foreground">Request reference: {correlationId}</p>}
+   </>;
+ }
+--- a/frontend/src/features/workflows/WorkflowControls.tsx
++++ b/frontend/src/features/workflows/WorkflowControls.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+ import { useRef, useState } from "react";
++import { InputError } from "@/api/feedback";
+ import { api, ApiError } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { toCanonical, hasWorkflowEdits } from "@/api/mapping";
+@@ -30,7 +31,7 @@
+     if (backend.status !== "connected") return "Connect to the backend to use this action.";
+     if (!backend.can(permissions[action])) return `${permissions[action]} permission is required.`;
+     if (action === "reload") return version ? "" : "This local draft has no server revision.";
+-    if (action === "save") return graphError || (!dirty ? "No unsaved changes." : "");
++    if (action === "save") return (workflow.remote ? "Resolve the newer server revision before saving." : "") || graphError || (!dirty ? "No unsaved changes." : "");
+     if (dirty) return "Save draft before this action.";
+     if (!version || !document) return "Save this draft first.";
+     if (action === "validate") return document.status === "draft" || document.status === "validated" ? "" : "Save an edited draft to validate a new revision.";
+@@ -58,13 +59,13 @@
+             : action === "submit" ? await api.submitApproval(ref)
+               : action === "validate" ? await api.request("validate_workflow", ref)
+                 : await api.request("approve_workflow", { ...ref, action: action === "approve" ? "approve" : "publish" });
+-        if (action === "reload") state.acceptWorkflow(result.workflow); else acceptConfirmed(result.workflow, snapshot);
++        if (action === "reload") { const now=useMesh.getState(); const edited=now.workflows.find(w=>w.id===current.id);if(edited&&editSnapshot(edited,now.agents)!==snapshot)throw new InputError("Your draft changed while reload was loading. Edits were retained; review and confirm reload again.");now.acceptWorkflow(result.workflow); } else acceptConfirmed(result.workflow, snapshot);
+         if (result.registry_review) backend.acceptReview(result.registry_review);
+-        if (action === "validate" && result.workflow.status !== "validated") throw new Error("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
++        if (action === "validate" && result.workflow.status !== "validated") throw new InputError("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
+         setMessage(`${labels[action]} confirmed · v${result.workflow.version} · ${result.workflow.status}`);
+       }
+       await backend.refreshOverview();
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); }
++    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); if(caught instanceof ApiError && caught.error.error_code==="REVISION_CONFLICT"){try{const latest=await api.request("get_workflow",{workflow_id:workflow.id});useMesh.getState().observeWorkflows([latest.workflow]);}catch{/* Existing error and working draft remain visible. */}} }
+     finally { pending.current = false; setBusy(""); }
+   };
+   const timestamp = document?.metadata["updated_at"];
+@@ -74,6 +75,7 @@
+   const review = candidateReview?.workflow_version === version ? candidateReview : undefined;
+   return <section aria-label="Workflow actions" className="flex w-full flex-wrap items-start gap-2">
+     <div className="w-full text-xs text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
++    {dirty&&document&&<p className="w-full text-xs text-muted-foreground">Saving creates a new editable revision. Tool authorization must be reviewed again; existing active releases keep their reviewed revision.</p>}
+     <ProcurementReview workflow={workflow} />
+     <SheetAccessReview targets={document?.metadata["sheet_write_targets"]} />
+     <CustomerAutomationReview policy={document?.metadata["customer_automation"]} emailPolicy={document?.metadata["email_recipient_policy"]} />
+--- a/frontend/src/features/workflows/unsaved.ts
++++ b/frontend/src/features/workflows/unsaved.ts
+@@ -2,6 +2,7 @@
+ import { useMesh } from "@/domain/store";
+ import { hasWorkflowEdits } from "@/api/mapping";
+ let editor: string | null = null;
++const registrations=new Map<string,number>();
+ export function editorIsDirty() {
+   const state = useMesh.getState(); const workflow = state.workflows.find(item => item.id === editor);
+   return !!workflow && hasWorkflowEdits(workflow, state.agents);
+@@ -11,7 +12,7 @@
+ }
+ export function useUnsavedWorkflow(workflowId: string) {
+   useEffect(() => {
+-    editor = workflowId;
++    editor = workflowId; registrations.set(workflowId,(registrations.get(workflowId)??0)+1);
+     const editorUrl = window.location.href; const editorHistory = window.history.state;
+     const back = (event: PopStateEvent) => {
+       if (window.location.href === editorUrl || !editorIsDirty()) return;
+@@ -23,6 +24,6 @@
+     window.addEventListener("popstate", back, true);
+     const unload = (event: BeforeUnloadEvent) => { if (editorIsDirty()) { event.preventDefault(); event.returnValue = ""; } };
+     window.addEventListener("beforeunload", unload);
+-    return () => { if (editor === workflowId) editor = null; window.removeEventListener("beforeunload", unload); window.removeEventListener("popstate", back, true); };
++    return () => { const remaining=(registrations.get(workflowId)??1)-1;registrations.set(workflowId,remaining);if (editor === workflowId && !remaining) editor = null; window.removeEventListener("beforeunload", unload); window.removeEventListener("popstate", back, true); };
+   }, [workflowId]);
+ }
+--- a/frontend/src/screens/app.workflows.$id.tsx
++++ b/frontend/src/screens/app.workflows.$id.tsx
+@@ -4,7 +4,6 @@
+ import { ClientOnly } from "@/lib/navigation";
+ import { lazy, Suspense, useEffect, useState } from "react";
+ import { useMesh } from "@/domain/store";
+-import { hasWorkflowEdits } from "@/api/mapping";
+ import { api } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+@@ -18,23 +17,24 @@
+   const workflow = useMesh((s) => s.workflows.find((w) => w.id === id));
+   const backendStatus = useBackend((s) => s.status);
+   const [error, setError] = useState<Error | null>(null);
+-  const [loaded, setLoaded] = useState(false);
++  const [loadedId, setLoadedId] = useState("");
++  const [attempt,setAttempt]=useState(0);
+   useEffect(() => {
+     let active = true;
+     const existing = useMesh.getState().workflows.find((w) => w.id === id);
+-    if (backendStatus !== "connected" || (existing && (!existing.serverVersion || hasWorkflowEdits(existing, useMesh.getState().agents)))) return;
++    if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
+     api.request("get_workflow", { workflow_id: id }).then((result) => {
+-      if (active) { useMesh.getState().acceptWorkflow(result.workflow); setLoaded(true); }
+-    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoaded(true); } });
++      if (active) { useMesh.getState().observeWorkflows([result.workflow]); setLoadedId(id); setError(null); }
++    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoadedId(id); } });
+     return () => { active = false; };
+-  }, [id, backendStatus]);
++  }, [id, backendStatus, attempt]);
+   if (!workflow) {
+-    if (backendStatus === "loading" || (backendStatus === "connected" && !loaded)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
++    if (backendStatus === "loading" || (backendStatus === "connected" && loadedId !== id)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
+     return (
+       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+         <p className="font-display text-xl font-medium">Workflow not found</p>
+         <p className="text-sm text-muted-foreground">This workflow could not be loaded from the server or this browser.</p>
+-        <ApiFeedback error={error} />
++        <ApiFeedback error={error} onRetry={()=>setAttempt(n=>n+1)} />
+         <Link to="/app/workflows" className="text-sm text-primary">Back to workflows</Link>
+       </div>
+     );

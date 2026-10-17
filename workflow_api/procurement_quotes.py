@@ -143,7 +143,7 @@ class ProcurementQuotes:
 
     def purchase_authority(self,approval,target,operation):
         workspace,project=target['workspace_id'],target['project_id']
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             row=db.execute('SELECT body FROM procurement_policy_proofs WHERE workspace=? AND project=? AND id=?',
                            (workspace,project,approval['record_id'])).fetchone()
         if not row:return False
@@ -163,7 +163,7 @@ class ProcurementQuotes:
             return run['status']=='completed' and any(a['status']=='approved' for a in run['approvals'])
         if proof['mode']!='published_simulation_policy' or not job['plan']['simulation'] or not self.automatic(job):return False
         if not settings.get('purchasing_limit'):return False
-        with self.workflows.store.transaction() as db:
+        with self.workflows.store.transaction(write=False) as db:
             row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
                            (workspace,owner['workflow_id'],owner['version'])).fetchone()
         workflow=json.loads(row[0]) if row else {}
@@ -243,7 +243,7 @@ class ProcurementQuotes:
 
     def process_quote(self,workspace,job,rfq,message,auth):
         project=job['plan']['project_id'];mid=message['message_id']
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             existing=db.execute('SELECT body FROM procurement_quote_messages WHERE workspace=? AND project=? AND message=?',(workspace,project,mid)).fetchone()
         if existing:return
         text=fresh_text(message.get('text',''))

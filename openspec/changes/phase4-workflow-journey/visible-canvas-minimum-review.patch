@@ -1,0 +1,11 @@
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -574,7 +574,7 @@
+       }} onRemove={id => { if(window.confirm("Remove this connection from the working draft?")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }} />
+       </>}
+       {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
+-      <div className="flex min-h-0 flex-1">
++      <div className="flex min-h-[420px] flex-1">
+         {/* Canvas */}
+         <div className="relative min-w-0 flex-1 bg-canvas">
+           {isMobile ? (

@@ -1,0 +1,5 @@
+# Design
+
+Keep editable graph state mounted while switching views. Design uses current draft topology without run overlays; hierarchy displays presentation parent links and agent responsibilities without treating them as execution edges. Execution loads get_run plus get_workflow at its exact workflow_version, independently of the draft store, and renders read-only nodes and recorded events. Fail closed when that revision cannot be loaded. Sequence/identity reconciliation must not infer node completion.
+
+Generation persists only a draft, then shows its actual structured plan and an explicit review/edit choice. Repeated planner identities must not overwrite saved or dirty drafts. Lifecycle stages derive from canonical revision, dirty state, Registry review and server overview, with unavailable simulation and clear prerequisites. Editing never activates or changes the immutable published revision. Diagnostics are advisory; authoritative server validation remains required. Dependency ordering supports mobile and keyboard outline/edit controls. Layout changes remain supported canonical node positions.

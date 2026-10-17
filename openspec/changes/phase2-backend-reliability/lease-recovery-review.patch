@@ -1,0 +1,182 @@
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -179,8 +179,23 @@
+         return connector, grant, agent, params, reservation
+ 
+     def advance(self, run_id, auth):
++        import os
++        from workflow_api.worker_control import LeaseHeartbeat
++        seconds=int(os.getenv('BUILDER_RUNTIME_LEASE_SECONDS','120'))
++        if not 30<=seconds<=3600:raise ValueError('Runtime lease must be 30-3600 seconds.')
++        worker='worker_'+uuid4().hex
++        def renew():
++            with self.runtime.store.transaction() as db:
++                run=self.runtime.load(db,run_id,auth,'workflow.execute')
++                if run.get('worker')!=worker or run['status']!='running':return False
++                run['lease_until']=self.runtime.clock()+seconds
++                self.runtime.save(db,run)
++            return True
++        with LeaseHeartbeat(renew,interval=max(1,seconds/3)):
++            return self._advance(run_id,auth,worker,seconds)
++
++    def _advance(self, run_id, auth, worker, lease_seconds):
+         runtime = self.runtime
+-        worker = 'worker_' + uuid4().hex
+         with runtime.store.transaction() as db:
+             run = runtime.load(db, run_id, auth, 'workflow.execute')
+             if run['subject_id'] != auth['subject']['subject_id']:
+@@ -197,7 +212,7 @@
+                 self.fail(db, run, 'UNKNOWN_INVOCATION_RESULT', blocked=True)
+                 return runtime.public(run)
+             run['worker'] = worker
+-            run['lease_until'] = runtime.clock() + 3600
++            run['lease_until'] = runtime.clock() + lease_seconds
+             if run['status'] == 'queued':
+                 runtime.transition(db, run, 'running')
+             runtime.save(db, run)
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -86,6 +86,7 @@
+         self.workflows, self.store, self.clock = workflows, workflows.store, clock
+         self.adapter = adapter or TriggerAdapter()
+         self.trigger_secrets = dict(trigger_secrets or {})
++        self.leased_tokens = {}
+         with self.store.transaction(write=True) as db:
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))")
+@@ -100,6 +101,7 @@
+             db.execute('CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)')
+             db.execute('CREATE INDEX IF NOT EXISTS lifecycle_preparations_workspace ON lifecycle_preparations(workspace)')
+             db.execute('CREATE INDEX IF NOT EXISTS lifecycle_jobs_ready ON lifecycle_jobs(workspace,state,available_at,lease_until)')
++            db.execute('CREATE TABLE IF NOT EXISTS lifecycle_job_claims (job_id TEXT PRIMARY KEY, token TEXT NOT NULL)')
+             db.execute('CREATE INDEX IF NOT EXISTS lifecycle_triggers_active ON lifecycle_triggers(workspace,state,workflow_id)')
+             # Recovery is lease-aware; another API instance may still be preparing.
+ 
+@@ -383,6 +385,9 @@
+                 job["state"], job["attempt"] = "leased", job["attempt"] + 1
+                 job["lease_until"] = (datetime.fromtimestamp(self.clock(), timezone.utc) + timedelta(seconds=seconds)).isoformat()
+                 db.execute("UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?", (job["lease_until"], job["attempt"], json.dumps(job), job_id))
++                token=uuid4().hex
++                db.execute('INSERT INTO lifecycle_job_claims VALUES (?,?) ON CONFLICT(job_id) DO UPDATE SET token=excluded.token',(job_id,token))
++                self.leased_tokens[job_id]=token
+                 jobs.append(job)
+             return jobs
+ 
+@@ -392,7 +397,23 @@
+             rows = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'", (workspace,)).fetchall()
+         return [json.loads(encoded) for _binding, encoded in rows if json.loads(encoded).get('delivery') == 'poll']
+ 
+-    def execute_job(self, job_id, runner, max_attempts=3):
++    def execute_job(self, job_id, runner, max_attempts=3, claim=None):
++        from .worker_control import LeaseHeartbeat
++        claim=claim or self.leased_tokens.get(job_id)
++        def renew():
++            with self.store.transaction() as db:
++                row=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++                current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
++                if not row or row[0]!=claim or not current:return False
++                job=json.loads(current[0])
++                if job['state']!='leased':return False
++                job['lease_until']=(datetime.fromtimestamp(self.clock(),timezone.utc)+timedelta(seconds=120)).isoformat()
++                db.execute('UPDATE lifecycle_jobs SET lease_until=?,document=? WHERE job_id=?',(job['lease_until'],json.dumps(job),job_id))
++            return True
++        with LeaseHeartbeat(renew,interval=10):
++            return self._execute_claimed_job(job_id,runner,max_attempts,claim)
++
++    def _execute_claimed_job(self, job_id, runner, max_attempts, claim):
+         with self.store.transaction() as db:
+             row = db.execute("SELECT document FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()
+             if not row:
+@@ -400,28 +421,47 @@
+             job = json.loads(row[0])
+             if job["state"] == "completed":
+                 return job
++            current_claim=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++            if not claim or not current_claim or current_claim[0]!=claim:
++                raise LifecycleFailure('JOB_LEASE_LOST','This worker no longer owns the dispatch job.')
++            if job['state']!='leased':return job
++            if not job.get('lease_until') or job['lease_until']<=now_iso(self.clock):
++                raise LifecycleFailure('JOB_LEASE_EXPIRED','The dispatch lease expired before execution.')
+             release_row = db.execute("SELECT state, document FROM lifecycle_releases WHERE release_id=?", (job["release_id"],)).fetchone()
+             identity_row = db.execute("SELECT authority, document FROM lifecycle_identities WHERE identity_id=?", (job["automation_identity_id"],)).fetchone()
+             tombstoned = db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (job["workspace_id"], self._job_workflow(db, job_id))).fetchone()
+             if not release_row or not identity_row or json.loads(identity_row[1])["active"] is not True or tombstoned:
+-                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED")
++                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED",claim)
+             release, auth = json.loads(release_row[1]), json.loads(identity_row[0])
+             workflow = self.store.get(db, job["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
+             if not workflow or not self.workflows.registry_adapter.review(workflow, auth)["ready"]:
+-                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED")
++                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED",claim)
++        resolver=getattr(self.workflows,'worker_authenticate',None)
++        if resolver:
++            fresh=resolver(job['workspace_id'],auth['subject']['subject_id'])
++            if fresh is None:
++                with self.store.transaction() as db:return self._finish_job(db,job,'cancelled','EXECUTION_AUTHORITY_REVOKED',claim)
++            auth=fresh
+         request = dict(request_id="req_" + job_id, operation="execute_workflow", idempotency_key=job["deduplication_key"],
+                        payload={**release["revision"], "inputs": job["inputs"]})
++        run=None
+         try:
+             run = runner.runtime.create_automation_run(request, auth)
+             run = runner.advance(run["run_id"], auth)
+             with self.store.transaction() as db:
+                 job["run_id"] = run["run_id"]
+-                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None)
+-        except Exception:
++                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None,claim)
++        except Exception as exc:
+             with self.store.transaction() as db:
+-                state = "dead_letter" if job["attempt"] >= max_attempts else "queued"
++                token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
++                stored=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
++                if not token or token[0]!=claim or json.loads(stored[0])['state']!='leased':return json.loads(stored[0])
++                from .postgres import DatabaseFailure
++                import sqlite3
++                transient=isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
++                state='queued' if run is None and transient and job['attempt']<max_attempts else 'dead_letter'
+                 job["lease_until"] = None
+-                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED"
++                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED" if transient else "RUNTIME_DISPATCH_UNCERTAIN"
+                 db.execute("UPDATE lifecycle_jobs SET state=?, lease_until=NULL, available_at=?, document=? WHERE job_id=?",
+                            (state, now_iso(self.clock), json.dumps({**job, "state": state}), job_id))
+                 return {**job, "state": state}
+@@ -429,7 +469,11 @@
+     def _job_workflow(self, db, job_id):
+         return db.execute("SELECT workflow_id FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()[0]
+ 
+-    def _finish_job(self, db, job, state, error):
++    def _finish_job(self, db, job, state, error, claim=None):
++        if claim:
++            current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job['job_id'],)).fetchone()
++            token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job['job_id'],)).fetchone()
++            if not token or token[0]!=claim or json.loads(current[0])['state']!='leased':return json.loads(current[0])
+         job["state"], job["lease_until"] = state, None
+         if error:
+             job["last_error_code"] = error
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -373,6 +373,7 @@
+                                         allowed_managers=recipients(env), model_rates=rates[model])
+         service.reply_monitor_health = {'state': 'starting'}
+     lookup = lambda workspace, subject: authenticate(service, auth, workspace, subject)
++    service.worker_authenticate=lookup
+     workers = [TriggerScheduler(service, lookup, interval=1), RuntimeWorker(runner, lookup)]
+     if procurement_worker:
+         workers.append(procurement_worker)
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -32,7 +32,12 @@
+             if not identity:
+                 raise ValueError("identity missing")
+             workflow = self.service.store.get(db, binding["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
+-        return workflow, json.loads(identity[0])
++        authority=json.loads(identity[0])
++        resolver=getattr(self.service,'worker_authenticate',None)
++        if resolver:
++            authority=resolver(binding['workspace_id'],authority['subject']['subject_id'])
++            if authority is None:raise ValueError('Trigger execution authority was revoked.')
++        return workflow, authority
+ 
+     def poll(self, binding, previous_cursor):
+         provider = binding["provider_id"]

@@ -1,0 +1,98 @@
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -277,6 +277,8 @@
+                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+     service = app.state.workflow_service
+     service.background_execution=process_role=='api'
++    from .integration_checks import smtp_probe
++    service.integration_probes={'smtp':smtp_probe(env)}
+     service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
+     from openai import OpenAI
+     from planner import PlannerService
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -400,6 +400,8 @@
+     async def workspace_collection(collection: str, request: Request):
+         if collection not in {'settings', 'knowledge', 'governance'}:
+             return error('NOT_FOUND', 'The workspace collection was not found.', 404)
++        if auth.get('decision')!='allow' or 'workflow.view' not in auth['permissions']:
++            return error('OPERATION_NOT_AUTHORIZED','Workspace read permission is required.',403)
+         table = {'settings': 'workspace_settings', 'knowledge': 'knowledge_sources', 'governance': 'governance_policies'}[collection]
+         try:
+             with workflow_service.store.transaction(write=False) as db:
+@@ -417,12 +419,19 @@
+     async def save_workspace_item(collection: str, item_id: str, request: Request):
+         if collection not in {'settings', 'knowledge', 'governance'}:
+             return error('NOT_FOUND', 'The workspace collection was not found.', 404)
+-        if 'admin' not in auth['roles']:
++        if 'admin' not in auth['roles'] or auth.get('decision')!='allow' or 'workspace:write' not in auth['scopes']:
+             return error('OPERATION_NOT_AUTHORIZED', 'Workspace administration is required.', 403)
+         try:
+             payload = await request.json()
+             from registry.safety import reject_secrets
+             reject_secrets(payload)
++            if not isinstance(payload,dict) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}',item_id):
++                return error('INVALID_REQUEST','Use a valid workspace item identifier and JSON object.',400)
++            if collection=='settings':
++                if set(payload)!={'value'} or len(json.dumps(payload,allow_nan=False).encode())>16000:
++                    return error('SETTING_INVALID','Use a value smaller than 16 KiB.',400)
++                if item_id=='notifications' and (not isinstance(payload['value'],str) or len(payload['value'])>2000):
++                    return error('SETTING_INVALID','Notification preference must be text of at most 2000 characters.',400)
+             import datetime
+             updated = datetime.datetime.now(datetime.timezone.utc).isoformat()
+             workspace = auth['subject']['workspace_id']
+@@ -438,15 +447,29 @@
+         except Exception:
+             return error('INVALID_API_DATA', 'The workspace item is invalid.', 400)
+ 
++    @app.post('/workflows/{workflow_id}/submit-for-approval')
++    async def submit_for_approval(workflow_id: str, request: Request):
++        try:
++            from .review_actions import submit
++            body=await request.json()
++            if not isinstance(body,dict) or not isinstance(body.get('payload'),dict) or body['payload'].get('workflow_id')!=workflow_id:
++                return error('REFERENCE_MISMATCH','Route and workflow reference must match.',400)
++            result=await run_in_threadpool(submit,workflow_service,body,auth)
++            return JSONResponse(result,status_code=result['status'])
++        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
++        except Exception:return error('APPROVAL_SUBMISSION_FAILED','The approval submission could not be confirmed.',503)
++
+     @app.post('/integrations/{provider}/test')
+     async def integration_test(provider: str, request: Request):
+-        # Connection tests are server-owned and accept only a provider name;
+-        # browser requests can never submit credentials.
+-        allowed = {'smtp', 'google_sheets', 'google_drive', 'google_calendar', 'google_docs', 'slack', 'github', 'open_meteo', 'open_library', 'generic_rest', 'webhook', 'brevo_smtp'}
+-        if provider not in allowed:
+-            return error('INTEGRATION_UNSUPPORTED', 'The provider is not supported.', 400)
+-        configured = bool(os.getenv('GMAIL_SMTP_USER')) if provider == 'smtp' else bool(os.getenv('GOOGLE_TOKEN_FILE')) if provider.startswith('google_') else True
+-        return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}', 200, {'provider': provider, 'configured': configured, 'tested': configured, 'message': 'Server-side connection test completed.' if configured else 'Configure this provider on the server.'}))
++        try:
++            from .integration_checks import check
++            payload=await request.json()
++            if not isinstance(payload,dict) or set(payload)-{'mode'}:
++                return error('INVALID_REQUEST','Only a check mode is accepted; credentials and destinations stay on the server.',400)
++            result=await run_in_threadpool(check,workflow_service,provider,auth,payload.get('mode','configuration'))
++            return JSONResponse(workflow_service.envelope(request_reference.get(),200,result))
++        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
++        except Exception:return error('INTEGRATION_CHECK_FAILED','The provider check could not be completed.',503)
+ 
+     @app.post('/approvals/{approval_id}/decision')
+     async def decision(approval_id: str, request: Request):
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -1,5 +1,6 @@
+ """Workflow transport/revision lifecycle and delegation to an explicit runtime."""
+ from copy import deepcopy
++from datetime import datetime, timezone
+ from .security import request_correlation
+ import hashlib
+ import json
+@@ -345,6 +346,8 @@
+                 raise ApiFailure('UNTRUSTED_ASSIGNMENT', 'Executable assignments must be supplied by the trusted registry.', 403)
+             workflow['metadata'].pop('validation_state', None)
+             workflow['metadata'].pop('approved_by', None)
++            workflow['metadata'].pop('approval_submission', None)
++            workflow['metadata']['updated_at'] = datetime.fromtimestamp(self.clock(),timezone.utc).isoformat()
+             workflow['metadata'].pop('registry_review', None)
+             workflow['metadata']['workspace_id'] = workspace
+             workflow['metadata']['validation_state'] = 'not_validated'

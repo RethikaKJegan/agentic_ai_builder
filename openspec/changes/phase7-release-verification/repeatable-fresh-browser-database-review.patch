@@ -1,0 +1,41 @@
+--- a/frontend/e2e/workflow-traces.spec.ts
++++ b/frontend/e2e/workflow-traces.spec.ts
+@@ -38,7 +38,6 @@
+     await expect(trace.getByText("no", {exact:true})).toBeVisible();
+     await expect(trace.getByText(/T002/)).toHaveCount(0);
+     await page.getByRole("button", {name:"Return to editable draft"}).click();
+-    await page.getByRole("button", {name:/Workflow outline and connections/}).count();
+     await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
+   });
+ }
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -15,7 +15,7 @@
+     url: "http://127.0.0.1:8011/session",
+     reuseExistingServer: false,
+     timeout: 60000,
+-    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0",
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0", BUILDER_TEST_FRESH_DATABASE: "1",
+       BUILDER_TEST_DATABASE_DIR: process.env["BUILDER_E2E_DATABASE_DIR"] ?? path.join(repository, ".local/browser-phase7"),
+       BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }, {
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -5,6 +5,7 @@
+ import os
+ import sys
+ from contextlib import nullcontext
++from tempfile import TemporaryDirectory
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT))
+@@ -43,7 +44,8 @@
+     if not directory.is_relative_to(ROOT / '.local'):
+         raise RuntimeError('Browser test databases must stay under this repository .local directory.')
+     directory.mkdir(exist_ok=True)
+-    with nullcontext(directory):
++    with (TemporaryDirectory(prefix="run-", dir=directory) if os.getenv("BUILDER_TEST_FRESH_DATABASE") == "1" else nullcontext(directory)) as database_directory:
++        directory = Path(database_directory)
+         # Explicit browser-only configured registry; never used by product startup.
+         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
+         agent.update(agent_id='reader_agent', capabilities=['read_spreadsheet'], permissions=['data.read'])

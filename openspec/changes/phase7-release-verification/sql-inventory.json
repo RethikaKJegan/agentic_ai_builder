@@ -1,0 +1,3106 @@
+{
+  "format": "builder-sql-inventory-v1",
+  "scope": [
+    "workflow_api",
+    "runtime",
+    "connector_extension (excluding tests)",
+    "scripts"
+  ],
+  "notes": [
+    "Dynamic SQL expressions are retained for review; values remain bound parameters.",
+    "Connector databases use separate schemas: equal table names across files must not be merged.",
+    "The procurement subtype loop expands into dynamic_tables; PostgreSQL adapter/migration catalog calls are included."
+  ],
+  "dynamic_tables": {
+    "connector_extension/procurement/store.py": [
+      "projects",
+      "boq_items",
+      "vendors",
+      "rfqs",
+      "quotations",
+      "awards",
+      "purchase_orders",
+      "fulfilment_events",
+      "approvals",
+      "evidence"
+    ]
+  },
+  "tables": {
+    "activity": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 91,
+        "ddl": "CREATE TABLE IF NOT EXISTS activity (sequence INTEGER PRIMARY KEY, workspace TEXT, project TEXT, transaction_key TEXT, record_id TEXT, revision INTEGER, recorded_at TEXT)"
+      }
+    ],
+    "builder_planning_jobs": [
+      {
+        "file": "workflow_api/planning_jobs.py",
+        "line": 27,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_planning_jobs (job_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, subject TEXT NOT NULL, retry_key TEXT NOT NULL, fingerprint TEXT NOT NULL, state TEXT NOT NULL, request TEXT, result TEXT, lease_until REAL, claim TEXT, created REAL NOT NULL, UNIQUE(workspace, subject, retry_key))"
+      }
+    ],
+    "builder_schema_migrations": [
+      {
+        "file": "workflow_api/postgres.py",
+        "line": 138,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+      },
+      {
+        "file": "workflow_api/storage.py",
+        "line": 38,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+      }
+    ],
+    "builder_store_versions": [
+      {
+        "file": "workflow_api/postgres.py",
+        "line": 139,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_store_versions (version INTEGER PRIMARY KEY)"
+      }
+    ],
+    "builder_worker_component_health": [
+      {
+        "file": "workflow_api/worker_control.py",
+        "line": 19,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_worker_component_health (worker_id TEXT, name TEXT, document TEXT NOT NULL, PRIMARY KEY(worker_id,name))"
+      }
+    ],
+    "builder_worker_health": [
+      {
+        "file": "workflow_api/worker_control.py",
+        "line": 18,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_worker_health (worker_id TEXT PRIMARY KEY, role TEXT NOT NULL, state TEXT NOT NULL, heartbeat REAL NOT NULL)"
+      }
+    ],
+    "builder_worker_leases": [
+      {
+        "file": "workflow_api/worker_control.py",
+        "line": 17,
+        "ddl": "CREATE TABLE IF NOT EXISTS builder_worker_leases (name TEXT PRIMARY KEY, owner TEXT NOT NULL, expires REAL NOT NULL)"
+      }
+    ],
+    "customer_case_actions": [
+      {
+        "file": "workflow_api/reply_cases.py",
+        "line": 58,
+        "ddl": "CREATE TABLE IF NOT EXISTS customer_case_actions (workspace TEXT NOT NULL, case_id TEXT NOT NULL, reply_id TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY(workspace,case_id,reply_id,kind))"
+      }
+    ],
+    "customer_cases": [
+      {
+        "file": "workflow_api/reply_cases.py",
+        "line": 54,
+        "ddl": "CREATE TABLE IF NOT EXISTS customer_cases (workspace TEXT NOT NULL, case_id TEXT NOT NULL, run_id TEXT NOT NULL, message_id TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,case_id), UNIQUE(workspace,run_id), UNIQUE(workspace,message_id))"
+      }
+    ],
+    "customer_mail_cursor": [
+      {
+        "file": "workflow_api/reply_cases.py",
+        "line": 57,
+        "ddl": "CREATE TABLE IF NOT EXISTS customer_mail_cursor (workspace TEXT NOT NULL, mailbox_id TEXT NOT NULL, uidvalidity TEXT NOT NULL, last_uid INTEGER NOT NULL, PRIMARY KEY(workspace,mailbox_id))"
+      }
+    ],
+    "customer_replies": [
+      {
+        "file": "workflow_api/reply_cases.py",
+        "line": 55,
+        "ddl": "CREATE TABLE IF NOT EXISTS customer_replies (workspace TEXT NOT NULL, mailbox_id TEXT NOT NULL, uidvalidity TEXT NOT NULL, uid TEXT NOT NULL, message_id TEXT, case_id TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,mailbox_id,uidvalidity,uid))"
+      }
+    ],
+    "customer_reply_jobs": [
+      {
+        "file": "workflow_api/reply_cases.py",
+        "line": 59,
+        "ddl": "CREATE TABLE IF NOT EXISTS customer_reply_jobs (workspace TEXT NOT NULL, case_id TEXT NOT NULL, reply_id TEXT NOT NULL, state TEXT NOT NULL, lease_until REAL NOT NULL, error_code TEXT, PRIMARY KEY(workspace,case_id,reply_id))"
+      }
+    ],
+    "effects": [
+      {
+        "file": "connector_extension/common.py",
+        "line": 80,
+        "ddl": "CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT)"
+      }
+    ],
+    "governance_policies": [
+      {
+        "file": "workflow_api/storage.py",
+        "line": 46,
+        "ddl": "CREATE TABLE IF NOT EXISTS governance_policies (workspace TEXT, policy_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)"
+      }
+    ],
+    "knowledge_sources": [
+      {
+        "file": "workflow_api/storage.py",
+        "line": 45,
+        "ddl": "CREATE TABLE IF NOT EXISTS knowledge_sources (workspace TEXT, source_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)"
+      }
+    ],
+    "lifecycle_active": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 92,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))"
+      }
+    ],
+    "lifecycle_checkpoints": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 98,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_checkpoints (workspace TEXT, binding_id TEXT, cursor TEXT, updated_at TEXT, PRIMARY KEY(workspace, binding_id))"
+      }
+    ],
+    "lifecycle_identities": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 95,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_identities (workspace TEXT, identity_id TEXT PRIMARY KEY, authority TEXT NOT NULL, document TEXT NOT NULL)"
+      }
+    ],
+    "lifecycle_job_claims": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 104,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_job_claims (job_id TEXT PRIMARY KEY, token TEXT NOT NULL)"
+      }
+    ],
+    "lifecycle_jobs": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 97,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_jobs (workspace TEXT, job_id TEXT PRIMARY KEY, release_id TEXT, workflow_id TEXT, state TEXT, available_at TEXT, lease_until TEXT, attempt INTEGER, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, release_id, job_id))"
+      }
+    ],
+    "lifecycle_operations": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 93,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))"
+      }
+    ],
+    "lifecycle_overview_events": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 99,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_overview_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, workflow_id TEXT, document TEXT NOT NULL)"
+      }
+    ],
+    "lifecycle_preparations": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 101,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)"
+      }
+    ],
+    "lifecycle_receipts": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 96,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_receipts (workspace TEXT, receipt_id TEXT PRIMARY KEY, binding_id TEXT, event_identity TEXT, document TEXT NOT NULL, UNIQUE(workspace, binding_id, event_identity))"
+      }
+    ],
+    "lifecycle_releases": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 91,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))"
+      }
+    ],
+    "lifecycle_tombstones": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 100,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_tombstones (workspace TEXT, workflow_id TEXT, deleted_at TEXT, cleanup_state TEXT, PRIMARY KEY(workspace, workflow_id))"
+      }
+    ],
+    "lifecycle_triggers": [
+      {
+        "file": "workflow_api/lifecycle.py",
+        "line": 94,
+        "ddl": "CREATE TABLE IF NOT EXISTS lifecycle_triggers (workspace TEXT, binding_id TEXT PRIMARY KEY, release_id TEXT, workflow_id TEXT, state TEXT, provider_reference TEXT, document TEXT NOT NULL)"
+      }
+    ],
+    "mutations": [
+      {
+        "file": "workflow_api/storage.py",
+        "line": 43,
+        "ddl": "CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))"
+      }
+    ],
+    "observations": [
+      {
+        "file": "connector_extension/sheet_creation.py",
+        "line": 55,
+        "ddl": "CREATE TABLE IF NOT EXISTS observations (workspace TEXT, project TEXT, marker TEXT, spreadsheet TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,marker))"
+      }
+    ],
+    "procurement_fulfilment_messages": [
+      {
+        "file": "workflow_api/procurement_fulfilment.py",
+        "line": 65,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_fulfilment_messages(workspace TEXT,project TEXT,po TEXT,message TEXT,body TEXT,PRIMARY KEY(workspace,project,po,message))"
+      }
+    ],
+    "procurement_fulfilment_policies": [
+      {
+        "file": "workflow_api/procurement_fulfilment.py",
+        "line": 66,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_fulfilment_policies(workspace TEXT,project TEXT,revision INTEGER,body TEXT,PRIMARY KEY(workspace,project,revision))"
+      }
+    ],
+    "procurement_jobs": [
+      {
+        "file": "connector_extension/procurement/service.py",
+        "line": 35,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_jobs(workspace TEXT,project TEXT,body TEXT NOT NULL, PRIMARY KEY(workspace,project))"
+      }
+    ],
+    "procurement_policy_proofs": [
+      {
+        "file": "workflow_api/procurement_quotes.py",
+        "line": 141,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_policy_proofs(workspace TEXT,project TEXT,id TEXT,body TEXT,PRIMARY KEY(workspace,project,id))"
+      }
+    ],
+    "procurement_quote_messages": [
+      {
+        "file": "workflow_api/procurement_quotes.py",
+        "line": 140,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_quote_messages(workspace TEXT,project TEXT,message TEXT,body TEXT,PRIMARY KEY(workspace,project,message))"
+      }
+    ],
+    "procurement_snapshots": [
+      {
+        "file": "connector_extension/procurement/service.py",
+        "line": 37,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_snapshots(workspace TEXT,project TEXT,kind TEXT, hash TEXT,body TEXT,PRIMARY KEY(workspace,project,kind))"
+      }
+    ],
+    "procurement_source_proofs": [
+      {
+        "file": "connector_extension/procurement/service.py",
+        "line": 39,
+        "ddl": "CREATE TABLE IF NOT EXISTS procurement_source_proofs(workspace TEXT,project TEXT,id TEXT, body TEXT,PRIMARY KEY(workspace,project,id))"
+      }
+    ],
+    "records": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 79,
+        "ddl": "CREATE TABLE IF NOT EXISTS records (workspace TEXT, project TEXT, id TEXT, kind TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(workspace,project,id))"
+      }
+    ],
+    "resources": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 96,
+        "ddl": "CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, record_id TEXT, provider TEXT, resource_type TEXT, resource_id TEXT, metadata TEXT NOT NULL, PRIMARY KEY(workspace,project,record_id,provider,resource_type,resource_id), FOREIGN KEY(workspace,project,record_id) REFERENCES records(workspace,project,id))"
+      },
+      {
+        "file": "connector_extension/sheet_creation.py",
+        "line": 52,
+        "ddl": "CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, spreadsheet TEXT, sheet INTEGER, spreadsheet_owned INTEGER, tab_owned INTEGER, manifest TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,spreadsheet,sheet))"
+      }
+    ],
+    "revisions": [
+      {
+        "file": "workflow_api/storage.py",
+        "line": 42,
+        "ddl": "CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))"
+      },
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 86,
+        "ddl": "CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, project TEXT, id TEXT, revision INTEGER, body TEXT NOT NULL, PRIMARY KEY(workspace,project,id,revision), FOREIGN KEY(workspace,project,id) REFERENCES records(workspace,project,id))"
+      }
+    ],
+    "runtime_events": [
+      {
+        "file": "runtime/service.py",
+        "line": 43,
+        "ddl": "CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)"
+      }
+    ],
+    "runtime_runs": [
+      {
+        "file": "runtime/service.py",
+        "line": 39,
+        "ddl": "CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))"
+      }
+    ],
+    "runtime_trace_exports": [
+      {
+        "file": "runtime/service.py",
+        "line": 42,
+        "ddl": "CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))"
+      }
+    ],
+    "sync_intents": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 100,
+        "ddl": "CREATE TABLE IF NOT EXISTS sync_intents (workspace TEXT, project TEXT, key TEXT, record_id TEXT, record_revision INTEGER, target TEXT, payload TEXT, status TEXT, PRIMARY KEY(workspace,project,key), FOREIGN KEY(workspace,project,record_id,record_revision) REFERENCES revisions(workspace,project,id,revision))"
+      }
+    ],
+    "transactions": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 89,
+        "ddl": "CREATE TABLE IF NOT EXISTS transactions (workspace TEXT, project TEXT, key TEXT, fingerprint TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(workspace,project,key))"
+      }
+    ],
+    "unique_refs": [
+      {
+        "file": "connector_extension/procurement/store.py",
+        "line": 93,
+        "ddl": "CREATE TABLE IF NOT EXISTS unique_refs (workspace TEXT, project TEXT, category TEXT, value TEXT, record_id TEXT, PRIMARY KEY(workspace,project,category,value), FOREIGN KEY(workspace,project,record_id) REFERENCES records(workspace,project,id))"
+      }
+    ],
+    "workspace_settings": [
+      {
+        "file": "workflow_api/storage.py",
+        "line": 44,
+        "ddl": "CREATE TABLE IF NOT EXISTS workspace_settings (workspace TEXT, key TEXT, value TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace, key))"
+      }
+    ]
+  },
+  "calls": [
+    {
+      "file": "connector_extension/app.py",
+      "line": 263,
+      "kind": "execute",
+      "sql_expression": "None",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/app.py",
+      "line": 268,
+      "kind": "execute",
+      "sql_expression": "None",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 80,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 89,
+      "kind": "execute",
+      "sql": "BEGIN IMMEDIATE",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 90,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,state,result FROM effects WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 96,
+      "kind": "execute",
+      "sql": "INSERT INTO effects VALUES (?,?,?,NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 105,
+      "kind": "execute",
+      "sql": "UPDATE effects SET result=? WHERE key=? AND state='started'",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 109,
+      "kind": "execute",
+      "sql": "UPDATE effects SET state='completed',result=? WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/common.py",
+      "line": 200,
+      "kind": "execute",
+      "sql_expression": "grant",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 35,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_jobs(workspace TEXT,project TEXT,body TEXT NOT NULL, PRIMARY KEY(workspace,project))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 37,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_snapshots(workspace TEXT,project TEXT,kind TEXT, hash TEXT,body TEXT,PRIMARY KEY(workspace,project,kind))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 39,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_source_proofs(workspace TEXT,project TEXT,id TEXT, body TEXT,PRIMARY KEY(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 45,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_jobs WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 50,
+      "kind": "execute",
+      "sql": "UPDATE procurement_jobs SET body=? WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 58,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_source_proofs WHERE workspace=? AND project=? AND id=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_jobs WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 102,
+      "kind": "execute",
+      "sql": "INSERT INTO procurement_jobs VALUES (?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 133,
+      "kind": "execute",
+      "sql": "SELECT hash FROM procurement_snapshots WHERE workspace=? AND project=? AND kind=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 135,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_snapshots VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 153,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_source_proofs VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 269,
+      "kind": "execute",
+      "sql": "UPDATE sync_intents SET status=? WHERE workspace=? AND project=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 303,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM observations WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 314,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,state,result FROM effects WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 434,
+      "kind": "execute",
+      "sql": "SELECT payload FROM sync_intents WHERE workspace=? AND project=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 436,
+      "kind": "execute",
+      "sql": "UPDATE sync_intents SET status='CONFIRMED' WHERE workspace=? AND project=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/service.py",
+      "line": 439,
+      "kind": "execute",
+      "sql": "SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') NOT IN ('DRAFTS_READY','NEEDS_CLARIFICATION','STOPPED') ORDER BY rowid LIMIT 5",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 77,
+      "kind": "execute",
+      "sql": "PRAGMA user_version",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 79,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS records (workspace TEXT, project TEXT, id TEXT, kind TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 83,
+      "kind": "execute",
+      "sql_expression": "f'CREATE TABLE IF NOT EXISTS {table} (workspace TEXT, project TEXT, id TEXT, body TEXT NOT NULL, PRIMARY KEY(workspace,project,id), FOREIGN KEY(workspace,project,id) REFERENCES records(workspace,project,id))'",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 86,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, project TEXT, id TEXT, revision INTEGER, body TEXT NOT NULL, PRIMARY KEY(workspace,project,id,revision), FOREIGN KEY(workspace,project,id) REFERENCES records(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 89,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS transactions (workspace TEXT, project TEXT, key TEXT, fingerprint TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(workspace,project,key))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS activity (sequence INTEGER PRIMARY KEY, workspace TEXT, project TEXT, transaction_key TEXT, record_id TEXT, revision INTEGER, recorded_at TEXT)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 93,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS unique_refs (workspace TEXT, project TEXT, category TEXT, value TEXT, record_id TEXT, PRIMARY KEY(workspace,project,category,value), FOREIGN KEY(workspace,project,record_id) REFERENCES records(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 96,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, record_id TEXT, provider TEXT, resource_type TEXT, resource_id TEXT, metadata TEXT NOT NULL, PRIMARY KEY(workspace,project,record_id,provider,resource_type,resource_id), FOREIGN KEY(workspace,project,record_id) REFERENCES records(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 100,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS sync_intents (workspace TEXT, project TEXT, key TEXT, record_id TEXT, record_revision INTEGER, target TEXT, payload TEXT, status TEXT, PRIMARY KEY(workspace,project,key), FOREIGN KEY(workspace,project,record_id,record_revision) REFERENCES revisions(workspace,project,id,revision))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 104,
+      "kind": "execute",
+      "sql": "PRAGMA user_version=1",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 121,
+      "kind": "execute",
+      "sql": "SELECT body FROM records WHERE workspace=? AND project=? AND id=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 124,
+      "kind": "execute",
+      "sql": "SELECT body FROM revisions WHERE workspace=? AND project=? AND id=? AND revision=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 132,
+      "kind": "execute",
+      "sql_expression": "'SELECT body FROM records WHERE workspace=? AND project=?' + (' AND kind=?' if kind else '') + ' ORDER BY id'",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 140,
+      "kind": "execute",
+      "sql": "SELECT transaction_key,record_id,revision,recorded_at FROM activity WHERE workspace=? AND project=? ORDER BY sequence",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 147,
+      "kind": "execute",
+      "sql": "SELECT record_id,provider,resource_type,resource_id,metadata FROM resources WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 154,
+      "kind": "execute",
+      "sql": "SELECT key,record_id,record_revision,target,payload,status FROM sync_intents WHERE workspace=? AND project=? ORDER BY key",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 413,
+      "kind": "execute",
+      "sql": "BEGIN IMMEDIATE",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 414,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,result FROM transactions WHERE workspace=? AND project=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 419,
+      "kind": "execute",
+      "sql": "SELECT body FROM records WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 438,
+      "kind": "execute",
+      "sql": "INSERT INTO records VALUES (?,?,?,?,?,?) ON CONFLICT(workspace,project,id) DO UPDATE SET revision=excluded.revision,body=excluded.body",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 440,
+      "kind": "execute",
+      "sql_expression": "f'INSERT INTO {TABLES[r['record_type']]} VALUES (?,?,?,?) ON CONFLICT(workspace,project,id) DO UPDATE SET body=excluded.body'",
+      "dynamic": true
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 442,
+      "kind": "execute",
+      "sql": "INSERT INTO revisions VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 443,
+      "kind": "execute",
+      "sql": "INSERT INTO activity(workspace,project,transaction_key,record_id,revision,recorded_at) VALUES (?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 452,
+      "kind": "execute",
+      "sql": "SELECT record_id FROM unique_refs WHERE workspace=? AND project=? AND category=? AND value=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 455,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO unique_refs VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 464,
+      "kind": "execute",
+      "sql": "SELECT metadata FROM resources WHERE workspace=? AND project=? AND record_id=? AND provider=? AND resource_type=? AND resource_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 467,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO resources VALUES (?,?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 474,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sync_intents WHERE workspace=? AND project=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 476,
+      "kind": "execute",
+      "sql": "INSERT INTO sync_intents VALUES (?,?,?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/procurement/store.py",
+      "line": 480,
+      "kind": "execute",
+      "sql": "INSERT INTO transactions VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 52,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, spreadsheet TEXT, sheet INTEGER, spreadsheet_owned INTEGER, tab_owned INTEGER, manifest TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,spreadsheet,sheet))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 55,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS observations (workspace TEXT, project TEXT, marker TEXT, spreadsheet TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,marker))",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 61,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO observations VALUES (?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 67,
+      "kind": "execute",
+      "sql": "INSERT INTO resources VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,project,spreadsheet,sheet) DO UPDATE SET spreadsheet_owned=MAX(resources.spreadsheet_owned,excluded.spreadsheet_owned), tab_owned=MAX(resources.tab_owned,excluded.tab_owned), manifest=excluded.manifest",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 103,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,state,result FROM effects WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 271,
+      "kind": "execute",
+      "sql": "BEGIN IMMEDIATE",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 272,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,state,result FROM effects WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "connector_extension/sheet_creation.py",
+      "line": 276,
+      "kind": "execute",
+      "sql": "UPDATE effects SET state='completed',result=? WHERE key=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/crew.py",
+      "line": 109,
+      "kind": "execute",
+      "sql_expression": "definition",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/crew.py",
+      "line": 123,
+      "kind": "execute",
+      "sql_expression": "definition",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/crew.py",
+      "line": 148,
+      "kind": "execute",
+      "sql_expression": "definition",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/graph.py",
+      "line": 390,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND EXISTS (SELECT 1 FROM json_each(runtime_runs.document,'$.approvals') a WHERE json_extract(a.value,'$.approval_id')=?) LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/graph.py",
+      "line": 399,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' AND json_extract(document,'$.details.approval_id')=? ORDER BY sequence LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 44,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' ORDER BY sequence",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 99,
+      "kind": "execute",
+      "sql_expression": "'SELECT COUNT(*) FROM runtime_runs WHERE ' + base",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 102,
+      "kind": "execute",
+      "sql_expression": "'SELECT rowid,document FROM runtime_runs WHERE ' + ' AND '.join(clauses) + ' ORDER BY rowid DESC LIMIT ?'",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 114,
+      "kind": "execute",
+      "sql": "SELECT sequence,document FROM runtime_events WHERE workspace=? AND run_id=? AND sequence>? ORDER BY sequence LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 115,
+      "kind": "execute",
+      "sql": "SELECT COUNT(*) FROM runtime_events WHERE workspace=? AND run_id=? AND sequence>?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 132,
+      "kind": "execute",
+      "sql": "SELECT json_extract(document,'$.status'),COUNT(*) FROM runtime_runs WHERE workspace=? GROUP BY json_extract(document,'$.status')",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 135,
+      "kind": "execute",
+      "sql_expression": "'SELECT ' + sums + ' FROM runtime_runs WHERE workspace=?'",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 136,
+      "kind": "execute",
+      "sql": "SELECT COUNT(*),COALESCE(AVG(CAST(json_extract(document,'$.finished_at') AS DOUBLE PRECISION)-CAST(json_extract(document,'$.created_at') AS DOUBLE PRECISION)),0) FROM runtime_runs WHERE workspace=? AND json_extract(document,'$.finished_at') IS NOT NULL",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 137,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT 20",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 138,
+      "kind": "execute",
+      "sql": "SELECT COUNT(*) FROM runtime_events WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 139,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 141,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 142,
+      "kind": "execute",
+      "sql": "SELECT t.rowid,t.workflow_id,t.state,t.document,r.document FROM lifecycle_triggers t JOIN lifecycle_releases r ON r.release_id=t.release_id AND r.workspace=t.workspace WHERE t.workspace=? AND t.rowid>? ORDER BY t.rowid LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 145,
+      "kind": "execute",
+      "sql": "SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 158,
+      "kind": "execute",
+      "sql": "SELECT r.rowid,r.document FROM revisions r WHERE r.workspace=? AND r.rowid>? AND json_extract(r.document,'$.status') IN ('approved','published') AND r.version=(SELECT MAX(x.version) FROM revisions x WHERE x.workspace=r.workspace AND x.workflow_id=r.workflow_id AND json_extract(x.document,'$.status') IN ('approved','published')) ORDER BY r.rowid LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 162,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_active'",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/history.py",
+      "line": 163,
+      "kind": "execute",
+      "sql": "SELECT r.version,r.document FROM lifecycle_active a JOIN lifecycle_releases r ON r.release_id=a.release_id WHERE a.workspace=? AND a.workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 39,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 40,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS runtime_runs_workspace_workflow ON runtime_runs(workspace, workflow_id)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 41,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS runtime_runs_pending ON runtime_runs(json_extract(document,'$.status')) WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval')",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 42,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 43,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 44,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 71,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version>?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 125,
+      "kind": "execute",
+      "sql": "SELECT fingerprint, document FROM runtime_runs WHERE workspace=? AND subject=? AND retry_key=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 135,
+      "kind": "execute",
+      "sql": "INSERT INTO runtime_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 146,
+      "kind": "execute",
+      "sql_expression": "'SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?' + (' FOR UPDATE' if getattr(db, 'write', False) else '')",
+      "dynamic": true
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 158,
+      "kind": "execute",
+      "sql": "INSERT INTO runtime_events(workspace, run_id, document) VALUES (?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 170,
+      "kind": "execute",
+      "sql": "UPDATE runtime_runs SET document=? WHERE run_id=? AND workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 185,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 211,
+      "kind": "execute",
+      "sql": "SELECT sequence, document FROM runtime_events WHERE sequence NOT IN (SELECT sequence FROM runtime_trace_exports WHERE observer=?) ORDER BY sequence LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/service.py",
+      "line": 219,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO runtime_trace_exports VALUES (?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/worker.py",
+      "line": 18,
+      "kind": "execute",
+      "sql": "SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "runtime/worker.py",
+      "line": 21,
+      "kind": "execute",
+      "sql": "SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 52,
+      "kind": "execute",
+      "sql": "PRAGMA integrity_check",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 53,
+      "kind": "execute",
+      "sql": "PRAGMA foreign_key_check",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 55,
+      "kind": "execute",
+      "sql": "SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY rowid",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 59,
+      "kind": "execute",
+      "sql_expression": "'PRAGMA table_info(' + identifier(name) + ')'",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 61,
+      "kind": "execute",
+      "sql_expression": "'SELECT rowid,' + ','.join((identifier(c) for c in columns)) + ' FROM ' + identifier(name) + ' ORDER BY rowid'",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 76,
+      "kind": "execute",
+      "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 78,
+      "kind": "execute",
+      "sql_expression": "table['ddl']",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 82,
+      "kind": "execute",
+      "sql_expression": "query",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 87,
+      "kind": "executemany",
+      "sql_expression": "insert",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 89,
+      "kind": "execute",
+      "sql": "SELECT name,sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY rowid",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 90,
+      "kind": "execute",
+      "sql_expression": "ddl",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sqlite_master WHERE name='sqlite_sequence'",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "SELECT name,seq FROM sqlite_sequence",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 94,
+      "kind": "execute",
+      "sql": "SELECT pg_get_serial_sequence(%s,%s)",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 96,
+      "kind": "execute",
+      "sql_expression": "'SELECT MAX(' + identifier(column) + ') FROM ' + identifier(table['name'])",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 98,
+      "kind": "execute",
+      "sql": "SELECT setval(%s,%s,%s)",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 101,
+      "kind": "execute",
+      "sql_expression": "query",
+      "dynamic": true
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 103,
+      "kind": "execute",
+      "sql": "PRAGMA user_version",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/migrate_builder_database.py",
+      "line": 105,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_store_versions(version) VALUES (%s) ON CONFLICT DO NOTHING",
+      "dynamic": false
+    },
+    {
+      "file": "scripts/serve_ui_test_api.py",
+      "line": 203,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 15,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 17,
+      "kind": "execute",
+      "sql": "SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 27,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_preparations WHERE operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 32,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_preparations SET document=? WHERE operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 38,
+      "kind": "execute",
+      "sql": "SELECT binding_id, document FROM lifecycle_triggers WHERE release_id=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 48,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET state='disabled', document=? WHERE binding_id=? AND release_id=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 50,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_triggers WHERE release_id=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 61,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_operations WHERE operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 65,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 67,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_releases SET state='failed', document=? WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 68,
+      "kind": "execute",
+      "sql": "SELECT binding_id, document FROM lifecycle_triggers WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 70,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET state='cleanup_pending', document=? WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 73,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_operations WHERE operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 94,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,document FROM lifecycle_operations WHERE workspace=? AND subject=? AND idempotency_key=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 125,
+      "kind": "execute",
+      "sql": "SELECT COALESCE(MAX(generation),0)+1 FROM lifecycle_releases WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 136,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_releases VALUES (?,?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 137,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_identities VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 139,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_triggers VALUES (?,?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 142,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_preparations VALUES (?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 156,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET provider_reference=?, document=? WHERE binding_id=? AND release_id=? AND state='preparing'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 174,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_releases SET state='active',document=? WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 175,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_identities SET document=? WHERE identity_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 176,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET state='ready' WHERE release_id=? AND state='preparing'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 177,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_active VALUES (?,?,?) ON CONFLICT(workspace,workflow_id) DO UPDATE SET release_id=excluded.release_id",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 180,
+      "kind": "execute",
+      "sql_expression": "f'SELECT {key},document FROM {table} WHERE release_id=?'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 182,
+      "kind": "execute",
+      "sql_expression": "f\"UPDATE {table} SET state='disabled',document=? WHERE {key}=?\"",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 196,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_preparations WHERE workspace=? AND json_extract(document,'$.state')='preparing'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 219,
+      "kind": "execute",
+      "sql": "SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 222,
+      "kind": "execute",
+      "sql": "SELECT release_id FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 227,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 229,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_releases SET state=?,document=? WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 230,
+      "kind": "execute",
+      "sql": "SELECT binding_id,document FROM lifecycle_triggers WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 232,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET state='cleanup_pending',document=? WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 233,
+      "kind": "execute",
+      "sql": "DELETE FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 234,
+      "kind": "execute",
+      "sql": "SELECT job_id,document FROM lifecycle_jobs WHERE workspace=? AND workflow_id=? AND state IN ('queued','leased')",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 237,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET state='cancelled',lease_until=NULL,document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 239,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_tombstones VALUES (?,?,?,?) ON CONFLICT(workspace,workflow_id) DO UPDATE SET cleanup_state=excluded.cleanup_state",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 240,
+      "kind": "execute",
+      "sql": "SELECT identity_id,document FROM lifecycle_identities WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 241,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 245,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_identities SET document=? WHERE identity_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 248,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 257,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_tombstones SET cleanup_state='complete' WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 263,
+      "kind": "execute",
+      "sql": "SELECT DISTINCT release_id FROM lifecycle_triggers WHERE workspace=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 264,
+      "kind": "execute",
+      "sql": "SELECT binding_id FROM lifecycle_triggers WHERE workspace=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 268,
+      "kind": "execute",
+      "sql": "SELECT binding_id FROM lifecycle_triggers WHERE workspace=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 269,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_operations WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 272,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_triggers WHERE workspace=? AND workflow_id=? AND state='cleanup_pending'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/activation.py",
+      "line": 274,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_tombstones SET cleanup_state='complete' WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/auxiliary_database.py",
+      "line": 28,
+      "kind": "execute",
+      "sql_expression": "sql.SQL('CREATE SCHEMA IF NOT EXISTS {}').format(sql.Identifier(schema))",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/auxiliary_database.py",
+      "line": 45,
+      "kind": "execute",
+      "sql": "PRAGMA foreign_keys=ON",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/auxiliary_database.py",
+      "line": 46,
+      "kind": "execute",
+      "sql": "PRAGMA query_only=ON",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 92,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 93,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 94,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_triggers (workspace TEXT, binding_id TEXT PRIMARY KEY, release_id TEXT, workflow_id TEXT, state TEXT, provider_reference TEXT, document TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 95,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_identities (workspace TEXT, identity_id TEXT PRIMARY KEY, authority TEXT NOT NULL, document TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 96,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_receipts (workspace TEXT, receipt_id TEXT PRIMARY KEY, binding_id TEXT, event_identity TEXT, document TEXT NOT NULL, UNIQUE(workspace, binding_id, event_identity))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 97,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_jobs (workspace TEXT, job_id TEXT PRIMARY KEY, release_id TEXT, workflow_id TEXT, state TEXT, available_at TEXT, lease_until TEXT, attempt INTEGER, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, release_id, job_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 98,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_checkpoints (workspace TEXT, binding_id TEXT, cursor TEXT, updated_at TEXT, PRIMARY KEY(workspace, binding_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 99,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_overview_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, workflow_id TEXT, document TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 100,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_tombstones (workspace TEXT, workflow_id TEXT, deleted_at TEXT, cleanup_state TEXT, PRIMARY KEY(workspace, workflow_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 101,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 102,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS lifecycle_preparations_workspace ON lifecycle_preparations(workspace)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 103,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS lifecycle_jobs_ready ON lifecycle_jobs(workspace,state,available_at,lease_until)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 104,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS lifecycle_job_claims (job_id TEXT PRIMARY KEY, token TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 105,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS lifecycle_triggers_active ON lifecycle_triggers(workspace,state,workflow_id)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 117,
+      "kind": "execute",
+      "sql": "SELECT fingerprint, document FROM lifecycle_operations WHERE workspace=? AND subject=? AND idempotency_key=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 125,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_operations VALUES (?, ?, ?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 131,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_operations SET document=? WHERE operation_id=? AND workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 159,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_overview_events(workspace, workflow_id, document) VALUES (?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 162,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_overview_events SET document=? WHERE sequence=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 170,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_preparations WHERE operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 173,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 176,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 202,
+      "kind": "execute",
+      "sql": "SELECT workspace, release_id, workflow_id, state, document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 231,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_receipts WHERE workspace=? AND binding_id=? AND event_identity=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 234,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 238,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 244,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_receipts VALUES (?, ?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 245,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_jobs VALUES (?, ?, ?, ?, 'queued', ?, NULL, 0, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 257,
+      "kind": "execute",
+      "sql": "SELECT state, document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 284,
+      "kind": "execute",
+      "sql": "SELECT workspace, state, document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 290,
+      "kind": "execute",
+      "sql": "SELECT cursor FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 292,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_checkpoints VALUES (?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 307,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_checkpoints SET cursor=?, updated_at=? WHERE workspace=? AND binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 310,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_checkpoints (workspace, binding_id, cursor, updated_at) VALUES (?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 322,
+      "kind": "execute",
+      "sql": "SELECT state, document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 381,
+      "kind": "execute",
+      "sql": "SELECT job_id, document FROM lifecycle_jobs WHERE workspace=? AND (state='queued' OR (state='leased' AND lease_until<?)) AND available_at<=? ORDER BY rowid LIMIT ?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 387,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 389,
+      "kind": "execute",
+      "sql": "INSERT INTO lifecycle_job_claims VALUES (?,?) ON CONFLICT(job_id) DO UPDATE SET token=excluded.token",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 397,
+      "kind": "execute",
+      "sql": "SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 405,
+      "kind": "execute",
+      "sql": "SELECT token FROM lifecycle_job_claims WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 406,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 411,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET lease_until=?,document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 418,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 424,
+      "kind": "execute",
+      "sql": "SELECT token FROM lifecycle_job_claims WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 430,
+      "kind": "execute",
+      "sql": "SELECT state, document FROM lifecycle_releases WHERE release_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 431,
+      "kind": "execute",
+      "sql": "SELECT authority, document FROM lifecycle_identities WHERE identity_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 432,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 456,
+      "kind": "execute",
+      "sql": "SELECT token FROM lifecycle_job_claims WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 457,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 465,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET state=?, lease_until=NULL, available_at=?, document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 470,
+      "kind": "execute",
+      "sql": "SELECT workflow_id FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 474,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 475,
+      "kind": "execute",
+      "sql": "SELECT token FROM lifecycle_job_claims WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 480,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET state=?, lease_until=NULL, document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 488,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_jobs WHERE workspace=? AND job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 495,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_jobs SET state='queued', available_at=?, lease_until=NULL, document=? WHERE job_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 518,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_overview_events WHERE workspace=? AND sequence>? ORDER BY sequence LIMIT 200",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 524,
+      "kind": "execute",
+      "sql": "SELECT workflow_id, run_id, json_extract(document, '$.status'),\n                    (SELECT COUNT(*) FROM json_each(runtime_runs.document, '$.approvals') a\n                     WHERE json_extract(a.value, '$.status')='pending')\n                    FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 537,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 539,
+      "kind": "execute",
+      "sql": "SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON r.release_id=a.release_id WHERE a.workspace=? AND a.workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 541,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 546,
+      "kind": "execute",
+      "sql": "SELECT MAX(version) FROM revisions WHERE workspace=? AND workflow_id=? AND json_extract(document,'$.status')='published'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 553,
+      "kind": "execute",
+      "sql": "SELECT COALESCE(MAX(sequence), 0) FROM lifecycle_overview_events WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 558,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/lifecycle.py",
+      "line": 563,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_operations WHERE workspace=? AND operation_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/live_providers.py",
+      "line": 93,
+      "kind": "execute",
+      "sql": "SELECT document, authority FROM lifecycle_identities WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/live_providers.py",
+      "line": 338,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/main.py",
+      "line": 438,
+      "kind": "execute",
+      "sql": "SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/main.py",
+      "line": 441,
+      "kind": "execute",
+      "sql_expression": "f'SELECT document FROM {table} WHERE workspace=? ORDER BY updated_at DESC'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/main.py",
+      "line": 469,
+      "kind": "execute",
+      "sql": "INSERT INTO workspace_settings VALUES (?, ?, ?, ?) ON CONFLICT(workspace, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/main.py",
+      "line": 474,
+      "kind": "execute",
+      "sql_expression": "f'INSERT INTO {table} VALUES (?, ?, ?, ?) ON CONFLICT({('source_id' if collection == 'knowledge' else 'policy_id')}) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 27,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_planning_jobs (job_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, subject TEXT NOT NULL, retry_key TEXT NOT NULL, fingerprint TEXT NOT NULL, state TEXT NOT NULL, request TEXT, result TEXT, lease_until REAL, claim TEXT, created REAL NOT NULL, UNIQUE(workspace, subject, retry_key))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 28,
+      "kind": "execute",
+      "sql": "CREATE INDEX IF NOT EXISTS builder_planning_queue ON builder_planning_jobs(state, created)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 45,
+      "kind": "execute",
+      "sql": "SELECT job_id, fingerprint FROM builder_planning_jobs WHERE workspace=? AND subject=? AND retry_key=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 53,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_planning_jobs VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 62,
+      "kind": "execute",
+      "sql": "SELECT state, result FROM builder_planning_jobs WHERE job_id=? AND workspace=? AND subject=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 71,
+      "kind": "execute",
+      "sql": "UPDATE builder_planning_jobs SET state='cancelled', request=NULL, result=NULL, lease_until=NULL, claim=NULL WHERE job_id=? AND workspace=? AND subject=? AND state IN ('queued','running')",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 79,
+      "kind": "execute",
+      "sql": "UPDATE builder_planning_jobs SET state='failed', result=?, request=NULL, claim=NULL, lease_until=NULL WHERE state='running' AND lease_until < ?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 80,
+      "kind": "execute",
+      "sql": "SELECT job_id, workspace, subject, request FROM builder_planning_jobs WHERE state='queued' ORDER BY created LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 83,
+      "kind": "execute",
+      "sql": "UPDATE builder_planning_jobs SET state='running', claim=?, lease_until=? WHERE job_id=? AND state='queued'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/planning_jobs.py",
+      "line": 94,
+      "kind": "execute",
+      "sql": "UPDATE builder_planning_jobs SET state=?, result=?, request=NULL, lease_until=NULL, claim=NULL WHERE job_id=? AND state='running' AND claim=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 70,
+      "kind": "execute",
+      "sql": "SELECT true",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 73,
+      "kind": "execute",
+      "sql": "SELECT true",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 75,
+      "kind": "execute",
+      "sql": "SELECT COALESCE(MAX(version),0) FROM builder_store_versions",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 77,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_store_versions(version) VALUES (1) ON CONFLICT DO NOTHING",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 97,
+      "kind": "execute",
+      "sql": "SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=%s AND column_name<>'rowid' ORDER BY ordinal_position",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 98,
+      "kind": "execute",
+      "sql": "SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=ANY(i.indkey) WHERE i.indrelid=to_regclass(%s) AND i.indisprimary ORDER BY a.attnum",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 111,
+      "kind": "execute",
+      "sql_expression": "placeholders(sql)",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 114,
+      "kind": "execute",
+      "sql_expression": "placeholders(sql)",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 124,
+      "kind": "execute",
+      "sql_expression": "statement",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 127,
+      "kind": "execute",
+      "sql": "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 138,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 139,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_store_versions (version INTEGER PRIMARY KEY)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 140,
+      "kind": "execute",
+      "sql": "SELECT COALESCE(MAX(version),0) FROM builder_schema_migrations",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 144,
+      "kind": "execute",
+      "sql_expression": "migration.read_text()",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 145,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_schema_migrations(version) VALUES (1)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 153,
+      "kind": "execute",
+      "sql_expression": "'SET TRANSACTION READ WRITE' if write else 'SET TRANSACTION READ ONLY'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 154,
+      "kind": "execute",
+      "sql": "SELECT set_config('lock_timeout',%s,true)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/postgres.py",
+      "line": 156,
+      "kind": "execute",
+      "sql": "SELECT pg_advisory_xact_lock(hashtextextended(current_database()||':'||current_schema(),0))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement.py",
+      "line": 307,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement.py",
+      "line": 339,
+      "kind": "execute",
+      "sql": "SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') NOT IN ('COMPLETED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION') AND (json_extract(body,'$.phase')!='STOPPED' OR json_extract(body,'$.fulfilment_policy.revision')=1) AND (json_extract(body,'$.phase')!='PO_RELEASED' OR json_extract(body,'$.owner_workflow.phase3_settings.enabled')=1) AND (json_extract(body,'$.phase')!='RFQS_SENT' OR json_extract(body,'$.owner_workflow.phase2_settings.enabled')=1) ORDER BY rowid LIMIT 5",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement.py",
+      "line": 354,
+      "kind": "execute",
+      "sql": "SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON a.release_id=r.release_id WHERE a.workspace=? AND a.workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 54,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 65,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_fulfilment_messages(workspace TEXT,project TEXT,po TEXT,message TEXT,body TEXT,PRIMARY KEY(workspace,project,po,message))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 66,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_fulfilment_policies(workspace TEXT,project TEXT,revision INTEGER,body TEXT,PRIMARY KEY(workspace,project,revision))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 87,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_fulfilment_policies VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 88,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_fulfilment_policies WHERE workspace=? AND project=? AND revision=1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 211,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 230,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_fulfilment_messages WHERE workspace=? AND project=? AND po=? AND message=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 245,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 253,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_fulfilment_messages VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_fulfilment.py",
+      "line": 268,
+      "kind": "execute",
+      "sql": "UPDATE procurement_fulfilment_messages SET body=? WHERE workspace=? AND project=? AND po=? AND message=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 95,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 118,
+      "kind": "execute",
+      "sql": "UPDATE procurement_quote_messages SET body=? WHERE workspace=? AND project=? AND message=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 140,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_quote_messages(workspace TEXT,project TEXT,message TEXT,body TEXT,PRIMARY KEY(workspace,project,message))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 141,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS procurement_policy_proofs(workspace TEXT,project TEXT,id TEXT,body TEXT,PRIMARY KEY(workspace,project,id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 147,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_policy_proofs WHERE workspace=? AND project=? AND id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 167,
+      "kind": "execute",
+      "sql": "SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 200,
+      "kind": "execute",
+      "sql": "INSERT OR REPLACE INTO procurement_policy_proofs VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 247,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_quote_messages WHERE workspace=? AND project=? AND message=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 251,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 256,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 280,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/procurement_quotes.py",
+      "line": 333,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/release_read.py",
+      "line": 7,
+      "kind": "execute",
+      "sql": "SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON r.release_id=a.release_id WHERE a.workspace=? AND r.workspace=? AND a.workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/release_read.py",
+      "line": 9,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 54,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS customer_cases (workspace TEXT NOT NULL, case_id TEXT NOT NULL, run_id TEXT NOT NULL, message_id TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,case_id), UNIQUE(workspace,run_id), UNIQUE(workspace,message_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 55,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS customer_replies (workspace TEXT NOT NULL, mailbox_id TEXT NOT NULL, uidvalidity TEXT NOT NULL, uid TEXT NOT NULL, message_id TEXT, case_id TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,mailbox_id,uidvalidity,uid))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 56,
+      "kind": "execute",
+      "sql": "CREATE UNIQUE INDEX IF NOT EXISTS customer_replies_message_id ON customer_replies(workspace,message_id) WHERE message_id IS NOT NULL AND message_id != ''",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 57,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS customer_mail_cursor (workspace TEXT NOT NULL, mailbox_id TEXT NOT NULL, uidvalidity TEXT NOT NULL, last_uid INTEGER NOT NULL, PRIMARY KEY(workspace,mailbox_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 58,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS customer_case_actions (workspace TEXT NOT NULL, case_id TEXT NOT NULL, reply_id TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY(workspace,case_id,reply_id,kind))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 59,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS customer_reply_jobs (workspace TEXT NOT NULL, case_id TEXT NOT NULL, reply_id TEXT NOT NULL, state TEXT NOT NULL, lease_until REAL NOT NULL, error_code TEXT, PRIMARY KEY(workspace,case_id,reply_id))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 64,
+      "kind": "execute",
+      "sql": "SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT 1000",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 95,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO customer_cases VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 180,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM customer_replies WHERE workspace=? AND mailbox_id=? AND uidvalidity=? AND uid=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 183,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM customer_replies WHERE workspace=? AND message_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 187,
+      "kind": "execute",
+      "sql_expression": "'SELECT document FROM customer_cases WHERE workspace=? AND (message_id IN (' + placeholders + ') OR case_id IN (SELECT case_id FROM customer_case_actions WHERE workspace=? AND kind=? AND state=? AND message_id IN (' + placeholders + ')))'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 199,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM customer_replies WHERE workspace=? AND mailbox_id=? AND uidvalidity=? AND uid=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 202,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM customer_replies WHERE workspace=? AND message_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 205,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 214,
+      "kind": "execute",
+      "sql": "INSERT INTO customer_replies VALUES (?,?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 219,
+      "kind": "execute",
+      "sql": "UPDATE customer_cases SET document=? WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 222,
+      "kind": "execute",
+      "sql": "INSERT OR IGNORE INTO customer_reply_jobs VALUES (?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 239,
+      "kind": "execute",
+      "sql": "SELECT r.version FROM lifecycle_active a JOIN lifecycle_releases r ON r.release_id=a.release_id WHERE a.workspace=? AND a.workflow_id=? AND r.state=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 249,
+      "kind": "execute",
+      "sql": "UPDATE customer_reply_jobs SET state='queued' WHERE workspace=? AND state='processing' AND lease_until<?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 250,
+      "kind": "execute",
+      "sql": "SELECT case_id,reply_id FROM customer_reply_jobs WHERE workspace=? AND state='queued' ORDER BY rowid LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 254,
+      "kind": "execute",
+      "sql": "UPDATE customer_reply_jobs SET state='processing',lease_until=? WHERE workspace=? AND case_id=? AND reply_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 256,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 266,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 273,
+      "kind": "execute",
+      "sql": "UPDATE customer_cases SET document=? WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 274,
+      "kind": "execute",
+      "sql": "UPDATE customer_replies SET document=? WHERE workspace=? AND case_id=? AND json_extract(document,'$.reply_id')=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 286,
+      "kind": "execute",
+      "sql": "SELECT state FROM customer_case_actions WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 302,
+      "kind": "execute",
+      "sql": "UPDATE customer_reply_jobs SET state=?,lease_until=0,error_code=? WHERE workspace=? AND case_id=? AND reply_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 319,
+      "kind": "execute",
+      "sql": "SELECT uidvalidity,last_uid FROM customer_mail_cursor WHERE workspace=? AND mailbox_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 338,
+      "kind": "execute",
+      "sql": "INSERT OR REPLACE INTO customer_mail_cursor VALUES (?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 345,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? ORDER BY rowid DESC LIMIT 100",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 348,
+      "kind": "execute",
+      "sql": "SELECT reply_id,state,error_code FROM customer_reply_jobs WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 350,
+      "kind": "execute",
+      "sql": "SELECT reply_id,kind,state FROM customer_case_actions WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 380,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 396,
+      "kind": "execute",
+      "sql": "SELECT state FROM customer_case_actions WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 406,
+      "kind": "execute",
+      "sql": "INSERT INTO customer_case_actions VALUES (?,?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 425,
+      "kind": "execute",
+      "sql": "UPDATE customer_case_actions SET state=? WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 427,
+      "kind": "execute",
+      "sql": "SELECT document FROM customer_cases WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/reply_cases.py",
+      "line": 436,
+      "kind": "execute",
+      "sql": "UPDATE customer_cases SET document=? WHERE workspace=? AND case_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/review_actions.py",
+      "line": 21,
+      "kind": "execute",
+      "sql": "SELECT fingerprint,response FROM mutations WHERE workspace=? AND subject=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/review_actions.py",
+      "line": 35,
+      "kind": "execute",
+      "sql": "INSERT INTO mutations VALUES (?,?,?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 30,
+      "kind": "execute",
+      "sql": "SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 44,
+      "kind": "execute",
+      "sql": "SELECT cursor FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 53,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 60,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET document=? WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 62,
+      "kind": "execute",
+      "sql": "SELECT workflow_id FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 72,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 78,
+      "kind": "execute",
+      "sql": "UPDATE lifecycle_triggers SET document=? WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/scheduler.py",
+      "line": 79,
+      "kind": "execute",
+      "sql": "SELECT workflow_id FROM lifecycle_triggers WHERE binding_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/service.py",
+      "line": 176,
+      "kind": "execute",
+      "sql": "SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/service.py",
+      "line": 236,
+      "kind": "execute",
+      "sql": "SELECT fingerprint, response FROM mutations WHERE workspace=? AND subject=? AND key=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/service.py",
+      "line": 242,
+      "kind": "execute",
+      "sql": "INSERT INTO mutations VALUES (?, ?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/service.py",
+      "line": 322,
+      "kind": "execute",
+      "sql": "SELECT deleted_at FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/slack_gmail.py",
+      "line": 71,
+      "kind": "execute",
+      "sql": "SELECT document, authority FROM lifecycle_identities WHERE workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/slack_socket.py",
+      "line": 33,
+      "kind": "execute",
+      "sql": "SELECT document FROM lifecycle_triggers WHERE workspace='local-workspace' AND state='ready'",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 36,
+      "kind": "execute",
+      "sql": "PRAGMA journal_mode=WAL",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 38,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 39,
+      "kind": "execute",
+      "sql": "SELECT COALESCE(MAX(version),0) FROM builder_schema_migrations",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 41,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_schema_migrations(version) VALUES (1) ON CONFLICT DO NOTHING",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 42,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 43,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS mutations (workspace TEXT, subject TEXT, key TEXT, fingerprint TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(workspace, subject, key))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 44,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS workspace_settings (workspace TEXT, key TEXT, value TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace, key))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 45,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS knowledge_sources (workspace TEXT, source_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 46,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS governance_policies (workspace TEXT, policy_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 69,
+      "kind": "execute",
+      "sql_expression": "f'PRAGMA busy_timeout={self.busy_timeout_ms}'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 71,
+      "kind": "execute",
+      "sql": "PRAGMA query_only=ON",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 72,
+      "kind": "execute",
+      "sql_expression": "'BEGIN IMMEDIATE' if write else 'BEGIN'",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 103,
+      "kind": "execute",
+      "sql_expression": "query + ' ORDER BY version DESC LIMIT 1' + (' FOR UPDATE' if getattr(db, 'write', False) else '')",
+      "dynamic": true
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 108,
+      "kind": "execute",
+      "sql": "INSERT OR REPLACE INTO revisions VALUES (?, ?, ?, ?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/storage.py",
+      "line": 113,
+      "kind": "execute",
+      "sql": "SELECT r.document FROM revisions r WHERE r.workspace=? AND r.version=(SELECT MAX(s.version) FROM revisions s WHERE s.workspace=r.workspace AND s.workflow_id=r.workflow_id) ORDER BY r.workflow_id",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/supplier_discovery.py",
+      "line": 91,
+      "kind": "execute",
+      "sql": "SELECT body FROM procurement_jobs WHERE workspace=? AND project=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/supplier_discovery.py",
+      "line": 101,
+      "kind": "execute",
+      "sql": "INSERT INTO procurement_jobs VALUES (?,?,?)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/trigger_sources.py",
+      "line": 49,
+      "kind": "execute",
+      "sql": "SELECT r.document FROM lifecycle_releases r JOIN lifecycle_triggers t ON t.release_id=r.release_id WHERE t.binding_id=? AND t.workspace=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/trigger_sources.py",
+      "line": 54,
+      "kind": "execute",
+      "sql": "SELECT authority FROM lifecycle_identities WHERE identity_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 17,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_worker_leases (name TEXT PRIMARY KEY, owner TEXT NOT NULL, expires REAL NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 18,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_worker_health (worker_id TEXT PRIMARY KEY, role TEXT NOT NULL, state TEXT NOT NULL, heartbeat REAL NOT NULL)",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 19,
+      "kind": "execute",
+      "sql": "CREATE TABLE IF NOT EXISTS builder_worker_component_health (worker_id TEXT, name TEXT, document TEXT NOT NULL, PRIMARY KEY(worker_id,name))",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 24,
+      "kind": "execute",
+      "sql": "SELECT owner,expires FROM builder_worker_leases WHERE name=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 27,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_worker_leases VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires=excluded.expires",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 28,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_worker_health VALUES (?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET state=excluded.state,heartbeat=excluded.heartbeat",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 35,
+      "kind": "execute",
+      "sql": "INSERT INTO builder_worker_component_health VALUES (?,?,?) ON CONFLICT(worker_id,name) DO UPDATE SET document=excluded.document",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 57,
+      "kind": "execute",
+      "sql": "DELETE FROM builder_worker_leases WHERE name=? AND owner=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 58,
+      "kind": "execute",
+      "sql": "UPDATE builder_worker_health SET state=?,heartbeat=? WHERE worker_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 97,
+      "kind": "execute",
+      "sql": "UPDATE builder_worker_leases SET expires=? WHERE name=? AND owner=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 99,
+      "kind": "execute",
+      "sql": "UPDATE builder_worker_health SET state='stopping',heartbeat=? WHERE worker_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 106,
+      "kind": "execute",
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 109,
+      "kind": "execute",
+      "sql": "SELECT role,state,heartbeat FROM builder_worker_health",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 112,
+      "kind": "execute",
+      "sql": "SELECT name,document FROM builder_worker_component_health",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 116,
+      "kind": "execute",
+      "sql": "SELECT state,COUNT(*) FROM lifecycle_jobs WHERE workspace=? GROUP BY state",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 117,
+      "kind": "execute",
+      "sql": "SELECT state,COUNT(*) FROM builder_planning_jobs WHERE workspace=? GROUP BY state",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 119,
+      "kind": "execute",
+      "sql": "SELECT COUNT(*) FROM runtime_runs WHERE workspace=? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval')",
+      "dynamic": false
+    }
+  ]
+}

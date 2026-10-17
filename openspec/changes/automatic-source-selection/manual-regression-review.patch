@@ -1,0 +1,22 @@
+--- a/frontend/e2e/api-integration.spec.ts
++++ b/frontend/e2e/api-integration.spec.ts
+@@ -1,9 +1,17 @@
+ import { test, expect } from "@playwright/test";
+-import { generate, localDraft, mutation } from "./helpers";
++import { localDraft, mutation } from "./helpers";
+ 
+ test("generated canonical branches and gates survive explicit save and reload",async({page})=>{
+  const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+- const id=await generate(page,"If an invoice arrives classify it and email the owner after approval for phase seven review");
++ // Legacy manually configured documents remain supported through the canonical API.
++ // The overview now always infers inputs automatically and cannot create this manual fixture.
++ await page.goto('/app');
++ const response=await mutation(page,'plan_workflow','workflows/plan',{objective:'If an invoice arrives classify it and email the owner after approval for phase seven review',context:{generation_mode:'hierarchy',execution_input_mode:'manual'}});
++ expect(response.status(),await response.text()).toBe(200);
++ const workflow=(await response.json()).data.workflow;const id=workflow.workflow_id;
++ const persisted=await mutation(page,'save_workflow_version',`workflows/${id}/versions/1`,{workflow_id:id,workflow_version:1,workflow,base_version:0},'PUT');
++ expect(persisted.status(),await persisted.text()).toBe(200);
++ await page.goto(`/app/workflows/${id}`);await expect(page.getByLabel('Workflow name',{exact:true})).toBeVisible();
+  const saved=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
+  expect(saved.conditions.length).toBeGreaterThan(0);expect(saved.approval_gates.length).toBeGreaterThan(0);
+  await page.getByLabel("Workflow name",{exact:true}).fill("Connected invoice review");

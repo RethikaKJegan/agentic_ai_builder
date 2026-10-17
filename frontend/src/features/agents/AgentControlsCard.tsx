@@ -36,7 +36,7 @@ export function AgentControlsCard({ agent }: { agent: Agent }) {
         {!allowed && <span className="text-[11px] text-muted-foreground">Read-only for your role</span>}
       </div>
       <label className="flex items-center justify-between gap-3 text-sm">
-        <span>{agent.paused ? "Paused" : "Active"}<span className="block text-[11px] text-muted-foreground">{agent.paused ? (children.length ? "This agent and its sub-agents will not run." : "Runs stop before this agent.") : "Draft configuration only"}</span></span>
+        <span>{agent.paused ? "Paused" : "Active"}<span className="block text-[11px] text-muted-foreground">{agent.paused ? (children.length ? "This local draft marks the agent and sub-agents paused; live runs are unchanged." : "This local draft is paused; live runs are unchanged.") : "Draft configuration only"}</span></span>
         <Switch checked={!agent.paused} disabled={!allowed} onCheckedChange={(v) => setPaused(agent.id, !v)} aria-label="Agent active" />
       </label>
       <p className="text-[11px] text-muted-foreground">

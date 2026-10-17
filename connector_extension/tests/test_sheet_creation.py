@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+from workflow_api.auxiliary_database import connection as database_connection
 import tempfile
 import unittest
 from urllib.parse import urlparse, parse_qs, unquote
@@ -104,7 +105,7 @@ class CreationTests(unittest.TestCase):
         body=self.http.calls[0]['body'];self.assertEqual(body['sheets'][0]['data'][0]['rowData'][0]['values'][-1],
                                                      {'userEnteredValue':{'stringValue':'=literal_header'}})
         self.assertEqual(len(write_targets(result['proposed_write_targets'])),1)
-        with sqlite3.connect(self.resources.path) as db:
+        with database_connection(self.resources.path,write=False) as db:
             row=db.execute('SELECT project,spreadsheet_owned,tab_owned FROM resources').fetchone()
         self.assertEqual(row,('project_demo',1,1))
 
@@ -145,7 +146,7 @@ class CreationTests(unittest.TestCase):
     def test_verification_failure_retains_creation_observation_and_never_recreates(self):
         self.http.fail_verification=True
         with self.assertRaises(RuntimeFailure):self.invoke()
-        with sqlite3.connect(self.resources.path) as db:
+        with database_connection(self.resources.path,write=False) as db:
             self.assertEqual(db.execute('SELECT spreadsheet FROM observations').fetchone()[0],'created_1')
         with self.assertRaises(RuntimeFailure):self.invoke(effect='retry')
         self.http.fail_verification=False;self.connector().reconcile(self.inputs,'created_1')
@@ -183,7 +184,7 @@ class CreationTests(unittest.TestCase):
         connector=SheetsSetup(CATALOG['extension_sheets_create'],GoogleAPI(token,self.http),self.journal,self.resources).bind_workflow(self.workflow)
         with self.assertRaises(RuntimeFailure):connector.invoke(grant('extension_sheets_create'),self.inputs,'scope')
         self.assertFalse(self.http.calls)
-        with sqlite3.connect(self.journal.path) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
+        with self.journal.connection(write=False) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
 
     def test_add_tabs_preserves_existing_business_data_and_reuses_matching_headers(self):
         self.http.add_book('original',{'Legacy':['id','value'],'Items':['item_id','quantity']})
@@ -202,7 +203,7 @@ class CreationTests(unittest.TestCase):
         self.http.add_book('original',{'Items':['id','other']});data={k:v for k,v in self.inputs.items() if k!='title'};data['spreadsheet_id']='original'
         with self.assertRaises(RuntimeFailure) as caught:self.invoke(data,'extension_sheets_add_tabs')
         self.assertEqual(caught.exception.code,'SHEETS_TAB_CONFLICT');self.assertEqual(self.http.write_count,0)
-        with sqlite3.connect(self.journal.path) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
+        with self.journal.connection(write=False) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM effects').fetchone()[0],0)
 
     def test_all_existing_tables_do_not_write_or_claim_ownership(self):
         self.http.add_book('original',{'Items':['item_id','quantity']});data={k:v for k,v in self.inputs.items() if k!='title'};data['spreadsheet_id']='original'

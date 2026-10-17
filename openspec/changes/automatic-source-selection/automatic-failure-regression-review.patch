@@ -1,0 +1,19 @@
+--- a/frontend/e2e/phase7.spec.ts
++++ b/frontend/e2e/phase7.spec.ts
+@@ -48,14 +48,14 @@
+   await page.getByRole('tab',{name:'Execution',exact:true}).click();await page.getByRole('button',{name:'Refresh trace',exact:true}).click();
+   await expect(page.getByText(new RegExp(`Read-only historical revision v2 · Run ${run.run_id}`))).toBeVisible();
+   await page.getByRole('button',{name:/Router.*condition/}).click();await expect(page.getByLabel('Node execution trace').getByText('yes',{exact:true})).toBeVisible();
+-  const candidate={...saved,version:3,status:'draft',inputs:[...saved.inputs,{name:'failure_payload',type:'object',required:true}]};candidate.conditions.find((condition:{expression:string})=>condition.expression==="'yes'").expression='inputs.failure_payload.missing';
++  const candidate={...saved,version:3,status:'draft',inputs:saved.inputs};candidate.conditions.find((condition:{expression:string})=>condition.expression==="'yes'").expression='outputs.master_orchestrator.missing';
+   for(const agent of candidate.agents){agent.allowed_tool_ids=[];}for(const tool of candidate.tools){delete tool.configuration_reference;}
+   const save=await mutation(page,'save_workflow_version',`workflows/${id}/versions/3`,{workflow_id:id,workflow_version:3,base_version:2,workflow:candidate},'PUT');expect(save.status(),await save.text()).toBe(200);
+   for(const operation of ['validate_workflow','approve_workflow','approve_workflow']){
+    const action=operation==='approve_workflow'?(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow.status==='approved'?'publish':'approve':undefined;
+    const response=await mutation(page,operation,`workflows/${id}/${operation==='validate_workflow'?'validate':'approve'}`,{workflow_id:id,workflow_version:3,...(action?{action}:{})});expect(response.status(),await response.text()).toBe(200);
+   }
+-  const failedKey=crypto.randomUUID();const payload={workflow_id:id,workflow_version:3,inputs:{...inputValues,failure_payload:{}}};
++  const failedKey=crypto.randomUUID();const payload={workflow_id:id,workflow_version:3,inputs:inputValues};
+   const failure=await mutation(page,'execute_workflow',`workflows/${id}/execute`,payload,'POST',failedKey);expect(failure.status()).toBe(200);const failed=(await failure.json()).data.run;expect(['failed','blocked']).toContain(failed.status);
+   const again=await mutation(page,'execute_workflow',`workflows/${id}/execute`,payload,'POST',failedKey);expect((await again.json()).data.run.run_id).toBe(failed.run_id);
+   await page.goto(`/app/runs?run=${failed.run_id}`);await expect(page.getByText(new RegExp(`Failed node: ${router}`))).toBeVisible();

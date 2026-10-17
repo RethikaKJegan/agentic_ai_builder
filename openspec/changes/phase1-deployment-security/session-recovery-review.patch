@@ -1,0 +1,31 @@
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -26,7 +26,7 @@
+   refreshOverview: async () => {
+     try {
+       const snapshot = await api.overview();
+-      if (get().status === "unavailable" && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
++      if ((get().status === "connected" || get().status === "unavailable") && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
+         const session = await api.session();
+         set({ session, status: "connected" });
+       }
+@@ -36,7 +36,7 @@
+     } catch (error) {
+       const failure = error instanceof ApiError ? error : get().error;
+       set({ liveStatus: "stale", error: failure,
+-        ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, status: "unavailable", tools: [], reviews: {} } : {}) });
++        ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, tools: [], reviews: {} } : {}) });
+     }
+   },
+   initialize: () => {
+--- a/frontend/e2e/phase1.spec.ts
++++ b/frontend/e2e/phase1.spec.ts
+@@ -44,7 +44,7 @@
+     await page.getByRole('button', { name: 'Generate workflow' }).click();
+     await expect(page.getByRole('status').filter({ hasText: 'plan_cancel_ui' })).toBeVisible();
+     await page.getByRole('button', { name: 'Cancel generation' }).click();
+-    await expect(page.getByRole('alert')).toContainText('PLANNING_CANCELLED');
++    await expect(page.getByRole('main').getByRole('alert')).toContainText('PLANNING_CANCELLED');
+     await expect(page.getByLabel('Process description')).toHaveValue(prompt);
+     await expect(page.getByRole('button', { name: 'Generate workflow' })).toBeEnabled();
+   });

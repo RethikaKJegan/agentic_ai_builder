@@ -318,7 +318,7 @@ class GraphTests(RuntimeFixture):
         self.assertEqual(runner.decide(request, self.approver()), approved)
         self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
 
-    def test_workspace_members_can_approve_a_gate_with_an_unknown_role(self):
+    def test_workspace_members_cannot_approve_a_gate_with_an_unknown_role(self):
         self.approval_graph()
         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
         self.put()
@@ -331,10 +331,11 @@ class GraphTests(RuntimeFixture):
                 paused = runner.advance(run['run_id'], self.auth)
                 member = dict(subject=dict(subject_id='member-' + str(index), workspace_id='local-workspace'),
                     roles=[role], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
-                approved = runner.decide(self.decision(paused, 'approved'), member)
-                self.assertEqual(approved['status'], 'running')
+                with self.assertRaises(RuntimeFailure):
+                    runner.decide(self.decision(paused, 'approved'), member)
+                self.assertEqual(self.runtime.get_run(run['run_id'], self.auth)['status'], 'paused_for_approval')
 
-    def test_viewer_can_approve_through_api_without_execution_permission(self):
+    def test_viewer_cannot_approve_through_api_without_gate_permission(self):
         self.approval_graph()
         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
         self.put()
@@ -344,8 +345,8 @@ class GraphTests(RuntimeFixture):
         member = dict(subject=dict(subject_id='viewer-member', workspace_id='local-workspace'),
             roles=['viewer'], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
         result = self.workflows.handle(self.decision(paused, 'approved'), member)
-        self.assertEqual(result['status'], 200, result)
-        self.assertEqual(result['data']['status'], 'approved')
+        self.assertEqual(result['status'], 403, result)
+        self.assertEqual(self.runtime.get_run(paused['run_id'], self.auth)['status'], 'paused_for_approval')
 
     def test_members_cannot_approve_another_workspace_or_without_authentication(self):
         self.approval_graph()

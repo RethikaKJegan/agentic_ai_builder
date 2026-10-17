@@ -1,0 +1,80 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -356,6 +356,13 @@
+     return result.data;
+   }
+ 
++  async releaseState(workflowId: string) {
++    const schema = z.object({ workflow_id: z.string(), release: z.object({ release_id: z.string(), workflow_version: z.number().int().positive(), state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]), trigger_binding_count: z.number().int().nonnegative() }).nullable(), ...metadata });
++    const result = schema.safeParse(await this.read(`workflows/${encodeURIComponent(workflowId)}/release-state`));
++    if (!result.success || result.data.workflow_id !== workflowId) return fail("INVALID_API_DATA", "The release state response is invalid.");
++    return result.data;
++  }
++
+   async overview(afterSequence?: number) {
+     const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
+     const result = overviewCollectionSchema.safeParse(await this.read(path));
+--- a/frontend/src/features/builder/AgentCommunication.tsx
++++ b/frontend/src/features/builder/AgentCommunication.tsx
+@@ -48,7 +48,7 @@
+           </DialogDescription>
+         </div>
+         {open &&
+-          (projectId ? (
++          (projectId && !trace.runId ? (
+             <ProcurementProjectCommunication
+               workflowId={workflow.id}
+               version={workflow.serverVersion ?? 1}
+--- a/frontend/src/features/builder/NodeTrace.test.tsx
++++ b/frontend/src/features/builder/NodeTrace.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(cleanup);
+ const node = { id: "choose", type: "mesh" as const, position: { x: 0, y: 0 }, data: { kind: "condition" as const, label: "Choose" } };
+ const run = { run_id: "run_one", workflow_id: "workflow", workflow_version: 1, status: "completed" as const, approvals: [] };
+-const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, selectRun: () => {} } satisfies WorkflowTrace;
++const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
+ test("historical missing evidence is explicit and unrelated nodes are excluded", () => {
+   render(<NodeTrace node={node} trace={{ ...trace, events: [{ event_id: "evt", run_id: run.run_id, workflow_id: "workflow", workflow_version: 1, timestamp: "2026-10-11T09:00:00Z", source: "runtime", event_type: "node.completed", details: { node_id: "other", output: "unrelated private data" } }] }} />);
+   expect(screen.getAllByText("Not captured for this run.").length).toBeGreaterThan(0);
+--- a/frontend/src/features/builder/NodeTrace.tsx
++++ b/frontend/src/features/builder/NodeTrace.tsx
+@@ -22,9 +22,11 @@
+     <ApiFeedback error={trace.error} />
+     {!trace.available ? <p className="text-sm text-muted-foreground">Execution traces require a connected runtime and permission to view runs.</p> : !trace.runId ? <p className="text-sm text-muted-foreground">No recorded runs for this workflow yet.</p> : !trace.run ? <p role="status" className="text-sm">{trace.loading ? "Loading execution trace…" : "Execution trace unavailable."}</p> : <>
+       <p className="break-all text-xs text-muted-foreground">{trace.run.run_id} · revision v{trace.run.workflow_version}</p>
+-      <StatusPill status={status ?? "not executed"} />
++      <StatusPill status={status ?? "No recorded status"} />
+       {!events.length && <p className="text-sm text-muted-foreground">This step has no recorded events in the selected run. It may not have been reached or may belong to a different revision.</p>}
+       <p className="text-xs text-muted-foreground">{duration === undefined ? "Timing not recorded or execution pending" : `${duration} ms recorded duration`} · {retries} retries</p>
++      <Evidence title="Recorded failure" value={events.filter(event => ["node.failed", "approval.rejected", "approval.timed_out"].includes(event.event_type)).at(-1)?.details} />
++      <Evidence title="Safe recorded inputs" value={observed?.["input"] ?? observed?.["inputs"]} />
+       <Evidence title="Observation" value={observed?.["observation"]} />
+       <Evidence title="Decision" value={decision} />
+       <Evidence title="How the decision was made" value={completed?.["expression"] !== undefined ? { expression: completed["expression"], evaluated_value: completed["evaluated_value"] } : observed ? { kind: observed["kind"], agent_id: observed["agent_id"], tool_id: observed["tool_id"], policy: observed["policy"] } : undefined} />
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -92,6 +92,7 @@
+         </div>
+         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
+       </div>
++      <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted-foreground">Describe → generate → review and edit → configure → save → validate → approve → publish → activate → run and monitor. Open a workflow for its lifecycle guidance. Draft revision and active release are separate.</p>
+       {backend.status === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading server workflows…</p>}
+       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+         <span className={`h-2 w-2 rounded-full ${backend.liveStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -247,6 +247,14 @@
+         except (ValueError, TypeError):
+             return error('INVALID_REQUEST', 'The lifecycle request is invalid.', 400)
+ 
++    @app.get('/workflows/{workflow_id}/release-state')
++    async def release_state(workflow_id: str):
++        if auth.get('decision') != 'allow' or 'workflow.view' not in auth['permissions']:
++            return error('OPERATION_NOT_AUTHORIZED', 'Workflow read permission is required.', 403)
++        from .release_read import read_release_state
++        data = await run_in_threadpool(read_release_state, workflow_service.store, auth['subject']['workspace_id'], workflow_id)
++        return JSONResponse(workflow_service.envelope(request_reference.get(), 200, data))
++
+     @app.post('/workflows/{workflow_id}/releases')
+     async def activate_release(workflow_id: str, request: Request):
+         return await lifecycle_dispatch(request, 'activate_release', {'workflow_id': workflow_id})

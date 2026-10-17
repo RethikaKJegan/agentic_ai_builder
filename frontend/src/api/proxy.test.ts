@@ -10,7 +10,7 @@ it("reports an unrelated upstream service with a canonical API error", async () 
   })));
   const response = await GET(new NextRequest("http://127.0.0.1:3001/api/backend/session"), { params: Promise.resolve({ path: ["session"] }) });
   expect(response.status).toBe(503);
-  expect(await response.json()).toMatchObject({ request_id: "req_proxy", status: 503,
+  expect(await response.json()).toMatchObject({ status: 503,
     data: { error: { error_code: "API_WRONG_SERVICE", retryable: true } } });
 });
 

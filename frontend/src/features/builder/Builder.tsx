@@ -4,6 +4,7 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  MarkerType,
   ReactFlow,
   ReactFlowProvider,
   addEdge,
@@ -59,18 +60,26 @@ import { insertPattern, PATTERNS, type PatternKind } from "@/domain/patterns";
 import {
   addSubAgent,
   depthOf,
-  hiddenIds,
-  isHierarchy,
-  layoutTB,
   removeSubtree,
 } from "@/domain/hierarchy";
 import { NODE_META } from "./nodeMeta";
+import { RevisionHistory } from "@/features/workflows/RevisionHistory";
 import { WorkflowControls } from "@/features/workflows/WorkflowControls";
 
 import { useWorkflowTrace } from "./useWorkflowTrace";
-import { NodeTrace } from "./NodeTrace";
 import { AgentCommunication } from "./AgentCommunication";
+import { HierarchyView } from "./HierarchyView";
+import { ProcurementProjectCommunication } from "./ProcurementProjectCommunication";
+import { ExecutionView } from "./ExecutionView";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { dependencyOrder, graphIssues } from "@/domain/graph-review";
+import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
+import { PlanReview } from "@/features/workflows/PlanReview";
 
+import { useDraftSync } from "@/features/workflows/useDraftSync";
+import { DraftConflict } from "@/features/workflows/DraftConflict";
+import { useUnsavedWorkflow } from "@/features/workflows/unsaved";
+import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 const nodeTypes = { mesh: MeshNode };
 type Graph = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
 
@@ -91,6 +100,8 @@ export default function BuilderRoot({ workflow }: { workflow: Workflow }) {
 }
 
 function Builder({ workflow }: { workflow: Workflow }) {
+  const sync=useDraftSync(workflow.id);
+  useUnsavedWorkflow(workflow.id);
   const navigate = useNavigate();
   const { fitView, screenToFlowPosition } = useReactFlow();
   const store = useMesh();
@@ -99,19 +110,19 @@ function Builder({ workflow }: { workflow: Workflow }) {
   const [edges, setEdges] = useState<WorkflowEdge[]>(workflow.edges);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const dragStart = useRef<Graph | null>(null);
   nodesRef.current = nodes;
   edgesRef.current = edges;
   const [past, setPast] = useState<Graph[]>([]);
   const [future, setFuture] = useState<Graph[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<"inspector" | null>(null);
-  const [composerOpen, setComposerOpen] = useState(
-    () => typeof window === "undefined" || window.innerWidth >= 768,
-  );
+  const [composerOpen, setComposerOpen] = useState(false);
   const [cmd, setCmd] = useState("");
-  const trace = useWorkflowTrace(workflow.id);
-  const { runState, activeEdges } = trace;
-  const [inspectorTab, setInspectorTab] = useState<"trace" | "configuration">("trace");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [mode, setMode] = useState<"design" | "hierarchy" | "execution">("design");
+  const [underlying,setUnderlying]=useState(false);
+  const trace = useWorkflowTrace(workflow.id, mode === "execution");
   const isMobile = useIsMobile();
 
   const commit = useCallback(
@@ -147,7 +158,13 @@ function Builder({ workflow }: { workflow: Workflow }) {
   }, [future, commit]);
 
   useEffect(() => {
+    setNodes(workflow.nodes as MeshFlowNode[]); setEdges(workflow.edges); setPast([]); setFuture([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflow.canonical]); // Confirmed server actions/reload reconcile the canvas without dropping newer local edits.
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (mode !== "design") return;
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]")) return;
       if (e.key === "Escape") {
@@ -164,12 +181,9 @@ function Builder({ workflow }: { workflow: Workflow }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, fitView]);
+  }, [undo, redo, fitView, mode]);
 
-  useEffect(() => {
-    const t = setTimeout(() => fitView({ duration: 250, padding: 0.15, maxZoom: 1 }), 60);
-    return () => clearTimeout(t);
-  }, [panel, fitView]);
+
 
   const onNodesChange = useCallback(
     (changes: NodeChange<MeshFlowNode>[]) => {
@@ -178,6 +192,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
         .map((c) => (c as { id: string }).id);
       const next = applyNodeChanges(changes, nodesRef.current);
       if (removed.length) {
+        if (!window.confirm("Remove these steps from the local draft? Undo can restore them until a server reload.")) return;
         if (nodesRef.current.some((n) => removed.includes(n.id) && n.data.kind === "trigger")) {
           toast.error("Every workflow needs a trigger.");
           return;
@@ -343,6 +358,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
   };
 
   const removeChild = (id: string) => {
+    if (!window.confirm("Remove this sub-agent and its nested steps from the local draft?")) return;
     const n = nodesRef.current.find((x) => x.id === id);
     const r = removeSubtree({ nodes: clean(nodesRef.current), edges: edgesRef.current }, id);
     commit({ nodes: r.nodes, edges: r.edges });
@@ -355,8 +371,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
   };
 
   const tidy = () => {
-    const layout = isHierarchy(nodesRef.current) ? layoutTB : autoLayout;
-    commit({ nodes: layout(clean(nodesRef.current), edgesRef.current), edges: edgesRef.current });
+    commit({ nodes: autoLayout(clean(nodesRef.current), edgesRef.current), edges: edgesRef.current });
     setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 50);
   };
 
@@ -376,7 +391,8 @@ function Builder({ workflow }: { workflow: Workflow }) {
 
   const current = store.workflows.find((w) => w.id === workflow.id) ?? workflow;
 
-  const hidden = useMemo(() => hiddenIds(nodes), [nodes]);
+  const hidden = useMemo(() => new Set<string>(), []);
+  const diagnostics = useMemo(() => graphIssues(nodes, edges), [nodes, edges]);
   const flowNodes = useMemo(
     () =>
       nodes.map((n) => ({
@@ -384,17 +400,18 @@ function Builder({ workflow }: { workflow: Workflow }) {
         hidden: hidden.has(n.id),
         data: {
           ...n.data,
-          runStatus: runState[n.id],
+          runStatus: undefined,
+          orientation: undefined,
+          role: undefined,
+          diagnosticCount: diagnostics.filter(x => x.nodeId === n.id).length,
           childCount:
-            n.data.kind === "agent"
-              ? nodes.filter((c) => c.data.parentNodeId === n.id && c.data.kind === "agent").length
-              : 0,
+            0,
           parentLabel: n.data.parentNodeId
             ? nodes.find((p) => p.id === n.data.parentNodeId)?.data.label
             : undefined,
         },
       })),
-    [nodes, runState, hidden],
+    [nodes, hidden, diagnostics],
   );
   const flowEdges: Edge[] = useMemo(
     () =>
@@ -405,13 +422,13 @@ function Builder({ workflow }: { workflow: Workflow }) {
         label: e.label,
         type: "smoothstep",
         hidden: hidden.has(e.source) || hidden.has(e.target),
-        className: activeEdges.has(e.id) ? "edge-active" : "",
+        markerEnd: { type: MarkerType.ArrowClosed },
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 6,
-        labelStyle: { fontSize: 10, fontWeight: 500, fill: "var(--primary-deep)" },
+        labelStyle: { fontSize: 12, fontWeight: 500, fill: "var(--primary-deep)" },
         labelBgStyle: { fill: "var(--highlight)" },
       })),
-    [edges, activeEdges, hidden],
+    [edges, hidden],
   );
 
   const selected = nodes.find((n) => n.id === selectedId);
@@ -429,35 +446,40 @@ function Builder({ workflow }: { workflow: Workflow }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden" data-testid="workflow-workspace">
+      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b bg-background px-4 py-2">
+        <Link to="/app/workflows" aria-label="Back to workflows" className="rounded-lg border p-2 hover:bg-muted"><ArrowLeft className="h-4 w-4"/></Link>
+        <input aria-label="Workflow name" value={current.name} onChange={e=>store.renameWorkflow(workflow.id,e.target.value)} className="min-w-0 flex-1 truncate bg-transparent text-sm font-semibold outline-none focus:bg-muted"/>
+        <StatusPill status={current.status==='published'?`v${current.serverVersion??1} published`:current.status} tone={current.status==='published'?'success':'neutral'}/>
+        <Dialog><DialogTrigger className="shrink-0 rounded-lg border px-3 py-2 text-xs hover:bg-muted">Workflow details</DialogTrigger>
+          <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>Workflow details</DialogTitle></DialogHeader>
+            <section><PlanReview workflow={{...current,nodes:clean(nodes),edges}} /></section>
+            <section><h2 className="mb-2 text-sm font-semibold">Lifecycle and release</h2><LifecycleJourney workflow={current}/></section>
+          </DialogContent>
+        </Dialog>
+      </header>
+      <DraftConflict workflow={current} recoveryOnly={sync.storageFailed} />
+      <ApiFeedback error={sync.error} />
+      {sync.storageFailed&&<p role="alert" className="border-b p-3 text-xs text-destructive">A browser draft backup could not be written. Keep this tab open and export your working draft before leaving.</p>}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-3 py-2">
+        <div role="tablist" aria-label="Workflow view" className="flex shrink-0 gap-1">
+          {(["design", "hierarchy", "execution"] as const).map(view => <button type="button" role="tab" key={view} aria-selected={mode === view} onClick={() => { setMode(view); setPanel(null); }} className={`rounded-lg px-3 py-2 text-sm ${mode === view ? "bg-highlight font-medium text-primary" : "text-muted-foreground hover:bg-muted"}`}>{view === "design" ? "Design" : view === "hierarchy" ? "Agent hierarchy" : "Execution"}</button>)}
+        </div>
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <WorkflowControls workflow={current} compact onStarted={()=>{setMode('execution');setPanel(null);}}/>
+          <AgentCommunication workflow={current} trace={trace}/>
+        </div>
+      </div>
+      {mode === "design" && <>
+      {current.serverVersion && <RevisionHistory key={`${current.id}:${current.serverVersion}`} workflowId={current.id} latest={current.serverVersion} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
       {/* Toolbar */}
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <Link
-          to="/app/workflows"
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-          aria-label="Back to workflows"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <input
-          aria-label="Workflow name"
-          value={current.name}
-          onChange={(e) => store.renameWorkflow(workflow.id, e.target.value)}
-          className="w-28 min-w-0 max-w-[280px] flex-1 rounded-md sm:w-auto sm:flex-none bg-transparent px-1.5 py-1 font-medium outline-none hover:bg-muted focus:bg-muted"
-        />
-        <span className="hidden sm:contents">
-          <StatusPill
-            status={
-              current.status === "published" ? `v${current.serverVersion ?? current.versions.length} published` : current.status
-            }
-            tone={current.status === "published" ? "success" : "neutral"}
-          />
-        </span>
+      <div className={`absolute right-3 z-20 flex max-w-[calc(100%-24px)] items-center gap-2 rounded-xl border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur ${current.canonical?.metadata["procurement_plan"]&&!underlying?"bottom-12":"top-[120px] max-sm:top-[176px]"}`}>
+        {!!current.canonical?.metadata['procurement_plan']&&<button onClick={()=>setUnderlying(v=>!v)} className="rounded-lg border px-3 py-1 text-xs">{underlying?'Show process overview':'Edit underlying graph'}</button>}
         <div className="flex-1" />
         <button
           onClick={undo}
           disabled={!past.length}
-          className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40 sm:block"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
           aria-label="Undo"
         >
           <Undo2 className="h-4 w-4" />
@@ -465,7 +487,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
         <button
           onClick={redo}
           disabled={!future.length}
-          className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40 sm:block"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
           aria-label="Redo"
         >
           <Redo2 className="h-4 w-4" />
@@ -510,7 +532,6 @@ function Builder({ workflow }: { workflow: Workflow }) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <WorkflowControls workflow={current} />
         <DropdownMenu>
           <DropdownMenuTrigger
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
@@ -536,54 +557,35 @@ function Builder({ workflow }: { workflow: Workflow }) {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Versions
             </DropdownMenuLabel>
-            {current.versions.length === 0 && (
-              <p className="px-2 py-1.5 text-sm text-muted-foreground">Not published yet</p>
-            )}
-            {current.versions
-              .slice()
-              .reverse()
-              .slice(0, 5)
-              .map((v) => (
-                <p key={v.id} className="px-2 py-1.5 text-sm">
-                  <span className="font-medium">v{v.version}</span>{" "}
-                  <span className="text-muted-foreground">
-                    · {new Date(v.publishedAt).toLocaleString()}
-                  </span>
-                </p>
-              ))}
+            <DropdownMenuItem disabled={!current.serverVersion} onSelect={() => setHistoryOpen(true)}>View saved revisions</DropdownMenuItem>
+            {!current.serverVersion && <p className="px-2 py-1.5 text-xs text-muted-foreground">Save draft to create a server revision.</p>}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Recent runs
             </DropdownMenuLabel>
-            {trace.runs.slice(0, 5).map((run) => <DropdownMenuItem key={run.run_id} onSelect={() => trace.selectRun(run.run_id)}>{run.run_id} · {run.status}</DropdownMenuItem>)}
+            <DropdownMenuItem onSelect={() => { setMode("execution"); setPanel(null); }}>Inspect recorded execution</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-xs">
-        <label htmlFor="trace-run" className="font-medium">Execution trace</label>
-        <select id="trace-run" aria-label="Select workflow run" value={trace.runId} onChange={(event) => trace.selectRun(event.target.value)} disabled={!trace.available || !trace.runs.length} className="min-w-0 max-w-full rounded-md border border-border bg-background p-1.5">
-          {!trace.runs.length && <option value="">{trace.available ? "No recorded runs" : "Runtime unavailable"}</option>}
-          {trace.runs.map((run) => <option key={run.run_id} value={run.run_id}>{run.run_id} · v{run.workflow_version} · {run.status}</option>)}
-        </select>
-        <span className="text-muted-foreground">Click a step to inspect its execution.</span>
-        <AgentCommunication workflow={{ ...current, nodes: clean(nodes), edges }} trace={trace} />
-        {trace.run && trace.run.workflow_version !== current.serverVersion && <span className="text-warning">Historical run · v{trace.run.workflow_version}; canvas shows the current draft.</span>}
-      </div>
-      <div className="flex min-h-0 flex-1">
+
+
+      </>}
+      {mode === "execution" ? <div className="min-h-0 flex-1 overflow-hidden"><ExecutionView trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="flex min-h-0 flex-1 flex-col"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setUnderlying(true);setSelectedId(id);setPanel("inspector");}} /></div> : current.canonical?.metadata["procurement_plan"]&&!underlying ? <ProcurementProjectCommunication workflowId={current.id} version={current.serverVersion??1} view="design"/> : (
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Canvas */}
         <div className="relative min-w-0 flex-1 bg-canvas">
           {isMobile ? (
             <ol className="h-full space-y-2 overflow-y-auto p-4 pb-48" aria-label="Workflow steps">
-              {nodes.map((n, i) => {
+              {dependencyOrder(nodes,edges).map((n, i) => {
                 const M = NODE_META[n.data.kind];
-                const st = runState[n.id];
+                const st = undefined;
                 return (
                   <li key={n.id}>
                     <button
                       onClick={() => {
                         setSelectedId(n.id);
-                        setInspectorTab("trace");
+
                         setPanel("inspector");
                       }}
                       className={`flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left ${selectedId === n.id ? "border-primary" : "border-border"}`}
@@ -609,6 +611,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
           ) : (
             <NodeActions.Provider value={nodeActions}>
               <PatternsPanel onInsert={(k) => insertPatternAt(k)} />
+              <div className="absolute inset-0">
               <ReactFlow
                 onDragOver={(e) => {
                   if (e.dataTransfer.types.includes(PATTERN_MIME)) {
@@ -623,10 +626,14 @@ function Builder({ workflow }: { workflow: Workflow }) {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
-                onNodeDragStop={() => commit({ nodes: nodesRef.current, edges: edgesRef.current })}
+                onNodeDragStart={() => { dragStart.current = structuredClone({nodes:clean(nodesRef.current),edges:edgesRef.current}); }}
+                onNodeDragStop={() => {
+                  if (dragStart.current) { const previous = dragStart.current; setPast(p=>[...p.slice(-49),previous]); setFuture([]); dragStart.current=null; }
+                  commit({ nodes: nodesRef.current, edges: edgesRef.current }, {history:false});
+                }}
                 onNodeClick={(_, n) => {
                   setSelectedId(n.id);
-                  setInspectorTab("trace");
+
                   setPanel("inspector");
                 }}
                 onPaneClick={() => {
@@ -634,7 +641,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                   setPanel((p) => (p === "inspector" ? null : p));
                 }}
                 fitView
-                fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+                fitViewOptions={{ padding: 0.15, minZoom: 0.5, maxZoom: 1 }}
                 minZoom={0.2}
                 deleteKeyCode={["Backspace", "Delete"]}
                 proOptions={{ hideAttribution: true }}
@@ -657,6 +664,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                   nodeColor="var(--border-accent)"
                 />
               </ReactFlow>
+              </div>
             </NodeActions.Provider>
           )}
 
@@ -753,11 +761,9 @@ function Builder({ workflow }: { workflow: Workflow }) {
                     ×
                   </button>
                 </div>
-                <div className="flex gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="Step inspector">
-                  {(["trace", "configuration"] as const).map((tab) => <button key={tab} role="tab" aria-selected={inspectorTab === tab} onClick={() => setInspectorTab(tab)} className={`rounded-md px-3 py-1.5 text-sm ${inspectorTab === tab ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{tab === "trace" ? "Trace" : "Configuration"}</button>)}
-                </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  {inspectorTab === "trace" ? <NodeTrace node={selected} trace={trace} /> : selectedAgent ? (
+                  {diagnostics.filter(x=>x.nodeId===selected.id).map((x,i)=><p role="alert" key={i} className="mb-2 rounded border border-destructive/30 p-2 text-xs text-destructive">{x.message}</p>)}
+                  {selectedAgent ? (
                     <>
                       <HierarchyBox
                         node={selected}
@@ -822,6 +828,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
           </aside>
         )}
       </div>
+      )}
     </div>
   );
 }

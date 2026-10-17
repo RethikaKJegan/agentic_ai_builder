@@ -1,0 +1,11 @@
+--- a/frontend/src/features/workflows/ProcurementReview.test.tsx
++++ b/frontend/src/features/workflows/ProcurementReview.test.tsx
+@@ -3,7 +3,7 @@
+ import { ProcurementReview } from "./ProcurementReview";
+ import type { Workflow } from "@/domain/types";
+ import { api, ApiError } from "@/api/client";
+-vi.mock("@/api/state", () => ({ useBackend: () => ({ overview: { workflow_demo: { published_version: 1 } }, can: () => true, initialize: vi.fn().mockResolvedValue(undefined) }) }));
++vi.mock("@/api/state", () => ({ useBackend: () => ({ session: { runtime_available: true }, overview: { workflow_demo: { published_version: 1 } }, can: () => true, initialize: vi.fn().mockResolvedValue(undefined) }) }));
+ 
+ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+ const plan = { project_id: "project_demo", name: "Workshop procurement", simulation: true,

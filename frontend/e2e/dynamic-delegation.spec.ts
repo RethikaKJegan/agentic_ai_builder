@@ -30,6 +30,7 @@ for (const mobile of [false, true]) {
       await route.fulfill({ json: { request_id: "req_dynamic_browser", status: 200, data } });
     });
     await page.goto(`/app/workflows/${workflow.workflow_id}`);
+    await page.getByRole("tab", { name: "Execution", exact: true }).click();
     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });

@@ -1,0 +1,10 @@
+- [x] Build stable stage grouping and exact action/agent drill-down.
+- [x] Replace hierarchy list and consolidate workflow navigation/header.
+- [x] Redesign procurement setup/status with tabs, order progress and activity search.
+- [x] Verify types, focused tests, lint, build, desktop/mobile views and deploy frontend.
+
+Verification: strict frontend typecheck, scoped ESLint, production build, 23 focused UI/domain tests and two read-only backend selection tests passed. Shared contracts, strict scoped OpenSpec and diff checks pass. Early panel test assertions were updated for the intentional dialog/tab navigation; final tests pass (React act warnings remain in existing asynchronous fixtures). No workflow mutation handler, business policy, execution semantics, send path or source data was changed by the UI work.
+
+Deployment: built in .local/procurement-workspace-ui/frontend before atomically replacing frontend/.next; previous build retained in .local/ui-rollbacks/procurement-20261017-153442. Only frontend and API were reloaded, the background worker stayed running. API reload applies the read-only communication history selection. Temporary loopback preview on 3100 was stopped after inspection.
+
+Live read-only desktop/mobile checks at https://praxi.bellcorpstudio.com passed: Design and communication each show 11 fixed stages; hierarchy shows Procurement master and Fulfilment master with their two real specialists each; Execution shows actual comparison recommendations; three existing order tables render in the new drawer; mobile has no document horizontal overflow; browser recorded zero page errors. Screenshots: /tmp/procurement-live-design.png, /tmp/procurement-live-hierarchy.png, /tmp/procurement-live-execution.png, /tmp/procurement-live-panel.png, /tmp/procurement-live-orders.png, /tmp/procurement-live-mobile.png, /tmp/procurement-live-mobile-panel.png. The checks did not start, publish, approve or send anything. Existing exact action histories remain inspectable and complete histories remain in Runs.

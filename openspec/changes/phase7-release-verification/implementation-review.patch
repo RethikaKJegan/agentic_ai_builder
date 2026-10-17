@@ -1,0 +1,565 @@
+--- a/frontend/e2e/agent-communication.spec.ts
++++ b/frontend/e2e/agent-communication.spec.ts
+@@ -187,6 +187,7 @@
+       await route.fulfill({ json: { request_id: "req_communication_test", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_hierarchy_v2");
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/api-integration.spec.ts
++++ b/frontend/e2e/api-integration.spec.ts
+@@ -1,121 +1,74 @@
+ import { test, expect } from "@playwright/test";
++import { generate, localDraft, mutation } from "./helpers";
+ 
+-test("planner drafts load canonical branches and gates, save revisions and survive reload", async ({ page }) => {
+-  const errors: string[] = [];
+-  page.on("pageerror", (error) => errors.push(error.message));
+-  await page.goto("/app");
+-  await page.getByLabel("Process description").fill("If an invoice arrives classify it and email the owner after approval");
+-  await page.getByRole("button", { name: "Plan workflow", exact: true }).click();
+-  await expect(page).toHaveURL(/\/app\/workflows\/planned_/);
+-  await expect(page.getByText("Server revision v1 · draft")).toBeVisible();
+-  await expect(page.locator(".react-flow__node")).toHaveCount(6);
+-  await expect(page.getByText(/Requested tools:.*smtp_send_email/)).toBeVisible();
+-  await page.locator('.react-flow__node[data-id="plan_objective"]').click();
+-  await page.getByRole("tab", { name: /^tools$/i }).click();
+-  await expect(page.getByText(/Requested capabilities:.*send_email/)).toBeVisible();
+-  await page.getByRole("button", { name: "Close inspector" }).click();
+-  await page.getByLabel("Workflow name", { exact: true }).fill("Connected invoice review");
+-  await expect(page.getByRole("button", { name: "Validate", exact: true })).toBeDisabled();
+-  await page.getByRole("button", { name: "Save revision", exact: true }).click();
+-  await expect(page.getByText("Server revision v2 · draft")).toBeVisible();
+-  await page.getByRole("button", { name: "Validate", exact: true }).click();
+-  await expect(page.getByText("Server revision v2 · validated")).toBeVisible();
+-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+-  await expect(page.getByText(/assignments require registry authorization/)).toBeVisible();
+-  await page.reload();
+-  await expect(page.getByLabel("Workflow name", { exact: true })).toHaveValue("Connected invoice review");
+-  await expect(page.getByText("Server revision v2 · validated")).toBeVisible();
+-  const id = new URL(page.url()).pathname.split("/").at(-1)!;
+-  const storage = await page.evaluate(() => JSON.parse(localStorage.getItem("mesh-local-drafts-v1")!).state.workflows);
+-  expect(storage.some((workflow: { id: string }) => workflow.id === id)).toBe(false);
+-  const response = await page.request.get(`/api/backend/workflows/${id}`);
+-  const document = (await response.json()).data.workflow;
+-  expect(document.conditions.length).toBeGreaterThan(0);
+-  expect(document.approval_gates.length).toBeGreaterThan(0);
+-  expect(document.agents[0].allowed_tool_ids).toEqual([]);
+-  expect(errors).toEqual([]);
++test("generated canonical branches and gates survive explicit save and reload",async({page})=>{
++ const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
++ const id=await generate(page,"If an invoice arrives classify it and email the owner after approval for phase seven review");
++ const saved=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
++ expect(saved.conditions.length).toBeGreaterThan(0);expect(saved.approval_gates.length).toBeGreaterThan(0);
++ await page.getByLabel("Workflow name",{exact:true}).fill("Connected invoice review");
++ const actions=page.getByRole("region",{name:"Workflow actions"});
++ await expect(actions.getByRole("button",{name:"Validate",exact:true})).toBeDisabled();
++ await actions.getByRole("button",{name:"Save draft",exact:true}).click();
++ await expect(actions.getByText(/Save draft confirmed · v2/)).toBeVisible();
++ await page.reload();await expect(page.getByLabel("Workflow name",{exact:true})).toHaveValue("Connected invoice review");
++ const document=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
++ expect(document.conditions).toEqual(saved.conditions);expect(document.approval_gates).toEqual(saved.approval_gates);
++ expect(document.agents.every((agent:{allowed_tool_ids:string[]})=>agent.allowed_tool_ids.length===0)).toBe(true);
++ expect(JSON.stringify(document)).not.toContain("cred_browser_");expect(errors).toEqual([]);
+ });
+ 
+-test("trusted registry assignments allow publication and editable revisions drop old grants", async ({ page }) => {
+-  await page.goto("/app/workflows/registry_ready");
+-  await expect(page.getByText("Registry requirements authorized for this revision")).toBeVisible();
+-  await page.locator('.react-flow__node[data-id="read_rows"]').click();
+-  await page.getByRole("tab", { name: /^tools$/i }).click();
+-  await expect(page.getByText("read_spreadsheet · sheets_ready", { exact: true })).toBeVisible();
+-  await page.getByRole("button", { name: "Close inspector" }).click();
+-  await page.getByRole("button", { name: "Validate", exact: true }).click();
+-  await expect(page.getByRole("button", { name: "Approve revision", exact: true })).toBeEnabled();
+-  await page.getByRole("button", { name: "Approve revision", exact: true }).click();
+-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+-  await expect(page.getByText("Server revision v1 · published")).toBeVisible();
+-  await page.reload();
+-  await expect(page.getByText("Server revision v1 · published")).toBeVisible();
+-  await page.goto("/app/workflows");
+-  const overviewRow = page.locator(".divide-y > div").filter({ hasText: "Registry ready" });
+-  await expect(overviewRow).toContainText("published v1");
+-  await expect(overviewRow).toContainText("active");
+-  await overviewRow.getByLabel("Actions for Registry ready").click();
+-  await page.getByText("Edit draft", { exact: true }).click();
+-  await expect(page).toHaveURL(/\/app\/workflows\/registry_ready/);
+-  const result = await page.request.get("/api/backend/workflows/registry_ready");
+-  const document = (await result.json()).data.workflow;
+-  expect(document.agents[0].allowed_tool_ids).toEqual(["sheets_ready"]);
+-  expect(JSON.stringify(document)).not.toContain("cred_browser_sheets");
+-  await page.getByLabel("Workflow name", { exact: true }).fill("New editable registry revision");
+-  await page.getByRole("button", { name: "Save revision", exact: true }).click();
+-  await expect(page.getByText("Server revision v2 · draft")).toBeVisible();
+-  const revised = (await (await page.request.get("/api/backend/workflows/registry_ready")).json()).data.workflow;
+-  expect(revised.agents[0].allowed_tool_ids).toEqual([]);
+-  await page.goto("/app/workflows");
+-  const lifecycleRow = page.locator(".divide-y > div").filter({ hasText: "New editable registry revision" });
+-  await lifecycleRow.getByLabel("Actions for New editable registry revision").click();
+-  await page.getByText("Disable", { exact: true }).click();
+-  await expect(lifecycleRow).toContainText("disabled");
+-  const disabledOverview = (await (await page.request.get("/api/backend/workflow-overview")).json()).data.items
+-    .find((item: { workflow_id: string }) => item.workflow_id === "registry_ready");
+-  const deletion = await page.request.delete("/api/backend/workflows/registry_ready", { data: {
+-    request_id: "req_browser_delete", operation: "delete_workflow", idempotency_key: "browser_delete_registry_ready",
+-    payload: { workflow_id: "registry_ready", expected_release_id: disabledOverview.release_id, confirmed: true },
+-  } });
+-  expect(deletion.status()).toBe(200);
+-  await expect(lifecycleRow).toHaveCount(0, { timeout: 10000 });
++test("trusted publication requires explicit approval and activation; new drafts clear grants",async({page})=>{
++ await page.goto("/app/workflows/registry_ready");
++ const actions=page.getByRole("region",{name:"Workflow actions"});
++ await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
++ const initial=(await(await page.request.get("/api/backend/workflows/registry_ready")).json()).data;expect(initial.registry_review.ready).toBe(true);
++ await actions.getByRole("button",{name:"Validate",exact:true}).click();
++ await expect(actions.getByText(/Validate confirmed/)).toBeVisible();
++ await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
++ await actions.getByRole("button",{name:"Approve",exact:true}).click();
++ await expect(actions.getByText(/Approve confirmed/)).toBeVisible();
++ await actions.getByRole("button",{name:"Publish",exact:true}).click();
++ await expect(actions.getByText(/Publish confirmed/)).toBeVisible();
++ let state=(await(await page.request.get("/api/backend/workflows/registry_ready/release-state")).json()).data;
++ expect(state.release).toBeNull();
++ page.once("dialog",dialog=>dialog.accept());await actions.getByRole("button",{name:"Activate",exact:true}).click();
++ await expect(actions.getByText(/Activation succeeded/)).toBeVisible();
++ state=(await(await page.request.get("/api/backend/workflows/registry_ready/release-state")).json()).data;
++ expect(state.release.state).toBe("active");expect(state.release.workflow_version).toBe(1);
++ const document=(await(await page.request.get("/api/backend/workflows/registry_ready")).json()).data.workflow;
++ expect(document.agents[0].allowed_tool_ids).toEqual(["sheets_ready"]);
++ await page.getByLabel("Workflow name",{exact:true}).fill("New editable registry revision");
++ await actions.getByRole("button",{name:"Save draft",exact:true}).click();
++ await expect(actions.getByText(/Save draft confirmed · v2/)).toBeVisible();
++ const revised=(await(await page.request.get("/api/backend/workflows/registry_ready")).json()).data.workflow;
++ expect(revised.agents[0].allowed_tool_ids).toEqual([]);
++ state=(await(await page.request.get("/api/backend/workflows/registry_ready/release-state")).json()).data;
++ expect(state.release.workflow_version).toBe(1);expect(state.release.state).toBe("active");
+ });
+ 
+-test("pending approvals and risky assignments remain blocked in the actual UI", async ({ page }) => {
+-  for (const [id, reason] of [["registry_pending", "APPROVAL_REQUIRED"], ["registry_risky", "RISK_NOT_AUTHORIZED"]]) {
+-    await page.goto(`/app/workflows/${id}`);
+-    await expect(page.getByLabel("Registry assignment review")).toContainText(reason!);
+-    await page.getByRole("button", { name: "Validate", exact: true }).click();
+-    await expect(page.getByText("Server revision v1 · validated")).toBeVisible();
+-    await expect(page.getByRole("button", { name: "Approve revision", exact: true })).toBeDisabled();
+-    await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+-  }
++test("pending approval and risky Registry assignments cannot approve or publish",async({page})=>{
++ for(const [id,reason] of [["registry_pending","APPROVAL_REQUIRED"],["registry_risky","RISK_NOT_AUTHORIZED"]]){
++  await page.goto(`/app/workflows/${id}`);
++  await expect(page.getByRole("region",{name:"Workflow actions"}).getByText(new RegExp(reason!))).toBeVisible();
++  const actions=page.getByRole("region",{name:"Workflow actions"});
++  await actions.getByRole("button",{name:"Validate",exact:true}).click();
++  await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
++  const response=await mutation(page,"approve_workflow",`workflows/${id}/approve`,{workflow_id:id,workflow_version:1,action:"approve"});
++  expect(response.status()).toBeGreaterThanOrEqual(400);
++  const saved=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
++  expect(["approved","published"]).not.toContain(saved.status);expect(saved.agents[0].allowed_tool_ids).toEqual([]);
++ }
+ });
+ 
+-test("local drafts save to canonical backend storage and validation errors stay actionable", async ({ page }) => {
+-  await page.goto("/app");
+-  await page.getByLabel("Workflow name", { exact: true }).fill("Persisted plain workflow");
+-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
+-  await page.getByRole("button", { name: "Save revision", exact: true }).click();
+-  await expect(page.getByText("Server revision v1 · draft")).toBeVisible();
+-  const id = new URL(page.url()).pathname.split("/").at(-1)!;
+-  const existing = (await (await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
+-  existing.version = 2;
+-  existing.edges[0].target = "missing_node";
+-  const response = await page.request.put(`/api/backend/workflows/${id}/versions/2`, { data: {
+-    request_id: "req_browser_invalid_graph", operation: "save_workflow_version", idempotency_key: "browser_invalid_graph_retry", payload: {
+-      workflow_id: id, workflow_version: 2, workflow: existing, base_version: 1,
+-    },
+-  } });
+-  expect(response.status()).toBe(200);
+-  await page.reload();
+-  await expect(page.getByText("Server revision v2 · draft")).toBeVisible();
+-  await page.getByRole("button", { name: "Validate", exact: true }).click();
+-  await expect(page.getByLabel("Workflow API controls").getByRole("alert")).toHaveText(/WORKFLOW_VALIDATION_FAILED.*edges\[0\].target/);
+-  await page.goto("/app/runs");
+-  await expect(page.getByText(/runtime API is not connected/)).toBeVisible();
+-  await page.goto("/app/approvals");
+-  await expect(page.getByText(/runtime API is not connected/)).toBeVisible();
+-  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
++test("invalid graph validation fails authoritatively without creating a run",async({page})=>{
++ const id=await localDraft(page,"Persisted plain workflow");
++ await page.getByRole("button",{name:"Save draft",exact:true}).click();
++ await expect(page.getByText(/Save draft confirmed · v1/)).toBeVisible();
++ const existing=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
++ existing.version=2;existing.edges[0].target="missing_node";
++ const save=await mutation(page,"save_workflow_version",`workflows/${id}/versions/2`,{workflow_id:id,workflow_version:2,workflow:existing,base_version:1},"PUT");expect(save.status()).toBe(200);
++ const response=await mutation(page,"validate_workflow",`workflows/${id}/validate`,{workflow_id:id,workflow_version:2});
++ expect(response.status()).toBeGreaterThanOrEqual(400);expect((await response.json()).data.error.error_code).toBe("WORKFLOW_VALIDATION_FAILED");
++ const runs=(await(await page.request.get(`/api/backend/runs?workflow_id=${id}`)).json()).data;expect(runs.total).toBe(0);
+ });
+--- a/frontend/e2e/baseline.spec.ts
++++ b/frontend/e2e/baseline.spec.ts
+@@ -1,4 +1,5 @@
+ import { test, expect } from "@playwright/test";
++import { localDraft } from "./helpers";
+ 
+ test("landing and workspace navigation preserve routes without demo controls", async ({ page }) => {
+   const errors: string[] = [];
+@@ -7,7 +8,7 @@
+   await expect(page.getByRole("heading", { name: "An entire AI workforce. One coordinated system." })).toBeVisible();
+   await expect(page.getByRole("link", { name: /interactive demo/i })).toHaveCount(0);
+   await page.getByRole("link", { name: "Launch Workspace", exact: true }).first().click();
+-  await expect(page.getByRole("button", { name: "Create draft", exact: true })).toBeVisible();
++  await expect(page.getByRole("button", { name: "Generate workflow", exact: true })).toBeVisible();
+   await expect(page.getByText("Investor demo")).toHaveCount(0);
+   await page.getByRole("button", { name: "Search or jump to…" }).click();
+   await page.getByPlaceholder("Search workflows, agents, or actions…").fill("Integrations");
+@@ -21,10 +22,7 @@
+ test("local draft canvas editing, undo and reload persistence work", async ({ page }) => {
+   const errors: string[] = [];
+   page.on("pageerror", (error) => errors.push(error.message));
+-  await page.goto("/app");
+-  await page.getByLabel("Workflow name", { exact: true }).fill("Review procurement");
+-  await page.getByLabel("Process description").fill("Review incoming purchase requests.");
+-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
++  await localDraft(page,"Review procurement");
+   await expect(page).toHaveURL(/\/app\/workflows\/wf_/);
+   await expect(page.getByLabel("Workflow name", { exact: true })).toHaveValue("Review procurement");
+   await expect(page.locator(".react-flow__node")).toHaveCount(2);
+@@ -49,7 +47,7 @@
+   expect(errors).toEqual([]);
+ });
+ 
+-test("all workspace routes load and backend actions stay absent", async ({ page }) => {
++test("all workspace routes load without demo role controls", async ({ page }) => {
+   const errors: string[] = [];
+   page.on("pageerror", (error) => errors.push(error.message));
+   for (const name of ["workflows", "agents", "marketplace", "integrations", "knowledge", "approvals", "runs", "monitoring", "governance", "settings"]) {
+@@ -72,9 +70,7 @@
+   await page.getByRole("button", { name: "More", exact: true }).click();
+   await page.getByRole("dialog").getByRole("link", { name: "Integrations", exact: true }).click();
+   await expect(page).toHaveURL(/\/app\/integrations$/);
+-  await page.goto("/app");
+-  await page.getByLabel("Workflow name", { exact: true }).fill("Mobile draft");
+-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
++  await localDraft(page,"Mobile draft");
+   await expect(page.getByLabel("Workflow name", { exact: true })).toHaveValue("Mobile draft");
+   await expect(page.getByRole("button", { name: "Add step" })).toBeVisible();
+ });
+--- a/frontend/e2e/delegated-tools.spec.ts
++++ b/frontend/e2e/delegated-tools.spec.ts
+@@ -26,6 +26,7 @@
+       await route.fulfill({ json: { request_id: "req_delegated_tools", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/dynamic-delegation.spec.ts
++++ b/frontend/e2e/dynamic-delegation.spec.ts
+@@ -30,6 +30,7 @@
+       await route.fulfill({ json: { request_id: "req_dynamic_browser", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/multitask-delegation.spec.ts
++++ b/frontend/e2e/multitask-delegation.spec.ts
+@@ -29,6 +29,7 @@
+       await route.fulfill({ json: { request_id: "req_multitask_browser", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/phase7.spec.ts
++++ b/frontend/e2e/phase7.spec.ts
+@@ -33,6 +33,9 @@
+   await page.getByText('Workflow lifecycle · 14 stages',{exact:true}).click();
+   await expect(page.getByText(/no supported side-effect-free runtime simulation/)).toBeVisible();
+   expect((await(await page.request.get(`/api/backend/runs?workflow_id=${id}`)).json()).data.total).toBe(0);
++  // Changed executable agent definitions require an explicit trusted operator
++  // Registry review. The fixture invokes the real registration/validation API.
++  const review=await page.request.post(`/api/backend/__test__/registry-review/${id}/2`);expect(review.status(),await review.text()).toBe(200);expect((await review.json()).data.tool_grants_issued).toBe(false);
+   await actions.getByRole('button',{name:'Submit for approval',exact:true}).click();await expect(actions.getByText(/Submit for approval confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Approve',exact:true}).click();await expect(actions.getByText(/Approve confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Publish',exact:true}).click();await expect(actions.getByText(/Publish confirmed/)).toBeVisible();
+@@ -40,7 +43,7 @@
+   const release=(await(await page.request.get(`/api/backend/workflows/${id}/release-state`)).json()).data.release;expect(release.state).toBe('active');expect(release.workflow_version).toBe(2);
+   const inputValues=Object.fromEntries(saved.inputs.map((field:{name:string;type:string})=>[field.name,field.type==='boolean'?true:field.type==='object'?{}:field.type==='array'?[]:field.type==='integer'||field.type==='number'?1:'Review this support request']));
+   const key=crypto.randomUUID();const executed=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect(executed.status(),await executed.text()).toBe(200);
+-  const run=(await executed.json()).data.run;expect(run.status).toBe('completed');
++  const run=(await executed.json()).data.run;const firstEvents=(await(await page.request.get(`/api/backend/runs/${run.run_id}/events?limit=500`)).json()).data.items;expect(run.status,JSON.stringify(firstEvents.filter((event:{event_type:string})=>['node.failed','runtime.denied','run.failed','run.blocked'].includes(event.event_type)))).toBe('completed');
+   const repeat=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect((await repeat.json()).data.run.run_id).toBe(run.run_id);
+   await page.getByRole('tab',{name:'Execution',exact:true}).click();await page.getByRole('button',{name:'Refresh trace',exact:true}).click();
+   await expect(page.getByText(new RegExp(`Read-only historical revision v2 · Run ${run.run_id}`))).toBeVisible();
+@@ -69,7 +72,7 @@
+   if(failed)await route.fulfill({status:503,json:{request_id:'req_phase7_settings',status:503,data:{error:{error_code:'SERVICE_UNAVAILABLE',message:'Settings temporarily unavailable.',request_id:'req_phase7_settings',retryable:false}}}});
+   else await route.continue();
+  });
+- await page.goto('/app/settings');await expect(page.getByRole('alert')).toContainText('SERVICE_UNAVAILABLE');await expect(page.getByLabel('Notification preference')).toBeDisabled();
++ await page.goto('/app/settings');await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toContainText('Settings temporarily unavailable');await expect(page.getByLabel('Notification preference')).toBeDisabled();
+  failed=false;await page.getByRole('button',{name:'Reload settings',exact:true}).click();await expect(page.getByLabel('Notification preference')).toBeEnabled();await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toHaveCount(0);
+  let rejected=true;
+  await page.route('**/api/backend/integrations/*/test',async route=>{
+@@ -77,7 +80,7 @@
+   else await route.continue();
+  });
+  await page.goto('/app/integrations');await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+- await expect(page.getByRole('alert')).toContainText('OPERATION_NOT_AUTHORIZED');await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
++ await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toContainText('Provider checks are not authorized');await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
+  rejected=false;await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+  await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toHaveCount(0);await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
+ });
+--- a/frontend/e2e/project-agent-communication.spec.ts
++++ b/frontend/e2e/project-agent-communication.spec.ts
+@@ -54,6 +54,7 @@
+       await route.fulfill({ json: { request_id: "req_project_diagram", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+     await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
+--- a/frontend/e2e/sheet-access.spec.ts
++++ b/frontend/e2e/sheet-access.spec.ts
+@@ -35,7 +35,7 @@
+     await expect(page.getByText("Can create missing records", { exact: true })).toBeVisible();
+     const link = page.getByRole("link", { name: "prompt-selected-sheet" }).first();
+     await expect(link).toHaveAttribute("href", "https://docs.google.com/spreadsheets/d/prompt-selected-sheet/edit");
+-    const panel = page.getByText(/Publishing approves these write destinations/).locator("..");
++    const panel = page.getByText(/Review these destinations before approving and publishing/).locator("..");
+     const box = await panel.boundingBox();
+     expect(box).not.toBeNull();
+     expect(box!.x).toBeGreaterThanOrEqual(0);
+--- a/frontend/e2e/workflow-traces.spec.ts
++++ b/frontend/e2e/workflow-traces.spec.ts
+@@ -26,20 +26,19 @@
+       await route.fulfill({ json: { request_id: "req_trace_test", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_latest");
+-    if (mobile) await page.getByRole("button", { name: /Open refund ticket/ }).click();
+-    else await page.locator('.react-flow__node[data-id="choose"]').click();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T002/).first()).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText("yes", { exact: true })).toBeVisible();
+-    await page.getByRole("tab", { name: "Configuration", exact: true }).click();
+-    await expect(page.getByLabel("Condition expression")).toBeVisible();
+-    await page.getByRole("tab", { name: "Trace", exact: true }).click();
+-    await page.getByRole("button", { name: "Close inspector" }).click();
++    await page.getByRole("button", { name: /Open refund ticket.*condition/ }).click();
++    const trace=page.getByLabel("Node execution trace");
++    await expect(trace.getByText(/T002/).first()).toBeVisible();
++    await expect(trace.getByText("yes", {exact:true})).toBeVisible();
++    await expect(page.getByText(/Read-only historical revision v1/)).toBeVisible();
+     await page.getByLabel("Select workflow run").selectOption("run_older");
+-    if (mobile) await page.getByRole("button", { name: /Open refund ticket/ }).click();
+-    else await page.locator('.react-flow__node[data-id="choose"]').click();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T001/).first()).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText("no", { exact: true })).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T002/)).toHaveCount(0);
++    await page.getByRole("button", { name: /Open refund ticket.*condition/ }).click();
++    await expect(trace.getByText(/T001/).first()).toBeVisible();
++    await expect(trace.getByText("no", {exact:true})).toBeVisible();
++    await expect(trace.getByText(/T002/)).toHaveCount(0);
++    await page.getByRole("button", {name:"Return to editable draft"}).click();
++    await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
+   });
+ }
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -1,19 +1,30 @@
+ import { defineConfig } from "@playwright/test";
+-process.env.PLAYWRIGHT_BROWSERS_PATH = ".browser-cache";
++import path from "node:path";
++process.env.PLAYWRIGHT_BROWSERS_PATH = path.resolve(import.meta.dirname, ".browser-cache");
++const directory = process.env["BUILDER_E2E_FRONTEND_DIR"] ?? import.meta.dirname;
++const repository = path.resolve(import.meta.dirname, "..");
+ export default defineConfig({
+   testDir: "./e2e",
+   fullyParallel: false,
+-  use: { baseURL: "http://127.0.0.1:3100", headless: true },
++  workers: 1,
++  timeout: 60000,
++  use: { baseURL: "http://127.0.0.1:3100", headless: true, trace: "retain-on-failure" },
+   webServer: [{
+-    command: "../.venv-integrations/bin/python ../scripts/serve_ui_test_api.py",
++    command: `${repository}/.venv-integrations/bin/python ${repository}/scripts/serve_ui_test_api.py`,
++    cwd: repository,
+     url: "http://127.0.0.1:8011/session",
+     reuseExistingServer: false,
+     timeout: 60000,
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0", BUILDER_TEST_FRESH_DATABASE: "1", BUILDER_TEST_OPERATOR_REVIEW: "1",
++      BUILDER_TEST_DATABASE_DIR: process.env["BUILDER_E2E_DATABASE_DIR"] ?? path.join(repository, ".local/browser-phase7"),
++      BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }, {
+     command: "npm run start -- --hostname 127.0.0.1 --port 3100",
++    cwd: directory,
+     url: "http://127.0.0.1:3100",
+     reuseExistingServer: false,
+     timeout: 60000,
+-    env: { BUILDER_API_URL: "http://127.0.0.1:8011" },
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_API_URL: "http://127.0.0.1:8011",
++      BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }],
+ });
+--- a/frontend/src/api/phase7-release.test.tsx
++++ b/frontend/src/api/phase7-release.test.tsx
+@@ -13,7 +13,7 @@
+  const workflow=fromCanonical(CanonicalWorkflowSchema.parse(document)).workflow;
+  const trace:WorkflowTrace={available:true,runs:[],runId:"",run:null,revision:null,events:[],runState:{},activeEdges:new Set(),error:null,loading:false,selectRun:()=>{},retry:()=>{},hasMoreRuns:false,loadMoreRuns:()=>{},hasMoreEvents:false,loadMoreEvents:()=>{}};
+  const view=render(<ExecutionView workflow={workflow} trace={trace} onDesign={()=>{}} />);
+- expect(screen.getByRole("button",{name:"Agent communication",exact:true})).toBeVisible();
++ expect(screen.getByRole("button",{name:"Agent communication"})).toBeVisible();
+  expect(screen.getByText(/No persisted runs for this workflow/)).toBeVisible();
+  expect(view.container.querySelector('.react-flow')).toBeNull();
+ });
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -582,7 +582,7 @@
+         commit({nodes:clean(nodesRef.current),edges:[...edgesRef.current,{id:uid("edge"),source,target,...(label?{label}:{})}]});
+       }} onRemove={id => { if(window.confirm("Remove this connection from the working draft?")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }} />
+       </>}
+-      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
++      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
+       <div className="flex min-h-[420px] flex-1">
+         {/* Canvas */}
+         <div className="relative min-w-0 flex-1 bg-canvas">
+--- a/frontend/src/features/builder/ExecutionView.tsx
++++ b/frontend/src/features/builder/ExecutionView.tsx
+@@ -7,6 +7,7 @@
+   MiniMap,
+   MarkerType,
+ } from "@xyflow/react";
++import type { Workflow } from "@/domain/types";
+ import type { WorkflowTrace } from "./useWorkflowTrace";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ import { MeshNode, type MeshFlowNode } from "./MeshNode";
+@@ -15,7 +16,7 @@
+ import { dependencyOrder } from "@/domain/graph-review";
+ import { AgentCommunication } from "./AgentCommunication";
+ const nodeTypes = { mesh: MeshNode };
+-export function ExecutionView({ trace, onDesign }: { trace: WorkflowTrace; onDesign: () => void }) {
++export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void }) {
+   const [selected, setSelected] = useState("");
+   const graph = trace.revision?.workflow;
+   const nodes = useMemo(
+@@ -89,7 +90,7 @@
+             {trace.run.status}
+           </p>
+         )}
+-        {graph && <AgentCommunication workflow={graph} trace={trace} />}
++        {(workflow || graph) && <AgentCommunication workflow={workflow ?? graph!} trace={trace} />}
+       </div>
+       <ApiFeedback error={trace.error} />
+       {!trace.available ? (
+--- a/frontend/src/features/workflows/SheetAccessReview.tsx
++++ b/frontend/src/features/workflows/SheetAccessReview.tsx
+@@ -19,7 +19,7 @@
+   const valid = Array.isArray(targets) && targets.length > 0 && targets.every(isTarget);
+   return <details className="relative text-sm">
+     <summary aria-label="Sheet write access" className="flex h-8 cursor-pointer items-center whitespace-nowrap rounded-lg border border-border px-2.5"><span className="sm:hidden">Sheets</span><span className="hidden sm:inline">Sheet write access</span></summary>
+-    <div className="fixed right-4 top-24 z-40 max-h-[60vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-lg sm:absolute sm:right-0 sm:top-10">
++    <div className="fixed right-4 top-24 z-40 max-h-[60vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-lg">
+       <p className="mb-3 text-xs text-muted-foreground">Review these destinations before approving and publishing. Writes require an authorized run and Google account access.</p>
+       {!valid ? <p role="alert">Sheet access is incomplete. Correct the setup prompt and regenerate before publishing.</p> :
+         (targets as SheetTarget[]).map((target, index) => <div key={index} className="border-t border-border py-3 first:border-0">
+--- a/frontend/src/screens/app.workflows.$id.tsx
++++ b/frontend/src/screens/app.workflows.$id.tsx
+@@ -24,7 +24,7 @@
+     const existing = useMesh.getState().workflows.find((w) => w.id === id);
+     if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
+     api.request("get_workflow", { workflow_id: id }).then((result) => {
+-      if (active) { useMesh.getState().observeWorkflows([result.workflow]); setLoadedId(id); setError(null); }
++      if (active) { useMesh.getState().observeWorkflows([result.workflow]); if(result.registry_review)useBackend.getState().acceptReview(result.registry_review); setLoadedId(id); setError(null); }
+     }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoadedId(id); } });
+     return () => { active = false; };
+   }, [id, backendStatus, attempt]);
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -5,6 +5,7 @@
+ import os
+ import sys
+ from contextlib import nullcontext
++from tempfile import TemporaryDirectory
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT))
+@@ -35,13 +36,23 @@
+ 
+ def _offline_model_factory(definition):
+     from runtime.model import BoundedLLM
+-    return BoundedLLM(definition, lambda messages, cap, duration: ('{}', 0, 0), lambda messages: 1, 0, 0)
++    def provider(messages, cap, duration):
++        if definition.get('hierarchy_role') == 'master':
++            result = {'action':'finish','reason':'Explicit offline provider fixture; no connector invocation.',
++                      'output':{'summary':'Offline fixture result'}}
++        else:
++            result = {}
++        return json.dumps(result), 0, 0
++    return BoundedLLM(definition, provider, lambda messages: 1, 0, 0)
+ 
+ if __name__ == '__main__':
+     (ROOT / '.local').mkdir(exist_ok=True)
+-    directory = ROOT / '.local' / 'browser-ui'
++    directory = Path(os.getenv('BUILDER_TEST_DATABASE_DIR', str(ROOT / '.local' / 'browser-ui'))).resolve()
++    if not directory.is_relative_to(ROOT / '.local'):
++        raise RuntimeError('Browser test databases must stay under this repository .local directory.')
+     directory.mkdir(exist_ok=True)
+-    with nullcontext(directory):
++    with (TemporaryDirectory(prefix="run-", dir=directory) if os.getenv("BUILDER_TEST_FRESH_DATABASE") == "1" else nullcontext(directory)) as database_directory:
++        directory = Path(database_directory)
+         # Explicit browser-only configured registry; never used by product startup.
+         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
+         agent.update(agent_id='reader_agent', capabilities=['read_spreadsheet'], permissions=['data.read'])
+@@ -106,7 +117,8 @@
+                 tools=[dict(tool_id=definition['tool_id'], capability='read_spreadsheet')],
+                 nodes=[dict(node_id='start', kind='trigger', label='Start'), dict(node_id='read_rows', kind='agent', label='Read rows', agent_id=agent['agent_id']), dict(node_id='finish', kind='output', label='Finish')],
+                 edges=[dict(edge_id='start_read', source='start', target='read_rows'), dict(edge_id='read_finish', source='read_rows', target='finish')],
+-                conditions=[], approval_gates=[], metadata={})
++                conditions=[], approval_gates=[], metadata={'execution_input_mode':'manual'})
++            workflow['inputs'] = [dict(name='request_text',type='string',required=True), dict(name='spreadsheet_id',type='string',required=True), dict(name='range',type='string',required=True)]
+             workflow['execution_policy']['allow_external_writes'] = False
+             documents.append(workflow)
+         source = Path(directory) / 'registry.json'
+@@ -173,4 +185,35 @@
+                 workflow_version=1, base_version=0, workflow=document)), auth)
+             if result['status'] != 200:
+                 raise RuntimeError('Browser-only registry setup failed.')
++        # Explicit test control-plane checkpoint. This does not exist in the
++        # production launcher and never grants tools or changes live resources.
++        if os.getenv('BUILDER_TEST_OPERATOR_REVIEW') == '1' and os.getenv('BUILDER_ENVIRONMENT') == 'test' and os.getenv('BUILDER_REAL_CONNECTORS') != '1':
++            from fastapi import Request
++            from fastapi.responses import JSONResponse
++            @app.post('/__test__/registry-review/{workflow_id}/{version}')
++            async def review_fixture_agents(workflow_id: str, version: int, request: Request):
++                authority = app.state.workflow_auth
++                if ('admin' not in authority['roles'] or 'tools.manage' not in authority['permissions'] or
++                        'workspace:write' not in authority['scopes'] or authority['decision'] != 'allow'):
++                    return JSONResponse({'error':'OPERATOR_REVIEW_NOT_AUTHORIZED'},status_code=403)
++                workspace = authority['subject']['workspace_id']
++                with service.store.transaction(write=False) as db:
++                    workflow = service.store.get(db, workspace, workflow_id, version)
++                    latest = service.store.get(db, workspace, workflow_id)
++                    active = db.execute('SELECT 1 FROM lifecycle_active WHERE workspace=? AND workflow_id=?',(workspace,workflow_id)).fetchone()
++                if not workflow or not latest or latest['version'] != version or workflow['status'] not in {'draft','validated'} or active:
++                    return JSONResponse({'error':'REVIEW_REQUIRES_EXACT_UNRELEASED_DRAFT'},status_code=409)
++                reviewed=[]
++                for candidate in workflow['agents']:
++                    previous = service.registry_adapter.agents.get(candidate['agent_id'])
++                    old = previous['definition'] if previous else {}
++                    definition = {**deepcopy(candidate),'allowed_tool_ids':[],
++                        'name':old.get('name',candidate['agent_id']),
++                        'retry_policy':{'max_retries':candidate['limits']['max_retries'],'backoff_seconds':1},
++                        'guardrails':deepcopy(old.get('guardrails',{'pii_redaction':True,'prompt_injection_detection':True,'output_validation':True}))}
++                    response = service.registry_adapter.service.register_agent(definition,authority)
++                    if response['status'] != 200:return JSONResponse(response,status_code=response['status'])
++                    service.registry_adapter.agents[candidate['agent_id']] = response['data']['agent']
++                    reviewed.append(candidate['agent_id'])
++                return JSONResponse(service.envelope('req_test_registry_review',200,{'reviewed_agent_ids':reviewed,'tool_grants_issued':False}))
+         uvicorn.run(app, host='127.0.0.1', port=int(os.getenv('BUILDER_TEST_API_PORT', '8011')), log_level='warning')

@@ -108,7 +108,7 @@ describe("API envelopes and retries", () => {
 });
 
 describe("workflow UI integration", () => {
-  it("publishes the revision and activates a release through the additive v2 boundary", async () => {
+  it("publishes only the approved revision and leaves activation explicit", async () => {
     const original = CanonicalWorkflowSchema.parse(fixture("workflows/support-triage.json"));
     original.status = "approved";
     original.metadata["unresolved_requirements"] = [];
@@ -128,7 +128,9 @@ describe("workflow UI integration", () => {
       automation_identity_id: "auto_1", agent_versions: {}, tool_versions: {}, policy_version: 1, trigger_binding_ids: [], created_at: new Date().toISOString() } } as never);
     render(<WorkflowControls workflow={mapped.workflow} />);
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-    await waitFor(() => expect(activate).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: original.workflow_id, expected_release_id: null })));
+    await waitFor(() => expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" })));
+    expect(activate).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
     expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" }));
   });
   it("keeps registry review details out of the editor while retaining a clear publish action", () => {
@@ -147,9 +149,9 @@ describe("workflow UI integration", () => {
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
     expect(screen.queryByText("Registry requirements authorized for this revision")).toBeNull();
   });
-  it("surfaces a server-side publication rejection without exposing registry internals", async () => {
+  it("surfaces publication rejection with actionable Registry blockers", async () => {
     const original = document();
-    original.status = "validated";
+    original.status = "approved";
     const mapped = fromCanonical(original);
     useMesh.setState({ agents: mapped.agents });
     const review = { workflow_id: original.workflow_id, workflow_version: original.version, ready: false, reason_codes: ["APPROVAL_REQUIRED", "TOOL_UNAVAILABLE"], items: [
@@ -165,12 +167,12 @@ describe("workflow UI integration", () => {
     expect(screen.getByRole("list", { name: "Publication requirements" })).toHaveTextContent("Configure Slack Events for the selected channel.");
     expect(screen.getByRole("alert")).toHaveTextContent("corr_review");
   });
-  it("saves an edited canonical revision as part of publishing and excludes it from browser draft persistence", async () => {
+  it("saves only the edited draft and clears dirty persistence after confirmation", async () => {
     const original = document();
     useMesh.getState().acceptWorkflow(original);
     useMesh.getState().renameWorkflow(original.workflow_id, "Invoice edits");
     const edited = useMesh.getState().workflows[0]!;
-    useBackend.setState({ session: session(["workflow.publish"]), refreshOverview: vi.fn(async () => undefined) });
+    useBackend.setState({ session: session(["workflow.edit"]), refreshOverview: vi.fn(async () => undefined) });
     const saved = { ...original, version: original.version + 1, name: "Invoice edits", status: "draft" as const, metadata: { ...original.metadata, workspace_id: "local-workspace" } };
     const save = vi.spyOn(api, "request").mockImplementation(async (operation, payload) => {
       if (operation === "save_workflow_version") return { workflow: { ...saved, ...("workflow" in payload ? payload.workflow : {}) }, correlation_id: "corr_saved" } as never;
@@ -180,18 +182,20 @@ describe("workflow UI integration", () => {
     });
     vi.spyOn(api, "activateRelease").mockResolvedValue({} as never);
     render(<WorkflowControls workflow={edited} />);
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-    await waitFor(() => expect(save).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" })));
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(save).toHaveBeenCalledWith("save_workflow_version", expect.objectContaining({ base_version: original.version, workflow: expect.objectContaining({ name: "Invoice edits", version: original.version + 1 }) }));
     expect(useMesh.getState().workflows[0]?.serverVersion).toBe(original.version + 1);
     expect(JSON.parse(localStorage.getItem("mesh-local-drafts-v1")!).state.workflows).toEqual([]);
   });
-  it("allows viewers to run a safe local test but not publish", () => {
+  it("explains unavailable privileged controls to viewers without simulated execution", () => {
     const mapped = fromCanonical(document());
     useMesh.setState({ agents: mapped.agents });
     useBackend.setState({ session: session(["workflow.view"]) });
     const view = render(<WorkflowControls workflow={mapped.workflow} />);
-    expect(screen.getByRole("button", { name: "Test workflow" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Test workflow" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
     view.unmount();
   });
@@ -199,9 +203,9 @@ describe("workflow UI integration", () => {
     const mapped = fromCanonical(document());
     useMesh.setState({ agents: mapped.agents });
     vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
-    useBackend.setState({ session: session(["workflow.publish"]) });
+    useBackend.setState({ session: session(["workflow.validate"]) });
     render(<WorkflowControls workflow={mapped.workflow} />);
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Correct the edge."));
   });
 });
@@ -232,7 +236,7 @@ describe("registry review contract safety", () => {
 
 describe("approval and run consumers", () => {
   it("submits only the exact trusted pending approval binding and renders the returned decision", async () => {
-    useBackend.setState({ session: { ...session(["runs.view"]), auth: { ...session(["runs.view"]).auth, roles: ["viewer"] }, approval_service_available: true } });
+    useBackend.setState({ session: { ...session(["runs.view", "workflow.approve"]), auth: { ...session(["runs.view", "workflow.approve"]).auth, roles: ["approver"] }, approval_service_available: true } });
     const approval = { approval_id: "approval_exact", workflow_id: "invoice_review", workflow_version: 3, status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] };
     const decision = vi.spyOn(api, "request").mockResolvedValue({ ...approval, status: "approved", allowed_decisions: [] } as never);
     render(<ApprovalControl approval={approval} />);
@@ -264,7 +268,7 @@ describe("approval and run consumers", () => {
     expect(screen.getByText(/runtime API is not connected/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Load run" })).toBeNull();
     const event = fixture("api-control-fixtures.json").valid_run_event as RunEvent;
-    act(() => useBackend.setState({ session: { ...session(), runtime_available: true } }));
+    act(() => useBackend.setState({ status:"connected",session: { ...session(["runs.view"]), runtime_available: true } }));
     vi.spyOn(api, "request").mockImplementation(async (operation) => operation === "get_run" ? ({ run: { run_id: event.run_id, workflow_id: event.workflow_id, workflow_version: event.workflow_version, status: "paused_for_approval", approvals: [] } }) as never : ({ items: [event], has_more: false }) as never);
     view.rerender(<ServerRunView />);
     fireEvent.change(screen.getByLabelText("Run ID"), { target: { value: event.run_id } });
@@ -280,7 +284,7 @@ describe("Slack-triggered approval collection", () => {
       approvals: [{ approval_id: "approval_dm", workflow_id: "slack-dm-gmail", workflow_version: 1,
         status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] }] };
     const spy = vi.spyOn(api, "runs").mockResolvedValue({ items: [{ ...record, run_id: "run_dm_1" }, { ...record, run_id: "run_dm_2" }], total: 2, has_more: false, next_cursor: null });
-    useBackend.setState({ session: { ...session(["workflow.approve"]), runtime_available: true, approval_service_available: true } });
+    useBackend.setState({ status:"connected",session: { ...session(["workflow.approve","runs.view"]), runtime_available: true, approval_service_available: true } });
     render(<ServerRunView approvalsOnly />);
     await waitFor(() => expect(screen.getByRole("button", { name: /run_dm_1/ })).toBeVisible());
     expect(screen.getByRole("button", { name: /run_dm_2/ })).toBeVisible();

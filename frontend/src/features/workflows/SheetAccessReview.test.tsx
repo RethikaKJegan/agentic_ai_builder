@@ -10,7 +10,7 @@ it("shows per-workflow spreadsheet scope and creation permissions for review", (
     { spreadsheet_id: "factory-sheet", range: "Followups!A1:F1000", identity_column: "case_id", writable_columns: ["draft", "findings"], allow_create: true },
   ]} />);
   expect(screen.getByText("Sheet write access")).toBeInTheDocument();
-  expect(screen.getByText(/Publishing approves these write destinations/)).toBeInTheDocument();
+  expect(screen.getByText(/Review these destinations before approving and publishing/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "factory-sheet", hidden: true })).toHaveAttribute("href", "https://docs.google.com/spreadsheets/d/factory-sheet/edit");
   expect(screen.getByText("Writable columns: status")).toBeInTheDocument();
   expect(screen.getByText("Existing records only")).toBeInTheDocument();

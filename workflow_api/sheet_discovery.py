@@ -15,6 +15,23 @@ def spreadsheet_references(objective):
     return ids
 
 
+def planning_spreadsheet_references(objective, context):
+    """Explicit resources first, then bounded workspace candidates; no access grants."""
+    references = spreadsheet_references(objective)
+    for key in ('workspace_sources', 'workspace_knowledge'):
+        sources = context.get(key, [])
+        for source in sources if isinstance(sources, list) else []:
+            if not isinstance(source, dict):
+                continue
+            reference = source.get('spreadsheet_id')
+            additions = ([reference] if isinstance(reference, str) and re.fullmatch(r'[A-Za-z0-9_-]+', reference)
+                         else spreadsheet_references(source.get('url', '')) if isinstance(source.get('url', ''), str) else [])
+            for reference in additions:
+                if reference not in references and len(references) < 8:
+                    references.append(reference)
+    return references
+
+
 def validate_discovered_setup(workflow, catalogs):
     if not catalogs:
         return

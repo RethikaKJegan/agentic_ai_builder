@@ -4,7 +4,7 @@ import { Check, ChevronDown, ChevronRight, Loader2, Minus, Network, Pause, Pause
 import { NODE_META } from "./nodeMeta";
 import { useMesh } from "@/domain/store";
 import { getModel } from "@/domain/models";
-import type { WorkflowNodeData } from "@/domain/types";
+import type { Agent, WorkflowNodeData } from "@/domain/types";
 
 export type MeshFlowNode = Node<WorkflowNodeData & { runStatus?: string | undefined; childCount?: number | undefined; parentLabel?: string | undefined }, "mesh">;
 
@@ -14,7 +14,8 @@ export const NodeActions = createContext<{ toggleCollapse: (id: string) => void 
 function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
   const meta = NODE_META[data.kind];
   const actions = useContext(NodeActions);
-  const agent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
+  const localAgent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
+  const agent = data["readOnly"] ? data["agentPreview"] as Agent | undefined : localAgent;
   const st = data.runStatus;
   const tb = data.orientation === "tb";
   const isMaster = data.role === "master";
@@ -56,10 +57,11 @@ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
           </span>
         )}
       </div>
+      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{meta.label}{data.kind === "trigger" ? " · Start" : data.kind === "output" ? " · End" : ""}{Number(data["diagnosticCount"]) > 0 ? ` · ${data["diagnosticCount"]} configuration issues` : ""}</p>
       {(agent?.purpose || data.description) && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{data.description || agent?.purpose}</p>}
       {(agent?.paused || (data.childCount ?? 0) > 0) && (
         <div className="mt-2 flex items-center gap-2">
-          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Paused</span>}
+          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Draft paused</span>}
           {(data.childCount ?? 0) > 0 && (
             <button
               onClick={(e) => { e.stopPropagation(); actions.toggleCollapse(id); }}

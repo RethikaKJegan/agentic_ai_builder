@@ -1,0 +1,30 @@
+--- a/openspec/changes/automatic-source-selection/verification.md
++++ b/openspec/changes/automatic-source-selection/verification.md
+@@ -25,3 +25,14 @@
+ Models/provider transports in automated tests are offline; visual fixtures that mock APIs remain visual evidence. Production Google Workspace login/authenticated public lifecycle remains deferred. Supported product simulation remains unavailable. These existing production acceptance limits are not waived by this change. No real provider business operation, email, Sheets write or production workflow generation is submitted during release verification.
+ 
+ The next all-spec browser run exposed two desktop/mobile instances of a stale controlled-failure fixture: adding a required manual input to an automatic workflow correctly failed validation. The failure case now references an absent field in the actual master output. This preserves automatic input validation and still checks authoritative failed-node events, idempotent retry and preservation of the active prior revision. Its successful automatic lifecycle/execution steps had already passed; a clean final suite is required after the fixture correction.
++
++
++## Final browser and live deployment result
++
++The final complete default browser suite passed **all 55 scenarios** with the corrected explicit-session/manual compatibility fixture and automatic runtime failure fixture. All failed/partial diagnostics remain separate; none is counted as passing. The final run includes the real canonical automatic generation/review/edit/save/validate/approve/publish/activate/execute/failure/retry journey on desktop and mobile, and all existing delegation, permissions, traces, settings, Sheets panel and session recovery cases.
++
++The exact tested frontend artifact **qPGCM9aYDKS2koDL1gx0W** was loaded into the running builder. The backend and worker were restarted to load source-context/knowledge changes. All three scoped services are active. Seven production source hashes match the checkpoint. Previous source originals and frontend artifact are retained with a prepared source/artifact rollback; rollback was not exercised. No migration or production business mutation was submitted.
++
++**20 live HTTP checks passed**, including verified HTTPS/build identity, redirect, protected public endpoints, local authenticated proxy reads, private anonymous and invalid-origin rejection, bounded collections/events, invalid request parameters and active worker health. **Four live browser surfaces passed**: local desktop/mobile and public HTTPS desktop/mobile. Each confirms the input-source dropdown is absent, automatic-source guidance is visible and the requirement prompt is usable, with no page errors or broken assets. The public session remains correctly denied (403) pending Google Workspace login; this does not claim a public authenticated workflow journey. Live smoke did not generate, approve, execute, probe a provider, send email or write Sheets.
++
++Evidence, screenshots, service identities and exact build/source checkpoints are retained under `.local/automatic-source-selection/`. Production readiness remains false for the existing deferred Google Workspace login and unavailable supported simulation.
+--- a/openspec/changes/automatic-source-selection/tasks.md
++++ b/openspec/changes/automatic-source-selection/tasks.md
+@@ -1,6 +1,6 @@
+ # Tasks
+ 
+-- [ ] 1. Implement prompt-only UI and trusted automatic workspace context.
+-- [ ] 2. Use supported saved/additional sources and fresh authorized runtime knowledge.
+-- [ ] 3. Verify source isolation, freshness, input inference and desktop/mobile flows.
+-- [ ] 4. Deploy verified changes and record live checks and limits.
++- [x] 1. Implement prompt-only UI and trusted automatic workspace context.
++- [x] 2. Use supported saved/additional sources and fresh authorized runtime knowledge.
++- [x] 3. Verify source isolation, freshness, input inference and desktop/mobile flows.
++- [x] 4. Deploy verified changes and record live checks and limits.

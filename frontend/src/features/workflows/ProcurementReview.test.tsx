@@ -1,11 +1,15 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProcurementReview } from "./ProcurementReview";
 import type { Workflow } from "@/domain/types";
 import { api, ApiError } from "@/api/client";
-vi.mock("@/api/state", () => ({ useBackend: () => ({ overview: { workflow_demo: { published_version: 1 } }, can: () => true, initialize: vi.fn().mockResolvedValue(undefined) }) }));
+vi.mock("@/api/state", () => ({ useBackend: () => ({ session: { runtime_available: true }, overview: { workflow_demo: { published_version: 1 } }, can: () => true, initialize: vi.fn().mockResolvedValue(undefined) }) }));
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+beforeEach(() => {
+  vi.spyOn(api, 'procurementStatus').mockResolvedValue({project_id:'project_demo',phase:'NOT_STARTED',issues:[],candidates:[],record_counts:{},resources:[],actions:{}});
+  vi.spyOn(api, "releaseState").mockResolvedValue({ workflow_id: "workflow_demo", release: { release_id: "release_demo", workflow_version: 1, state: "active", trigger_binding_count: 0 } });
+});
 const plan = { project_id: "project_demo", name: "Workshop procurement", simulation: true,
   context: { delivery_location: "Chennai", delivery_deadline: null, quote_deadline: null, time_zone: "Asia/Kolkata", comparison_currency: "INR" },
   requirements: { spreadsheet_url: "https://docs.google.com/spreadsheets/d/req/edit", range: "Items!A1:F101", columns: { item_id: "Reference", quantity: "Amount" } },
@@ -15,6 +19,8 @@ const workflow = { id: "workflow_demo", serverVersion: 1, canonical: { status: "
 it("reviews actual project mappings and leaves missing context visible", () => {
   render(<ProcurementReview workflow={workflow} />);
   fireEvent.click(screen.getByText("Procurement setup & status"));
+
+  fireEvent.click(screen.getByRole("button",{name:"Setup"}));
   expect(screen.getByDisplayValue("Contact Email")).toBeDisabled();
   expect(screen.getByDisplayValue("Amount")).toBeDisabled();
   expect(screen.queryByText("Save project settings")).not.toBeInTheDocument();
@@ -27,6 +33,7 @@ it("shows actual phase, counts, run references and resource link", async () => {
     actions: { send_vendor: { workflow_id: "send_workflow", state: "paused_for_approval", run_id: "run_demo" } } });
   render(<ProcurementReview workflow={workflow} />);
   fireEvent.click(screen.getByText("Procurement setup & status"));
+
   fireEvent.click(screen.getByText("Refresh project status"));
   await waitFor(() => expect(screen.getByText("SENDING")).toBeInTheDocument());
   expect(screen.getByText(/run_demo/)).toBeInTheDocument();
@@ -44,7 +51,8 @@ it("activates existing POs with configured contacts without executing procuremen
   const activate = vi.spyOn(api, "procurementFulfilmentActivate").mockResolvedValue({});
   const execute = vi.spyOn(api, "request");
   render(<ProcurementReview workflow={workflow} />);
-  fireEvent.click(screen.getByText("Refresh project status"));
+  fireEvent.click(screen.getByText("Procurement setup & status"));
+
   await waitFor(() => expect(screen.getByText("Activate Phase 3 for these existing POs")).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText("Buyer receiving email"), { target: { value: "buyer@example.com" } });
   fireEvent.change(screen.getByLabelText("Manager notification email"), { target: { value: "manager@example.com" } });
@@ -59,9 +67,11 @@ it("starts the published revision directly with no spreadsheet trigger input", a
   vi.spyOn(api, "procurementStatus").mockResolvedValue({ project_id: "project_demo", phase: "TRACKING", issues: [], candidates: [], record_counts: {}, resources: [], actions: {} });
   render(<ProcurementReview workflow={workflow} />);
   fireEvent.click(screen.getByText("Procurement setup & status"));
+
+  await waitFor(() => expect(screen.getByText("Start procurement")).toBeEnabled());
   fireEvent.click(screen.getByText("Start procurement"));
-  await waitFor(() => expect(request).toHaveBeenCalledWith("execute_workflow", { workflow_id: "workflow_demo", workflow_version: 1, inputs: {} }, expect.any(String)));
-  expect(screen.getByText(/No new spreadsheet row is needed/)).toBeInTheDocument();
+  await waitFor(() => expect(request).toHaveBeenCalledWith("execute_workflow", { workflow_id: "workflow_demo", workflow_version: 1, inputs: {} }, "procurement_start_release_demo"));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 it("reviews candidate evidence and keeps unknown emails unselectable", async () => {
@@ -72,7 +82,9 @@ it("reviews candidate evidence and keeps unknown emails unselectable", async () 
     shortlist_digest: "current_digest", record_counts: {}, resources: [], actions: {} });
   const review = vi.spyOn(api, "procurementSuppliersReview").mockResolvedValue({});
   render(<ProcurementReview workflow={workflow} />);
-  fireEvent.click(screen.getByText("Procurement setup & status")); fireEvent.click(screen.getByText("Refresh project status"));
+  fireEvent.click(screen.getByText("Procurement setup & status"));
+ fireEvent.click(screen.getByText("Refresh project status"));
+  fireEvent.click(screen.getByRole("button",{name:"Vendors & quotes"}));
   await waitFor(() => expect(screen.getByLabelText("Supplier B")).toBeDisabled());
   fireEvent.click(screen.getByLabelText("Supplier A")); fireEvent.click(screen.getByText("Approve selected suppliers"));
   await waitFor(() => expect(review).toHaveBeenCalledWith("project_demo", "approved", ["supplier_a"], "current_digest"));
@@ -81,7 +93,42 @@ it("reviews candidate evidence and keeps unknown emails unselectable", async () 
 it("shows a ready-to-start state when the project has not been created", async () => {
   vi.spyOn(api, "procurementStatus").mockRejectedValue(new ApiError({ error_code: "PROCUREMENT_PROJECT_NOT_FOUND", message: "Not found", request_id: "req_test", retryable: false }));
   render(<ProcurementReview workflow={workflow} />);
+  fireEvent.click(screen.getByText("Procurement setup & status"));
   fireEvent.click(screen.getByText("Refresh project status"));
   await waitFor(() => expect(screen.getByText(/Ready to start/)).toBeInTheDocument());
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it.each([null, { release_id: "old", workflow_version: 1, state: "disabled" as const, trigger_binding_count: 0 },
+  { release_id: "other_revision", workflow_version: 2, state: "active" as const, trigger_binding_count: 0 }])("prevents starts without an active matching published revision: %j", async release => {
+  vi.mocked(api.releaseState).mockResolvedValue({ workflow_id: "workflow_demo", release });
+  const execute = vi.spyOn(api, "request");
+  render(<ProcurementReview workflow={workflow} />);
+  fireEvent.click(screen.getByText("Procurement setup & status"));
+  await waitFor(() => expect(screen.getByText("Activate published revision v1 before starting procurement.")).toBeInTheDocument());
+  expect(screen.getByText("Start procurement")).toBeDisabled();
+  fireEvent.click(screen.getByText("Start procurement"));
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it("rechecks activation before submitting and stops a revoked release", async () => {
+  const execute = vi.spyOn(api, "request");
+  render(<ProcurementReview workflow={workflow} />);
+  fireEvent.click(screen.getByText("Procurement setup & status"));
+  await waitFor(() => expect(screen.getByText("Start procurement")).toBeEnabled());
+  vi.mocked(api.releaseState).mockResolvedValue({ workflow_id: "workflow_demo", release: null });
+  fireEvent.click(screen.getByText("Start procurement"));
+  await waitFor(() => expect(screen.getByText("Start procurement")).toBeDisabled());
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it("refreshes activation after the operator activates the workflow", async () => {
+  vi.mocked(api.releaseState).mockResolvedValue({ workflow_id: "workflow_demo", release: null });
+  vi.spyOn(api, "procurementStatus").mockRejectedValue(new ApiError({ error_code: "PROCUREMENT_PROJECT_NOT_FOUND", message: "Not found", request_id: "req_test", retryable: false }));
+  render(<ProcurementReview workflow={workflow} />);
+  fireEvent.click(screen.getByText("Procurement setup & status"));
+  await waitFor(() => expect(screen.getByText("Activate published revision v1 before starting procurement.")).toBeInTheDocument());
+  vi.mocked(api.releaseState).mockResolvedValue({ workflow_id: "workflow_demo", release: { release_id: "new", workflow_version: 1, state: "active", trigger_binding_count: 0 } });
+  fireEvent.click(screen.getByText("Refresh project status"));
+  await waitFor(() => expect(screen.getByText("Start procurement")).toBeEnabled());
 });

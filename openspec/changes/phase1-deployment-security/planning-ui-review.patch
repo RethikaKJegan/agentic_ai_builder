@@ -1,0 +1,132 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -65,6 +65,8 @@
+   save_workflow_version: workflowData, validate_workflow: workflowData, approve_workflow: workflowData,
+   execute_workflow: runData, get_run: runData, list_run_events: eventsData, list_tools: toolsData,
+   list_capabilities: capabilitiesData, decide_approval: approvalData };
++const planningJobSchema = z.object({ job_id: z.string(), state: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]), result: ApiResponseSchema.nullable() });
++export type PlanningJob = z.infer<typeof planningJobSchema>;
+ export type Session = z.infer<typeof sessionData>;
+ export type ToolRecord = z.infer<typeof toolsData>["items"][number];
+ export type RegistryReview = z.infer<typeof registryReviewSchema>;
+@@ -122,6 +124,20 @@
+   private sessionGeneration = 0;
+   private sessionMode: string | null = null;
+   private planningJobsAvailable = false;
++  private planningListeners = new Set<(job: PlanningJob) => void>();
++  subscribePlanning(listener: (job: PlanningJob) => void) {
++    this.planningListeners.add(listener);
++    return () => { this.planningListeners.delete(listener); };
++  }
++  private reportPlanning(job: PlanningJob) {
++    for (const listener of this.planningListeners) listener(job);
++  }
++  async cancelPlanning(jobId: string) {
++    const job = planningJobSchema.safeParse(await this.read(`planning-jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" }));
++    if (!job.success) return fail("INVALID_API_DATA", "The cancellation response is invalid.");
++    this.reportPlanning(job.data);
++    return job.data;
++  }
+   constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {
+     if (base !== "/api/backend/") throw new Error("Use the relative same-origin workflow API path.");
+   }
+@@ -270,14 +286,20 @@
+   }
+ 
+   private async planJob(options: RequestInit) {
+-    const schema = z.object({ job_id: z.string(), state: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
+-      result: ApiResponseSchema.nullable() });
+-    let job = schema.parse(await this.read("planning-jobs", options));
++    let job = planningJobSchema.parse(await this.read("planning-jobs", options));
++    this.reportPlanning(job);
+     const until = Date.now() + 45 * 60_000;
+     while (job.state === "queued" || job.state === "running") {
+       if (Date.now() > until) return fail("PLANNING_PENDING", `Planning is still pending. Job reference: ${job.job_id}. Check its status before starting another request.`);
+       await new Promise((resolve) => setTimeout(resolve, 1500));
+-      job = schema.parse(await this.read(`planning-jobs/${encodeURIComponent(job.job_id)}`));
++      try { job = planningJobSchema.parse(await this.read(`planning-jobs/${encodeURIComponent(job.job_id)}`)); }
++      catch (error) {
++        if (error instanceof ApiError) throw new ApiError({ ...error.error,
++          message: `${error.message} Planning job: ${job.job_id}. Reconnect and check its status before starting another request.`,
++          details: { ...error.error.details, planning_job_id: job.job_id } }, error.correlationId);
++        return fail("INVALID_API_DATA", "The planning status response is invalid.");
++      }
++      this.reportPlanning(job);
+     }
+     // A confirmed terminal failure/cancellation permits the next explicit user retry
+     // to create a new job. Unknown transport outcomes keep the existing retry key.
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -26,6 +26,10 @@
+   refreshOverview: async () => {
+     try {
+       const snapshot = await api.overview();
++      if (get().status === "unavailable" && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
++        const session = await api.session();
++        set({ session, status: "connected" });
++      }
+       const overview = Object.fromEntries(snapshot.items.map((item) => [item.workflow_id, item]));
+       set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
+         error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" ? null : get().error });
+--- a/frontend/src/screens/app.index.tsx
++++ b/frontend/src/screens/app.index.tsx
+@@ -1,10 +1,11 @@
+ "use client";
+-import { useState } from "react";
++import { useEffect, useState } from "react";
+ import { motion } from "motion/react";
+ import { ArrowRight, Sparkles } from "lucide-react";
+ import { Link, useNavigate } from "@/lib/navigation";
+ import { useMesh } from "@/domain/store";
+ import { createWorkflow } from "@/api/create-workflow";
++import { api, type PlanningJob } from "@/api/client";
+ import { toast } from "sonner";
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+@@ -14,11 +15,21 @@
+   const workflows = useMesh((s) => s.workflows);
+   const [description, setDescription] = useState("");
+   const [planning, setPlanning] = useState(false);
++  const [planningJob, setPlanningJob] = useState<PlanningJob | null>(null);
++  const [cancelling, setCancelling] = useState(false);
++  useEffect(() => api.subscribePlanning(setPlanningJob), []);
++  const cancel = async () => {
++    if (!planningJob || cancelling) return;
++    setCancelling(true);
++    try { await api.cancelPlanning(planningJob.job_id); }
++    catch (error) { setApiError(error instanceof Error ? error : new Error("Cancellation could not be confirmed. Check the job status.")); }
++    finally { setCancelling(false); }
++  };
+   const [apiError, setApiError] = useState<Error | null>(null);
+   const generate = async () => {
+     const prompt = description.trim();
+     if (planning || !prompt) return;
+-    setPlanning(true); setApiError(null);
++    setPlanning(true); setPlanningJob(null); setApiError(null);
+     try {
+       const context = {
+         generation_mode: "hierarchy",
+@@ -44,7 +55,12 @@
+       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+       <p className="mt-4 text-sm text-muted-foreground">Include the source URL and any range or trigger details here. Published event workflows receive new data automatically.</p>
+       <div className="mt-6 flex flex-wrap items-center gap-3">
+-      <button type="button" disabled={planning || !description.trim()} onClick={() => void generate()} className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Sparkles className="h-4 w-4" />{planning ? "Generating…" : "Generate workflow"}</button></div><ApiFeedback error={apiError} />
++      {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
++        <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}
++      <button type="button" disabled={planning || !description.trim()} onClick={() => void generate()} className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Sparkles className="h-4 w-4" />{planning ? "Generating…" : "Generate workflow"}</button></div>
++      {planningJob && <p role="status" className="mt-3 break-all text-xs text-muted-foreground">Generation {planningJob.state} · Job {planningJob.job_id}</p>}
++      {planningJob?.state === "cancelled" && <p className="mt-1 text-xs text-muted-foreground">Cancellation discards the result. Model usage already incurred cannot be undone.</p>}
++      <ApiFeedback error={apiError} />
+     </section>
+     <section className="mt-12"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium">Recent workflows</h2><Link to="/app/workflows" className="text-sm text-primary">View all</Link></div>{workflows.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Generate a workflow above to see it here.</p> : <div className="divide-y divide-border rounded-xl border border-border">{workflows.slice(0, 5).map((w) => <Link key={w.id} to="/app/workflows/$id" params={{ id: w.id }} className="flex items-center justify-between px-4 py-3 hover:bg-canvas"><span><span className="block font-medium">{w.name}</span><span className="text-xs text-muted-foreground">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : "local draft"}</span></span><ArrowRight className="h-4 w-4 text-primary" /></Link>)}</div>}</section>
+   </div>;
+--- a/frontend/src/api/planning-jobs.test.ts
++++ b/frontend/src/api/planning-jobs.test.ts
+@@ -26,6 +26,7 @@
+   const client = new WorkflowClient(transport);
+   await client.session();
+   const promise = client.request('plan_workflow', { objective: 'Review invoice approval' });
++  await vi.waitFor(() => expect(transport.mock.calls.some(([url]) => String(url).endsWith('/planning-jobs'))).toBe(true));
+   await vi.advanceTimersByTimeAsync(3100);
+   expect((await promise).workflow.workflow_id).toBe(workflow.workflow_id);
+   expect(transport.mock.calls.filter(([url]) => String(url).includes('/planning-jobs/'))).toHaveLength(2);

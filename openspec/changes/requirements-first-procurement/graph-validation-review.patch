@@ -1,0 +1,22 @@
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -106,6 +106,8 @@
+                     "may use actual event/output fields but must not depend on a user-supplied condition_result. "
+                     "Only these node configuration keys are executable: input, input_mapping, description, ui, on_timeout, timeout_outcome, error_outcome. "
+                     "Never use output_mapping. Output nodes use input_mapping and produce every required workflow output on every terminal branch. "
++                    "Every workflow MUST contain a kind=trigger node and a kind=output node, with every graph node reachable from the trigger. "
++                    "For a prompt-started procurement draft, connect a manual trigger to the master agent, then any review gates and the final output. "
+                     "Trigger nodes omit configuration entirely; event mapping and provider settings belong only in metadata.trigger_templates. "
+                     "Tool references contain ONLY tool_id and capability; never generate configuration_reference. "
+                     "Every agent MUST include allowed_tool_ids=[]; executable assignments come only from Registry review. "
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -211,7 +211,7 @@
+                     raise
+                 hints = {
+                     'EMAIL_SOURCE_MAPPING_REQUIRED': 'The initial graph sends only to the source-row customer. Remove manager email nodes and reply-loop branches; the inbox worker handles those using customer_automation metadata.',
+-                    'WORKFLOW_VALIDATION_FAILED': 'Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
++                    'WORKFLOW_VALIDATION_FAILED': 'Include a kind=trigger node and a kind=output node, and connect every graph node to a path from the trigger. Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
+                     'OUTPUT_FIELD_NOT_DECLARED': 'SMTP returns message_id, not sent. Map message_id from the sender output; if email_sent is required, use True only in the output step reached after successful SMTP submission.',
+                 }
+                 errors.append({'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})})

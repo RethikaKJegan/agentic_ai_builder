@@ -14,7 +14,7 @@ export function NodeTrace({ node, trace }: { node: WorkflowNode; trace: Workflow
   const last = events.at(-1);
   const status = trace.runState[node.id];
   const first = events.find((event) => event.event_type === "node.observed" || event.event_type === "node.started");
-  const duration = first && last && completed ? Math.max(0, Date.parse(last.timestamp) - Date.parse(first.timestamp)) : undefined;
+  const duration = first && last && completed ? Number.isFinite(Date.parse(last.timestamp) - Date.parse(first.timestamp)) && Date.parse(last.timestamp) >= Date.parse(first.timestamp) ? Date.parse(last.timestamp) - Date.parse(first.timestamp) : undefined : undefined;
   const retries = events.filter((event) => event.event_type === "node.retry").length;
   const decision = completed?.["outcome"] ?? (status === "skipped" ? "Skipped" : status === "paused" ? "Waiting for approval" : status === "failed" || status === "blocked" ? last?.details?.["error_code"] : completed ? "Completed" : undefined);
   const explanation = completed?.["explanation"] ?? (status === "skipped" ? last?.details?.["explanation"] : completed && completed["output"] !== undefined && node.data.kind === "agent" ? "The agent returned the recorded output below. Any explanation supplied by the agent is included in that output; no additional rationale was recorded." : completed && Array.isArray(completed["selected_edges"]) ? "The step completed and selected the recorded successor edges." : undefined);
@@ -22,9 +22,11 @@ export function NodeTrace({ node, trace }: { node: WorkflowNode; trace: Workflow
     <ApiFeedback error={trace.error} />
     {!trace.available ? <p className="text-sm text-muted-foreground">Execution traces require a connected runtime and permission to view runs.</p> : !trace.runId ? <p className="text-sm text-muted-foreground">No recorded runs for this workflow yet.</p> : !trace.run ? <p role="status" className="text-sm">{trace.loading ? "Loading execution trace…" : "Execution trace unavailable."}</p> : <>
       <p className="break-all text-xs text-muted-foreground">{trace.run.run_id} · revision v{trace.run.workflow_version}</p>
-      <StatusPill status={status ?? "not executed"} />
+      <StatusPill status={status ?? "No recorded status"} />
       {!events.length && <p className="text-sm text-muted-foreground">This step has no recorded events in the selected run. It may not have been reached or may belong to a different revision.</p>}
       <p className="text-xs text-muted-foreground">{duration === undefined ? "Timing not recorded or execution pending" : `${duration} ms recorded duration`} · {retries} retries</p>
+      <Evidence title="Recorded failure" value={events.filter(event => ["node.failed", "approval.rejected", "approval.timed_out"].includes(event.event_type)).at(-1)?.details} />
+      <Evidence title="Safe recorded inputs" value={observed?.["input"] ?? observed?.["inputs"]} />
       <Evidence title="Observation" value={observed?.["observation"]} />
       <Evidence title="Decision" value={decision} />
       <Evidence title="How the decision was made" value={completed?.["expression"] !== undefined ? { expression: completed["expression"], evaluated_value: completed["evaluated_value"] } : observed ? { kind: observed["kind"], agent_id: observed["agent_id"], tool_id: observed["tool_id"], policy: observed["policy"] } : undefined} />

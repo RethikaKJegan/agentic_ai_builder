@@ -1,0 +1,241 @@
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -38,8 +38,10 @@
+         with self.store.transaction() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))')
+             db.execute('CREATE INDEX IF NOT EXISTS runtime_runs_workspace_workflow ON runtime_runs(workspace, workflow_id)')
++            db.execute("CREATE INDEX IF NOT EXISTS runtime_runs_pending ON runtime_runs(json_extract(document,'$.status')) WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval')")
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))')
+             db.execute('CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)')
++            db.execute('CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)')
+ 
+     @staticmethod
+     def authorize(auth, permission, roles):
+@@ -141,7 +143,7 @@
+ 
+     def load(self, db, run_id, auth, permission='runs.view'):
+         self.authorize(auth, permission, {'admin', 'builder', 'viewer', 'approver'} if permission == 'runs.view' else {'admin', 'builder'})
+-        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (auth['subject']['workspace_id'], run_id)).fetchone()
++        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?' + (' FOR UPDATE' if getattr(db,'write',False) else ''), (auth['subject']['workspace_id'], run_id)).fetchone()
+         if row is None:
+             raise RuntimeFailure('RUN_NOT_FOUND', 'The run was not found in this workspace.', 404)
+         return json.loads(row[0])
+--- a/runtime/worker.py
++++ b/runtime/worker.py
+@@ -4,17 +4,20 @@
+ 
+ 
+ class RuntimeWorker:
+-    def __init__(self, runner, authenticate, interval=1):
++    def __init__(self, runner, authenticate, interval=1, batch_size=100):
+         self.runner, self.authenticate, self.interval = runner, authenticate, interval
++        self.batch_size = min(max(int(batch_size),1),1000)
++        self.health = {"state":"starting","last_success":None,"last_error":None}
+         self.stop_event = Event()
+         self.thread = None
+ 
+     def drain(self):
+         runtime = self.runner.runtime
+         with runtime.store.transaction(write=False) as db:
+-            rows = db.execute('SELECT document FROM runtime_runs ORDER BY rowid').fetchall()
++            rows = db.execute("SELECT document FROM runtime_runs WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.batch_size,)).fetchall()
+         advanced = []
+         for row in rows:
++            if self.stop_event.is_set():break
+             run = json.loads(row[0])
+             if run['status'] not in {'queued', 'running', 'paused_for_approval'}:
+                 continue
+@@ -28,6 +31,8 @@
+             except Exception:
+                 continue
+         runtime.export_traces()
++        import time
++        self.health={"state":"ready","last_success":time.time(),"last_error":None}
+         return advanced
+ 
+     def start(self):
+@@ -36,7 +41,11 @@
+         self.stop_event.clear()
+         def loop():
+             while not self.stop_event.is_set():
+-                self.drain()
++                try:self.drain()
++                except Exception:
++                    import logging
++                    self.health['state'],self.health['last_error']='error','RUNTIME_WORKER_FAILED'
++                    logging.getLogger(__name__).warning('Runtime worker failed; durable runs retained.')
+                 self.stop_event.wait(self.interval)
+         self.thread = Thread(target=loop, name='builder-runtime-worker', daemon=True)
+         self.thread.start()
+--- a/workflow_api/scheduler.py
++++ b/workflow_api/scheduler.py
+@@ -17,6 +17,7 @@
+         self.stop_event = Event()
+         self.thread = None
+         self.last_polled = {}
++        self.health={"state":"starting","last_success":None,"last_error":None}
+ 
+     def tick(self):
+         lifecycle = self.service.lifecycle
+@@ -26,12 +27,15 @@
+         polled = queued = dispatched = 0
+         # Poll bindings are workspace scoped and the worker uses fresh auth.
+         with lifecycle.store.transaction(write=False) as db:
+-            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers WHERE state='ready'").fetchall()}
++            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations").fetchall()}
+         for workspace in workspaces:
++            if self.stop_event.is_set():break
++            lifecycle.reconcile_cleanup(workspace)
+             auth = self.authenticate(workspace, "local-builder")
+             if not auth:
+                 continue
+             for binding in lifecycle.poll_bindings(workspace):
++                if self.stop_event.is_set():break
+                 binding_id = binding["binding_id"]
+                 now = time.time()
+                 if now - self.last_polled.get(binding_id, 0) < binding.get("poll_interval_seconds", self.interval):
+@@ -76,9 +80,10 @@
+                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
+                     self.last_polled[binding_id] = now
+                     continue
+-            for job in lifecycle.lease(workspace):
++            for job in lifecycle.lease(workspace,limit=1,seconds=120):
+                 lifecycle.execute_job(job["job_id"], runner)
+                 dispatched += 1
++        self.health={"state":"ready","last_success":time.time(),"last_error":None}
+         return {"polled": polled, "queued": queued, "dispatched": dispatched}
+ 
+     def start(self):
+@@ -90,7 +95,11 @@
+ 
+     def _loop(self):
+         while not self.stop_event.is_set():
+-            self.tick()
++            try:self.tick()
++            except Exception:
++                import logging
++                self.health['state'],self.health['last_error']='error','TRIGGER_WORKER_FAILED'
++                logging.getLogger(__name__).warning('Trigger worker failed; durable jobs retained.')
+             self.stop_event.wait(self.interval)
+ 
+     def stop(self):
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -30,7 +30,7 @@
+ 
+ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
+                runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True,
+-               ui_origins=None, environment_name=None, planner_timeout_seconds=180):
++               ui_origins=None, environment_name=None, planner_timeout_seconds=180, planning_worker_enabled=True):
+     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
+     mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
+     allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
+@@ -82,13 +82,15 @@
+         lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
+         deadline=planning_deadline(planner_timeout_seconds))
+     app.state.planning_jobs = planning_jobs
++    from .worker_control import WorkerSupervisor
++    app.state.worker_registration = WorkerSupervisor(workflow_service.store,[],role='api')
+     app.state.workers = workers
+     app.state.allowed_origins = allowed_origins
+     app.state.environment_name = mode
+ 
+     @app.on_event('startup')
+     def start_planning():
+-        planning_jobs.start()
++        if planning_worker_enabled:planning_jobs.start()
+ 
+     @app.on_event('shutdown')
+     async def stop_workers():
+@@ -386,6 +388,14 @@
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+ 
++    @app.get('/worker-health')
++    async def worker_health():
++        if 'runs.view' not in auth['permissions']:
++            return error('OPERATION_NOT_AUTHORIZED','Worker monitoring access is required.',403)
++        from .worker_control import health
++        data = await run_in_threadpool(health,workflow_service.store,auth['subject']['workspace_id'])
++        return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
++
+     @app.get('/workspace/{collection}')
+     async def workspace_collection(collection: str, request: Request):
+         if collection not in {'settings', 'knowledge', 'governance'}:
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -258,6 +258,8 @@
+ def create_configured_app(env=None, database=None, client=None, model_factory=None):
+     env = environment() if env is None else env
+     mode = deployment_mode(env.get('BUILDER_ENVIRONMENT', 'production'))
++    process_role=env.get('BUILDER_PROCESS_ROLE','combined')
++    if process_role not in {'api','worker','combined'}:raise ValueError('Use api, worker or combined process role.')
+     if env.get('BUILDER_DEV_AUTH') != '1':
+         raise ValueError('Explicitly enable development authentication for the local live launcher.')
+     allowed_origins = origins(env.get('BUILDER_UI_ORIGINS'))
+@@ -272,7 +274,7 @@
+     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
+                      registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
+                      environment_name=mode, ui_origins=allowed_origins,
+-                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')))
++                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+     service = app.state.workflow_service
+     from openai import OpenAI
+     from planner import PlannerService
+@@ -388,27 +390,26 @@
+     app.state.live_operator_auth = auth
+     app.state.live_workers = workers
+ 
++    class ReplyWorker:
++        def start(self):
++            nonlocal reply_thread
++            reply_stop.clear()
++            reply_thread=Thread(target=poll_replies,name='builder-reply-monitor',daemon=True)
++            reply_thread.start()
++        def stop(self):
++            reply_stop.set()
++            if reply_thread:reply_thread.join(timeout=5)
++    from .worker_control import WorkerSupervisor
++    components=[*workers,app.state.planning_jobs]
++    if hasattr(service,'reply_cases'):components.append(ReplyWorker())
++    supervisor=WorkerSupervisor(service.store,components,role=process_role)
++    app.state.worker_supervisor=supervisor
++    app.state.process_role=process_role
++
+     @app.on_event('startup')
+-    def start():
+-        nonlocal reply_thread
+-        try:
+-            for worker in workers:
+-                worker.start()
+-            if hasattr(service, 'reply_cases'):
+-                reply_stop.clear()
+-                reply_thread = Thread(target=poll_replies, name='builder-reply-monitor', daemon=True)
+-                reply_thread.start()
+-        except Exception:
+-            for worker in workers:
+-                worker.stop()
+-            raise
++    def start():supervisor.start()
+ 
+     @app.on_event('shutdown')
+-    def stop():
+-        reply_stop.set()
+-        if reply_thread:
+-            reply_thread.join(timeout=5)
+-        for worker in workers:
+-            worker.stop()
++    def stop():supervisor.stop()
+ 
+     return app
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -99,6 +99,8 @@
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_tombstones (workspace TEXT, workflow_id TEXT, deleted_at TEXT, cleanup_state TEXT, PRIMARY KEY(workspace, workflow_id))")
+             db.execute('CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)')
+             db.execute('CREATE INDEX IF NOT EXISTS lifecycle_preparations_workspace ON lifecycle_preparations(workspace)')
++            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_jobs_ready ON lifecycle_jobs(workspace,state,available_at,lease_until)')
++            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_triggers_active ON lifecycle_triggers(workspace,state,workflow_id)')
+             # Recovery is lease-aware; another API instance may still be preparing.
+ 
+     @staticmethod

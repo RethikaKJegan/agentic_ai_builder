@@ -1,0 +1,11 @@
+--- a/workflow_api/scheduler.py
++++ b/workflow_api/scheduler.py
+@@ -80,7 +80,7 @@
+                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
+                     self.last_polled[binding_id] = now
+                     continue
+-            for job in lifecycle.lease(workspace,limit=1,seconds=120):
++            for job in lifecycle.lease(workspace,limit=10,seconds=120):
+                 lifecycle.execute_job(job["job_id"], runner)
+                 dispatched += 1
+         self.health={"state":"ready","last_success":time.time(),"last_error":None}

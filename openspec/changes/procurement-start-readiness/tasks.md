@@ -1,0 +1,6 @@
+- [x] Trace the reported run against authoritative release timing.
+- [x] Reject inactive procurement execution before run creation.
+- [x] Preserve specific connector activation/setup errors.
+- [x] Gate Start using authoritative release state and scope retries to the release.
+- [x] Verify offline backend/frontend regressions, contracts and production desktop/mobile browser behavior.
+- [x] Load the tested fix and verify existing live workflow readiness without replaying business actions.

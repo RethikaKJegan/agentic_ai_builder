@@ -1,0 +1,7 @@
+- [x] Correct immutable canonical mappings and complete workflow-owned agent dirty tracking/persistence.
+- [x] Add atomic read reconciliation and confirmed-save handling that preserve newer local edits and exact baselines.
+- [x] Detect remote/tab conflicts and provide explicit comparison, export, discard/reload and safe non-overlapping rebase.
+- [x] Preserve canonical metadata/branches/approvals/layout and clear unreviewed executable grants on editable revisions.
+- [x] Standardize safe API error, field, recovery, unknown-outcome and bounded read retry behavior.
+- [x] Verify regression, desktop/mobile/multi-tab browser, backend contracts/security and production build checks.
+- [x] Load tested changes safely, verify live read-only paths and record actual results/remaining limits.

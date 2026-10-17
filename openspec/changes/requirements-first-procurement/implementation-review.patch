@@ -1,0 +1,157 @@
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -57,6 +57,21 @@
+                     "Return only JSON. Produce a workflow draft using exactly the canonical field names in the supplied schema. "
+                     "Do not use aliases such as steps, trigger, or error_handling. Include every required top-level field, "
+                     "use draft status, keep tool assignments empty, and put unknown requirements in metadata.unresolved_requirements. "
++                    "For requirements_first procurement, omit metadata.customer_automation. Automatic procurement planning does not enable customer-email reply handling. "
++                    "When context.procurement_planning_mode=requirements_first, create a plan that generates a new BOQ "
++                    "from the objective before supplier research, quotation comparison, budget review, procurement report and "
++                    "RFQ/PO drafting. Do not require an existing BOQ spreadsheet or reuse an unrelated historical project as "
++                    "the new requirements. Save the user's requirements, capacity, currency and spending ceiling as setup "
++                    "data, and preserve them in agent instructions and mapped inputs. Use meaningful specialist outputs so "
++                    "the BOQ, quotes, comparison and final report can be inspected in execution traces. "
++                    "Estimated prices are estimates, never verified offers. Only use simulated quotations if the user permits "
++                    "simulation, and label their supplier identity, price, availability, quality and delivery assumptions as "
++                    "SIMULATED/UNVERIFIED. Do not fabricate real supplier contacts or claim live verification without an "
++                    "authorized read result. Distinguish draft RFQs/POs from issued documents. No supplier contact, external "
++                    "write or issuance is authorized by generating drafts; actual issuance needs verified destinations, "
++                    "authorized tools and the user's required approval gate. Missing live supplier access must not prevent "
++                    "permitted estimate/simulation/draft stages from being planned. Do not make those stages depend on "
++                    "nonexistent spreadsheets, invented tools or manual condition_result inputs. "
+                     "Conditions use a restricted Python expression language rooted only at inputs/input or outputs/nodes. "
+                     "Allowed: dictionary attributes/subscripts, literals, comparisons (==, !=, <, <=, >, >=, in, not in), "
+                     "and/or/not. Never use JavaScript operators (===, &&, ||), function or method calls, lambdas, "
+@@ -92,6 +107,8 @@
+                     "may use actual event/output fields but must not depend on a user-supplied condition_result. "
+                     "Only these node configuration keys are executable: input, input_mapping, description, ui, on_timeout, timeout_outcome, error_outcome. "
+                     "Never use output_mapping. Output nodes use input_mapping and produce every required workflow output on every terminal branch. "
++                    "Every workflow MUST contain a kind=trigger node and a kind=output node, with every graph node reachable from the trigger. "
++                    "For a prompt-started procurement draft, connect a manual trigger to the master agent, then any review gates and the final output. "
+                     "Trigger nodes omit configuration entirely; event mapping and provider settings belong only in metadata.trigger_templates. "
+                     "Tool references contain ONLY tool_id and capability; never generate configuration_reference. "
+                     "Every agent MUST include allowed_tool_ids=[]; executable assignments come only from Registry review. "
+@@ -102,6 +119,12 @@
+                     "When independent work remains, the master can delegate with continuation data and keep working while specialists run. "
+                     "Describe domain-specific delegation triggers and remaining master work in agent instructions, not fixed child graph routes. "
+                     "Give the master max_llm_calls=4 and max_tokens=16000; give each specialist max_llm_calls=3 and max_tokens=12000. "
++                    "For requirements_first procurement, override the generic hierarchy defaults with enough bounded "
++                    "turns for dependent BOQ, quotation, comparison and document-drafting stages: use max_rounds=8, "
++                    "max_tasks=12 and master max_llm_calls=8 with max_tokens=16000. Preserve the configured workspace "
++                    "ceilings and reserve sufficient workflow call/token/cost budgets for the selected specialist pool. "
++                    "Unknown details may be disclosed assumptions in permitted draft-only estimates; do not require "
++                    "a pre-existing BOQ to execute the stage that creates it. Actual issuance remains separately gated. "
+                     "Workflow budgets must cover all master turns and permitted child calls. Use broad object input schemas for the master "
+                     "and meaningful specialist schemas. Specialists that need external facts declare the appropriate available connector "
+                     "capabilities and workflow tool references; Registry assigns their allowed tools. Read tools owned by dynamic "
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -142,18 +142,9 @@
+         from registry.contracts import RegistryError
+         import ast
+         supplied = {**context, **self.context}
+-        from .sheet_discovery import spreadsheet_references, validate_discovered_setup, catalog_snapshot
++        from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, validate_discovered_setup, catalog_snapshot
+         catalogs = []
+-        references = spreadsheet_references(objective)
+-        # References supplied in this prompt remain first; existing workspace sources
+-        # add candidates without replacing explicit requirements or granting access.
+-        for source in supplied.get('workspace_sources', []) + supplied.get('workspace_knowledge', []):
+-            reference = source.get('spreadsheet_id')
+-            additions = ([reference] if isinstance(reference, str) and re.fullmatch(r'[A-Za-z0-9_-]+', reference)
+-                         else spreadsheet_references(source.get('url', '')))
+-            for reference in additions:
+-                if reference not in references and len(references) < 8:
+-                    references.append(reference)
++        references = planning_spreadsheet_references(objective, supplied)
+         if self.sheet_discoverer is not None:
+             try:
+                 explicit = set(spreadsheet_references(objective))
+@@ -175,6 +166,10 @@
+         explicit_review = bool(re.search(r'\b(?:human|manual)\s+approval\b|\brequire\s+approval\b', objective, re.I))
+         wants_automatic = bool(re.search(r'\bautomatic(?:ally)?\b|\bwithout\s+(?:manual\s+)?approval\b', objective, re.I)) and not explicit_review
+         supplied['customer_automation_requested'] = wants_automatic and self.direct_send
++        if supplied.get('procurement_planning_mode') == 'requirements_first':
++            # Automatic planning does not authorize customer-email handling.
++            supplied['customer_automation_requested'] = False
++            supplied.pop('customer_automation_defaults', None)
+         # At most two bounded planning calls. A correction edits the draft;
+         # neither call registers grants, publishes, executes or approves it.
+         for attempt in range(2):
+@@ -220,7 +215,7 @@
+                     raise
+                 hints = {
+                     'EMAIL_SOURCE_MAPPING_REQUIRED': 'The initial graph sends only to the source-row customer. Remove manager email nodes and reply-loop branches; the inbox worker handles those using customer_automation metadata.',
+-                    'WORKFLOW_VALIDATION_FAILED': 'Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
++                    'WORKFLOW_VALIDATION_FAILED': 'Include a kind=trigger node and a kind=output node, and connect every graph node to a path from the trigger. Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
+                     'OUTPUT_FIELD_NOT_DECLARED': 'SMTP returns message_id, not sent. Map message_id from the sender output; if email_sent is required, use True only in the output step reached after successful SMTP submission.',
+                 }
+                 errors.append({'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})})
+--- a/workflow_api/procurement.py
++++ b/workflow_api/procurement.py
+@@ -218,11 +218,26 @@
+     def generate(self, objective, context):
+         if not re.search(r'\b(procurement|rfqs?|boq|bill of quantities)\b', objective,re.I):
+             return self.fallback.generate(objective,context)
+-        from .sheet_discovery import spreadsheet_references, catalog_snapshot
++        # Creating a requirements list is a planning stage, not an ingestion prerequisite.
++        create_requirements = re.search(
++            r'\b(?:generat(?:e|ing)|creat(?:e|ing)|draft(?:ing)?|produc(?:e|ing)|build(?:ing)?|develop(?:ing)?|prepar(?:e|ing))'
++            r'\s+(?:(?:a|an|the|new|detailed|initial|complete|comprehensive|itemized|itemised|full)\s+){0,8}'
++            r'(?:boq\b|bill\s+of\s+quantities\b|requirements\s+(?:list|table)\b|equipment\s+(?:list|schedule)\b)', objective, re.I)
++        if create_requirements:
++            return self.fallback.generate(objective, {**context, 'procurement_planning_mode': 'requirements_first'})
++        from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, catalog_snapshot
+         from connector_extension.procurement.store import ProcurementError
+         from registry.safety import reject_secrets
+-        catalogs=[self.discoverer(ref) for ref in spreadsheet_references(objective)]
+-        if not catalogs: raise PlannerFailure('PROCUREMENT_SOURCE_REQUIRED','Include the requirements and vendor spreadsheet links.')
++        explicit = set(spreadsheet_references(objective))
++        catalogs = []
++        for reference in planning_spreadsheet_references(objective, context):
++            try:
++                catalogs.append(self.discoverer(reference))
++            except Exception:
++                if reference in explicit:
++                    raise PlannerFailure('SHEETS_DISCOVERY_FAILED', 'Could not inspect the supplied procurement spreadsheet. Check the link and account access.') from None
++        if not catalogs:
++            raise PlannerFailure('PROCUREMENT_SOURCE_REQUIRED', 'No accessible requirements spreadsheet was identified. Provide its link or save it as a workspace source; to create a new BOQ, ask to generate it from your requirements.')
+         nullable={'type':['string','null']}
+         context_schema=obj({k:nullable for k in CONTEXT_FIELDS}, CONTEXT_FIELDS)
+         def source(fields):
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -208,6 +208,7 @@
+                             'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
+                             'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
+                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
++                    safe['PROCUREMENT_SOURCE_REQUIRED'] = 'No accessible requirements spreadsheet was identified. Include its link or save it as a workspace source. To start from an idea, ask to generate a new BOQ first.'
+                     safe.update(PLANNER_PROVIDER_TIMEOUT='Workflow generation timed out. Retry generation.',
+                                 PLANNER_PROVIDER_UNAVAILABLE='The model connection is unavailable. Retry generation.',
+                                 PLANNER_RATE_LIMITED='The model provider rate limit was reached. Retry later.',
+--- a/workflow_api/sheet_discovery.py
++++ b/workflow_api/sheet_discovery.py
+@@ -13,6 +13,23 @@
+     if len(ids) > 8:
+         raise PlannerFailure('SHEETS_DISCOVERY_LIMIT', 'Use at most eight spreadsheet links in one setup.')
+     return ids
++
++
++def planning_spreadsheet_references(objective, context):
++    """Explicit resources first, then bounded workspace candidates; no access grants."""
++    references = spreadsheet_references(objective)
++    for key in ('workspace_sources', 'workspace_knowledge'):
++        sources = context.get(key, [])
++        for source in sources if isinstance(sources, list) else []:
++            if not isinstance(source, dict):
++                continue
++            reference = source.get('spreadsheet_id')
++            additions = ([reference] if isinstance(reference, str) and re.fullmatch(r'[A-Za-z0-9_-]+', reference)
++                         else spreadsheet_references(source.get('url', '')) if isinstance(source.get('url', ''), str) else [])
++            for reference in additions:
++                if reference not in references and len(references) < 8:
++                    references.append(reference)
++    return references
+ 
+ 
+ def validate_discovered_setup(workflow, catalogs):

@@ -1,0 +1,3 @@
+# Phase 5 state synchronization and feedback
+
+Implement correction-plan sections 17–18. Preserve exact server baselines separately from editable working data, track all workflow-owned agents including delegated templates, prevent stale/late reads overwriting edits, detect remote/tab conflicts, provide explicit resolution and preserve canonical metadata/layout/control flow. New editable revisions clear executable grants and need renewed Registry review. Standardize safe error/field/unknown-outcome feedback without replaying mutations. Preserve Phase 1–4, shared contracts and live business data; production Google Workspace login stays deferred.

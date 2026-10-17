@@ -1,0 +1,39 @@
+--- a/frontend/e2e/session-recovery.spec.ts
++++ b/frontend/e2e/session-recovery.spec.ts
+@@ -1,4 +1,7 @@
+ import { test, expect } from "@playwright/test";
++
++// Recovery may span two documented 15-second polling cycles.
++test.setTimeout(60000);
+ 
+ for (const mobile of [false, true]) {
+   test(`open workflows recover a stale session on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
+@@ -21,13 +24,13 @@
+       await route.fulfill({ status: denied ? 401 : 200, json: { request_id: "req_recovery", status: denied ? 401 : 200, data } });
+     });
+     await page.goto("/app/workflows");
+-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
++    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
+     expired = true;
+     const authenticationError = page.getByRole("alert").filter({ hasText: "AUTHENTICATION_REQUIRED" });
+-    await expect(authenticationError).toContainText("Expired local session", { timeout: 12000 });
++    await expect(authenticationError).toContainText("Expired local session", { timeout: 25000 });
+     renewalBlocked = false;
+-    await expect(authenticationError).toHaveCount(0, { timeout: 12000 });
+-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
++    await expect(authenticationError).toHaveCount(0, { timeout: 25000 });
++    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
+     expect(renewals).toBe(1);
+     expect(errors).toEqual([]);
+   });
+--- a/frontend/src/screens/app.governance.tsx
++++ b/frontend/src/screens/app.governance.tsx
+@@ -64,7 +64,7 @@
+       <PageHeader title="Governance" sub="Live server guardrails and audit records, alongside local policy drafts." />
+       {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: a server-authenticated administrator is required to edit these browser drafts. Enforced production rules are read-only.</p>}
+       <Tabs defaultValue="usage">
+-        <TabsList className="flex-wrap"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Enforced governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
++        <TabsList className="h-auto flex-wrap justify-start gap-1"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Enforced governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
+         <TabsContent value="control" className="mt-4"><AgentControlTab /></TabsContent>
+         <TabsContent value="usage" className="mt-4"><LiveRuntimePanel /></TabsContent>
+         <TabsContent value="policies" className="mt-4 space-y-4">

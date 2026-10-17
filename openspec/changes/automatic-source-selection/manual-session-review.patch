@@ -1,0 +1,10 @@
+--- a/frontend/e2e/api-integration.spec.ts
++++ b/frontend/e2e/api-integration.spec.ts
+@@ -6,6 +6,7 @@
+  // Legacy manually configured documents remain supported through the canonical API.
+  // The overview now always infers inputs automatically and cannot create this manual fixture.
+  await page.goto('/app');
++ const session=await page.request.get('/api/backend/session');expect(session.status(),await session.text()).toBe(200);
+  const response=await mutation(page,'plan_workflow','workflows/plan',{objective:'If an invoice arrives classify it and email the owner after approval for phase seven review',context:{generation_mode:'hierarchy',execution_input_mode:'manual'}});
+  expect(response.status(),await response.text()).toBe(200);
+  const workflow=(await response.json()).data.workflow;const id=workflow.workflow_id;

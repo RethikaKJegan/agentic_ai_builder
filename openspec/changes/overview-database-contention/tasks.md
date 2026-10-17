@@ -1,0 +1,6 @@
+- [x] Make overview read-only and summarize run metadata without loading full outputs.
+- [x] Index run workspace/workflow ownership and classify database busy errors.
+- [x] Verify lifecycle counts, concurrent writer behavior and scoped checks.
+- [x] Reload only the deployed Builder backend and verify public save/read behavior if authorized by the current repair request.
+
+Verification: 15 concurrency/lifecycle tests passed; the final expanded three focused tests also passed. Shared contracts, strict scoped OpenSpec and diff checks pass. Before repair, the deployed journal showed successful planning followed by SQLite lock failures during draft save and overview. Fixed read-only overview returned 4289 existing workflows in 0.283 seconds in a read-only diagnostic. Reloaded only agentic-builder-backend.service after checking stalled active invocations were Gmail thread reads. Public HTTPS session, overview, model planning and draft save returned HTTP 200; overview took 0.599 seconds. Synthetic draft planned_21d877e7af07f874 (Deployment Summary Check 20261014) was saved, not published or executed. No Nginx configuration, credentials or frontend service was changed. Full procurement execution was not repeated by this verification.

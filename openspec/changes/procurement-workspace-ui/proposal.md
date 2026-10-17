@@ -1,0 +1,6 @@
+# Procurement workspace UI
+Replace stacked editor controls and action-per-branch procurement diagrams with a stable stage workspace, a connected configured hierarchy, and a tabbed accessible project drawer. Group repeated actions without deleting their exact historical evidence. Preserve all workflow mutation handlers, authorization, release semantics, run selection and procurement execution. UI-only presentation must not generate synthetic agents or successful events.
+
+Original areas: Builder.tsx stacks LifecycleJourney above tabs plus toolbar/WorkflowControls; HierarchyView.tsx renders ul/li; ProcurementProjectCommunication.tsx renders projectDiagram(all actions); ProcurementReview.tsx renders a small absolute details dropdown. Replacements: compact workflow header/progressive lifecycle details, connected hierarchy, fixed procurement stage selection with exact action drill-down, full-height tabbed dialog. No runtime behavior changes.
+
+Read-only backend adjustment: procurement_observability communication selection now retains ingestion and a real fulfilment extraction while bounding repeated polling samples. Exact returned revisions/events and all authorization checks are unchanged. This prevents poll history from hiding actual teams; no runtime or business-state transition changes.

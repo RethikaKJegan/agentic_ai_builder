@@ -1,0 +1,34 @@
+--- a/runtime/graph.py
++++ b/runtime/graph.py
+@@ -387,7 +387,7 @@
+         if not isinstance(key, str) or not 8 <= len(key) <= 128:
+             raise RuntimeFailure('INVALID_IDEMPOTENCY_KEY', 'An approval retry key is required.', 400)
+         with runtime.store.transaction() as db:
+-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=?', (approver['subject']['workspace_id'],)).fetchall()
++            rows = db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND EXISTS (SELECT 1 FROM json_each(runtime_runs.document,'$.approvals') a WHERE json_extract(a.value,'$.approval_id')=?) LIMIT 1", (approver['subject']['workspace_id'], payload.get('approval_id'))).fetchall()
+             run = next((json.loads(row[0]) for row in rows if any(a['approval_id'] == payload.get('approval_id') for a in json.loads(row[0])['approvals'])), None)
+             if run is None:
+                 raise RuntimeFailure('APPROVAL_NOT_FOUND', 'The approval was not found in this workspace.', 404)
+--- a/runtime/history.py
++++ b/runtime/history.py
+@@ -39,11 +39,19 @@
+         if isinstance(run.get(key), (int, float)):
+             result[key] = run[key]
+     workflow = None
++    gates_by_approval = {}
++    if result['approvals']:
++        for encoded, in db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' ORDER BY sequence", (run['workspace_id'], run['run_id'])):
++            details = json.loads(encoded).get('details', {})
++            gates_by_approval[details.get('approval_id')] = details.get('node_id')
+     for approval in result['approvals']:
+         if workflow is None:
+             workflow = runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {}
+         context = run.get('approval_context', {})
+-        gate = next((g for g in workflow.get('approval_gates', []) if g['approval_gate_id'] == context.get('gate_id')), None)
++        node_id = gates_by_approval.get(approval['approval_id'])
++        node = next((n for n in workflow.get('nodes', []) if n['node_id'] == node_id), None)
++        gate_id = node.get('approval_gate_id') if node else context.get('gate_id') if approval['status'] == 'pending' else None
++        gate = next((g for g in workflow.get('approval_gates', []) if g['approval_gate_id'] == gate_id), None)
+         roles = gate['approver_roles'] if gate else []
+         approval['required_roles'] = roles
+         eligible = (gate and auth.get('decision') == 'allow' and 'workflow.approve' in auth.get('permissions', [])

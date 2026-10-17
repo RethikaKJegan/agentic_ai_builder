@@ -1,0 +1,43 @@
+--- a/runtime/worker.py
++++ b/runtime/worker.py
+@@ -8,17 +8,22 @@
+         self.runner, self.authenticate, self.interval = runner, authenticate, interval
+         self.batch_size = min(max(int(batch_size),1),1000)
+         self.health = {"state":"starting","last_success":None,"last_error":None}
++        self.cursor = 0
+         self.stop_event = Event()
+         self.thread = None
+ 
+     def drain(self):
+         runtime = self.runner.runtime
+         with runtime.store.transaction(write=False) as db:
+-            rows = db.execute("SELECT document FROM runtime_runs WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.batch_size,)).fetchall()
++            rows = db.execute("SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.cursor,self.batch_size)).fetchall()
++            if not rows:
++                self.cursor=0
++                rows = db.execute("SELECT rowid,document FROM runtime_runs WHERE rowid>? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid LIMIT ?",(self.cursor,self.batch_size)).fetchall()
+         advanced = []
+         for row in rows:
+             if self.stop_event.is_set():break
+-            run = json.loads(row[0])
++            self.cursor=row[0]
++            run = json.loads(row[1])
+             if run['status'] not in {'queued', 'running', 'paused_for_approval'}:
+                 continue
+             # Authentication adapters may reject expired/revoked identities. The
+--- a/workflow_api/scheduler.py
++++ b/workflow_api/scheduler.py
+@@ -80,8 +80,11 @@
+                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
+                     self.last_polled[binding_id] = now
+                     continue
+-            for job in lifecycle.lease(workspace,limit=10,seconds=120):
+-                lifecycle.execute_job(job["job_id"], runner)
++            for _ in range(10):
++                if self.stop_event.is_set():break
++                jobs=lifecycle.lease(workspace,limit=1,seconds=120)
++                if not jobs:break
++                lifecycle.execute_job(jobs[0]["job_id"], runner)
+                 dispatched += 1
+         self.health={"state":"ready","last_success":time.time(),"last_error":None}
+         return {"polled": polled, "queued": queued, "dispatched": dispatched}

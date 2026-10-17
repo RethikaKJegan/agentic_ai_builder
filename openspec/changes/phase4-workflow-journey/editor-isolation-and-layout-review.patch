@@ -1,0 +1,149 @@
+--- a/frontend/e2e/prompt-only.spec.ts
++++ b/frontend/e2e/prompt-only.spec.ts
+@@ -49,6 +49,8 @@
+         await page.getByLabel("Process description").fill(prompt);
+         await expect(page.getByLabel("Google Sheets URL or ID")).toHaveCount(0);
+         await page.getByRole("button", { name: "Generate workflow" }).click();
++        await expect(page.getByRole("region", { name: "Generation result" })).toBeVisible();
++        await page.getByRole("button", { name: "Review and edit workflow" }).click();
+         await expect(page).toHaveURL(new RegExp(`/app/workflows/${published.workflow_id}$`));
+         expect(sessionRequests).toBeGreaterThanOrEqual(2);
+         const planning = calls.find((call) => call.operation === "plan_workflow");
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -102,6 +102,7 @@
+   const [edges, setEdges] = useState<WorkflowEdge[]>(workflow.edges);
+   const nodesRef = useRef(nodes);
+   const edgesRef = useRef(edges);
++  const dragStart = useRef<Graph | null>(null);
+   nodesRef.current = nodes;
+   edgesRef.current = edges;
+   const [past, setPast] = useState<Graph[]>([]);
+@@ -115,7 +116,6 @@
+   const [historyOpen, setHistoryOpen] = useState(false);
+   const [mode, setMode] = useState<"design" | "hierarchy" | "execution">("design");
+   const trace = useWorkflowTrace(workflow.id, mode === "execution");
+-  const [, setInspectorTab] = useState<"trace" | "configuration">("configuration");
+   const isMobile = useIsMobile();
+ 
+   const commit = useCallback(
+@@ -157,6 +157,7 @@
+ 
+   useEffect(() => {
+     const onKey = (e: KeyboardEvent) => {
++      if (mode !== "design") return;
+       const t = e.target as HTMLElement;
+       if (t.closest("input, textarea, select, [contenteditable]")) return;
+       if (e.key === "Escape") {
+@@ -173,7 +174,7 @@
+     };
+     window.addEventListener("keydown", onKey);
+     return () => window.removeEventListener("keydown", onKey);
+-  }, [undo, redo, fitView]);
++  }, [undo, redo, fitView, mode]);
+ 
+   useEffect(() => {
+     const t = setTimeout(() => fitView({ duration: 250, padding: 0.15, maxZoom: 1 }), 60);
+@@ -398,6 +399,7 @@
+           runStatus: undefined,
+           orientation: undefined,
+           role: undefined,
++          diagnosticCount: diagnostics.filter(x => x.nodeId === n.id).length,
+           childCount:
+             0,
+           parentLabel: n.data.parentNodeId
+@@ -405,7 +407,7 @@
+             : undefined,
+         },
+       })),
+-    [nodes, hidden],
++    [nodes, hidden, diagnostics],
+   );
+   const flowEdges: Edge[] = useMemo(
+     () =>
+@@ -566,12 +568,12 @@
+ 
+       <div className="shrink-0 border-b border-border px-3 py-3"><WorkflowControls workflow={current} /></div>
+ 
+-      <GraphTools nodes={clean(nodes)} edges={edges} onSelect={id => { setSelectedId(id); setInspectorTab("configuration"); setPanel("inspector"); }} onConnect={(source,target,label) => {
++      <GraphTools nodes={clean(nodes)} edges={edges} onSelect={id => { setSelectedId(id);  setPanel("inspector"); }} onConnect={(source,target,label) => {
+         if (edgesRef.current.some(e => e.source === source && (label ? e.label === label : e.target === target))) { toast.error("This connection or branch outcome is already used. Remove it before reconnecting."); return; }
+         commit({nodes:clean(nodesRef.current),edges:[...edgesRef.current,{id:uid("edge"),source,target,...(label?{label}:{})}]});
+       }} onRemove={id => { if(window.confirm("Remove this connection from the working draft?")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }} />
+       </>}
+-      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setInspectorTab("configuration");setPanel("inspector");}} /></div> : (
++      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
+       <div className="flex min-h-0 flex-1">
+         {/* Canvas */}
+         <div className="relative min-w-0 flex-1 bg-canvas">
+@@ -585,7 +587,7 @@
+                     <button
+                       onClick={() => {
+                         setSelectedId(n.id);
+-                        setInspectorTab("configuration");
++                        
+                         setPanel("inspector");
+                       }}
+                       className={`flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left ${selectedId === n.id ? "border-primary" : "border-border"}`}
+@@ -625,10 +627,14 @@
+                 onNodesChange={onNodesChange}
+                 onEdgesChange={onEdgesChange}
+                 onConnect={onConnect}
+-                onNodeDragStop={() => commit({ nodes: nodesRef.current, edges: edgesRef.current })}
++                onNodeDragStart={() => { dragStart.current = structuredClone({nodes:clean(nodesRef.current),edges:edgesRef.current}); }}
++                onNodeDragStop={() => {
++                  if (dragStart.current) { const previous = dragStart.current; setPast(p=>[...p.slice(-49),previous]); setFuture([]); dragStart.current=null; }
++                  commit({ nodes: nodesRef.current, edges: edgesRef.current }, {history:false});
++                }}
+                 onNodeClick={(_, n) => {
+                   setSelectedId(n.id);
+-                  setInspectorTab("configuration");
++                  
+                   setPanel("inspector");
+                 }}
+                 onPaneClick={() => {
+--- a/frontend/src/features/builder/MeshNode.tsx
++++ b/frontend/src/features/builder/MeshNode.tsx
+@@ -4,7 +4,7 @@
+ import { NODE_META } from "./nodeMeta";
+ import { useMesh } from "@/domain/store";
+ import { getModel } from "@/domain/models";
+-import type { WorkflowNodeData } from "@/domain/types";
++import type { Agent, WorkflowNodeData } from "@/domain/types";
+ 
+ export type MeshFlowNode = Node<WorkflowNodeData & { runStatus?: string | undefined; childCount?: number | undefined; parentLabel?: string | undefined }, "mesh">;
+ 
+@@ -14,7 +14,8 @@
+ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
+   const meta = NODE_META[data.kind];
+   const actions = useContext(NodeActions);
+-  const agent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
++  const localAgent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
++  const agent = data["readOnly"] ? data["agentPreview"] as Agent | undefined : localAgent;
+   const st = data.runStatus;
+   const tb = data.orientation === "tb";
+   const isMaster = data.role === "master";
+@@ -56,10 +57,11 @@
+           </span>
+         )}
+       </div>
++      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{meta.label}{data.kind === "trigger" ? " · Start" : data.kind === "output" ? " · End" : ""}{Number(data["diagnosticCount"]) > 0 ? ` · ${data["diagnosticCount"]} configuration issues` : ""}</p>
+       {(agent?.purpose || data.description) && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{data.description || agent?.purpose}</p>}
+       {(agent?.paused || (data.childCount ?? 0) > 0) && (
+         <div className="mt-2 flex items-center gap-2">
+-          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Paused</span>}
++          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Draft paused</span>}
+           {(data.childCount ?? 0) > 0 && (
+             <button
+               onClick={(e) => { e.stopPropagation(); actions.toggleCollapse(id); }}
+--- a/frontend/src/features/builder/NodeTrace.tsx
++++ b/frontend/src/features/builder/NodeTrace.tsx
+@@ -14,7 +14,7 @@
+   const last = events.at(-1);
+   const status = trace.runState[node.id];
+   const first = events.find((event) => event.event_type === "node.observed" || event.event_type === "node.started");
+-  const duration = first && last && completed ? Math.max(0, Date.parse(last.timestamp) - Date.parse(first.timestamp)) : undefined;
++  const duration = first && last && completed ? Number.isFinite(Date.parse(last.timestamp) - Date.parse(first.timestamp)) && Date.parse(last.timestamp) >= Date.parse(first.timestamp) ? Date.parse(last.timestamp) - Date.parse(first.timestamp) : undefined : undefined;
+   const retries = events.filter((event) => event.event_type === "node.retry").length;
+   const decision = completed?.["outcome"] ?? (status === "skipped" ? "Skipped" : status === "paused" ? "Waiting for approval" : status === "failed" || status === "blocked" ? last?.details?.["error_code"] : completed ? "Completed" : undefined);
+   const explanation = completed?.["explanation"] ?? (status === "skipped" ? last?.details?.["explanation"] : completed && completed["output"] !== undefined && node.data.kind === "agent" ? "The agent returned the recorded output below. Any explanation supplied by the agent is included in that output; no additional rationale was recorded." : completed && Array.isArray(completed["selected_edges"]) ? "The step completed and selected the recorded successor edges." : undefined);

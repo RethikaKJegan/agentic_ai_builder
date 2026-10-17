@@ -1,0 +1,53 @@
+--- a/planner/service.py
++++ b/planner/service.py
+@@ -19,7 +19,7 @@
+         self.provider = provider or OpenAIStructuredOutputProvider()
+         self.idempotency = idempotency or IdempotencyStore()
+ 
+-    def plan(self, request: dict[str, Any]) -> dict[str, Any]:
++    def plan(self, request: dict[str, Any], context_resolver=None) -> dict[str, Any]:
+         request_id = str(request.get("request_id") or f"req_{uuid.uuid4().hex}")
+         try:
+             if request.get("operation") != "plan_workflow":
+@@ -44,9 +44,13 @@
+                     raise PlannerFailure("IDEMPOTENCY_KEY_REUSED", "The idempotency key was already used for a different request.", field="idempotency_key")
+                 return existing.response
+             reject_sensitive(payload)
+-            workflow = self.provider.generate(objective.strip(), payload.get("context", {}))
++            context = payload.get('context', {})
++            if context_resolver is not None:
++                context = context_resolver(context)
++            reject_sensitive(context)
++            workflow = self.provider.generate(objective.strip(), context)
+             reject_sensitive(workflow)
+-            mark_automatic_inputs(workflow, payload.get('context', {}))
++            mark_automatic_inputs(workflow, context)
+             self._clear_proposed_assignments(workflow)
+             identity_objective = objective + '\n[dynamic-delegation-v1]' if workflow.get('metadata', {}).get('dynamic_delegation') else objective
+             if workflow.get('metadata', {}).get('execution_input_mode') == 'automatic':
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -198,8 +198,7 @@
+                 trusted['payload']['auth_context'] = {
+                     **auth['subject'], 'roles': auth['roles'], 'permissions': auth['permissions']}
+                 from .source_context import planning_context
+-                trusted['payload']['context'] = planning_context(self.store, auth, trusted['payload'].get('context', {}))
+-                result = self.planner.plan(trusted)
++                result = self.planner.plan(trusted, context_resolver=lambda context: planning_context(self.store, auth, context))
+                 if result['status'] >= 400:
+                     error = result.get('error') or (result.get('data') or {}).get('error') or {}
+                     code = error.get('error_code', 'PLANNER_PROVIDER_FAILED')
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -393,6 +393,11 @@
+             agent['limits'] = {**agent['limits'], 'max_llm_calls': 3, 'max_tokens': 12000, 'max_estimated_cost_usd': .15}
+         workflow['execution_policy']['limits'].update(max_llm_calls=4 + 3 * (len(agents) - 1), max_tokens=16000 + 12000 * (len(agents) - 1), max_estimated_cost_usd=.2 + .15 * (len(agents) - 1), max_tool_calls=max(workflow['execution_policy']['limits']['max_tool_calls'], len(workflow['tools'])))
+         workflow['metadata']['dynamic_delegation'] = {'master_orchestrator': {'max_rounds': 4, 'max_tasks': 6}}
++        if context.get('execution_input_mode') == 'automatic' and not workflow['tools'] and not workflow['conditions']:
++            # Offline provider only: known setup text is a constant, not a future run field.
++            workflow['inputs'] = []
++            next(node for node in workflow['nodes'] if node['node_id'] == 'master_orchestrator')['configuration'] = {
++                'input': {'objective_context': {'objective': objective}}}
+         return workflow
+ 
+     @staticmethod

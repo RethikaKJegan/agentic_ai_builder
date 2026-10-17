@@ -1,0 +1,20 @@
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -587,7 +587,7 @@
+                     <button
+                       onClick={() => {
+                         setSelectedId(n.id);
+-                        
++
+                         setPanel("inspector");
+                       }}
+                       className={`flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left ${selectedId === n.id ? "border-primary" : "border-border"}`}
+@@ -634,7 +634,7 @@
+                 }}
+                 onNodeClick={(_, n) => {
+                   setSelectedId(n.id);
+-                  
++
+                   setPanel("inspector");
+                 }}
+                 onPaneClick={() => {

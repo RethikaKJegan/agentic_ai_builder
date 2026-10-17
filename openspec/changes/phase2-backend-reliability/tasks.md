@@ -1,0 +1,8 @@
+- [x] Audit and correct read/write transactions; add bounded busy configuration and contention telemetry.
+- [x] Persist activation preparation and move provider setup/cleanup outside transactions with atomic revalidation.
+- [x] Audit remaining external operations and shorten transaction lifetimes.
+- [x] Inventory all tables/direct SQL and implement/test SQLite/PostgreSQL persistence boundary and versioned migrations.
+- [x] Prepare data-preserving backup/migration/validation/rollback tooling; do not automatically migrate live storage.
+- [x] Separate API/worker roles, coordinate claims/leases, crash recovery, shutdown and backlog/health.
+- [x] Add regression/concurrency/recovery tests and run relevant suites.
+- [x] Record exact patches, files, test results, risks and remaining deployment requirements.

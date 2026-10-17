@@ -1,0 +1,12 @@
+--- a/frontend/src/features/workflows/WorkflowControls.tsx
++++ b/frontend/src/features/workflows/WorkflowControls.tsx
+@@ -70,7 +70,8 @@
+   const timestamp = document?.metadata["updated_at"];
+   const saved = typeof timestamp === "string" && Number.isFinite(Date.parse(timestamp)) ? new Date(timestamp).toLocaleString() : null;
+   const conflict = error instanceof ApiError && ["REVISION_CONFLICT", "RELEASE_CONFLICT"].includes(error.error.error_code);
+-  const review = backend.reviews[workflow.id];
++  const candidateReview = backend.reviews[workflow.id];
++  const review = candidateReview?.workflow_version === version ? candidateReview : undefined;
+   return <section aria-label="Workflow actions" className="flex w-full flex-wrap items-start gap-2">
+     <div className="w-full text-xs text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
+     <ProcurementReview workflow={workflow} />

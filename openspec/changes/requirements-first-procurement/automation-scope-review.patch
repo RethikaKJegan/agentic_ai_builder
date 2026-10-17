@@ -1,0 +1,23 @@
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -166,6 +166,10 @@
+         explicit_review = bool(re.search(r'\b(?:human|manual)\s+approval\b|\brequire\s+approval\b', objective, re.I))
+         wants_automatic = bool(re.search(r'\bautomatic(?:ally)?\b|\bwithout\s+(?:manual\s+)?approval\b', objective, re.I)) and not explicit_review
+         supplied['customer_automation_requested'] = wants_automatic and self.direct_send
++        if supplied.get('procurement_planning_mode') == 'requirements_first':
++            # Automatic planning does not authorize customer-email handling.
++            supplied['customer_automation_requested'] = False
++            supplied.pop('customer_automation_defaults', None)
+         # At most two bounded planning calls. A correction edits the draft;
+         # neither call registers grants, publishes, executes or approves it.
+         for attempt in range(2):
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -57,6 +57,7 @@
+                     "Return only JSON. Produce a workflow draft using exactly the canonical field names in the supplied schema. "
+                     "Do not use aliases such as steps, trigger, or error_handling. Include every required top-level field, "
+                     "use draft status, keep tool assignments empty, and put unknown requirements in metadata.unresolved_requirements. "
++                    "For requirements_first procurement, omit metadata.customer_automation. Automatic procurement planning does not enable customer-email reply handling. "
+                     "When context.procurement_planning_mode=requirements_first, create a plan that generates a new BOQ "
+                     "from the objective before supplier research, quotation comparison, budget review, procurement report and "
+                     "RFQ/PO drafting. Do not require an existing BOQ spreadsheet or reuse an unrelated historical project as "

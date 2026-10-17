@@ -35,7 +35,7 @@ for (const mobile of [false, true]) {
     await expect(page.getByText("Can create missing records", { exact: true })).toBeVisible();
     const link = page.getByRole("link", { name: "prompt-selected-sheet" }).first();
     await expect(link).toHaveAttribute("href", "https://docs.google.com/spreadsheets/d/prompt-selected-sheet/edit");
-    const panel = page.getByText(/Publishing approves these write destinations/).locator("..");
+    const panel = page.getByText(/Review these destinations before approving and publishing/).locator("..");
     const box = await panel.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.x).toBeGreaterThanOrEqual(0);

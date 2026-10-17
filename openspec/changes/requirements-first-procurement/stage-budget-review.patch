@@ -1,0 +1,15 @@
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -116,6 +116,12 @@
+                     "When independent work remains, the master can delegate with continuation data and keep working while specialists run. "
+                     "Describe domain-specific delegation triggers and remaining master work in agent instructions, not fixed child graph routes. "
+                     "Give the master max_llm_calls=4 and max_tokens=16000; give each specialist max_llm_calls=3 and max_tokens=12000. "
++                    "For requirements_first procurement, override the generic hierarchy defaults with enough bounded "
++                    "turns for dependent BOQ, quotation, comparison and document-drafting stages: use max_rounds=8, "
++                    "max_tasks=12 and master max_llm_calls=8 with max_tokens=32000. Preserve the configured workspace "
++                    "ceilings and reserve sufficient workflow call/token/cost budgets for the selected specialist pool. "
++                    "Unknown details may be disclosed assumptions in permitted draft-only estimates; do not require "
++                    "a pre-existing BOQ to execute the stage that creates it. Actual issuance remains separately gated. "
+                     "Workflow budgets must cover all master turns and permitted child calls. Use broad object input schemas for the master "
+                     "and meaningful specialist schemas. Specialists that need external facts declare the appropriate available connector "
+                     "capabilities and workflow tool references; Registry assigns their allowed tools. Read tools owned by dynamic "

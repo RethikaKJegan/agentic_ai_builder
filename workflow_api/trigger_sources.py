@@ -21,8 +21,31 @@ class ProviderTriggerSource:
         self.service, self.connectors = service, connectors
         self.default_resources = dict(default_resources or {})
 
+    def validate_configuration(self, binding, workflow, auth):
+        """Local readiness only; never poll, subscribe, or call a provider."""
+        from .lifecycle import LifecycleFailure
+        provider = binding['provider_id']
+        if binding['delivery'] != 'poll':
+            if provider == 'generic_hmac_webhook':
+                return
+            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Install and configure the incoming provider adapter before activation.', 400)
+        tool_id = self.TOOL_BY_PROVIDER.get(provider)
+        if not tool_id or tool_id not in self.connectors:
+            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure the provider polling connector before activation.', 400)
+        grants = self.service.registry_adapter.execution_assignments(workflow, auth)
+        if not any(grant['tool_id'] == tool_id for grant in grants):
+            raise LifecycleFailure('ASSIGNMENT_REVALIDATION_FAILED', 'Review current registry authorization for the trigger polling tool.', 403)
+        resource = binding['resource_id']
+        if resource == 'configured_default':
+            resource = self.default_resources.get(provider)
+        if not isinstance(resource, str) or not resource:
+            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure an explicit trigger source resource before activation.', 400)
+        if provider == 'google_sheets':
+            from runtime.connectors import google_spreadsheet_id
+            google_spreadsheet_id(resource)
+
     def _authority(self, binding):
-        with self.service.store.transaction() as db:
+        with self.service.store.transaction(write=False) as db:
             row = db.execute("SELECT r.document FROM lifecycle_releases r JOIN lifecycle_triggers t ON t.release_id=r.release_id WHERE t.binding_id=? AND t.workspace=?",
                              (binding['binding_id'], binding['workspace_id'])).fetchone()
             if not row:
@@ -32,7 +55,12 @@ class ProviderTriggerSource:
             if not identity:
                 raise ValueError("identity missing")
             workflow = self.service.store.get(db, binding["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
-        return workflow, json.loads(identity[0])
+        authority=json.loads(identity[0])
+        resolver=getattr(self.service,'worker_authenticate',None)
+        if resolver:
+            authority=resolver(binding['workspace_id'],authority['subject']['subject_id'])
+            if authority is None:raise ValueError('Trigger execution authority was revoked.')
+        return workflow, authority
 
     def poll(self, binding, previous_cursor):
         provider = binding["provider_id"]

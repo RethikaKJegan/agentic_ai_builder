@@ -1,0 +1,2 @@
+# Prevent overview polling from blocking workflow saves
+Deployed journal evidence shows successful planning followed by SQLite database-locked failures during save and overview polling. Overview currently holds BEGIN IMMEDIATE while scanning and parsing every run document per workflow. Use a read-only transaction and one workspace-scoped lightweight summary query, index run ownership, and classify transient SQLite lock errors as retryable API availability errors. Preserve all lifecycle counts, identity/workspace checks and public contracts.

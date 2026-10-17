@@ -1,0 +1,54 @@
+--- a/workflow_api/planning_jobs.py
++++ b/workflow_api/planning_jobs.py
+@@ -42,16 +42,33 @@
+         workspace, subject = (auth['subject'][key] for key in ('workspace_id', 'subject_id'))
+         fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+         with self.store.transaction() as db:
+-            old = db.execute('SELECT job_id, fingerprint FROM builder_planning_jobs WHERE workspace=? AND subject=? AND retry_key=?',
+-                             (workspace, subject, request['idempotency_key'])).fetchone()
+-            if old:
++            retry_key = request['idempotency_key']
++            while True:
++                old = db.execute('SELECT job_id, fingerprint, state, result FROM builder_planning_jobs WHERE workspace=? AND subject=? AND retry_key=?',
++                                 (workspace, subject, retry_key)).fetchone()
++                if not old:
++                    break
+                 if old[1] != fingerprint:
+                     raise ApiFailure('IDEMPOTENCY_KEY_REUSED', 'This planning key belongs to a different request.', 409)
++                if old[2] != 'succeeded':
++                    break
++                result = json.loads(old[3])
++                workflow_id = (result.get('data') or {}).get('workflow', {}).get('workflow_id')
++                deleted = db.execute('SELECT deleted_at FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',
++                                     (workspace, workflow_id)).fetchone()
++                if not deleted:
++                    break
++                # Deletion ends this result's reuse. Preserve its job as history,
++                # and make retries of the new generation converge on one job.
++                retry_key = 'recreate_' + hashlib.sha256(f'{old[0]}:{deleted[0]}'.encode()).hexdigest()
++            if old:
+                 job_id = old[0]
+             else:
+                 job_id = 'plan_' + uuid4().hex
++                queued_request = deepcopy(request)
++                queued_request['idempotency_key'] = retry_key
+                 db.execute('INSERT INTO builder_planning_jobs VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)',
+-                           (job_id, workspace, subject, request['idempotency_key'], fingerprint, 'queued', json.dumps(request), time.time()))
++                           (job_id, workspace, subject, retry_key, fingerprint, 'queued', json.dumps(queued_request), time.time()))
+         self.wake.set()
+         return self.get(job_id, auth)
+ 
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -227,7 +227,10 @@
+                     if operation == 'list_workflows':
+                         from .workflow_pages import read_page
+                         return self.envelope(request_id, 200, read_page(self.store, workspace, read_cursor, connection=db))
+-                    workflow = self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version'))
++                    deleted = db.execute('SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',
++                                         (workspace, payload.get('workflow_id'))).fetchone()
++                    workflow = (None if deleted and payload.get('workflow_version') is None else
++                                self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version')))
+                     if not workflow:
+                         raise ApiFailure('WORKFLOW_NOT_FOUND', 'This workflow revision was not found.', 404)
+                     return self.envelope(request_id, 200, self.document_data(workflow, auth))

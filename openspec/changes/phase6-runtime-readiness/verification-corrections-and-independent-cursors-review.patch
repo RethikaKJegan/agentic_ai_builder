@@ -1,0 +1,195 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -212,14 +212,14 @@
+     return result.data;
+   }
+ 
+-  async monitoring(cursor?:string) {
++  async monitoring(cursors:{source_cursor?:string;policy_cursor?:string}={}) {
+     const count=z.number().finite().nonnegative();
+     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+       sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional(),state:z.string().optional(),release_state:z.string().optional(),workflow_version:z.number().optional(),delivery:z.string().optional(),event_type:z.string().optional(),source:z.string().optional(),schedule:z.string().nullable().optional(),timezone:z.string().nullable().optional(),preparation_succeeded:z.boolean().optional()})).optional(),
+       policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+       source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+-    const result=schema.safeParse(await this.read(`monitoring${queryString({cursor})}`));
++    const result=schema.safeParse(await this.read(`monitoring${queryString(cursors)}`));
+     if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+     return result.data;
+   }
+--- a/frontend/src/api/integration.test.tsx
++++ b/frontend/src/api/integration.test.tsx
+@@ -268,7 +268,7 @@
+     expect(screen.getByText(/runtime API is not connected/)).toBeVisible();
+     expect(screen.queryByRole("button", { name: "Load run" })).toBeNull();
+     const event = fixture("api-control-fixtures.json").valid_run_event as RunEvent;
+-    act(() => useBackend.setState({ session: { ...session(), runtime_available: true } }));
++    act(() => useBackend.setState({ status:"connected",session: { ...session(["runs.view"]), runtime_available: true } }));
+     vi.spyOn(api, "request").mockImplementation(async (operation) => operation === "get_run" ? ({ run: { run_id: event.run_id, workflow_id: event.workflow_id, workflow_version: event.workflow_version, status: "paused_for_approval", approvals: [] } }) as never : ({ items: [event], has_more: false }) as never);
+     view.rerender(<ServerRunView />);
+     fireEvent.change(screen.getByLabelText("Run ID"), { target: { value: event.run_id } });
+@@ -284,7 +284,7 @@
+       approvals: [{ approval_id: "approval_dm", workflow_id: "slack-dm-gmail", workflow_version: 1,
+         status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] }] };
+     const spy = vi.spyOn(api, "runs").mockResolvedValue({ items: [{ ...record, run_id: "run_dm_1" }, { ...record, run_id: "run_dm_2" }], total: 2, has_more: false, next_cursor: null });
+-    useBackend.setState({ session: { ...session(["workflow.approve"]), runtime_available: true, approval_service_available: true } });
++    useBackend.setState({ status:"connected",session: { ...session(["workflow.approve","runs.view"]), runtime_available: true, approval_service_available: true } });
+     render(<ServerRunView approvalsOnly />);
+     await waitFor(() => expect(screen.getByRole("button", { name: /run_dm_1/ })).toBeVisible());
+     expect(screen.getByRole("button", { name: /run_dm_2/ })).toBeVisible();
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -36,7 +36,7 @@
+     if(!feed.run || feed.run.workflow_id!==workflowId)return;
+     let disposed=false;
+     void api.request("get_workflow",{workflow_id:workflowId,workflow_version:feed.run.workflow_version}).then(result=>{
+-      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==feed.run!.workflow_version)throw new Error("Historical revision mismatch.");
++      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==feed.run!.workflow_version)throw new Error("The server returned a different historical revision.");
+       if(!disposed){setRevision({runId:feed.run!.run_id,value:fromCanonical(result.workflow)});setError(null);}
+     }).catch(caught=>{if(!disposed)setError(caught instanceof Error?caught:new Error("Historical revision is unavailable."));});
+     return()=>{disposed=true;};
+--- a/frontend/src/features/runs/ServerRunView.tsx
++++ b/frontend/src/features/runs/ServerRunView.tsx
+@@ -75,7 +75,7 @@
+       <label className="text-xs">Workflow<input aria-label="Filter workflow" value={filters.workflow_id} onChange={e=>{setCursor(undefined);setFilters({...filters,workflow_id:e.target.value});}} className="block rounded border bg-background p-2" /></label>
+       <label className="text-xs">Status<select aria-label="Filter status" value={filters.status} onChange={e=>{setCursor(undefined);setFilters({...filters,status:e.target.value});}} className="block rounded border bg-background p-2"><option value="">All statuses</option>{["queued","running","paused_for_approval","completed","failed","blocked","rejected","cancelled"].map(status=><option key={status} value={status}>{status}</option>)}</select></label>
+       <label className="text-xs">From<input aria-label="Filter from date" type="date" value={filters.from_date} onChange={e=>{setCursor(undefined);setFilters({...filters,from_date:e.target.value});}} className="block rounded border bg-background p-2" /></label>
+-      <label className="text-xs">Until<input aria-label="Filter to date" type="date" value={filters.to_date} onChange={e=>{setCursor(undefined);setFilters({...filters,to_date:e.target.value?e.target.value+"T23:59:59.999Z":""});}} className="block rounded border bg-background p-2" /></label>
++      <label className="text-xs">Until<input aria-label="Filter to date" type="date" value={filters.to_date.slice(0,10)} onChange={e=>{setCursor(undefined);setFilters({...filters,to_date:e.target.value?e.target.value+"T23:59:59.999Z":""});}} className="block rounded border bg-background p-2" /></label>
+     </div>
+     <div className="space-y-2" aria-label={approvalsOnly ? "Pending approvals" : "Recent runs"}>
+       {availableRuns.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">{approvalsOnly ? "No pending approvals." : "No runs yet."}</p>}
+--- a/frontend/src/screens/app.monitoring.tsx
++++ b/frontend/src/screens/app.monitoring.tsx
+@@ -10,7 +10,7 @@
+ export function LiveRuntimePanel() {
+   const [data, setData] = useState<Monitoring | null>(null);
+   const [error, setError] = useState<Error | null>(null);
+-  const [cursor,setCursor]=useState<string|undefined>();
++  const [cursor,setCursor]=useState<{source_cursor?:string;policy_cursor?:string}>({});
+   useEffect(() => {
+     let cancelled = false;
+     let timer:ReturnType<typeof setTimeout>;
+@@ -35,7 +35,7 @@
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime audit</p>{(data.audit ?? []).map(event => <p key={event.event_id} className="mt-2 text-xs text-muted-foreground">{event.timestamp} · {event.event_type} · {event.run_id}</p>)}{!data.audit?.length && <p className="mt-2 text-sm text-muted-foreground">No runtime audit events yet.</p>}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Run status distribution</p><div className="mt-4 space-y-2">{Object.entries(data.status_breakdown ?? {}).map(([status, count]) => <div key={status} className="flex items-center gap-3 text-xs"><span className="w-32 text-muted-foreground">{status}</span><div className="h-2 flex-1 rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${data.runs.total ? Math.max(2, (count / data.runs.total) * 100) : 0}%` }} /></div><span>{count}</span></div>)}</div><p className="mt-4 text-xs text-muted-foreground">Average completed duration: {Number(data.duration_seconds?.avg ?? 0).toFixed(2)}s</p></div>
+       <div className="rounded-xl border border-border"><p className="border-b border-border p-4 font-medium">Recent traces</p>{data.latest.length === 0 ? <p className="p-6 text-sm text-muted-foreground">No runtime traces yet.</p> : data.latest.map((run) => <div key={run.run_id} className="border-b border-border p-4 last:border-0"><p className="text-sm font-medium">{run.run_id} · {run.status}</p><p className="mt-1 text-xs text-muted-foreground">{run.correlation_id} · {run.trace_reference}</p></div>)}</div>
+-      <div className="flex flex-wrap gap-2"><button type="button" disabled={!cursor} onClick={()=>setCursor(undefined)} className="rounded border px-3 py-2 text-xs disabled:opacity-40">First readiness page</button>{data.source_next_cursor && <button type="button" onClick={()=>setCursor(data.source_next_cursor??undefined)} className="rounded border px-3 py-2 text-xs">More triggers</button>}{data.policy_next_cursor && <button type="button" onClick={()=>setCursor(data.policy_next_cursor??undefined)} className="rounded border px-3 py-2 text-xs">More enforced revisions</button>}</div>
++      <div className="flex flex-wrap gap-2"><button type="button" disabled={!cursor.source_cursor && !cursor.policy_cursor} onClick={()=>setCursor({})} className="rounded border px-3 py-2 text-xs disabled:opacity-40">First readiness page</button>{data.source_next_cursor && <button type="button" onClick={()=>setCursor({...cursor,source_cursor:data.source_next_cursor??undefined})} className="rounded border px-3 py-2 text-xs">More triggers</button>}{data.policy_next_cursor && <button type="button" onClick={()=>setCursor({...cursor,policy_cursor:data.policy_next_cursor??undefined})} className="rounded border px-3 py-2 text-xs">More enforced revisions</button>}</div>
+     </>}
+   </div>;
+ }
+--- a/runtime/history.py
++++ b/runtime/history.py
+@@ -20,11 +20,11 @@
+ def query_options(query, kind):
+     allowed = {'limit', 'after_sequence'} if kind == 'events' else {'limit', 'cursor', 'workflow_id', 'status', 'from_date', 'to_date', 'pending_only'}
+     if kind == 'monitoring':
+-        allowed = {'limit', 'cursor'}
++        allowed = {'limit', 'source_cursor', 'policy_cursor'}
+     if set(query) - allowed - {'request_id'}:
+         raise RuntimeFailure('INVALID_REQUEST', 'This history filter is unsupported.', 400)
+     result = {key: value for key, value in query.items() if key in allowed}
+-    for name in {'limit', 'cursor', 'after_sequence'} & result.keys():
++    for name in {'limit', 'cursor', 'after_sequence', 'source_cursor', 'policy_cursor'} & result.keys():
+         result[name] = integer(result[name], 1 if name == 'limit' else 0, 500 if name == 'limit' else 9223372036854775807)
+     if 'pending_only' in result:
+         if result['pending_only'] not in {'true', 'false'}:
+@@ -48,7 +48,7 @@
+         approval['required_roles'] = roles
+         eligible = (gate and auth.get('decision') == 'allow' and 'workflow.approve' in auth.get('permissions', [])
+                     and bool(set(auth.get('roles', [])) & set(roles))
+-                    and bool(set(auth.get('scopes', [])) & {'workspace:read', 'workspace:write'})
++                    and bool(set(auth.get('scopes', [])) & {'workspace:read', 'workspace:write'}))
+         if not eligible or approval['status'] != 'pending':
+             approval['allowed_decisions'] = []
+     return result
+@@ -114,10 +114,11 @@
+     return dict(items=items, total=total, has_more=more, next_cursor=str(rows[limit - 1][0]) if more else None)
+ 
+ 
+-def monitoring(runtime, auth, limit=50, cursor=None):
++def monitoring(runtime, auth, limit=50, source_cursor=None, policy_cursor=None):
+     runtime.authorize(auth, 'runs.view', ROLES)
+     workspace = auth['subject']['workspace_id']; limit = integer(limit, 1, 500)
+-    after = integer(cursor or 0)
++    source_after = integer(source_cursor or 0)
++    policy_after = integer(policy_cursor or 0)
+     usage_keys = ['llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd']
+     with runtime.store.transaction(write=False) as db:
+         counts = db.execute("SELECT json_extract(document,'$.status'),COUNT(*) FROM runtime_runs WHERE workspace=? GROUP BY json_extract(document,'$.status')", (workspace,)).fetchall()
+@@ -130,7 +131,7 @@
+         audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+         sources, policies = [], []
+         if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
+-            rows = db.execute('SELECT t.rowid,t.workflow_id,t.state,t.document,r.document FROM lifecycle_triggers t JOIN lifecycle_releases r ON r.release_id=t.release_id AND r.workspace=t.workspace WHERE t.workspace=? AND t.rowid>? ORDER BY t.rowid LIMIT ?', (workspace, after, limit + 1)).fetchall()
++            rows = db.execute('SELECT t.rowid,t.workflow_id,t.state,t.document,r.document FROM lifecycle_triggers t JOIN lifecycle_releases r ON r.release_id=t.release_id AND r.workspace=t.workspace WHERE t.workspace=? AND t.rowid>? ORDER BY t.rowid LIMIT ?', (workspace, source_after, limit + 1)).fetchall()
+             for position, workflow_id, state, encoded, release_doc in rows[:limit]:
+                 trigger, release = json.loads(encoded), json.loads(release_doc)
+                 checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
+@@ -146,7 +147,7 @@
+             source_more, source_cursor = False, None
+         # Only approved/published revisions are enforced candidates. Drafts are
+         # explicitly excluded. Read a bounded page, never all workflow documents.
+-        rows = db.execute("SELECT r.rowid,r.document FROM revisions r WHERE r.workspace=? AND r.rowid>? AND json_extract(r.document,'$.status') IN ('approved','published') AND r.version=(SELECT MAX(x.version) FROM revisions x WHERE x.workspace=r.workspace AND x.workflow_id=r.workflow_id AND json_extract(x.document,'$.status') IN ('approved','published')) ORDER BY r.rowid LIMIT ?", (workspace, after, limit + 1)).fetchall()
++        rows = db.execute("SELECT r.rowid,r.document FROM revisions r WHERE r.workspace=? AND r.rowid>? AND json_extract(r.document,'$.status') IN ('approved','published') AND r.version=(SELECT MAX(x.version) FROM revisions x WHERE x.workspace=r.workspace AND x.workflow_id=r.workflow_id AND json_extract(x.document,'$.status') IN ('approved','published')) ORDER BY r.rowid LIMIT ?", (workspace, policy_after, limit + 1)).fetchall()
+         for position, encoded in rows[:limit]:
+             workflow = json.loads(encoded)
+             active = None
+--- a/tests/test_runtime.py
++++ b/tests/test_runtime.py
+@@ -318,7 +318,7 @@
+         self.assertEqual(runner.decide(request, self.approver()), approved)
+         self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
+ 
+-    def test_workspace_members_can_approve_a_gate_with_an_unknown_role(self):
++    def test_workspace_members_cannot_approve_a_gate_with_an_unknown_role(self):
+         self.approval_graph()
+         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+         self.put()
+@@ -331,10 +331,11 @@
+                 paused = runner.advance(run['run_id'], self.auth)
+                 member = dict(subject=dict(subject_id='member-' + str(index), workspace_id='local-workspace'),
+                     roles=[role], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+-                approved = runner.decide(self.decision(paused, 'approved'), member)
+-                self.assertEqual(approved['status'], 'running')
+-
+-    def test_viewer_can_approve_through_api_without_execution_permission(self):
++                with self.assertRaises(RuntimeFailure):
++                    runner.decide(self.decision(paused, 'approved'), member)
++                self.assertEqual(self.runtime.get_run(run['run_id'], self.auth)['status'], 'paused_for_approval')
++
++    def test_viewer_cannot_approve_through_api_without_gate_permission(self):
+         self.approval_graph()
+         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']
+         self.put()
+@@ -344,8 +345,8 @@
+         member = dict(subject=dict(subject_id='viewer-member', workspace_id='local-workspace'),
+             roles=['viewer'], permissions=['runs.view'], scopes=['workspace:read'], decision='allow')
+         result = self.workflows.handle(self.decision(paused, 'approved'), member)
+-        self.assertEqual(result['status'], 200, result)
+-        self.assertEqual(result['data']['status'], 'approved')
++        self.assertEqual(result['status'], 403, result)
++        self.assertEqual(self.runtime.get_run(paused['run_id'], self.auth)['status'], 'paused_for_approval')
+ 
+     def test_members_cannot_approve_another_workspace_or_without_authentication(self):
+         self.approval_graph()
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -404,6 +404,7 @@
+ 
+     @app.get('/monitoring')
+     async def monitoring(request: Request):
++        from runtime.service import RuntimeFailure
+         try:
+             if workflow_service.runtime_runner is None:
+                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+@@ -411,7 +412,7 @@
+             from runtime.history import query_options
+             data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth, **query_options(dict(request.query_params), 'monitoring'))
+             return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
+-        except __import__('runtime.service', fromlist=['RuntimeFailure']).RuntimeFailure as exc:
++        except RuntimeFailure as exc:
+             return error(exc.code, str(exc), exc.status)
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)

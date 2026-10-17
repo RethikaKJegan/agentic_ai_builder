@@ -8,6 +8,7 @@ for (const mobile of [false, true]) {
       if (mobile) await page.setViewportSize({ width: 390, height: 844 });
       const evidence = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "fixtures/delegated-tools.json"), "utf8"));
       const published = evidence.workflow;
+      published.status = "published";
       published.inputs = [];
       published.metadata.execution_input_mode = "automatic";
       published.metadata.trigger_templates = mode === "event" ? [{ provider_id: "google_sheets", event_type: "row.created", input_mapping: {} }] : [];
@@ -47,7 +48,10 @@ for (const mobile of [false, true]) {
         const prompt = "Read https://docs.google.com/spreadsheets/d/test_sheet_1234567890/edit range Sheet1!A:D and prepare a report when I start it.";
         await page.getByLabel("Process description").fill(prompt);
         await expect(page.getByLabel("Google Sheets URL or ID")).toHaveCount(0);
+        await expect(page.getByRole("combobox", { name: "Workflow input source" })).toHaveCount(0);
         await page.getByRole("button", { name: "Generate workflow" }).click();
+        await expect(page.getByRole("region", { name: "Generation result" })).toBeVisible();
+        await page.getByRole("button", { name: "Review and edit workflow" }).click();
         await expect(page).toHaveURL(new RegExp(`/app/workflows/${published.workflow_id}$`));
         expect(sessionRequests).toBeGreaterThanOrEqual(2);
         const planning = calls.find((call) => call.operation === "plan_workflow");
@@ -58,10 +62,11 @@ for (const mobile of [false, true]) {
         await page.getByRole("button", { name: `Actions for ${published.name}` }).click();
         await page.getByRole("menuitem", { name: "Run published" }).click();
         if (mode === "manual") {
+          await page.getByRole("button", { name: "Start run", exact: true }).click();
           await expect.poll(() => calls.filter((call) => call.operation === "execute_workflow").length).toBe(1);
           expect(calls.find((call) => call.operation === "execute_workflow")?.payload).toMatchObject({ workflow_version: 1, inputs: {} });
         } else {
-          await expect(page.getByText(/This workflow starts automatically/)).toBeVisible();
+          await expect(page.getByText(/This workflow waits for its configured event/)).toBeVisible();
           expect(calls.filter((call) => call.operation === "execute_workflow")).toHaveLength(0);
         }
       }

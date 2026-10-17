@@ -1,0 +1,43 @@
+--- a/docs/phase1-deployment.md
++++ b/docs/phase1-deployment.md
+@@ -10,7 +10,7 @@
+ BUILDER_ENVIRONMENT=development BUILDER_DEV_AUTH=1 .venv-integrations/bin/python scripts/run_live_backend.py
+ ```
+ 
+-The live backend still binds only to `127.0.0.1`, default port 8000. If another service occupies 8000, use an available explicit `--port` and use that same port in Next's server environment. Do not stop unrelated services. The already-running backend on 8002 and UI on 3001 were not restarted by this change.
++The live backend still binds only to `127.0.0.1`, default port 8000. If another service occupies 8000, use an available explicit `--port` and use that same port in Next's server environment. Do not stop unrelated services. The subsequent user-authorized live rollout restarted the backend on 8002 and UI on 3001 with these tested changes. Both retain loopback-only bindings. See `openspec/changes/phase1-deployment-security/live-rollout-verification.md`.
+ 
+ Run Next from `frontend/` with matching configuration:
+ 
+@@ -53,4 +53,4 @@
+ 
+ Before public deployment, implement Google Workspace login, server-validated individual identities, workspace/role/permission mappings, secure expiring HttpOnly sessions, CSRF enforcement, approval separation, revocation, trusted automation identities and actual HTTPS smoke tests. Configure a Google OAuth web client and the actual Workspace domain; connector authorization tokens are not login identity. Production authentication and public authenticated success remain deferred/unverified.
+ 
+-Keep backend ports private. The observed Builder backend listener was loopback-only; this is not a full firewall or external-internet exposure audit. No firewall, reverse-proxy, credential or live-service configuration changed.
++Keep backend ports private. The observed Builder backend listener was loopback-only; this is not a full firewall or external-internet exposure audit. No firewall, reverse-proxy or credential configuration changed. The live services now have explicit local-mode systemd overrides; public development authentication is blocked until Google Workspace login is implemented.
+--- a/openspec/changes/phase1-deployment-security/verification.md
++++ b/openspec/changes/phase1-deployment-security/verification.md
+@@ -96,3 +96,7 @@
+ Loading these source changes into the active app requires a controlled restart with explicit matching local/test environment, origins and private upstream port. Exact commands and limitations are in `docs/phase1-deployment.md`.
+ 
+ Before public deployment, return to Google Workspace authentication: configure the OAuth web client and actual Workspace domain, validate individual identities, map workspace/roles/permissions server-side, enforce secure expiring sessions/CSRF and approval separation, and use trusted automation identities. Then verify real HTTPS routing and the full lifecycle. This work remains explicitly deferred, not complete.
++
++## Subsequent user-authorized deployment
++
++The user subsequently requested deployment and live verification. Both Builder services have now been restarted with the tested build and local-only configuration. Live HTTPS/local-session/origin/CSRF/network checks completed; public development sessions are blocked. See [live rollout verification](live-rollout-verification.md) for exact results, service IDs, background-activity observations and remaining production-authentication limits. This supersedes the earlier no-restart statement for current deployment status.
+--- a/openspec/changes/phase1-deployment-security/tasks.md
++++ b/openspec/changes/phase1-deployment-security/tasks.md
+@@ -9,3 +9,13 @@
+ ## Final verification
+ 
+ 355 backend cases and 73 subtests passed; 137 frontend tests passed; 12 selected desktop/mobile browser scenarios passed. Types, lint, isolated production build, contracts, generated-validator drift, strict OpenSpec and diff checks passed. Full evidence: `verification.md`. Production Google Workspace authentication and public HTTPS smoke verification remain explicitly deferred. Existing live services were not restarted.
++
++## Authorized live rollout follow-up
++
++- [x] Load the tested build and restart the two managed Builder services.
++- [x] Verify real HTTPS routing/TLS, local authenticated reads, missing/expired sessions and invalid-origin/CSRF rejection.
++- [x] Verify loopback listeners and probe the public hostname on known application ports.
++- [x] Verify desktop/mobile live browsers without workflow execution.
++- [ ] DEFERRED with Google Workspace: successful authenticated public requests and production identity-bound session/CSRF/permission verification.
++
++Evidence: `live-rollout-verification.md`. Public HTML remains reachable; public API development sessions are intentionally rejected.

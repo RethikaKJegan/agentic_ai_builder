@@ -1,0 +1,268 @@
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -168,13 +168,13 @@
+         db.execute('UPDATE runtime_runs SET document=? WHERE run_id=? AND workspace=?', (json.dumps(run), run['run_id'], run['workspace_id']))
+ 
+     def get_run(self, run_id, auth):
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             return self.public(self.load(db, run_id, auth))
+ 
+     def list_runs(self, auth, limit=100, status=None):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+         items = [self.public(json.loads(row[0])) for row in rows]
+         if status:
+@@ -184,7 +184,7 @@
+     def list_approvals(self, auth, pending_only=False, limit=100):
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
+         items = []
+         for row in rows:
+@@ -195,7 +195,7 @@
+         return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
+ 
+     def events(self, run_id, auth):
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             self.load(db, run_id, auth)
+             items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
+             return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+@@ -204,7 +204,7 @@
+         """Return workspace-scoped counters and safe trace references."""
+         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+         workspace = auth['subject']['workspace_id']
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
+             event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
+             audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
+@@ -248,7 +248,7 @@
+         """
+         if self.observer is None:
+             return 0
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute('SELECT sequence, document FROM runtime_events WHERE sequence NOT IN (SELECT sequence FROM runtime_trace_exports WHERE observer=?) ORDER BY sequence LIMIT ?', (observer_id, limit)).fetchall()
+         exported = 0
+         for sequence, document in rows:
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -392,7 +392,7 @@
+             return error('NOT_FOUND', 'The workspace collection was not found.', 404)
+         table = {'settings': 'workspace_settings', 'knowledge': 'knowledge_sources', 'governance': 'governance_policies'}[collection]
+         try:
+-            with workflow_service.store.transaction() as db:
++            with workflow_service.store.transaction(write=False) as db:
+                 if collection == 'settings':
+                     rows = db.execute('SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key', (auth['subject']['workspace_id'],)).fetchall()
+                     items = [{'key': k, 'value': json.loads(v), 'updated_at': t} for k, v, t in rows]
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -326,7 +326,7 @@
+     def read_case_evidence(case, requests):
+         from runtime.service import RuntimeFailure
+         from runtime.connectors import google_spreadsheet_id
+-        with service.store.transaction() as db:
++        with service.store.transaction(write=False) as db:
+             stored = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?',
+                                 (auth['subject']['workspace_id'], case['run_id'])).fetchone()
+             original_run = json.loads(stored[0]) if stored else None
+@@ -335,7 +335,7 @@
+         authority = authenticate(service, auth, auth['subject']['workspace_id'], original_run['subject_id'])
+         if authority is None:
+             raise RuntimeFailure('EXECUTION_AUTHORITY_REVOKED', 'The case workflow is no longer active.')
+-        with service.store.transaction() as db:
++        with service.store.transaction(write=False) as db:
+             workflow, grants = runner.runtime.revision(db, case['workflow_id'], case['workflow_version'], authority, True)
+         permitted = {(google_spreadsheet_id(t['spreadsheet_id']), t['range']) for t in workflow['metadata'].get('sheet_read_targets', [])}
+         read_grant = next((g for g in grants if g['tool_id'] == 'google_sheets_read_rows'), None)
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -22,7 +22,7 @@
+         self.default_resources = dict(default_resources or {})
+ 
+     def _authority(self, binding):
+-        with self.service.store.transaction() as db:
++        with self.service.store.transaction(write=False) as db:
+             row = db.execute("SELECT r.document FROM lifecycle_releases r JOIN lifecycle_triggers t ON t.release_id=r.release_id WHERE t.binding_id=? AND t.workspace=?",
+                              (binding['binding_id'], binding['workspace_id'])).fetchone()
+             if not row:
+--- a/workflow_api/slack_socket.py
++++ b/workflow_api/slack_socket.py
+@@ -29,7 +29,7 @@
+                           event_type='message.im', text=event['text'], body=event['text'],
+                           timestamp=event.get('ts', ''))
+         lifecycle = self.service.lifecycle
+-        with lifecycle.store.transaction() as db:
++        with lifecycle.store.transaction(write=False) as db:
+             rows = db.execute("SELECT document FROM lifecycle_triggers WHERE workspace='local-workspace' AND state='ready'").fetchall()
+         routed = 0
+         for row in rows:
+--- a/workflow_api/procurement_fulfilment.py
++++ b/workflow_api/procurement_fulfilment.py
+@@ -50,7 +50,7 @@
+             events=self.workflows.runtime_runner.runtime.events(action['run_id'],auth)['items']
+             codes={e['details'].get('error_code') for e in events if e['event_type']=='node.failed'}
+             if codes!={'MODEL_OUTPUT_SCHEMA_INVALID'}:return False
+-            with self.workflows.store.transaction() as db:
++            with self.workflows.store.transaction(write=False) as db:
+                 row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                     (workspace,action['workflow_id'],action['workflow_version'])).fetchone()
+             if not row:return False
+@@ -207,7 +207,7 @@
+         # change a previously submitted/approved notification's fingerprint.
+         action_key = 'ful_notify_'+key; existing = job['actions'].get(action_key)
+         if existing:
+-            with self.workflows.store.transaction() as db:
++            with self.workflows.store.transaction(write=False) as db:
+                 row = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                     (workspace, existing['workflow_id'], existing['workflow_version'])).fetchone()
+             require(row is not None, 'FULFILMENT_ACTION_MISSING')
+@@ -241,7 +241,7 @@
+                     key+='_structured_control1';workflow['workflow_id']+='_structured_control1'
+                 previous = job['actions'].get(key)
+                 if previous:
+-                    with self.workflows.store.transaction() as db:
++                    with self.workflows.store.transaction(write=False) as db:
+                         saved = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                             (workspace, previous['workflow_id'], previous['workflow_version'])).fetchone()
+                     if saved: workflow = json.loads(saved[0])
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -86,7 +86,7 @@
+         self.workflows, self.store, self.clock = workflows, workflows.store, clock
+         self.adapter = adapter or TriggerAdapter()
+         self.trigger_secrets = dict(trigger_secrets or {})
+-        with self.store.transaction(write=False) as db:
++        with self.store.transaction(write=True) as db:
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))")
+             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))")
+@@ -139,7 +139,7 @@
+         if not workspace:
+             return
+         fingerprint = json_digest({"kind": kind, "payload": payload})
+-        with self.store.transaction(write=False) as db:
++        with self.store.transaction(write=True) as db:
+             operation, replay = self.operation(db, workspace, auth, kind, key, workflow_id,
+                                                payload.get("expected_release_id"), fingerprint)
+             if not replay or operation["state"] == "preparing":
+@@ -170,7 +170,7 @@
+         workspace = auth["subject"]["workspace_id"]
+         fingerprint = json_digest({"kind": "activate_release", "payload": payload})
+         prepared = []
+-        with self.store.transaction(write=False) as db:
++        with self.store.transaction(write=True) as db:
+             operation, replay = self.operation(db, workspace, auth, "activate_release", key, workflow_id, expected, fingerprint)
+             if replay:
+                 return {"operation": operation, "release": self._release_for_operation(db, operation)}
+@@ -323,7 +323,7 @@
+ 
+     def verify_webhook(self, binding_id, provider_id, raw_body, signature, timestamp=None):
+         """Verify provider delivery before parsing or dispatching its event."""
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+         if not row or row[0] != "ready":
+             raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This trigger binding is not active.", 404)
+@@ -388,7 +388,7 @@
+                 raise ValueError()
+         except Exception:
+             raise LifecycleFailure("INVALID_SCHEDULE_TICK", "A schedule tick requires a timezone-aware instant.", 400) from None
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
+             if not row or row[0] != "ready":
+                 raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This schedule binding is not active.", 404)
+@@ -460,7 +460,7 @@
+ 
+     def poll_bindings(self, workspace):
+         """Return active polling bindings without credential material."""
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             rows = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'", (workspace,)).fetchall()
+         return [json.loads(encoded) for _binding, encoded in rows if json.loads(encoded).get('delivery') == 'poll']
+ 
+@@ -646,7 +646,7 @@
+ 
+     def get_operation(self, operation_id, auth):
+         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
+-        with self.store.transaction() as db:
++        with self.store.transaction(write=False) as db:
+             row = db.execute("SELECT document FROM lifecycle_operations WHERE workspace=? AND operation_id=?", (auth["subject"]["workspace_id"], operation_id)).fetchone()
+             if not row:
+                 raise LifecycleFailure("OPERATION_NOT_FOUND", "The lifecycle operation was not found.", 404)
+--- a/workflow_api/storage.py
++++ b/workflow_api/storage.py
+@@ -1,15 +1,24 @@
+ """Transactional local POC revision/idempotency store; no runtime state."""
+ import json
+ import sqlite3
++import logging
++import os
++import time
++from threading import Lock
+ from contextlib import contextmanager
+ from pathlib import Path
+ 
+ 
+ class WorkflowStore:
+-    def __init__(self, path):
++    def __init__(self, path, *, busy_timeout_ms=None):
++        self.busy_timeout_ms = int(os.getenv('BUILDER_DATABASE_BUSY_TIMEOUT_MS', '3000')) if busy_timeout_ms is None else busy_timeout_ms
++        if type(self.busy_timeout_ms) is not int or not 0 <= self.busy_timeout_ms <= 30000:
++            raise ValueError('Database busy timeout must be between 0 and 30000 milliseconds.')
++        self.metrics = {'reads': 0, 'writes': 0, 'contention': 0, 'failures': 0, 'slow_transactions': 0}
++        self.metrics_lock = Lock()
+         self.path = str(path)
+         Path(path).parent.mkdir(parents=True, exist_ok=True)
+-        with sqlite3.connect(self.path, timeout=30) as db:
++        with sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000) as db:
+             db.execute('PRAGMA journal_mode=WAL')
+         with self.transaction() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS revisions (workspace TEXT, workflow_id TEXT, version INTEGER, document TEXT NOT NULL, PRIMARY KEY(workspace, workflow_id, version))')
+@@ -20,15 +29,35 @@
+ 
+     @contextmanager
+     def transaction(self, *, write=True):
+-        db = sqlite3.connect(self.path, timeout=30)
++        db = sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000)
++        started = time.monotonic()
++        category = None
+         try:
++            db.execute(f'PRAGMA busy_timeout={self.busy_timeout_ms}')
++            if not write:
++                db.execute('PRAGMA query_only=ON')
+             db.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
+             yield db
+             db.commit()
+-        except Exception:
++        except Exception as exc:
+             db.rollback()
++            code = getattr(exc, 'sqlite_errorcode', 0) & 255
++            category = 'contention' if code in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) else 'transaction_state' if code == sqlite3.SQLITE_MISUSE else 'database_failure'
++            logging.getLogger(__name__).warning('Database transaction failed', extra={
++                'database_category': category, 'database_code': code, 'transaction_write': write,
++                'transaction_seconds': round(time.monotonic() - started, 4)})
+             raise
+         finally:
++            elapsed = time.monotonic() - started
++            with self.metrics_lock:
++                self.metrics['writes' if write else 'reads'] += 1
++                if category:
++                    self.metrics['contention' if category == 'contention' else 'failures'] += 1
++                if elapsed >= 1:
++                    self.metrics['slow_transactions'] += 1
++            if elapsed >= 1:
++                logging.getLogger(__name__).info('Slow database transaction', extra={
++                    'transaction_write': write, 'transaction_seconds': round(elapsed, 4)})
+             db.close()
+ 
+     @staticmethod

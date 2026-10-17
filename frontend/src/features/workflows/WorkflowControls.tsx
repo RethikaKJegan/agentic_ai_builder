@@ -1,90 +1,95 @@
-import { useState } from "react";
-import { FlaskConical, Rocket, X } from "lucide-react";
-import { api } from "@/api/client";
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { InputError } from "@/api/feedback";
+import { api, ApiError } from "@/api/client";
 import { useBackend } from "@/api/state";
 import { toCanonical, hasWorkflowEdits } from "@/api/mapping";
 import { useMesh } from "@/domain/store";
 import type { Workflow } from "@/domain/types";
-import { runTotals, simulateRun, type SimResult } from "@/domain/simulator";
-import { RunTrace } from "@/features/runs/RunTrace";
 import { assertWorkflowReferences } from "@/api/control";
 import { ApiFeedback } from "./ApiFeedback";
 import { SheetAccessReview } from "./SheetAccessReview";
 import { CustomerAutomationReview } from "./CustomerAutomationReview";
 import { ProcurementReview } from "./ProcurementReview";
+import { editSnapshot, acceptConfirmed } from "./workflow-state";
+import { useUnsavedWorkflow } from "./unsaved";
 
-export function WorkflowControls({ workflow }: { workflow: Workflow }) {
-  const backend = useBackend();
-  const agents = useMesh((s) => s.agents);
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState<Error>();
-  const [test, setTest] = useState<SimResult>();
-  const version = workflow.serverVersion;
-  const activeRelease = backend.overview[workflow.id];
-  if (backend.status !== "connected") return null;
+type Action = "save" | "validate" | "submit" | "approve" | "publish" | "activate" | "reload";
+const labels: Record<Action, string> = { save: "Save draft", validate: "Validate", submit: "Submit for approval", approve: "Approve", publish: "Publish", activate: "Activate", reload: "Reload server revision" };
+const permissions: Record<Action, string> = { save: "workflow.edit", validate: "workflow.validate", submit: "workflow.validate", approve: "workflow.approve", publish: "workflow.publish", activate: "workflow.publish", reload: "workflow.view" };
+
+export function WorkflowControls({ workflow, onStarted, compact = false }: { workflow: Workflow; onStarted?: () => void; compact?: boolean }) {
+  const backend = useBackend(); const agents = useMesh(state => state.agents);
+  const [busy, setBusy] = useState<Action | "">(""); const pending = useRef(false);
+  const [error, setError] = useState<Error>(); const [message, setMessage] = useState("");
+  useUnsavedWorkflow(workflow.id);
+  const version = workflow.serverVersion; const document = workflow.canonical;
+  const failedAt=useRef<{document:Workflow["canonical"]}|null>(null);
+  useEffect(()=>{if(failedAt.current && failedAt.current.document!==document){failedAt.current=null;setError(undefined);}},[document]);
   const dirty = hasWorkflowEdits(workflow, agents);
-  let graphError: Error | null = null;
-  try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught : new Error("Complete the workflow configuration."); }
-  const saveDraft = async () => {
-    const state = useMesh.getState();
-    const current = state.workflows.find((item) => item.id === workflow.id) ?? workflow;
-    const document = toCanonical(current, state.agents);
-    const result = await api.request("save_workflow_version", { workflow_id: document.workflow_id,
-      workflow_version: document.version, base_version: current.serverVersion ?? 0, workflow: document });
-    useMesh.getState().acceptWorkflow(result.workflow);
-    if (result.registry_review) backend.acceptReview(result.registry_review);
-    return result.workflow;
+  let graphError = "";
+  try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught.message : "Complete the workflow configuration."; }
+  const blocker = (action: Action) => {
+    if (backend.status !== "connected") return "Connect to the backend to use this action.";
+    if (!backend.can(permissions[action])) return `${permissions[action]} permission is required.`;
+    if (action === "reload") return version ? "" : "This local draft has no server revision.";
+    if (action === "save") return (workflow.remote ? "Resolve the newer server revision before saving." : "") || graphError || (!dirty ? "No unsaved changes." : "");
+    if (dirty) return "Save draft before this action.";
+    if (!version || !document) return "Save this draft first.";
+    if (action === "validate") return document.status === "draft" || document.status === "validated" ? "" : "Save an edited draft to validate a new revision.";
+    if (action === "submit") return document.status !== "validated" ? "Validate this revision first." : document.metadata["approval_submission"] ? "This revision is submitted for review." : "";
+    if (action === "approve") return document.status === "validated" ? "" : "A validated revision is required.";
+    if (action === "publish") return document.status === "approved" ? "" : "Explicit approval is required before publication.";
+    return document.status === "published" ? "" : "Publish this revision before activation.";
   };
-  const testWorkflow = () => {
-    setError(undefined);
-    if (graphError) { setError(graphError); return; }
-    const state = useMesh.getState();
-    const current = state.workflows.find((item) => item.id === workflow.id) ?? workflow;
-    // This simulation is local. It cannot call a connector, send mail, or modify a provider resource.
-    setTest(simulateRun(current, state.agents, current.description || "Safe editor test", {}, undefined, state.controlContext(current.id)));
-  };
-  const publish = async () => {
-    if (busy || graphError || backend.status !== "connected") return;
-    setBusy("publish"); setError(undefined);
+  const act = async (action: Action) => {
+    if (pending.current || blocker(action)) return;
+    if (action === "reload" && dirty && !window.confirm("Reload the server revision and discard this editor's unsaved changes?")) return;
+    if (action === "activate" && !window.confirm(`Activate published revision v${version}? Configured events will be allowed to start runs under this revision's reviewed policies.`)) return;
+    pending.current = true; setBusy(action); setError(undefined); setMessage("");
     try {
-      let document = workflow.canonical;
-      if (dirty || !document || !version) document = await saveDraft();
-      const ref = { workflow_id: document.workflow_id, workflow_version: document.version };
-      if (document.status === "draft") {
-        const validated = await api.request("validate_workflow", ref);
-        useMesh.getState().acceptWorkflow(validated.workflow);
-        document = validated.workflow;
+      const state = useMesh.getState(); const current = state.workflows.find(item => item.id === workflow.id) ?? workflow;
+      const snapshot = editSnapshot(current, state.agents);
+      const ref = { workflow_id: current.id, workflow_version: current.serverVersion! };
+      if (action === "activate") {
+        const active = useBackend.getState().overview[current.id];
+        const result = await api.activateRelease({ ...ref, expected_release_id: active?.activation_state === "active" ? active.release_id : null, triggers: [] });
+        setMessage(`Activation ${result.operation.state} · release ${result.release.release_id}`);
+      } else {
+        const result = action === "save" ? await api.request("save_workflow_version", { workflow_id: current.id, workflow_version: (current.serverVersion ?? 0) + 1, base_version: current.serverVersion ?? 0, workflow: toCanonical(current, state.agents) })
+          : action === "reload" ? await api.request("get_workflow", { workflow_id: current.id })
+            : action === "submit" ? await api.submitApproval(ref)
+              : action === "validate" ? await api.request("validate_workflow", ref)
+                : await api.request("approve_workflow", { ...ref, action: action === "approve" ? "approve" : "publish" });
+        if (action === "reload") { const now=useMesh.getState(); const edited=now.workflows.find(w=>w.id===current.id);if(edited&&editSnapshot(edited,now.agents)!==snapshot)throw new InputError("Your draft changed while reload was loading. Edits were retained; review and confirm reload again.");now.acceptWorkflow(result.workflow); } else acceptConfirmed(result.workflow, snapshot);
+        if (result.registry_review) backend.acceptReview(result.registry_review);
+        if (action === "validate" && result.workflow.status !== "validated") throw new InputError("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
+        setMessage(`${labels[action]} confirmed · v${result.workflow.version} · ${result.workflow.status}`);
       }
-      if (document.status === "validated") {
-        const approved = await api.request("approve_workflow", { ...ref, action: "approve" });
-        useMesh.getState().acceptWorkflow(approved.workflow);
-        document = approved.workflow;
-      }
-      if (document.status !== "approved") throw new Error("This revision cannot be published. Resolve its review requirements first.");
-      const published = await api.request("approve_workflow", { workflow_id: document.workflow_id, workflow_version: document.version, action: "publish" });
-      useMesh.getState().acceptWorkflow(published.workflow);
-      await api.activateRelease({ workflow_id: document.workflow_id, workflow_version: document.version,
-        expected_release_id: activeRelease?.activation_state === "active" ? activeRelease.release_id : null, triggers: [] });
       await backend.refreshOverview();
-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The workflow could not be published.")); }
-    finally { setBusy(""); }
+    } catch (caught) { failedAt.current={document:useMesh.getState().workflows.find(w=>w.id===workflow.id)?.canonical}; setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); if(caught instanceof ApiError && caught.error.error_code==="REVISION_CONFLICT"){try{const latest=await api.request("get_workflow",{workflow_id:workflow.id});useMesh.getState().observeWorkflows([latest.workflow]);}catch{/* Existing error and working draft remain visible. */}} }
+    finally { pending.current = false; setBusy(""); }
   };
-  const saved = workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
-  const totals = test ? runTotals(test.steps) : null;
-  return <>
-    <ProcurementReview workflow={workflow} />
-    <SheetAccessReview targets={workflow.canonical?.metadata["sheet_write_targets"]} />
-    <CustomerAutomationReview policy={workflow.canonical?.metadata["customer_automation"]} emailPolicy={workflow.canonical?.metadata["email_recipient_policy"]} />
-    <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">{dirty ? "Unsaved edits" : `Saved ${saved}`}</span>
-    <button type="button" onClick={testWorkflow} className="flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 text-sm hover:border-border-accent" aria-label="Test workflow"><FlaskConical className="h-4 w-4" />Test</button>
-    <button type="button" onClick={() => void publish()} disabled={!!busy || !!graphError || backend.status !== "connected" || !backend.can("workflow.publish")} className="flex h-8 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Rocket className="h-4 w-4" />{busy ? "Publishing…" : "Publish"}</button>
-    {error && <div className="absolute right-4 top-14 z-30 max-h-[60vh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto shadow-sm"><ApiFeedback error={error} /></div>}
-    {test && <div role="dialog" aria-modal="true" aria-label="Safe test run" className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4">
-      <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl">
-        <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h2 className="font-display text-xl font-semibold">Test run</h2><p className="mt-1 text-sm text-muted-foreground">Simulated locally. No email, Sheets update, webhook, or external connector was called.</p></div><button onClick={() => setTest(undefined)} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close test run"><X className="h-5 w-5" /></button></div>
-        <div className="my-4 grid grid-cols-4 gap-2 rounded-xl bg-muted/50 p-3 text-center text-xs"><span><b className="block text-base">{test.status}</b>Status</span><span><b className="block text-base">{test.steps.length}</b>Steps</span><span><b className="block text-base">{totals?.tokens ?? 0}</b>Tokens</span><span><b className="block text-base">${totals?.cost.toFixed(4) ?? "0.0000"}</b>Estimated</span></div>
-        <RunTrace steps={test.steps} />
-      </div>
-    </div>}
-  </>;
+  useEffect(() => { if (message && compact) toast.success(message); }, [message, compact]);
+  const timestamp = document?.metadata["updated_at"];
+  const saved = typeof timestamp === "string" && Number.isFinite(Date.parse(timestamp)) ? new Date(timestamp).toLocaleString() : null;
+  const conflict = error instanceof ApiError && ["REVISION_CONFLICT", "RELEASE_CONFLICT"].includes(error.error.error_code);
+  const candidateReview = backend.reviews[workflow.id];
+  const review = candidateReview?.workflow_version === version ? candidateReview : undefined;
+  const activePublished=!dirty&&document?.status==='published'&&backend.overview[workflow.id]?.activation_state==='active';
+  const primary:Action=dirty?'save':document?.status==='draft'?'validate':document?.status==='validated'?(document.metadata['approval_submission']?'approve':'submit'):document?.status==='approved'?'publish':'activate';
+  const renderAction=(action:Action)=>{const reason=blocker(action);return <div key={action}><button type="button" disabled={!!busy||!!reason} title={reason||labels[action]} aria-describedby={`${workflow.id}-${action}-reason`} onClick={()=>void act(action)} className={`rounded-lg border px-3 py-2 text-xs disabled:opacity-40 ${action===primary?'border-primary bg-primary text-primary-foreground':'border-border hover:bg-muted'}`}>{busy===action?`${labels[action]}…`:labels[action]}</button><span id={`${workflow.id}-${action}-reason`} className="sr-only">{reason}</span></div>;};
+  return <section aria-label="Workflow actions" className={`flex flex-wrap items-center gap-2 ${compact?"":"w-full"}`}>
+    {!compact && <div className="text-[11px] leading-5 text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>}
+    <ProcurementReview workflow={workflow} onStarted={onStarted} />
+    <SheetAccessReview targets={document?.metadata["sheet_write_targets"]} />
+    <CustomerAutomationReview policy={document?.metadata["customer_automation"]} emailPolicy={document?.metadata["email_recipient_policy"]} />
+    {activePublished ? onStarted?<button onClick={onStarted} className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground">Open execution</button>:<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-800">Release active</span> : renderAction(primary)}
+    <details className="relative"><summary className="cursor-pointer rounded-lg border px-3 py-2 text-xs">Revision actions</summary><div className="absolute right-0 top-11 z-40 w-72 space-y-3 rounded-xl border bg-background p-4 shadow-xl">    <div className="text-[11px] leading-5 text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
+<p className="text-xs text-muted-foreground">Each action remains a separate server-confirmed transition.</p><div className="flex flex-wrap gap-2">{(['save','validate','submit','approve','publish','activate','reload'] as const).filter(a=>activePublished||a!==primary).map(renderAction)}</div>{dirty&&document&&<p className="text-[11px] text-muted-foreground">Saving creates a new editable revision. The active release keeps its reviewed revision.</p>}</div></details>
+    {review && !review.ready && <p role="status" className="w-full text-sm text-destructive">Registry blockers: {review.reason_codes.join(", ") || "Review the tool assignments."}</p>}
+    {conflict && <p role="alert" className="w-full text-sm">The server changed. Your edits are retained. Copy any changes you want to keep before choosing Reload server revision, then reapply them to the latest draft.</p>}
+    <div className={error||(!compact&&message)?"w-full":"hidden"}><ApiFeedback error={error} />{message && !compact && <p role="status" className="text-sm text-emerald-700">{message}</p>}</div>
+  </section>;
 }

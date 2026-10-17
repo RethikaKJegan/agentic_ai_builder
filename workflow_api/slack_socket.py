@@ -29,7 +29,7 @@ class SlackSocketReceiver:
                           event_type='message.im', text=event['text'], body=event['text'],
                           timestamp=event.get('ts', ''))
         lifecycle = self.service.lifecycle
-        with lifecycle.store.transaction() as db:
+        with lifecycle.store.transaction(write=False) as db:
             rows = db.execute("SELECT document FROM lifecycle_triggers WHERE workspace='local-workspace' AND state='ready'").fetchall()
         routed = 0
         for row in rows:

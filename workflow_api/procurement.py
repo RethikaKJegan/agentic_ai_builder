@@ -12,7 +12,8 @@ from connector_extension.catalog import CATALOG, definition, obj
 from connector_extension.common import Connector, denied
 from connector_extension.procurement.service import ProcurementService, CONTEXT_FIELDS, ITEM_FIELDS
 from connector_extension.procurement.layout import TABLE_HEADERS
-from connector_extension.procurement.store import require, SCHEMA
+from connector_extension.procurement.store import require, SCHEMA, ProcurementError
+from runtime.service import RuntimeFailure
 from connector_extension.procurement.runtime_tools import PROJECT, TOOLS, ProcurementConnector, ingestion_workflow
 from .supplier_discovery import SupplierDiscovery, CONTACTS, SelectedContacts
 from .procurement_quotes import ProcurementQuotes
@@ -218,11 +219,34 @@ class ProcurementPlanner:
     def generate(self, objective, context):
         if not re.search(r'\b(procurement|rfqs?|boq|bill of quantities)\b', objective,re.I):
             return self.fallback.generate(objective,context)
-        from .sheet_discovery import spreadsheet_references, catalog_snapshot
+        # Creating a requirements list is a planning stage, not an ingestion prerequisite.
+        create_requirements = re.search(
+            r'\b(?:generat(?:e|ing)|creat(?:e|ing)|draft(?:ing)?|produc(?:e|ing)|build(?:ing)?|develop(?:ing)?|prepar(?:e|ing))'
+            r'\s+(?:(?:a|an|the|new|detailed|initial|complete|comprehensive|itemized|itemised|full)\s+){0,8}'
+            r'(?:boq\b|bill\s+of\s+quantities\b|requirements\s+(?:list|table)\b|equipment\s+(?:list|schedule)\b)', objective, re.I)
+        # Reading existing requirements takes precedence over preparing their BOQ.
+        # A supplementary spreadsheet link alone is not an ingestion instruction.
+        read_requirements = re.search(
+            r'\b(?:read|load|import)\s+(?:(?:the|existing|saved|supplied|connected)\s+){0,3}'
+            r'(?:requirements?\b|boq\b|bill\s+of\s+quantities\b)'
+            r'|\b(?:requirements?|vendors?)\s+(?:and\s+(?:requirements?|vendors?)\s+)?(?:tabs?|sheets?|tables?)\b'
+            r'|\bfrom\s+(?:(?:the|existing|saved|supplied|connected)\s+){0,3}'
+            r'(?:requirements?\b|boq\b|bill\s+of\s+quantities\b|spreadsheet\b)', objective, re.I)
+        if create_requirements and not read_requirements:
+            return self.fallback.generate(objective, {**context, 'procurement_planning_mode': 'requirements_first'})
+        from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, catalog_snapshot
         from connector_extension.procurement.store import ProcurementError
         from registry.safety import reject_secrets
-        catalogs=[self.discoverer(ref) for ref in spreadsheet_references(objective)]
-        if not catalogs: raise PlannerFailure('PROCUREMENT_SOURCE_REQUIRED','Include the requirements and vendor spreadsheet links.')
+        explicit = set(spreadsheet_references(objective))
+        catalogs = []
+        for reference in planning_spreadsheet_references(objective, context):
+            try:
+                catalogs.append(self.discoverer(reference))
+            except Exception:
+                if reference in explicit:
+                    raise PlannerFailure('SHEETS_DISCOVERY_FAILED', 'Could not inspect the supplied procurement spreadsheet. Check the link and account access.') from None
+        if not catalogs:
+            raise PlannerFailure('PROCUREMENT_SOURCE_REQUIRED', 'No accessible requirements spreadsheet was identified. Provide its link or save it as a workspace source; to create a new BOQ, ask to generate it from your requirements.')
         nullable={'type':['string','null']}
         context_schema=obj({k:nullable for k in CONTEXT_FIELDS}, CONTEXT_FIELDS)
         def source(fields):
@@ -284,7 +308,9 @@ class ProcurementPlanner:
                              details={'requirement_codes':list(dict.fromkeys(failures))})
 
 
-class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDiscovery, ProcurementService):
+from .procurement_projection_recovery import RFQProjectionRecovery
+
+class IntegratedProcurement(RFQProjectionRecovery, ProcurementFulfilment, ProcurementQuotes, SupplierDiscovery, ProcurementService):
     """Same canonical workflow store/approvals; only domain ledger is separate."""
     def setup(self, plan, auth, *, owner_workflow=None):
         require(owner_workflow is not None,'PROCUREMENT_PUBLISHED_WORKFLOW_REQUIRED')
@@ -317,7 +343,7 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
         return super().ingest(workspace,project,requirements_rows,vendor_rows)
 
     def failed_actions(self,job):
-        return [a for key,a in job['actions'].items() if key not in job.get('rejected_pages',[]) and
+        return [a for key,a in job['actions'].items() if key not in job.get('rejected_pages',[]) and key not in job.get('rfq_projection_recovery',{}) and
                 a['state'] in ('failed','blocked','rejected','cancelled')]
 
     def status(self,workspace,project):
@@ -335,10 +361,10 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
         return result
 
     def tick(self):
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             rows=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') "
                             "NOT IN ('COMPLETED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION') "
-                            "AND (json_extract(body,'$.phase')!='STOPPED' OR json_extract(body,'$.fulfilment_policy.revision')=1) "
+                            " "
                             "AND (json_extract(body,'$.phase')!='PO_RELEASED' OR json_extract(body,'$.owner_workflow.phase3_settings.enabled')=1) "
                             "AND (json_extract(body,'$.phase')!='RFQS_SENT' OR json_extract(body,'$.owner_workflow.phase2_settings.enabled')=1) ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
         if not rows:self.cursor=0
@@ -347,12 +373,14 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
             auth=self.auth_supplier(workspace)
             if auth is not None:self.advance(project,auth)
 
-    def active(self, workspace, job):
+    def active(self, workspace, job, db=None):
         owner=job.get('owner_workflow')
         if not owner:return True
-        with self.workflows.store.transaction(write=False) as db:
-            row=db.execute('SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON a.release_id=r.release_id '
-                           'WHERE a.workspace=? AND a.workflow_id=?',(workspace,owner['workflow_id'])).fetchone()
+        if db is None:
+            with self.workflows.store.transaction(write=False) as connection:
+                return self.active(workspace,job,connection)
+        row=db.execute('SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON a.release_id=r.release_id '
+                       'WHERE a.workspace=? AND r.workspace=? AND a.workflow_id=?',(workspace,workspace,owner['workflow_id'])).fetchone()
         return bool(row and json.loads(row[0])['state']=='active' and
                     json.loads(row[0])['revision']['workflow_version']==owner['version'])
 
@@ -361,6 +389,8 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
                                           job.get('discovery_plan',{}).get('action_mode')=='automatic')
 
     def run_action(self,workspace,job,name,workflow,auth):
+        if name in job.get('rfq_projection_recovery',{}):
+            workflow=deepcopy(workflow);workflow['workflow_id']+='_reconcile1';name+='_reconcile1'
         if self.automatic(job):
             workflow=deepcopy(workflow)
             approvals={n['node_id'] for n in workflow['nodes'] if n['kind']=='approval'}
@@ -393,7 +423,7 @@ class IntegratedProcurement(ProcurementFulfilment, ProcurementQuotes, SupplierDi
         phase=self.job(workspace,project)['phase']
         if phase=='STOPPED':
             job=self.job(workspace,project)
-            if self.recover_fulfilment_control(workspace,job,auth):phase=job['phase']
+            if self.recover_rfq_projection(workspace,job,auth) or self.recover_fulfilment_control(workspace,job,auth):phase=job['phase']
         if phase=='COMPLETED':return self.status(workspace,project)
         job=self.job(workspace,project)
         if phase=='PO_RELEASED' and job.get('owner_workflow',{}).get('phase3_settings') and not job.get('fulfilment_policy'):
@@ -488,8 +518,12 @@ class StartConnector(Connector):
         auth=self.auth_supplier(workspace)
         require(auth is not None,'PROCUREMENT_AUTH_REQUIRED')
         owner={'workflow_id':self.workflow['workflow_id'],'version':self.workflow['version']}
-        require(self.service.active(workspace,{'owner_workflow':owner}),'PROCUREMENT_WORKFLOW_INACTIVE')
-        result=self.service.setup(plan,auth,owner_workflow=owner)
+        if not self.service.active(workspace,{'owner_workflow':owner}):
+            raise RuntimeFailure('PROCUREMENT_WORKFLOW_INACTIVE', 'Activate this published workflow revision before starting procurement.')
+        try:
+            result=self.service.setup(plan,auth,owner_workflow=owner)
+        except ProcurementError as failure:
+            raise RuntimeFailure(failure.code, 'Procurement setup was stopped. Review the project settings and recorded error code.') from None
         job=self.service.job(workspace,plan['project_id'])
         if not job.get('root_run_id'):
             job['root_run_id']=effect_id.split(':',1)[0];self.service.save_job(workspace,job)
@@ -525,7 +559,7 @@ def install(app, settings, env, client, model, auth):
     from connector_extension.app import state_directory
     state=state_directory(ROOT/env.get('BUILDER_PROCUREMENT_STATE','.local/connector-extension/native-procurement'))
     token_file=ROOT/env.get('BUILDER_PROCUREMENT_GOOGLE_TOKEN','.local/connector-extension/google-token.json')
-    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state);artifacts=ArtifactStore(state);resources=SheetResourceStore(state)
+    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'));artifacts=ArtifactStore(state);resources=SheetResourceStore(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'))
     # Approval review adds grants for each exact child action without revoking other reviewed workflows.
     registry=service.registry_adapter.service
     old=service.registry_adapter
@@ -535,6 +569,15 @@ def install(app, settings, env, client, model, auth):
     procurement=IntegratedProcurement(service,state,settings['procurement_currency_precision'],supplier)
     procurement.model = model
     procurement.automatic_enabled=bool(settings.get('_automatic_actions'))
+    previous_execution_validator=getattr(runner.runtime,'execution_validator',None)
+    def validate_execution(workflow, execution_auth, db):
+        if previous_execution_validator:
+            previous_execution_validator(workflow,execution_auth,db)
+        if not any(tool['tool_id']==START_ID for tool in workflow['tools']):return
+        owner={'workflow_id':workflow['workflow_id'],'version':workflow['version']}
+        if not procurement.active(execution_auth['subject']['workspace_id'],{'owner_workflow':owner},db):
+            raise RuntimeFailure('PROCUREMENT_WORKFLOW_INACTIVE', 'Activate this published workflow revision before starting procurement.')
+    runner.runtime.execution_validator=validate_execution
     procurement.phase2_initialize()
     procurement.fulfilment_initialize()
     for tool in definitions(settings):

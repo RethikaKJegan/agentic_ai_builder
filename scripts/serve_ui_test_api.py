@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from contextlib import nullcontext
+from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -35,13 +36,23 @@ class _OfflineConnector:
 
 def _offline_model_factory(definition):
     from runtime.model import BoundedLLM
-    return BoundedLLM(definition, lambda messages, cap, duration: ('{}', 0, 0), lambda messages: 1, 0, 0)
+    def provider(messages, cap, duration):
+        if definition.get('hierarchy_role') == 'master':
+            result = {'action':'finish','reason':'Explicit offline provider fixture; no connector invocation.',
+                      'output':{'summary':'Offline fixture result'}}
+        else:
+            result = {}
+        return json.dumps(result), 0, 0
+    return BoundedLLM(definition, provider, lambda messages: 1, 0, 0)
 
 if __name__ == '__main__':
     (ROOT / '.local').mkdir(exist_ok=True)
-    directory = ROOT / '.local' / 'browser-ui'
+    directory = Path(os.getenv('BUILDER_TEST_DATABASE_DIR', str(ROOT / '.local' / 'browser-ui'))).resolve()
+    if not directory.is_relative_to(ROOT / '.local'):
+        raise RuntimeError('Browser test databases must stay under this repository .local directory.')
     directory.mkdir(exist_ok=True)
-    with nullcontext(directory):
+    with (TemporaryDirectory(prefix="run-", dir=directory) if os.getenv("BUILDER_TEST_FRESH_DATABASE") == "1" else nullcontext(directory)) as database_directory:
+        directory = Path(database_directory)
         # Explicit browser-only configured registry; never used by product startup.
         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
         agent.update(agent_id='reader_agent', capabilities=['read_spreadsheet'], permissions=['data.read'])
@@ -106,7 +117,8 @@ if __name__ == '__main__':
                 tools=[dict(tool_id=definition['tool_id'], capability='read_spreadsheet')],
                 nodes=[dict(node_id='start', kind='trigger', label='Start'), dict(node_id='read_rows', kind='agent', label='Read rows', agent_id=agent['agent_id']), dict(node_id='finish', kind='output', label='Finish')],
                 edges=[dict(edge_id='start_read', source='start', target='read_rows'), dict(edge_id='read_finish', source='read_rows', target='finish')],
-                conditions=[], approval_gates=[], metadata={})
+                conditions=[], approval_gates=[], metadata={'execution_input_mode':'manual'})
+            workflow['inputs'] = [dict(name='request_text',type='string',required=True), dict(name='spreadsheet_id',type='string',required=True), dict(name='range',type='string',required=True)]
             workflow['execution_policy']['allow_external_writes'] = False
             documents.append(workflow)
         source = Path(directory) / 'registry.json'
@@ -173,4 +185,35 @@ if __name__ == '__main__':
                 workflow_version=1, base_version=0, workflow=document)), auth)
             if result['status'] != 200:
                 raise RuntimeError('Browser-only registry setup failed.')
+        # Explicit test control-plane checkpoint. This does not exist in the
+        # production launcher and never grants tools or changes live resources.
+        if os.getenv('BUILDER_TEST_OPERATOR_REVIEW') == '1' and os.getenv('BUILDER_ENVIRONMENT') == 'test' and os.getenv('BUILDER_REAL_CONNECTORS') != '1':
+            from fastapi import Request
+            from fastapi.responses import JSONResponse
+            @app.post('/__test__/registry-review/{workflow_id}/{version}')
+            async def review_fixture_agents(workflow_id: str, version: int, request: Request):
+                authority = app.state.workflow_auth
+                if ('admin' not in authority['roles'] or 'tools.manage' not in authority['permissions'] or
+                        'workspace:write' not in authority['scopes'] or authority['decision'] != 'allow'):
+                    return JSONResponse({'error':'OPERATOR_REVIEW_NOT_AUTHORIZED'},status_code=403)
+                workspace = authority['subject']['workspace_id']
+                with service.store.transaction(write=False) as db:
+                    workflow = service.store.get(db, workspace, workflow_id, version)
+                    latest = service.store.get(db, workspace, workflow_id)
+                    active = db.execute('SELECT 1 FROM lifecycle_active WHERE workspace=? AND workflow_id=?',(workspace,workflow_id)).fetchone()
+                if not workflow or not latest or latest['version'] != version or workflow['status'] not in {'draft','validated'} or active:
+                    return JSONResponse({'error':'REVIEW_REQUIRES_EXACT_UNRELEASED_DRAFT'},status_code=409)
+                reviewed=[]
+                for candidate in workflow['agents']:
+                    previous = service.registry_adapter.agents.get(candidate['agent_id'])
+                    old = previous['definition'] if previous else {}
+                    definition = {**deepcopy(candidate),'allowed_tool_ids':[],
+                        'name':old.get('name',candidate['agent_id']),
+                        'retry_policy':{'max_retries':candidate['limits']['max_retries'],'backoff_seconds':1},
+                        'guardrails':deepcopy(old.get('guardrails',{'pii_redaction':True,'prompt_injection_detection':True,'output_validation':True}))}
+                    response = service.registry_adapter.service.register_agent(definition,authority)
+                    if response['status'] != 200:return JSONResponse(response,status_code=response['status'])
+                    service.registry_adapter.agents[candidate['agent_id']] = response['data']['agent']
+                    reviewed.append(candidate['agent_id'])
+                return JSONResponse(service.envelope('req_test_registry_review',200,{'reviewed_agent_ids':reviewed,'tool_grants_issued':False}))
         uvicorn.run(app, host='127.0.0.1', port=int(os.getenv('BUILDER_TEST_API_PORT', '8011')), log_level='warning')

@@ -1,0 +1,8 @@
+- [x] Separate workflow lifecycle controls and add durable explicit approval submission/review.
+- [x] Preserve dirty/in-flight edits, truthful saved times, revision conflicts and unsaved navigation.
+- [x] Add published-schema run form, permission/runtime/event checks, deduplication and run details links.
+- [x] Correct settings persistence and backend validation/permissions.
+- [x] Correct integration configuration/verification semantics and safe provider checks.
+- [x] Inventory all controls, correct misleading/unavailable actions and confirm destructive actions.
+- [x] Verify regressions, canonical contracts, types/lint/build and keyboard/mobile browser flows.
+- [x] Load tested changes safely and document exact patches, audit matrix and verification limits.

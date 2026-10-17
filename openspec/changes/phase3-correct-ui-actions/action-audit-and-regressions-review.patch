@@ -1,0 +1,348 @@
+--- a/frontend/src/api/integration.test.tsx
++++ b/frontend/src/api/integration.test.tsx
+@@ -108,7 +108,7 @@
+ });
+ 
+ describe("workflow UI integration", () => {
+-  it("publishes the revision and activates a release through the additive v2 boundary", async () => {
++  it("publishes only the approved revision and leaves activation explicit", async () => {
+     const original = CanonicalWorkflowSchema.parse(fixture("workflows/support-triage.json"));
+     original.status = "approved";
+     original.metadata["unresolved_requirements"] = [];
+@@ -128,7 +128,9 @@
+       automation_identity_id: "auto_1", agent_versions: {}, tool_versions: {}, policy_version: 1, trigger_binding_ids: [], created_at: new Date().toISOString() } } as never);
+     render(<WorkflowControls workflow={mapped.workflow} />);
+     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+-    await waitFor(() => expect(activate).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: original.workflow_id, expected_release_id: null })));
++    await waitFor(() => expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" })));
++    expect(activate).not.toHaveBeenCalled();
++    expect(request).toHaveBeenCalledTimes(1);
+     expect(request).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" }));
+   });
+   it("keeps registry review details out of the editor while retaining a clear publish action", () => {
+@@ -147,9 +149,9 @@
+     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+     expect(screen.queryByText("Registry requirements authorized for this revision")).toBeNull();
+   });
+-  it("surfaces a server-side publication rejection without exposing registry internals", async () => {
+-    const original = document();
+-    original.status = "validated";
++  it("surfaces publication rejection with actionable Registry blockers", async () => {
++    const original = document();
++    original.status = "approved";
+     const mapped = fromCanonical(original);
+     useMesh.setState({ agents: mapped.agents });
+     const review = { workflow_id: original.workflow_id, workflow_version: original.version, ready: false, reason_codes: ["APPROVAL_REQUIRED", "TOOL_UNAVAILABLE"], items: [
+@@ -165,12 +167,12 @@
+     expect(screen.getByRole("list", { name: "Publication requirements" })).toHaveTextContent("Configure Slack Events for the selected channel.");
+     expect(screen.getByRole("alert")).toHaveTextContent("corr_review");
+   });
+-  it("saves an edited canonical revision as part of publishing and excludes it from browser draft persistence", async () => {
++  it("saves only the edited draft and clears dirty persistence after confirmation", async () => {
+     const original = document();
+     useMesh.getState().acceptWorkflow(original);
+     useMesh.getState().renameWorkflow(original.workflow_id, "Invoice edits");
+     const edited = useMesh.getState().workflows[0]!;
+-    useBackend.setState({ session: session(["workflow.publish"]), refreshOverview: vi.fn(async () => undefined) });
++    useBackend.setState({ session: session(["workflow.edit"]), refreshOverview: vi.fn(async () => undefined) });
+     const saved = { ...original, version: original.version + 1, name: "Invoice edits", status: "draft" as const, metadata: { ...original.metadata, workspace_id: "local-workspace" } };
+     const save = vi.spyOn(api, "request").mockImplementation(async (operation, payload) => {
+       if (operation === "save_workflow_version") return { workflow: { ...saved, ...("workflow" in payload ? payload.workflow : {}) }, correlation_id: "corr_saved" } as never;
+@@ -180,18 +182,20 @@
+     });
+     vi.spyOn(api, "activateRelease").mockResolvedValue({} as never);
+     render(<WorkflowControls workflow={edited} />);
+-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+-    await waitFor(() => expect(save).toHaveBeenCalledWith("approve_workflow", expect.objectContaining({ action: "publish" })));
++    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
++    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+     expect(save).toHaveBeenCalledWith("save_workflow_version", expect.objectContaining({ base_version: original.version, workflow: expect.objectContaining({ name: "Invoice edits", version: original.version + 1 }) }));
+     expect(useMesh.getState().workflows[0]?.serverVersion).toBe(original.version + 1);
+     expect(JSON.parse(localStorage.getItem("mesh-local-drafts-v1")!).state.workflows).toEqual([]);
+   });
+-  it("allows viewers to run a safe local test but not publish", () => {
++  it("explains unavailable privileged controls to viewers without simulated execution", () => {
+     const mapped = fromCanonical(document());
+     useMesh.setState({ agents: mapped.agents });
+     useBackend.setState({ session: session(["workflow.view"]) });
+     const view = render(<WorkflowControls workflow={mapped.workflow} />);
+-    expect(screen.getByRole("button", { name: "Test workflow" })).toBeEnabled();
++    expect(screen.queryByRole("button", { name: "Test workflow" })).toBeNull();
++    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
++    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
+     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+     view.unmount();
+   });
+@@ -199,9 +203,9 @@
+     const mapped = fromCanonical(document());
+     useMesh.setState({ agents: mapped.agents });
+     vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
+-    useBackend.setState({ session: session(["workflow.publish"]) });
++    useBackend.setState({ session: session(["workflow.validate"]) });
+     render(<WorkflowControls workflow={mapped.workflow} />);
+-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
++    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Correct the edge."));
+   });
+ });
+@@ -232,7 +236,7 @@
+ 
+ describe("approval and run consumers", () => {
+   it("submits only the exact trusted pending approval binding and renders the returned decision", async () => {
+-    useBackend.setState({ session: { ...session(["runs.view"]), auth: { ...session(["runs.view"]).auth, roles: ["viewer"] }, approval_service_available: true } });
++    useBackend.setState({ session: { ...session(["runs.view", "workflow.approve"]), auth: { ...session(["runs.view", "workflow.approve"]).auth, roles: ["approver"] }, approval_service_available: true } });
+     const approval = { approval_id: "approval_exact", workflow_id: "invoice_review", workflow_version: 3, status: "pending" as const, allowed_decisions: ["approved" as const, "rejected" as const] };
+     const decision = vi.spyOn(api, "request").mockResolvedValue({ ...approval, status: "approved", allowed_decisions: [] } as never);
+     render(<ApprovalControl approval={approval} />);
+--- a/frontend/src/features/agents/AgentControlsCard.tsx
++++ b/frontend/src/features/agents/AgentControlsCard.tsx
+@@ -36,7 +36,7 @@
+         {!allowed && <span className="text-[11px] text-muted-foreground">Read-only for your role</span>}
+       </div>
+       <label className="flex items-center justify-between gap-3 text-sm">
+-        <span>{agent.paused ? "Paused" : "Active"}<span className="block text-[11px] text-muted-foreground">{agent.paused ? (children.length ? "This agent and its sub-agents will not run." : "Runs stop before this agent.") : "Draft configuration only"}</span></span>
++        <span>{agent.paused ? "Paused" : "Active"}<span className="block text-[11px] text-muted-foreground">{agent.paused ? (children.length ? "This local draft marks the agent and sub-agents paused; live runs are unchanged." : "This local draft is paused; live runs are unchanged.") : "Draft configuration only"}</span></span>
+         <Switch checked={!agent.paused} disabled={!allowed} onCheckedChange={(v) => setPaused(agent.id, !v)} aria-label="Agent active" />
+       </label>
+       <p className="text-[11px] text-muted-foreground">
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -185,6 +185,7 @@
+         .map((c) => (c as { id: string }).id);
+       const next = applyNodeChanges(changes, nodesRef.current);
+       if (removed.length) {
++        if (!window.confirm("Remove these steps from the local draft? Undo can restore them until a server reload.")) return;
+         if (nodesRef.current.some((n) => removed.includes(n.id) && n.data.kind === "trigger")) {
+           toast.error("Every workflow needs a trigger.");
+           return;
+@@ -350,6 +351,7 @@
+   };
+ 
+   const removeChild = (id: string) => {
++    if (!window.confirm("Remove this sub-agent and its nested steps from the local draft?")) return;
+     const n = nodesRef.current.find((x) => x.id === id);
+     const r = removeSubtree({ nodes: clean(nodesRef.current), edges: edgesRef.current }, id);
+     commit({ nodes: r.nodes, edges: r.edges });
+--- a/frontend/src/features/governance/AgentControlTab.tsx
++++ b/frontend/src/features/governance/AgentControlTab.tsx
+@@ -44,10 +44,10 @@
+     const c = controls[scope];
+     return (
+       <div className="rounded-2xl border border-border">
+-        <p className="border-b border-border px-4 py-3 text-sm font-medium">{scope === "organization" ? "Organization · Acme Corp" : "Workspace · Acme Ops"}</p>
++        <p className="border-b border-border px-4 py-3 text-sm font-medium">{scope === "organization" ? "Draft organization" : "Draft workspace"}</p>
+         <div className="divide-y divide-border">
+           <label className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+-            <span>Agent execution<span className="block text-xs text-muted-foreground">{c.executionEnabled ? "Agents may run" : "All agent runs are blocked"}</span></span>
++            <span>Agent execution<span className="block text-xs text-muted-foreground">{c.executionEnabled ? "Draft execution enabled" : "Draft execution disabled"}</span></span>
+             <Switch checked={c.executionEnabled} disabled={!allowed} onCheckedChange={(v) => set(scope, { executionEnabled: v })} aria-label={`${scope} agent execution`} />
+           </label>
+           {NUMERIC.map((n) => (
+@@ -92,6 +92,7 @@
+ 
+   return (
+     <div className="space-y-4">
++      <p role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">Local draft controls only. These settings do not change live execution, approvals or server budgets. See Live governance &amp; usage for enforced policies.</p>
+       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+         {[["Total agents", agents.length], ["Active", agents.length - paused], ["Paused", paused], ["Total runs", runs.length], ["Est. spend", `$${totalCost.toFixed(2)}`]].map(([l, v]) => (
+           <div key={l as string} className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">{l}</p><p className="mt-1 font-display text-xl font-semibold">{v}</p></div>
+--- a/frontend/src/features/workflows/ProcurementReview.tsx
++++ b/frontend/src/features/workflows/ProcurementReview.tsx
+@@ -1,9 +1,11 @@
+ "use client";
+-import { useEffect, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { api, ApiError } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { useMesh } from "@/domain/store";
+ import type { Workflow } from "@/domain/types";
++import { toCanonical } from "@/api/mapping";
++import { editSnapshot, acceptConfirmed } from "./workflow-state";
+ import { ApiFeedback } from "./ApiFeedback";
+ 
+ type FulfilmentSettings = { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean };
+@@ -21,25 +23,29 @@
+   const [status, setStatus] = useState<Awaited<ReturnType<typeof api.procurementStatus>>>();
+   const [error, setError] = useState<Error>();
+   const [busy, setBusy] = useState(false);
++  const pending = useRef(false);
++  const [startRun, setStartRun] = useState("");
+   const [selected, setSelected] = useState<string[]>([]);
+   const [notStarted, setNotStarted] = useState(false);
+   const [fulfilment, setFulfilment] = useState<FulfilmentSettings>({ enabled: true, buyer_email: "", manager_email: "", acceptance_hours: 24, reminder_hours: 24, allow_delivery_reschedule: false });
+   useEffect(() => { setDraft(plan); }, [raw]); // eslint-disable-line react-hooks/exhaustive-deps
+   if (!plan || !draft) return null;
+-  const editable = workflow.canonical?.status === "draft" || workflow.canonical?.status === "validated";
++  const editable = backend.can("workflow.edit") && (workflow.canonical?.status === "draft" || workflow.canonical?.status === "validated");
+   const publishedVersion = backend.overview[workflow.id]?.published_version;
+   const start = async () => {
+-    if (busy || !publishedVersion) return;
+-    setBusy(true); setError(undefined);
++    if (pending.current || !publishedVersion || !backend.can("workflow.execute") || !backend.session?.runtime_available) return;
++    pending.current = true; setBusy(true); setError(undefined);
+     try {
+-      await api.request("execute_workflow", { workflow_id: workflow.id, workflow_version: publishedVersion, inputs: {} }, crypto.randomUUID());
+-      setStatus(await api.procurementStatus(plan.project_id));
+-      setNotStarted(false);
++      const result = await api.request("execute_workflow", { workflow_id: workflow.id, workflow_version: publishedVersion, inputs: {} });
++      setStartRun(`${result.run.run_id} · ${result.run.status}`);
++      try { setStatus(await api.procurementStatus(plan.project_id)); setNotStarted(false); }
++      catch (failure) { if (failure instanceof ApiError && failure.error.error_code === "PROCUREMENT_PROJECT_NOT_FOUND") setNotStarted(true); else throw failure; }
+     } catch (e) { setError(e instanceof Error ? e : new Error("Procurement could not be started.")); }
+-    finally { setBusy(false); }
++    finally { pending.current = false; setBusy(false); }
+   };
+   const load = async () => {
+-    setError(undefined);
++    if (pending.current) return;
++    pending.current = true; setError(undefined);
+     setBusy(true);
+     try {
+       // Recover the session/capabilities after a local backend restart.
+@@ -50,34 +56,34 @@
+       const absent = e instanceof ApiError && e.error.error_code === "PROCUREMENT_PROJECT_NOT_FOUND";
+       setNotStarted(absent);
+       setError(absent ? undefined : e instanceof Error ? e : new Error("Could not load procurement status."));
+-    } finally { setBusy(false); }
++    } finally { pending.current = false; setBusy(false); }
+   };
+   const save = async () => {
+-    if (!workflow.canonical || busy) return;
+-    setBusy(true); setError(undefined);
++    if (!workflow.canonical || pending.current || !backend.can("workflow.edit")) return;
++    pending.current = true; setBusy(true); setError(undefined);
+     try {
+-      const document = structuredClone(workflow.canonical);
+-      document.version = (workflow.serverVersion ?? document.version) + 1;
+-      document.status = "draft";
++      const state = useMesh.getState(); const current = state.workflows.find(item => item.id === workflow.id) ?? workflow;
++      const snapshot = editSnapshot(current, state.agents);
++      const document = toCanonical(current, state.agents);
+       document.metadata["procurement_plan"] = draft;
+       const result = await api.request("save_workflow_version", { workflow_id: document.workflow_id,
+         workflow_version: document.version, base_version: workflow.serverVersion ?? 0, workflow: document });
+-      useMesh.getState().acceptWorkflow(result.workflow);
++      acceptConfirmed(result.workflow, snapshot);
+     } catch (e) { setError(e instanceof Error ? e : new Error("Could not save project settings.")); }
+-    finally { setBusy(false); }
++    finally { pending.current = false; setBusy(false); }
+   };
+   const reviewSuppliers = async (decision: "approved" | "rejected") => {
+-    if (!status?.shortlist_digest || busy) return;
+-    setBusy(true); setError(undefined);
++    if (!status?.shortlist_digest || pending.current || !backend.can("workflow.approve")) return;
++    pending.current = true; setBusy(true); setError(undefined);
+     try {
+       await api.procurementSuppliersReview(plan.project_id, decision, selected, status.shortlist_digest);
+       setStatus(await api.procurementStatus(plan.project_id));
+     } catch (e) { setError(e instanceof Error ? e : new Error("Supplier selection could not be saved.")); }
+-    finally { setBusy(false); }
++    finally { pending.current = false; setBusy(false); }
+   };
+   const activateFulfilment = async () => {
+-    if (busy || !publishedVersion) return;
+-    setBusy(true); setError(undefined);
++    if (pending.current || !publishedVersion || !backend.can("workflow.approve")) return;
++    pending.current = true; setBusy(true); setError(undefined);
+     try {
+       if (typeof api.procurementFulfilmentActivate !== "function") {
+         throw new Error("The frontend API client is out of date. Restart the frontend and reload this page, then activate fulfilment again.");
+@@ -85,7 +91,7 @@
+       await api.procurementFulfilmentActivate(plan.project_id, workflow.id, publishedVersion, status?.fulfilment_policy?.revision ?? 0, fulfilment);
+       setStatus(await api.procurementStatus(plan.project_id));
+     } catch (e) { setError(e instanceof Error ? e : new Error("Could not activate fulfilment.")); }
+-    finally { setBusy(false); }
++    finally { pending.current = false; setBusy(false); }
+   };
+   const fulfilmentInputs = (value: FulfilmentSettings, change: (next: FulfilmentSettings) => void, disabled: boolean) => <>
+     {(["buyer_email", "manager_email"] as const).map(field => <label className="block" key={field}>{field === "buyer_email" ? "Buyer receiving email" : "Manager notification email"}
+@@ -109,26 +115,26 @@
+       <p className="text-sm">Supplier mode: {draft.supplier_mode ?? "supplied"}{draft.supplier_mode !== "supplied" && draft.supplier_mode ? " · DDGS keyless research" : ""}</p>
+       {(["requirements", "vendors"] as const).map(kind => { const source = draft[kind]; return source ? <div key={kind} className="text-sm">
+         <p className="font-medium capitalize">{kind}</p><p className="break-all">{source.spreadsheet_url}</p>
+-        <label className="block">Table range<input disabled={!editable} className="mt-1 w-full rounded border p-1" value={source.range}
++        <label className="block">Table range<input disabled={!editable || busy} className="mt-1 w-full rounded border p-1" value={source.range}
+           onChange={e => setDraft({ ...draft, [kind]: { ...source, range: e.target.value } })} /></label>
+         {Object.entries(source.columns).map(([field, header]) => <label key={field} className="mt-1 flex items-center justify-between gap-2">
+-          <span>{field}</span><input disabled={!editable} className="w-1/2 rounded border p-1" value={header}
++          <span>{field}</span><input disabled={!editable || busy} className="w-1/2 rounded border p-1" value={header}
+             onChange={e => setDraft({ ...draft, [kind]: { ...source, columns: { ...source.columns, [field]: e.target.value } } })} /></label>)}
+       </div> : null; })}
+       {Object.entries(draft.context).map(([field, value]) => <label key={field} className="block text-sm">
+-        {field.replaceAll("_", " ")}<input disabled={!editable} className="mt-1 w-full rounded border p-1" value={value ?? ""}
++        {field.replaceAll("_", " ")}<input disabled={!editable || busy} className="mt-1 w-full rounded border p-1" value={value ?? ""}
+           placeholder="Required project information" onChange={e => setDraft({ ...draft, context: { ...draft.context, [field]: e.target.value || null } })} />
+       </label>)}
+       {draft.phase2 && <section className="space-y-2 rounded border p-2 text-sm">
+         <p className="font-medium">Quotation comparison and purchase orders</p>
+         <p>{draft.action_mode === "automatic" ? "Automatic simulation awards and PO release use the published project spending limit." : "Award and PO emails require action approval."}</p>
+-        <label className="block">Calendar<input disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.calendar_id}
++        <label className="block">Calendar<input disabled={!editable || busy} className="w-full rounded border p-1" value={draft.phase2.calendar_id}
+           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, calendar_id: e.target.value } })} /></label>
+-        <label className="block">Reminder minutes<input type="number" min={0} max={40320} disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.reminder_minutes}
++        <label className="block">Reminder minutes<input type="number" min={0} max={40320} disabled={!editable || busy} className="w-full rounded border p-1" value={draft.phase2.reminder_minutes}
+           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, reminder_minutes: Number(e.target.value) } })} /></label>
+-        <label className="block">Total project spending limit ({draft.context["comparison_currency"]})<input disabled={!editable} className="w-full rounded border p-1" value={draft.phase2.purchasing_limit ?? ""}
++        <label className="block">Total project spending limit ({draft.context["comparison_currency"]})<input disabled={!editable || busy} className="w-full rounded border p-1" value={draft.phase2.purchasing_limit ?? ""}
+           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, purchasing_limit: e.target.value || null } })} /></label>
+-        <label className="block"><input type="checkbox" disabled={!editable} checked={draft.phase2.allow_single_offer}
++        <label className="block"><input type="checkbox" disabled={!editable || busy} checked={draft.phase2.allow_single_offer}
+           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.target.checked } })} /> Permit a sole qualifying offer</label>
+       </section>}
+       {editable && draft.phase2 && <section className="space-y-2 rounded border p-2 text-sm">
+@@ -136,10 +142,14 @@
+         {draft.phase3 && fulfilmentInputs(draft.phase3, next => setDraft({ ...draft, phase3: next }), busy)}
+       </section>}
+       {editable && <button disabled={busy} onClick={() => void save()} className="rounded border px-3 py-1 text-sm">Save project settings</button>}
++      {!backend.can("workflow.edit") && <p className="text-xs">workflow.edit permission is required to save project settings.</p>}
++      {!backend.can("workflow.execute") && <p className="text-xs">workflow.execute permission is required to start procurement.</p>}
++      {!backend.can("workflow.approve") && <p className="text-xs">workflow.approve permission is required for supplier and fulfilment approvals.</p>}
++      {startRun && <p role="status" className="text-sm">Submitted run {startRun}. Check Runs for its progress.</p>}
+       <p className="text-sm">This workflow starts manually. No new spreadsheet row is needed. Publish, then start procurement here. Runs, Agent communication and Approvals show the actual actions.</p>
+-      <button disabled={busy || !publishedVersion || !backend.can("workflow.execute")} onClick={() => void start()} className="rounded border px-3 py-1 text-sm disabled:opacity-40">{busy ? "Working…" : "Start procurement"}</button>
++      <button disabled={busy || !publishedVersion || !backend.can("workflow.execute") || !backend.session?.runtime_available} onClick={() => void start()} className="rounded border px-3 py-1 text-sm disabled:opacity-40">{busy ? "Working…" : "Start procurement"}</button>
+       <button disabled={busy} onClick={() => void load()} className="rounded border px-3 py-1 text-sm">Refresh project status</button>
+-      {notStarted && <p role="status" className="text-sm">Ready to start. Click Start procurement to read the source sheets and create the project.</p>}
++      {notStarted && <p role="status" className="text-sm">{startRun ? "The submitted run has not created the project yet. Refresh status after the worker advances it." : "Ready to start. Click Start procurement to read the source sheets and create the project."}</p>}
+       {status && <div className="space-y-2 text-sm"><p className="font-medium">{status.phase}</p>
+         <p>{Object.entries(status.record_counts).map(([kind, count]) => `${kind}: ${count}`).join(" · ")}</p>
+         {status.issues.map(issue => <p key={issue}>{issue}</p>)}
+--- a/frontend/src/features/workflows/SheetAccessReview.tsx
++++ b/frontend/src/features/workflows/SheetAccessReview.tsx
+@@ -20,7 +20,7 @@
+   return <details className="relative text-sm">
+     <summary aria-label="Sheet write access" className="flex h-8 cursor-pointer items-center whitespace-nowrap rounded-lg border border-border px-2.5"><span className="sm:hidden">Sheets</span><span className="hidden sm:inline">Sheet write access</span></summary>
+     <div className="fixed right-4 top-24 z-40 max-h-[60vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-lg sm:absolute sm:right-0 sm:top-10">
+-      <p className="mb-3 text-xs text-muted-foreground">Publishing approves these write destinations for this workflow. Google account access is also required.</p>
++      <p className="mb-3 text-xs text-muted-foreground">Review these destinations before approving and publishing. Writes require an authorized run and Google account access.</p>
+       {!valid ? <p role="alert">Sheet access is incomplete. Correct the setup prompt and regenerate before publishing.</p> :
+         (targets as SheetTarget[]).map((target, index) => <div key={index} className="border-t border-border py-3 first:border-0">
+           <a href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(target.spreadsheet_id)}/edit`} target="_blank" rel="noreferrer" className="break-all text-primary">{target.spreadsheet_id}</a>
+--- a/frontend/src/screens/app.governance.tsx
++++ b/frontend/src/screens/app.governance.tsx
+@@ -35,7 +35,7 @@
+     const rule: PolicyRule = type === "block-model" ? { type, modelId } : type === "require-guardrail" ? { type, guardrail: guard } : { type, usd: Math.max(0.001, Number(usd) || 0.5) };
+     const p: Policy = { id: uid("pol"), scope: "workspace", name: describe(rule), description: "Added by workspace admin.", rule, enabled: true };
+     upsertPolicy(p);
+-    toast.success("Workspace policy added");
++    toast.success("Local policy draft added");
+   };
+ 
+   const Section = ({ scope }: { scope: Policy["scope"] }) => (
+@@ -49,7 +49,7 @@
+               <p className="text-xs text-muted-foreground">{describe(p.rule)} · {p.description}</p>
+             </div>
+             <Switch checked={p.enabled} disabled={!allowed} onCheckedChange={(v) => upsertPolicy({ ...p, enabled: v })} aria-label={`Toggle ${p.name}`} />
+-            {scope === "workspace" && allowed && <button onClick={() => removePolicy(p.id)} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4" /></button>}
++            {scope === "workspace" && allowed && <button onClick={() => { if (window.confirm(`Delete local policy draft "${p.name}"?`)) removePolicy(p.id); }} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4" /></button>}
+           </div>
+         ))}
+       </div>
+@@ -65,6 +65,7 @@
+         <TabsContent value="control" className="mt-4"><AgentControlTab /></TabsContent>
+         <TabsContent value="usage" className="mt-4"><LiveRuntimePanel /></TabsContent>
+         <TabsContent value="policies" className="mt-4 space-y-4">
++          <p className="text-sm text-muted-foreground">These policy drafts are stored in this browser and do not enforce server policy.</p>
+           <Section scope="organization" />
+           <Section scope="workspace" />
+           {allowed && (

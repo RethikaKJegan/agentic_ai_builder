@@ -1,0 +1,19 @@
+--- a/workflow_api/procurement.py
++++ b/workflow_api/procurement.py
+@@ -223,7 +223,15 @@
+             r'\b(?:generat(?:e|ing)|creat(?:e|ing)|draft(?:ing)?|produc(?:e|ing)|build(?:ing)?|develop(?:ing)?|prepar(?:e|ing))'
+             r'\s+(?:(?:a|an|the|new|detailed|initial|complete|comprehensive|itemized|itemised|full)\s+){0,8}'
+             r'(?:boq\b|bill\s+of\s+quantities\b|requirements\s+(?:list|table)\b|equipment\s+(?:list|schedule)\b)', objective, re.I)
+-        if create_requirements:
++        # Reading existing requirements takes precedence over preparing their BOQ.
++        # A supplementary spreadsheet link alone is not an ingestion instruction.
++        read_requirements = re.search(
++            r'\b(?:read|load|import)\s+(?:(?:the|existing|saved|supplied|connected)\s+){0,3}'
++            r'(?:requirements?\b|boq\b|bill\s+of\s+quantities\b)'
++            r'|\b(?:requirements?|vendors?)\s+(?:and\s+(?:requirements?|vendors?)\s+)?(?:tabs?|sheets?|tables?)\b'
++            r'|\bfrom\s+(?:(?:the|existing|saved|supplied|connected)\s+){0,3}'
++            r'(?:requirements?\b|boq\b|bill\s+of\s+quantities\b|spreadsheet\b)', objective, re.I)
++        if create_requirements and not read_requirements:
+             return self.fallback.generate(objective, {**context, 'procurement_planning_mode': 'requirements_first'})
+         from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, catalog_snapshot
+         from connector_extension.procurement.store import ProcurementError

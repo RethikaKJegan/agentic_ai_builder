@@ -6,6 +6,7 @@ import re
 
 from scripts.integration_config import ROOT, load_env, private_write
 from .main import create_app, ROLE_PERMISSIONS
+from .security import origins, deployment_mode
 
 REGISTRY = ROOT / '.local/live-provider-registry.json'
 
@@ -141,11 +142,22 @@ class LivePlannerProvider:
         from registry.contracts import RegistryError
         import ast
         supplied = {**context, **self.context}
-        from .sheet_discovery import spreadsheet_references, validate_discovered_setup, catalog_snapshot
+        from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, validate_discovered_setup, catalog_snapshot
         catalogs = []
+        references = planning_spreadsheet_references(objective, supplied)
         if self.sheet_discoverer is not None:
             try:
-                catalogs = [self.sheet_discoverer(ref) for ref in spreadsheet_references(objective)]
+                explicit = set(spreadsheet_references(objective))
+                unavailable = []
+                for reference in references:
+                    try:
+                        catalogs.append(self.sheet_discoverer(reference))
+                    except Exception:
+                        if reference in explicit:
+                            raise
+                        unavailable.append(reference)
+                if unavailable:
+                    supplied['unavailable_source_ids'] = unavailable
             except Exception as exc:
                 raise PlannerFailure(getattr(exc, 'code', 'SHEETS_DISCOVERY_FAILED'),
                     'Could not inspect the spreadsheet. Check its link, headers, and Google account access.') from None
@@ -154,6 +166,10 @@ class LivePlannerProvider:
         explicit_review = bool(re.search(r'\b(?:human|manual)\s+approval\b|\brequire\s+approval\b', objective, re.I))
         wants_automatic = bool(re.search(r'\bautomatic(?:ally)?\b|\bwithout\s+(?:manual\s+)?approval\b', objective, re.I)) and not explicit_review
         supplied['customer_automation_requested'] = wants_automatic and self.direct_send
+        if supplied.get('procurement_planning_mode') == 'requirements_first':
+            # Automatic planning does not authorize customer-email handling.
+            supplied['customer_automation_requested'] = False
+            supplied.pop('customer_automation_defaults', None)
         # At most two bounded planning calls. A correction edits the draft;
         # neither call registers grants, publishes, executes or approves it.
         for attempt in range(2):
@@ -199,7 +215,7 @@ class LivePlannerProvider:
                     raise
                 hints = {
                     'EMAIL_SOURCE_MAPPING_REQUIRED': 'The initial graph sends only to the source-row customer. Remove manager email nodes and reply-loop branches; the inbox worker handles those using customer_automation metadata.',
-                    'WORKFLOW_VALIDATION_FAILED': 'Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
+                    'WORKFLOW_VALIDATION_FAILED': 'Include a kind=trigger node and a kind=output node, and connect every graph node to a path from the trigger. Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
                     'OUTPUT_FIELD_NOT_DECLARED': 'SMTP returns message_id, not sent. Map message_id from the sender output; if email_sent is required, use True only in the output step reached after successful SMTP submission.',
                 }
                 errors.append({'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})})
@@ -256,6 +272,12 @@ class LivePlannerProvider:
 
 def create_configured_app(env=None, database=None, client=None, model_factory=None):
     env = environment() if env is None else env
+    mode = deployment_mode(env.get('BUILDER_ENVIRONMENT', 'production'))
+    process_role=env.get('BUILDER_PROCESS_ROLE','combined')
+    if process_role not in {'api','worker','combined'}:raise ValueError('Use api, worker or combined process role.')
+    if env.get('BUILDER_DEV_AUTH') != '1':
+        raise ValueError('Explicitly enable development authentication for the local live launcher.')
+    allowed_origins = origins(env.get('BUILDER_UI_ORIGINS'))
     config = registry_configuration(env)
     from .procurement import configuration as procurement_configuration, extend_registry
     procurement_settings = procurement_configuration(env)
@@ -265,8 +287,14 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
-                     registry_config=REGISTRY, database=database, start_workers=False, planning_available=True)
+                     registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
+                     environment_name=mode, ui_origins=allowed_origins,
+                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
     service = app.state.workflow_service
+    service.background_execution=process_role=='api'
+    from .integration_checks import smtp_probe
+    service.integration_probes={'smtp':smtp_probe(env)}
+    service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
     from openai import OpenAI
     from planner import PlannerService
     from runtime.connectors import SMTPConnector, GoogleSheetsConnector
@@ -304,8 +332,12 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         resolve, ROOT / env['GOOGLE_TOKEN_FILE'], targets, timeout=15, require_approval=not direct_write)
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
-    runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(rates, client, tokenizers))
-    service.trigger_poller = ProviderTriggerSource(service, runner.connectors).poll
+    from .source_context import knowledge_documents
+    runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(rates, client, tokenizers),
+                                knowledge_loader=lambda workspace: knowledge_documents(service.store, workspace))
+    source = ProviderTriggerSource(service, runner.connectors)
+    service.trigger_poller = source.poll
+    service.trigger_configuration_validator = source.validate_configuration
     service.planner = PlannerService(provider=LivePlannerProvider(model, recipients(env), client, direct_send,
         targets, direct_write, planner_timeout, runner.connectors['google_sheets_read_rows'].discover,
         env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
@@ -319,7 +351,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     def read_case_evidence(case, requests):
         from runtime.service import RuntimeFailure
         from runtime.connectors import google_spreadsheet_id
-        with service.store.transaction() as db:
+        with service.store.transaction(write=False) as db:
             stored = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?',
                                 (auth['subject']['workspace_id'], case['run_id'])).fetchone()
             original_run = json.loads(stored[0]) if stored else None
@@ -328,7 +360,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         authority = authenticate(service, auth, auth['subject']['workspace_id'], original_run['subject_id'])
         if authority is None:
             raise RuntimeFailure('EXECUTION_AUTHORITY_REVOKED', 'The case workflow is no longer active.')
-        with service.store.transaction() as db:
+        with service.store.transaction(write=False) as db:
             workflow, grants = runner.runtime.revision(db, case['workflow_id'], case['workflow_version'], authority, True)
         permitted = {(google_spreadsheet_id(t['spreadsheet_id']), t['range']) for t in workflow['metadata'].get('sheet_read_targets', [])}
         read_grant = next((g for g in grants if g['tool_id'] == 'google_sheets_read_rows'), None)
@@ -363,6 +395,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
                                         allowed_managers=recipients(env), model_rates=rates[model])
         service.reply_monitor_health = {'state': 'starting'}
     lookup = lambda workspace, subject: authenticate(service, auth, workspace, subject)
+    service.worker_authenticate=lookup
     workers = [TriggerScheduler(service, lookup, interval=1), RuntimeWorker(runner, lookup)]
     if procurement_worker:
         workers.append(procurement_worker)
@@ -381,27 +414,33 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     app.state.live_operator_auth = auth
     app.state.live_workers = workers
 
+    class ReplyWorker:
+        def __init__(self):self.stop_event=reply_stop;self.thread=None
+        @property
+        def health(self):
+            state=service.reply_monitor_health
+            return {'state':state.get('state','starting'),'last_success':state.get('last_success'),'last_error':state.get('error_code')}
+        def start(self):
+            nonlocal reply_thread
+            if reply_thread and reply_thread.is_alive():return
+            reply_stop.clear()
+            reply_thread=Thread(target=poll_replies,name='builder-reply-monitor',daemon=True)
+            self.thread=reply_thread
+            reply_thread.start()
+        def stop(self):
+            reply_stop.set()
+            if reply_thread:reply_thread.join(timeout=5)
+    from .worker_control import WorkerSupervisor
+    components=[*workers,app.state.planning_jobs]
+    if hasattr(service,'reply_cases'):components.append(ReplyWorker())
+    supervisor=WorkerSupervisor(service.store,components,role=process_role)
+    app.state.worker_supervisor=supervisor
+    app.state.process_role=process_role
+
     @app.on_event('startup')
-    def start():
-        nonlocal reply_thread
-        try:
-            for worker in workers:
-                worker.start()
-            if hasattr(service, 'reply_cases'):
-                reply_stop.clear()
-                reply_thread = Thread(target=poll_replies, name='builder-reply-monitor', daemon=True)
-                reply_thread.start()
-        except Exception:
-            for worker in workers:
-                worker.stop()
-            raise
+    def start():supervisor.start()
 
     @app.on_event('shutdown')
-    def stop():
-        reply_stop.set()
-        if reply_thread:
-            reply_thread.join(timeout=5)
-        for worker in workers:
-            worker.stop()
+    def stop():supervisor.stop()
 
     return app

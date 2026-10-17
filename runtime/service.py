@@ -37,8 +37,11 @@ class RuntimeService:
         self.workflows, self.store, self.clock = workflows, workflows.store, clock
         with self.store.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))')
+            db.execute('CREATE INDEX IF NOT EXISTS runtime_runs_workspace_workflow ON runtime_runs(workspace, workflow_id)')
+            db.execute("CREATE INDEX IF NOT EXISTS runtime_runs_pending ON runtime_runs(json_extract(document,'$.status')) WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval')")
             db.execute('CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))')
             db.execute('CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)')
+            db.execute('CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)')
 
     @staticmethod
     def authorize(auth, permission, roles):
@@ -124,6 +127,8 @@ class RuntimeService:
                 if row[0] != fingerprint:
                     raise RuntimeFailure('IDEMPOTENCY_KEY_REUSED', 'The retry key identifies different execution inputs.')
                 return self.public(json.loads(row[1]))
+            if validator := getattr(self, 'execution_validator', None):
+                validator(workflow, auth, db)
             run = dict(run_id='run_' + uuid4().hex, workflow_id=workflow['workflow_id'], workflow_version=workflow['version'],
                        status='queued', approvals=[], workflow_digest=digest(workflow), workspace_id=workspace, subject_id=subject,
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
@@ -140,7 +145,7 @@ class RuntimeService:
 
     def load(self, db, run_id, auth, permission='runs.view'):
         self.authorize(auth, permission, {'admin', 'builder', 'viewer', 'approver'} if permission == 'runs.view' else {'admin', 'builder'})
-        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (auth['subject']['workspace_id'], run_id)).fetchone()
+        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?' + (' FOR UPDATE' if getattr(db,'write',False) else ''), (auth['subject']['workspace_id'], run_id)).fetchone()
         if row is None:
             raise RuntimeFailure('RUN_NOT_FOUND', 'The run was not found in this workspace.', 404)
         return json.loads(row[0])
@@ -167,23 +172,18 @@ class RuntimeService:
         db.execute('UPDATE runtime_runs SET document=? WHERE run_id=? AND workspace=?', (json.dumps(run), run['run_id'], run['workspace_id']))
 
     def get_run(self, run_id, auth):
-        with self.store.transaction() as db:
-            return self.public(self.load(db, run_id, auth))
+        with self.store.transaction(write=False) as db:
+            from .history import public_run
+            return public_run(self, db, self.load(db, run_id, auth), auth)
 
-    def list_runs(self, auth, limit=100, status=None):
-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
-        workspace = auth['subject']['workspace_id']
-        with self.store.transaction() as db:
-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
-        items = [self.public(json.loads(row[0])) for row in rows]
-        if status:
-            items = [item for item in items if item['status'] == status]
-        return {'items': items, 'total': len(items), 'has_more': len(items) >= min(max(int(limit), 1), 500), 'next_cursor': None}
+    def list_runs(self, auth, limit=100, status=None, **filters):
+        from .history import runs
+        return runs(self, auth, limit=limit, status=status, **filters)
 
     def list_approvals(self, auth, pending_only=False, limit=100):
         self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
         workspace = auth['subject']['workspace_id']
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC LIMIT ?', (workspace, min(max(int(limit), 1), 500))).fetchall()
         items = []
         for row in rows:
@@ -193,51 +193,13 @@ class RuntimeService:
                     items.append({**approval, 'run_id': run['run_id']})
         return {'items': items, 'total': len(items), 'has_more': False, 'next_cursor': None}
 
-    def events(self, run_id, auth):
-        with self.store.transaction() as db:
-            self.load(db, run_id, auth)
-            items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
-            return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+    def events(self, run_id, auth, limit=100, after_sequence=0):
+        from .history import events
+        return events(self, run_id, auth, limit, after_sequence)
 
-    def monitoring(self, auth):
-        """Return workspace-scoped counters and safe trace references."""
-        self.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
-        workspace = auth['subject']['workspace_id']
-        with self.store.transaction() as db:
-            runs = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC', (workspace,))]
-            event_count = db.execute('SELECT COUNT(*) FROM runtime_events WHERE workspace=?', (workspace,)).fetchone()[0]
-            audit = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30', (workspace,))]
-            sources = []
-            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'").fetchone():
-                for workflow_id, state, document in db.execute('SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?', (workspace,)):
-                    trigger = json.loads(document)
-                    checkpoint = db.execute('SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?', (workspace, trigger['binding_id'])).fetchone()
-                    sources.append(dict(workflow_id=workflow_id, binding_id=trigger['binding_id'], provider_id=trigger['provider_id'],
-                                        state=state, health=trigger.get('health', state), error_code=trigger.get('last_error_code'),
-                                        baseline_ready=checkpoint is not None, last_successful_poll=checkpoint[0] if checkpoint else None))
-            policies = []
-            for workflow in self.store.list(db, workspace):
-                if workflow['status'] not in {'approved', 'published'}:
-                    continue
-                policies.append(dict(workflow_id=workflow['workflow_id'], version=workflow['version'],
-                                     action_approval_required=bool(workflow.get('approval_gates')),
-                                     agents=[{key: agent.get(key) for key in ('agent_id', 'guardrails', 'limits', 'approval_requirements')}
-                                             for agent in workflow['agents']]))
-        usage = {'llm_calls': 0, 'tool_calls': 0, 'tokens': 0, 'retries': 0, 'estimated_cost_usd': 0}
-        for run in runs:
-            # Workflow counters already include each per-agent reservation.
-            counters = run.get('usage', {}).get('workflow', {})
-            for key in usage:
-                usage[key] += counters.get(key, 0)
-        by_status = {status: sum(r['status'] == status for r in runs) for status in ('queued', 'running', 'paused_for_approval', 'completed', 'failed', 'blocked', 'rejected', 'cancelled')}
-        durations = [max(0, (r.get('finished_at', r.get('created_at', self.clock())) - r.get('created_at', self.clock()))) for r in runs if isinstance(r.get('finished_at'), (int, float))]
-        return {'runs': {'total': len(runs), 'active': sum(r['status'] in {'queued', 'running', 'paused_for_approval'} for r in runs),
-                         'completed': sum(r['status'] == 'completed' for r in runs), 'failed': sum(r['status'] in {'failed', 'blocked'} for r in runs)},
-                'status_breakdown': by_status, 'duration_seconds': {'count': len(durations), 'avg': sum(durations) / len(durations) if durations else 0},
-                'events': event_count, 'usage': usage,
-                'sources': sources, 'policies': policies,
-                'audit': [{key: event.get(key) for key in ('event_id', 'event_type', 'run_id', 'timestamp')} for event in audit],
-                'latest': [self.public(run) for run in runs[:20]]}
+    def monitoring(self, auth, **options):
+        from .history import monitoring
+        return monitoring(self, auth, **options)
 
     def export_traces(self, observer_id='default', limit=100):
         """Export committed events. Export failure never permits a side effect.
@@ -247,7 +209,7 @@ class RuntimeService:
         """
         if self.observer is None:
             return 0
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             rows = db.execute('SELECT sequence, document FROM runtime_events WHERE sequence NOT IN (SELECT sequence FROM runtime_trace_exports WHERE observer=?) ORDER BY sequence LIMIT ?', (observer_id, limit)).fetchall()
         exported = 0
         for sequence, document in rows:

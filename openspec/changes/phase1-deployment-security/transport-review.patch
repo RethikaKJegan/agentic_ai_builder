@@ -1,0 +1,144 @@
+--- a/frontend/src/app/api/backend/[...path]/route.ts
++++ b/frontend/src/app/api/backend/[...path]/route.ts
+@@ -7,7 +7,7 @@
+ const safeId = (value: string | null) => value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
+ const cookieNames = new Set(["builder_dev_session", "__Secure-builder_session", "__Secure-builder_login"]);
+ async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+-  let reference = safeId(request.headers.get("x-request-id")) || `req_${crypto.randomUUID()}`;
++  let reference = safeId(request.headers.get("x-request-id")) || safeId(request.nextUrl.searchParams.get("request_id")) || `req_${crypto.randomUUID()}`;
+   const correlation = safeId(request.headers.get("x-correlation-id")) || reference;
+   const error = (code: string, message: string, status: number, retryable = false) => NextResponse.json({ request_id: reference, status,
+     data: { correlation_id: correlation, error: { error_code: code, message, request_id: reference, retryable } } },
+@@ -19,7 +19,9 @@
+   const route = path.join("/");
+   const webhook = route.startsWith("webhooks/");
+   const origin = request.headers.get("origin");
+-  if (!config.origins.includes(request.nextUrl.origin) || (origin && (!config.origins.includes(origin) || origin !== request.nextUrl.origin)) ||
++  // NextURL rewrites loopback IPs to localhost; Host retains the actual browser origin.
++  const requestOrigin = request.headers.get('host') ? `${request.nextUrl.protocol}//${request.headers.get('host')!.toLowerCase()}` : request.nextUrl.origin;
++  if (!config.origins.includes(requestOrigin) || (origin && (!config.origins.includes(origin) || origin !== requestOrigin)) ||
+       (!webhook && request.headers.get("sec-fetch-site") === "cross-site")) return error("ORIGIN_NOT_AUTHORIZED", "This request origin is not authorized.", 403);
+   if (process.env['BUILDER_ENVIRONMENT'] === 'production' && !webhook && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !origin)
+     return error("ORIGIN_NOT_AUTHORIZED", "An authorized same-origin request is required.", 403);
+--- a/frontend/src/lib/backend-config.ts
++++ b/frontend/src/lib/backend-config.ts
+@@ -18,6 +18,6 @@
+   }
+   const plannerSeconds = Number(process.env['BUILDER_PLANNER_TIMEOUT_SECONDS'] || 180);
+   // LivePlannerProvider may make two generation attempts, each with a correction.
+-  if (!Number.isInteger(plannerSeconds) || plannerSeconds < 1 || plannerSeconds > 600) throw new Error('Invalid planner deadline.');
++  if (!Number.isInteger(plannerSeconds) || plannerSeconds < 30 || plannerSeconds > 300) throw new Error('Invalid planner deadline.');
+   return { upstream, origins, normalTimeout: 30_000, plannerTimeout: plannerSeconds * 4_000 + 30_000, maxBody: 2 * 1024 * 1024 };
+ }
+--- a/workflow_api/security.py
++++ b/workflow_api/security.py
+@@ -1,5 +1,8 @@
+ """Deployment origin validation. Production login is deliberately deferred."""
+ from urllib.parse import urlsplit
++from contextvars import ContextVar
++
++request_correlation = ContextVar("builder_request_correlation", default=None)
+ 
+ PUBLIC_ORIGIN = 'https://praxi.bellcorpstudio.com'
+ LOCAL_ORIGINS = tuple(f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 3100))
+@@ -38,3 +41,9 @@
+         raise ValueError('Configure at least one UI origin.')
+     return frozenset(result)
+ 
++
++
++def planning_deadline(seconds):
++    if type(seconds) is not int or not 30 <= seconds <= 300:
++        raise ValueError('Planner timeout must be an integer between 30 and 300 seconds.')
++    return seconds * 4 + 30
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -13,7 +13,7 @@
+ from .service import ApiFailure, WorkflowService
+ from .storage import WorkflowStore
+ from .registry_adapter import load_registry_config
+-from .security import origins, deployment_mode
++from .security import origins, deployment_mode, request_correlation, planning_deadline
+ from contextvars import ContextVar
+ 
+ request_reference = ContextVar("builder_request_reference", default=None)
+@@ -30,7 +30,7 @@
+ 
+ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
+                runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True,
+-               ui_origins=None, environment_name=None):
++               ui_origins=None, environment_name=None, planner_timeout_seconds=180):
+     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
+     mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
+     allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
+@@ -79,7 +79,8 @@
+     app.state.workflow_auth = auth
+     from .planning_jobs import PlanningJobs
+     planning_jobs = PlanningJobs(workflow_service,
+-        lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None)
++        lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None,
++        deadline=planning_deadline(planner_timeout_seconds))
+     app.state.planning_jobs = planning_jobs
+     app.state.workers = workers
+     app.state.allowed_origins = allowed_origins
+@@ -110,6 +111,9 @@
+         candidate = request.headers.get('x-request-id', '')
+         reference = candidate if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', candidate) else f'req_{uuid4().hex}'
+         reference_token = request_reference.set(reference)
++        candidate_correlation = request.headers.get('x-correlation-id', reference)
++        correlation = candidate_correlation if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', candidate_correlation) else reference
++        correlation_token = request_correlation.set(correlation)
+         try:
+             host = request.url.hostname
+             origin = request.headers.get('origin')
+@@ -126,11 +130,11 @@
+             response.headers['Cache-Control'] = 'no-store'
+             response.headers['X-Builder-Service'] = 'workflow-api'
+             response.headers['X-Request-ID'] = reference
+-            correlation = request.headers.get('x-correlation-id', reference)
+-            response.headers['X-Correlation-ID'] = correlation if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', correlation) else reference
++            response.headers['X-Correlation-ID'] = correlation
+             return response
+         finally:
+             request_reference.reset(reference_token)
++            request_correlation.reset(correlation_token)
+ 
+     @app.get('/session')
+     def get_session():
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -271,7 +271,8 @@
+     private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
+     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
+                      registry_config=REGISTRY, database=database, start_workers=False, planning_available=True,
+-                     environment_name=mode, ui_origins=allowed_origins)
++                     environment_name=mode, ui_origins=allowed_origins,
++                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')))
+     service = app.state.workflow_service
+     from openai import OpenAI
+     from planner import PlannerService
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -1,5 +1,6 @@
+ """Workflow transport/revision lifecycle and delegation to an explicit runtime."""
+-from copy import deepcopy
++from copy from .security import request_correlation
++import deepcopy
+ import hashlib
+ import json
+ import logging
+@@ -105,7 +106,7 @@
+     @staticmethod
+     def envelope(request_id, status, data):
+         result = dict(request_id=request_id, status=status, data={
+-            'correlation_id': f'corr_{uuid4().hex}', 'contract_versions': deepcopy(VERSIONS), **data})
++            'correlation_id': request_correlation.get() or f'corr_{uuid4().hex}', 'contract_versions': deepcopy(VERSIONS), **data})
+         Draft202012Validator(schema('api')['properties']['response_envelope']).validate(result)
+         reject_secrets(result)
+         return result
+
+# Follow-up import correction (shown before applying):
+-from copy from .security import request_correlation
+-import deepcopy
++from copy import deepcopy
++from .security import request_correlation

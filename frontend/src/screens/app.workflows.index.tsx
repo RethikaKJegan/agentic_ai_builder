@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { useBackend } from "@/api/state";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { api } from "@/api/client";
-import { useEffect, useState } from "react";
+import { RunWorkflowDialog } from "@/features/workflows/RunWorkflowDialog";
+import type { CanonicalWorkflow } from "@/api/contracts.generated";
+import { useEffect, useRef, useState } from "react";
 
 
 
@@ -24,70 +26,54 @@ export default function WorkflowsPage() {
   const visibleWorkflows = backend.status === "connected" && backend.lastOverviewUpdate
     ? workflows.filter((workflow) => !workflow.serverVersion || backend.overview[workflow.id])
     : workflows;
+  const lock = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [runDocument, setRunDocument] = useState<CanonicalWorkflow>();
   const [actionError, setActionError] = useState<Error | null>(null);
   useEffect(() => {
     if (backendStatus !== "connected") return;
-    void refreshOverview();
-    const timer = window.setInterval(() => void useBackend.getState().refreshOverview(), 5000);
-    const source = typeof EventSource === "undefined" ? null : new EventSource(`/api/backend/workflow-overview/events?after_sequence=${useBackend.getState().overviewSequence}`);
-    if (source) {
-      source.onopen = () => useBackend.setState({ liveStatus: "live" });
-      source.onmessage = (message) => {
-        const sequence = Number(message.lastEventId);
-        if (!Number.isSafeInteger(sequence) || sequence <= useBackend.getState().overviewSequence) return;
-        useBackend.setState({ overviewSequence: sequence });
-        void useBackend.getState().refreshOverview();
-      };
-      source.onerror = () => useBackend.setState({ liveStatus: "stale" });
-    }
-    return () => { window.clearInterval(timer); source?.close(); };
+    let stopped=false;let timer:ReturnType<typeof setTimeout>;
+    const refresh=async()=>{
+      await refreshOverview();
+      if(!stopped)timer=setTimeout(()=>void refresh(),15000);
+    };
+    void refresh();
+    return()=>{stopped=true;clearTimeout(timer);};
   }, [backendStatus, refreshOverview]);
 
   const run = async (workflowId: string) => {
-    const workflow = useMesh.getState().workflows.find((item) => item.id === workflowId);
-    const overview = useBackend.getState().overview[workflowId];
-    if (!workflow?.canonical || !overview?.published_version) return;
-    try {
-      setActionError(null);
-      const published = await api.request("get_workflow", { workflow_id: workflowId, workflow_version: overview.published_version });
-      const automatic = published.workflow.metadata["execution_input_mode"] === "automatic";
-      const triggers = published.workflow.metadata["trigger_templates"];
-      if (automatic && Array.isArray(triggers) && triggers.length) {
-        toast.info(overview.activation_state === "active"
-          ? "This workflow starts automatically when its configured event arrives. Create a new event in its source, then check Runs."
-          : "Publish and activate this workflow to start receiving its configured events.");
-        return;
-      }
-      const inputs: Record<string, unknown> = {};
-      if (!automatic) for (const field of published.workflow.inputs) {
-        const value = window.prompt(`Run input: ${field.name}${field.required ? " (required)" : ""}`);
-        if (value === null) return;
-        if (value || field.required) inputs[field.name] = field.type === "number" || field.type === "integer" ? Number(value) : field.type === "boolean" ? value === "true" : field.type === "object" || field.type === "array" ? JSON.parse(value) : value;
-      }
-      const result = await api.request("execute_workflow", { workflow_id: workflowId, workflow_version: overview.published_version, inputs });
-      toast(`Run ${result.run.run_id} is ${result.run.status}`);
-      await useBackend.getState().refreshOverview();
-    } catch (error) { setActionError(error instanceof Error ? error : new Error("Run failed.")); }
+    const state = useBackend.getState(); const overview = state.overview[workflowId];
+    if (lock.current || !overview?.published_version || !state.can("workflow.execute") || !state.session?.runtime_available) return;
+    lock.current = true; setBusy(true); setActionError(null);
+    try { setRunDocument((await api.request("get_workflow", { workflow_id: workflowId, workflow_version: overview.published_version })).workflow); }
+    catch (error) { setActionError(error instanceof Error ? error : new Error("The published revision could not be loaded.")); }
+    finally { lock.current = false; setBusy(false); }
   };
 
   const remove = async (workflowId: string, name: string) => {
+    if (lock.current) return;
     const overview = useBackend.getState().overview[workflowId];
     if (!window.confirm(`Delete "${name}"? Runs and audit evidence will be retained.`)) return;
+    lock.current = true; setBusy(true); setActionError(null);
     try {
       await api.deleteWorkflow(workflowId, overview?.release_id ?? null);
       useMesh.getState().deleteWorkflow(workflowId);
       await useBackend.getState().refreshOverview();
       toast(`Deleted "${name}"`);
     } catch (error) { setActionError(error instanceof Error ? error : new Error("Delete failed.")); }
+    finally { lock.current = false; setBusy(false); }
   };
 
   const disable = async (workflowId: string) => {
+    if (lock.current || !window.confirm("Disable this workflow and stop accepting new trigger runs? Queued dispatches will be cancelled; run history is retained.")) return;
+    lock.current = true; setBusy(true); setActionError(null);
     const overview = useBackend.getState().overview[workflowId];
     try {
       await api.disableRelease(workflowId, overview?.release_id ?? null);
       await useBackend.getState().refreshOverview();
       toast("Workflow disabled");
     } catch (error) { setActionError(error instanceof Error ? error : new Error("Disable failed.")); }
+    finally { lock.current = false; setBusy(false); }
   };
 
   return (
@@ -95,10 +81,11 @@ export default function WorkflowsPage() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">Workflows</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{visibleWorkflows.filter((w) => w.serverVersion).length} server workflows · {visibleWorkflows.filter((w) => !w.serverVersion).length} local drafts</p>
+          <p className="mt-2 text-sm text-muted-foreground">{visibleWorkflows.filter((w) => w.serverVersion).length}{backend.workflowTotal !== null ? ` of ${backend.workflowTotal}` : ""} server workflows · {visibleWorkflows.filter((w) => !w.serverVersion).length} local drafts</p>
         </div>
         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
       </div>
+      <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted-foreground">Describe → generate → review and edit → configure → save → validate → approve → publish → activate → run and monitor. Open a workflow for its lifecycle guidance. Draft revision and active release are separate.</p>
       {backend.status === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading server workflows…</p>}
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <span className={`h-2 w-2 rounded-full ${backend.liveStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
@@ -106,6 +93,11 @@ export default function WorkflowsPage() {
         {backend.lastOverviewUpdate && ` · updated ${new Date(backend.lastOverviewUpdate).toLocaleTimeString()}`}
       </div>
       <ApiFeedback error={actionError ?? backend.error} />
+      {(backend.workflowCursor || backend.workflowNextCursor) && <nav aria-label="Workflow pages" className="mt-4 flex gap-3">
+        <button type="button" disabled={backend.workflowPageBusy || !backend.workflowCursor} onClick={() => void backend.loadWorkflowPage(null)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">First workflows</button>
+        <button type="button" disabled={backend.workflowPageBusy || !backend.workflowNextCursor} onClick={() => void backend.loadWorkflowPage(backend.workflowNextCursor)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{backend.workflowPageBusy ? "Loading workflows…" : "Next workflows"}</button>
+      </nav>}
+      {runDocument && <RunWorkflowDialog workflow={runDocument} onClose={() => setRunDocument(undefined)} />}
       {visibleWorkflows.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No workflows yet. <Link to="/app" className="text-primary">Create your first draft</Link>.</p>
       ) : (
@@ -122,14 +114,15 @@ export default function WorkflowsPage() {
                 </Link>
                 <StatusPill status={live?.activation_state ?? `${w.serverVersion ? `v${w.serverVersion} · ` : "local · "}${w.status}`} tone={live?.activation_state === "active" ? "success" : "neutral"} />
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Actions for ${w.name}`}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
+                  <DropdownMenuTrigger disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Actions for ${w.name}`}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {live?.published_version && backend.session?.runtime_available && <DropdownMenuItem onSelect={() => void run(w.id)}><Play className="mr-2 h-4 w-4" /> Run published</DropdownMenuItem>}
+                    <DropdownMenuItem disabled={busy || !live?.published_version || !backend.session?.runtime_available || !backend.can("workflow.execute")} onSelect={() => void run(w.id)}><Play className="mr-2 h-4 w-4" /> Run published</DropdownMenuItem>
+                    {(!backend.can("workflow.execute") || !backend.session?.runtime_available || !live?.published_version) && <p className="max-w-56 px-2 py-1 text-xs text-muted-foreground">{!backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : "Publish a revision before running."}</p>}
                     <DropdownMenuItem onSelect={() => navigate({ to: "/app/workflows/$id", params: { id: w.id } })}><Pencil className="mr-2 h-4 w-4" /> Edit draft</DropdownMenuItem>
                     {live?.activation_state === "active" && backend.can("workflow.publish") && <DropdownMenuItem onSelect={() => void disable(w.id)}><Power className="mr-2 h-4 w-4" /> Disable</DropdownMenuItem>}
-                    <DropdownMenuItem onSelect={() => { const id = dup(w.id); if (id) navigate({ to: "/app/workflows/$id", params: { id } }); }}><Copy className="mr-2 h-4 w-4" /> Duplicate</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { const id = dup(w.id); if (id) toast("Duplicated as a local draft. Save draft to persist it on the server."); if (id) navigate({ to: "/app/workflows/$id", params: { id } }); }}><Copy className="mr-2 h-4 w-4" /> Duplicate</DropdownMenuItem>
                     {w.serverVersion && backend.can("workflow.delete") && <DropdownMenuItem className="text-destructive" onSelect={() => void remove(w.id, w.name)}><Trash2 className="mr-2 h-4 w-4" /> Delete workflow</DropdownMenuItem>}
-                    {!w.serverVersion && <DropdownMenuItem className="text-destructive" onSelect={() => { del(w.id); toast(`Deleted "${w.name}"`); }}><Trash2 className="mr-2 h-4 w-4" /> Delete local draft</DropdownMenuItem>}
+                    {!w.serverVersion && <DropdownMenuItem className="text-destructive" onSelect={() => { if (window.confirm(`Delete local draft "${w.name}" from this browser?`)) { del(w.id); toast(`Deleted local draft "${w.name}"`); } }}><Trash2 className="mr-2 h-4 w-4" /> Delete local draft</DropdownMenuItem>}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

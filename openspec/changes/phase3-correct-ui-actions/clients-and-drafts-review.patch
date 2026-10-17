@@ -1,0 +1,148 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -185,6 +185,32 @@
+     return result.data;
+   }
+ 
++  async settings() {
++    const parsed = z.object({ items: z.array(z.object({ key: z.string(), value: z.unknown(), updated_at: z.string() })), total: z.number() }).safeParse(await this.read("workspace/settings"));
++    if (!parsed.success) return fail("INVALID_API_DATA", "The settings response is invalid.");
++    return parsed.data;
++  }
++  async saveNotification(value: string) {
++    if (containsSecret(value)) return fail("SENSITIVE_DATA_DETECTED", "Keep credentials in server configuration.");
++    const parsed = z.object({ key: z.literal("notifications"), value: z.string(), updated_at: z.string() }).safeParse(await this.read("workspace/settings/notifications", {
++      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value }),
++    }));
++    if (!parsed.success || parsed.data.value !== value) return fail("INVALID_API_DATA", "The setting save was not confirmed.");
++    return parsed.data;
++  }
++  async integrationCheck(provider: string, mode: "configuration" | "connection" = "configuration") {
++    const parsed = z.object({ provider: z.string(), configured: z.boolean(), verified: z.boolean(), tested: z.boolean(),
++      state: z.enum(["not_configured", "configured", "verified", "connection_failed"]), live_test_supported: z.boolean(), message: z.string() })
++      .safeParse(await this.read(`integrations/${encodeURIComponent(provider)}/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) }));
++    if (!parsed.success || parsed.data.provider !== provider || parsed.data.verified !== (parsed.data.state === "verified") || parsed.data.tested !== parsed.data.verified) return fail("INVALID_API_DATA", "The integration check response is invalid.");
++    return parsed.data;
++  }
++  async submitApproval(payload: Ref) {
++    const parsed = workflowData.safeParse(await this.lifecycle("submit_workflow_for_approval", `workflows/${encodeURIComponent(payload.workflow_id)}/submit-for-approval`, payload));
++    if (!parsed.success) return fail("INVALID_API_DATA", "The approval submission was not confirmed.");
++    return parsed.data;
++  }
++
+   async procurementCommunication(workflowId: string, version: number) {
+     const result = workflowData.safeParse(await this.read(`procurement/workflows/${encodeURIComponent(workflowId)}/${version}/communication`));
+     if (!result.success) return fail("INVALID_API_DATA", "The procurement communication response is invalid.");
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -1,5 +1,6 @@
+ import { create } from "zustand";
+ import { api, ApiError, type Session, type ToolRecord, type RegistryReview, type WorkflowOverview } from "./client";
++import { hasWorkflowEdits } from "./mapping";
+ import { useMesh } from "@/domain/store";
+ 
+ interface BackendState {
+@@ -48,7 +49,10 @@
+         const results = await Promise.allSettled([api.request("list_workflows", {}), api.request("list_tools", {}), api.overview()]);
+         const workflows = results[0];
+         const tools = results[1];
+-        if (workflows?.status === "fulfilled") workflows.value.items.forEach((w) => useMesh.getState().acceptWorkflow(w));
++        if (workflows?.status === "fulfilled") workflows.value.items.forEach((w) => {
++          const state = useMesh.getState(); const existing = state.workflows.find(item => item.id === w.workflow_id);
++          if (!existing || !hasWorkflowEdits(existing, state.agents)) state.acceptWorkflow(w);
++        });
+         if (tools?.status === "fulfilled") set({ tools: tools.value.items });
+         const overview = results[2];
+         if (overview?.status === "fulfilled") set({ overview: Object.fromEntries(overview.value.items.map((item) => [item.workflow_id, item])),
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -9,7 +9,7 @@
+ import { makeAgent } from "./templates";
+ import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
+ import type { ControlContext } from "./simulator";
+-import { fromCanonical } from "@/api/mapping";
++import { fromCanonical, hasWorkflowEdits } from "@/api/mapping";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export interface AuditEvent { id: string; at: string; actor: string; role: Role; action: string; target: string }
+@@ -97,9 +97,19 @@
+       duplicateWorkflow: (id) => {
+         const w = get().workflows.find((x) => x.id === id);
+         if (!w) return;
+-        const copyId = uid("wf");
+-        const copy: Workflow = { ...w, id: copyId, canonical: w.canonical ? { ...w.canonical, workflow_id: copyId, version: 1, status: "draft" } : undefined, serverVersion: undefined, name: `${w.name} (copy)`, status: "draft", versions: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+-        set((s) => ({ workflows: [copy, ...s.workflows] }));
++        const copyId = uid("wf"); const at = new Date().toISOString();
++        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, origin: "local" as const, updatedAt: at }));
++        const remap = new Map(get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map((agent, index) => [agent.id, clones[index]!.id]));
++        const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
++        if (canonical) {
++          canonical.workflow_id = copyId; canonical.version = 1; canonical.status = "draft";
++          for (const key of ["approved_by", "validation_state", "approval_submission"]) delete canonical.metadata[key];
++          const triggers = canonical.metadata["trigger_templates"];
++          if (Array.isArray(triggers)) canonical.metadata["trigger_templates"] = triggers.map(trigger => { const copy = { ...trigger }; delete copy.binding_id; return copy; });
++        }
++        const copy: Workflow = { ...structuredClone(w), id: copyId, canonical, serverVersion: undefined, name: `${w.name} (copy)`, status: "draft", versions: [], createdAt: at, updatedAt: at,
++          nodes: w.nodes.map(node => ({ ...structuredClone(node), data: { ...node.data, ...(node.data.agentId ? { agentId: remap.get(node.data.agentId) ?? node.data.agentId } : {}) } })) };
++        set((s) => ({ workflows: [copy, ...s.workflows], agents: [...clones, ...s.agents] }));
+         return copy.id;
+       },
+       deleteWorkflow: (id) => set((s) => ({ workflows: s.workflows.filter((w) => w.id !== id) })),
+@@ -159,7 +169,7 @@
+       version: 1,
+       storage: createJSONStorage(() => localStorage),
+       skipHydration: true,
+-      partialize: (s) => ({ workflows: s.workflows.filter((w) => w.serverVersion === undefined), agents: s.agents.filter((a) => a.origin !== "backend"), runs: s.runs, activity: s.activity, connectors: s.connectors, knowledge: s.knowledge, installed: s.installed, role: s.role, policies: s.policies, controls: s.controls, audit: s.audit }),
++      partialize: (s) => ({ workflows: s.workflows.filter((w) => w.serverVersion === undefined || hasWorkflowEdits(w, s.agents)), agents: s.agents.filter((a) => a.origin !== "backend" || s.workflows.some(w => hasWorkflowEdits(w, s.agents) && w.nodes.some(n => n.data.agentId === a.id))), runs: s.runs, activity: s.activity, connectors: s.connectors, knowledge: s.knowledge, installed: s.installed, role: s.role, policies: s.policies, controls: s.controls, audit: s.audit }),
+     },
+   ),
+ );
+--- a/frontend/src/lib/navigation.tsx
++++ b/frontend/src/lib/navigation.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+ import NextLink from "next/link";
++import { confirmDraftNavigation } from "@/features/workflows/unsaved";
+ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+ import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+ 
+@@ -13,17 +14,17 @@
+ type LinkProps = Omit<ComponentProps<typeof NextLink>, "href"> & Destination & {
+   activeOptions?: { exact?: boolean }; activeProps?: { className?: string };
+ };
+-export function Link({ to, params, search, activeOptions, activeProps, className, ...props }: LinkProps) {
++export function Link({ to, params, search, activeOptions, activeProps, className, onNavigate, ...props }: LinkProps) {
+   const pathname = usePathname();
+   const href = routeHref({ ...(to ? { to } : {}), ...(params ? { params } : {}), ...(search ? { search } : {}) });
+   const path = href.split("?")[0]!;
+   const active = activeOptions?.exact ? pathname === path : pathname === path || pathname.startsWith(path + "/");
+-  return <NextLink href={href} className={[className, active ? activeProps?.className : ""].filter(Boolean).join(" ")} aria-current={active ? "page" : undefined} {...props} />;
++  return <NextLink href={href} onNavigate={event => { if (!confirmDraftNavigation()) event.preventDefault(); else onNavigate?.(event); }} className={[className, active ? activeProps?.className : ""].filter(Boolean).join(" ")} aria-current={active ? "page" : undefined} {...props} />;
+ }
+ export function useNavigate(_options?: { from?: string }) {
+   const router = useRouter();
+   const pathname = usePathname();
+-  return useCallback((destination: Destination) => router.push(routeHref({ ...destination, to: destination.to ?? pathname })), [router, pathname]);
++  return useCallback((destination: Destination) => { if (confirmDraftNavigation()) router.push(routeHref({ ...destination, to: destination.to ?? pathname })); }, [router, pathname]);
+ }
+ export function useRouteSearch(): Record<string, string | undefined> {
+   return Object.fromEntries(useSearchParams().entries());
+--- a/frontend/src/screens/app.workflows.$id.tsx
++++ b/frontend/src/screens/app.workflows.$id.tsx
+@@ -4,6 +4,7 @@
+ import { ClientOnly } from "@/lib/navigation";
+ import { lazy, Suspense, useEffect, useState } from "react";
+ import { useMesh } from "@/domain/store";
++import { hasWorkflowEdits } from "@/api/mapping";
+ import { api } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+@@ -21,7 +22,7 @@
+   useEffect(() => {
+     let active = true;
+     const existing = useMesh.getState().workflows.find((w) => w.id === id);
+-    if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
++    if (backendStatus !== "connected" || (existing && (!existing.serverVersion || hasWorkflowEdits(existing, useMesh.getState().agents)))) return;
+     api.request("get_workflow", { workflow_id: id }).then((result) => {
+       if (active) { useMesh.getState().acceptWorkflow(result.workflow); setLoaded(true); }
+     }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoaded(true); } });

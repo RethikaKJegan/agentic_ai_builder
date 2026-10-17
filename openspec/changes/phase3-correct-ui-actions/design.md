@@ -1,0 +1,9 @@
+# Design
+
+Each workflow action makes only its explicit transition. Approval submission is a durable metadata record on an already validated current revision, with canonical envelope/idempotency and server permission checks; approval remains the existing explicitly authorized action. Publication never saves, validates, approves or activates. Activation confirms its external trigger implications. Server timestamps mark confirmed saves. Confirmed responses reconcile concurrent local edits without discarding changes entered while a request was in flight. Dirty server drafts persist locally and background loading does not overwrite them.
+
+The run form loads the exact published revision and validates canonical input types; event-only workflows explain trigger activation. A per-action synchronous submission lock prevents duplicate requests; existing transport retry keys prevent uncertain mutation replay. Runs link to server details through a query parameter.
+
+Settings and integrations use the existing validated envelope/error transport. Settings editors load confirmed values and retain unsaved input on failure. Administrative changes require server roles. Integration configuration is resolved from the configured server connector/Registry, never inferred as verified. Only explicitly supported server-owned read-only probes can return verified; unsupported probes are labeled Check configuration. No arbitrary browser URL/credential inputs are accepted.
+
+Action inventory includes all source controls in screens/features/components, including delegated UI primitives and local graph/draft edits. Local actions are labeled as drafts and do not claim backend authority. Destructive actions confirm, privileged controls explain missing permission, asynchronous actions guard repeat submissions and show errors. Browser tests cover keyboard/mobile and real isolated API transitions without real external effects.

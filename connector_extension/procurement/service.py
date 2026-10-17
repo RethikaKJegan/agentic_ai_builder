@@ -6,7 +6,8 @@ import hashlib
 import json
 import re
 import threading
-import sqlite3
+import os
+from workflow_api.auxiliary_database import connection as database_connection
 from uuid import uuid4
 from jsonschema import Draft202012Validator
 from runtime.connectors import google_spreadsheet_id
@@ -26,7 +27,7 @@ def stable(value):return hashlib.sha256(encoded(value).encode()).hexdigest()
 class ProcurementService:
     def __init__(self, workflows, state, currency_precision, auth_supplier):
         self.workflows,self.auth_supplier=workflows,auth_supplier
-        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority)
+        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority,database_url=getattr(workflows,'auxiliary_database_url',None))
         self.lock=threading.RLock()
         self.restored=set()
         self.cursor=0
@@ -40,7 +41,7 @@ class ProcurementService:
 
     def job(self, workspace, project):
         self.store.scope(workspace,project)
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             row=db.execute('SELECT body FROM procurement_jobs WHERE workspace=? AND project=?',(workspace,project)).fetchone()
         require(row is not None,'PROCUREMENT_PROJECT_NOT_FOUND');return json.loads(row[0])
 
@@ -53,7 +54,7 @@ class ProcurementService:
         # Source accessibility attests only the selected input table, never buyer,
         # supplier, compliance or canonical human approval.
         if role!='OPERATOR' or evidence['data']['provider']!='google_sheets':return False
-        with self.store.connection() as db:
+        with self.store.connection(write=False) as db:
             row=db.execute('SELECT body FROM procurement_source_proofs WHERE workspace=? AND project=? AND id=?',
                            (evidence['workspace_id'],evidence['project_id'],evidence['record_id'])).fetchone()
         return bool(row and json.loads(row[0])==evidence)
@@ -297,8 +298,8 @@ class ProcurementService:
                     failed['state'] in ('blocked','failed') and not job.get('tracking'), 'TRACKING_RETRY_NOT_ALLOWED')
             require(len(job.get('recovery_history',[]))<2,'TRACKING_RETRY_LIMIT')
             path=self.store.path.parent/'sheet-resources.sqlite3'
-            if path.exists():
-                with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
+            if path.exists() or self.store.database_url or os.getenv('BUILDER_AUXILIARY_DATABASE_URL'):
+                with database_connection(path,write=False,database_url=self.store.database_url) as db:
                     found=db.execute('SELECT 1 FROM observations WHERE workspace=? AND project=?',(workspace,project)).fetchone()
                 require(not found,'TRACKING_RESOURCE_RECONCILIATION_REQUIRED')
             known_rejection=False
@@ -309,7 +310,7 @@ class ProcurementService:
                 published=self.call('get_workflow',ref,auth,failed['workflow_id']+'_recovery_read')['workflow']
                 inputs=setup_inputs(next(n['configuration']['input'] for n in published['nodes'] if n.get('tool_id')=='extension_sheets_create'))
                 effect='sheet_setup_'+effect_digest([workspace,project,inputs['creation_key']])
-                with sqlite3.connect('file:'+str(self.store.path.parent/'effects.sqlite3')+'?mode=ro',uri=True) as db:
+                with database_connection(self.store.path.parent/'effects.sqlite3',write=False,database_url=self.store.database_url) as db:
                     prior=db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?',
                                      (effect_digest(['extension_sheets_create',effect]),)).fetchone()
                 known_rejection=bool(prior and prior[0]==effect_digest(inputs) and prior[1]=='started' and prior[2] and
@@ -435,7 +436,7 @@ class ProcurementService:
             db.execute("UPDATE sync_intents SET status='CONFIRMED' WHERE workspace=? AND project=? AND key=?",(workspace,project,key))
 
     def tick(self):
-        with self.store.connection() as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
+        with self.store.connection(write=False) as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
             "json_extract(body,'$.phase') NOT IN ('DRAFTS_READY','NEEDS_CLARIFICATION','STOPPED') ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
         if not jobs:self.cursor=0
         for rowid,workspace,project,body in jobs:

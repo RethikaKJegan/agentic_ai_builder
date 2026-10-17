@@ -1,0 +1,51 @@
+--- a/frontend/src/features/workflows/RunWorkflowDialog.tsx
++++ b/frontend/src/features/workflows/RunWorkflowDialog.tsx
+@@ -1,5 +1,5 @@
+ "use client";
+-import { InputError } from "@/api/feedback";
++import { fieldMessages, InputError } from "@/api/feedback";
+ import { useRef, useState } from "react";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+ import { api, ApiError, type RunRecord } from "@/api/client";
+@@ -36,9 +36,10 @@
+       {blocker && <p role="status" className="text-sm text-muted-foreground">{blocker}</p>}
+       {!run && !automatic && <form onSubmit={event => { event.preventDefault(); void submit(); }} className="space-y-3" noValidate>
+         {workflow.inputs.map(field => <label key={field.name} className="block text-sm">{field.name}{field.required ? " (required)" : " (optional)"}<span className="block text-xs text-muted-foreground">{field.description} · {field.type}</span>
+-          {field.type === "boolean" ? <select aria-label={field.name} disabled={busy} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))}><option value="">Choose…</option><option value="true">True</option><option value="false">False</option></select>
+-            : field.type === "array" || field.type === "object" ? <textarea aria-label={field.name} disabled={busy} className="mt-1 w-full rounded border bg-background p-2 font-mono" value={values[field.name] ?? ""} placeholder={field.type === "array" ? "[]" : "{}"} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />
+-              : <input aria-label={field.name} disabled={busy} inputMode={field.type === "integer" ? "numeric" : field.type === "number" ? "decimal" : "text"} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />}
++          {field.type === "boolean" ? <select aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))}><option value="">Choose…</option><option value="true">True</option><option value="false">False</option></select>
++            : field.type === "array" || field.type === "object" ? <textarea aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} className="mt-1 w-full rounded border bg-background p-2 font-mono" value={values[field.name] ?? ""} placeholder={field.type === "array" ? "[]" : "{}"} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />
++              : <input aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} inputMode={field.type === "integer" ? "numeric" : field.type === "number" ? "decimal" : "text"} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />}
++          {fieldMessages(error,`inputs.${field.name}`).map((message,index)=><span key={index} id={`run-input-${field.name}-error`} className="mt-1 block text-xs text-destructive">{message}</span>)}
+         </label>)}
+         <button type="submit" disabled={busy || !!blocker} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-40">{busy ? "Submitting…" : "Start run"}</button>
+       </form>}
+--- a/frontend/src/features/workflows/run-inputs.ts
++++ b/frontend/src/features/workflows/run-inputs.ts
+@@ -4,18 +4,19 @@
+   const result: Record<string, unknown> = {};
+   for (const field of fields) {
+     const raw = values[field.name] ?? "";
+-    if (!raw.trim()) { if (field.required) throw new InputError(`${field.name} is required.`); continue; }
++    const invalid=(message:string)=>new InputError(message,`inputs.${field.name}`);
++    if (!raw.trim()) { if (field.required) throw invalid(`${field.name} is required.`); continue; }
+     let value: unknown = raw;
+     if (field.type === "number" || field.type === "integer") {
+-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw new InputError(`${field.name} must be a number.`);
++      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw invalid(`${field.name} must be a number.`);
+       value = Number(raw);
+-      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw new InputError(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
++      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw invalid(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
+     } else if (field.type === "boolean") {
+-      if (!["true", "false"].includes(raw)) throw new InputError(`${field.name} must be true or false.`);
++      if (!["true", "false"].includes(raw)) throw invalid(`${field.name} must be true or false.`);
+       value = raw === "true";
+     } else if (field.type === "array" || field.type === "object") {
+-      try { value = JSON.parse(raw); } catch { throw new InputError(`${field.name} must contain valid JSON.`); }
+-      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw new InputError(`${field.name} must be a JSON ${field.type}.`);
++      try { value = JSON.parse(raw); } catch { throw invalid(`${field.name} must contain valid JSON.`); }
++      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw invalid(`${field.name} must be a JSON ${field.type}.`);
+     }
+     result[field.name] = value;
+   }

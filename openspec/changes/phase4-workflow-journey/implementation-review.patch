@@ -1,0 +1,583 @@
+--- a/frontend/e2e/phase1.spec.ts
++++ b/frontend/e2e/phase1.spec.ts
+@@ -46,6 +46,6 @@
+     await page.getByRole('button', { name: 'Cancel generation' }).click();
+     await expect(page.getByRole('main').getByRole('alert')).toContainText('PLANNING_CANCELLED');
+     await expect(page.getByLabel('Process description')).toHaveValue(prompt);
+-    await expect(page.getByRole('button', { name: 'Generate workflow' })).toBeEnabled();
++    await expect(page.getByRole('button', { name: 'Retry generation' })).toBeEnabled();
+   });
+ }
+--- a/frontend/e2e/prompt-only.spec.ts
++++ b/frontend/e2e/prompt-only.spec.ts
+@@ -49,6 +49,8 @@
+         await page.getByLabel("Process description").fill(prompt);
+         await expect(page.getByLabel("Google Sheets URL or ID")).toHaveCount(0);
+         await page.getByRole("button", { name: "Generate workflow" }).click();
++        await expect(page.getByRole("region", { name: "Generation result" })).toBeVisible();
++        await page.getByRole("button", { name: "Review and edit workflow" }).click();
+         await expect(page).toHaveURL(new RegExp(`/app/workflows/${published.workflow_id}$`));
+         expect(sessionRequests).toBeGreaterThanOrEqual(2);
+         const planning = calls.find((call) => call.operation === "plan_workflow");
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -356,6 +356,13 @@
+     return result.data;
+   }
+ 
++  async releaseState(workflowId: string) {
++    const schema = z.object({ workflow_id: z.string(), release: z.object({ release_id: z.string(), workflow_version: z.number().int().positive(), state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]), trigger_binding_count: z.number().int().nonnegative() }).nullable(), ...metadata });
++    const result = schema.safeParse(await this.read(`workflows/${encodeURIComponent(workflowId)}/release-state`));
++    if (!result.success || result.data.workflow_id !== workflowId) return fail("INVALID_API_DATA", "The release state response is invalid.");
++    return result.data;
++  }
++
+   async overview(afterSequence?: number) {
+     const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
+     const result = overviewCollectionSchema.safeParse(await this.read(path));
+--- a/frontend/src/api/control.ts
++++ b/frontend/src/api/control.ts
+@@ -27,7 +27,16 @@
+     if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(event)) throw new Error("The runtime reused an event ID with different data.");
+     events.set(event.event_id, event);
+   }
+-  return [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
++  const result = [...events.values()];
++  const sequence = (event: RunEvent) => event.details?.["recorded_sequence"];
++  if (result.every(event => Number.isSafeInteger(sequence(event)))) {
++    const unique = new Set(result.map(sequence));
++    if (unique.size !== result.length) throw new Error("The runtime reused an event sequence.");
++    result.sort((a, b) => Number(sequence(a)) - Number(sequence(b)));
++  }
++  // Legacy responses already arrive in database sequence order. Equal/skewed
++  // timestamps must never reorder causal events or manufacture completion.
++  return result;
+ }
+ export function assertWorkflowReferences(workflow: CanonicalWorkflow) {
+   const nodes = new Set(workflow.nodes.map((n) => n.node_id));
+--- a/frontend/src/features/builder/AgentCommunication.tsx
++++ b/frontend/src/features/builder/AgentCommunication.tsx
+@@ -48,7 +48,7 @@
+           </DialogDescription>
+         </div>
+         {open &&
+-          (projectId ? (
++          (projectId && !trace.runId ? (
+             <ProcurementProjectCommunication
+               workflowId={workflow.id}
+               version={workflow.serverVersion ?? 1}
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -4,6 +4,7 @@
+   BackgroundVariant,
+   Controls,
+   MiniMap,
++  MarkerType,
+   ReactFlow,
+   ReactFlowProvider,
+   addEdge,
+@@ -59,9 +60,6 @@
+ import {
+   addSubAgent,
+   depthOf,
+-  hiddenIds,
+-  isHierarchy,
+-  layoutTB,
+   removeSubtree,
+ } from "@/domain/hierarchy";
+ import { NODE_META } from "./nodeMeta";
+@@ -69,8 +67,12 @@
+ import { WorkflowControls } from "@/features/workflows/WorkflowControls";
+ 
+ import { useWorkflowTrace } from "./useWorkflowTrace";
+-import { NodeTrace } from "./NodeTrace";
+-import { AgentCommunication } from "./AgentCommunication";
++import { HierarchyView } from "./HierarchyView";
++import { ExecutionView } from "./ExecutionView";
++import { GraphTools } from "./GraphTools";
++import { dependencyOrder, graphIssues } from "@/domain/graph-review";
++import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
++import { PlanReview } from "@/features/workflows/PlanReview";
+ 
+ const nodeTypes = { mesh: MeshNode };
+ type Graph = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+@@ -100,6 +102,7 @@
+   const [edges, setEdges] = useState<WorkflowEdge[]>(workflow.edges);
+   const nodesRef = useRef(nodes);
+   const edgesRef = useRef(edges);
++  const dragStart = useRef<Graph | null>(null);
+   nodesRef.current = nodes;
+   edgesRef.current = edges;
+   const [past, setPast] = useState<Graph[]>([]);
+@@ -111,9 +114,8 @@
+   );
+   const [cmd, setCmd] = useState("");
+   const [historyOpen, setHistoryOpen] = useState(false);
+-  const trace = useWorkflowTrace(workflow.id);
+-  const { runState, activeEdges } = trace;
+-  const [inspectorTab, setInspectorTab] = useState<"trace" | "configuration">("trace");
++  const [mode, setMode] = useState<"design" | "hierarchy" | "execution">("design");
++  const trace = useWorkflowTrace(workflow.id, mode === "execution");
+   const isMobile = useIsMobile();
+ 
+   const commit = useCallback(
+@@ -155,6 +157,7 @@
+ 
+   useEffect(() => {
+     const onKey = (e: KeyboardEvent) => {
++      if (mode !== "design") return;
+       const t = e.target as HTMLElement;
+       if (t.closest("input, textarea, select, [contenteditable]")) return;
+       if (e.key === "Escape") {
+@@ -171,7 +174,7 @@
+     };
+     window.addEventListener("keydown", onKey);
+     return () => window.removeEventListener("keydown", onKey);
+-  }, [undo, redo, fitView]);
++  }, [undo, redo, fitView, mode]);
+ 
+   useEffect(() => {
+     const t = setTimeout(() => fitView({ duration: 250, padding: 0.15, maxZoom: 1 }), 60);
+@@ -364,8 +367,7 @@
+   };
+ 
+   const tidy = () => {
+-    const layout = isHierarchy(nodesRef.current) ? layoutTB : autoLayout;
+-    commit({ nodes: layout(clean(nodesRef.current), edgesRef.current), edges: edgesRef.current });
++    commit({ nodes: autoLayout(clean(nodesRef.current), edgesRef.current), edges: edgesRef.current });
+     setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 50);
+   };
+ 
+@@ -385,7 +387,8 @@
+ 
+   const current = store.workflows.find((w) => w.id === workflow.id) ?? workflow;
+ 
+-  const hidden = useMemo(() => hiddenIds(nodes), [nodes]);
++  const hidden = useMemo(() => new Set<string>(), []);
++  const diagnostics = useMemo(() => graphIssues(nodes, edges), [nodes, edges]);
+   const flowNodes = useMemo(
+     () =>
+       nodes.map((n) => ({
+@@ -393,17 +396,18 @@
+         hidden: hidden.has(n.id),
+         data: {
+           ...n.data,
+-          runStatus: runState[n.id],
++          runStatus: undefined,
++          orientation: undefined,
++          role: undefined,
++          diagnosticCount: diagnostics.filter(x => x.nodeId === n.id).length,
+           childCount:
+-            n.data.kind === "agent"
+-              ? nodes.filter((c) => c.data.parentNodeId === n.id && c.data.kind === "agent").length
+-              : 0,
++            0,
+           parentLabel: n.data.parentNodeId
+             ? nodes.find((p) => p.id === n.data.parentNodeId)?.data.label
+             : undefined,
+         },
+       })),
+-    [nodes, runState, hidden],
++    [nodes, hidden, diagnostics],
+   );
+   const flowEdges: Edge[] = useMemo(
+     () =>
+@@ -414,13 +418,13 @@
+         label: e.label,
+         type: "smoothstep",
+         hidden: hidden.has(e.source) || hidden.has(e.target),
+-        className: activeEdges.has(e.id) ? "edge-active" : "",
++        markerEnd: { type: MarkerType.ArrowClosed },
+         labelBgPadding: [6, 3] as [number, number],
+         labelBgBorderRadius: 6,
+-        labelStyle: { fontSize: 10, fontWeight: 500, fill: "var(--primary-deep)" },
++        labelStyle: { fontSize: 12, fontWeight: 500, fill: "var(--primary-deep)" },
+         labelBgStyle: { fill: "var(--highlight)" },
+       })),
+-    [edges, activeEdges, hidden],
++    [edges, hidden],
+   );
+ 
+   const selected = nodes.find((n) => n.id === selectedId);
+@@ -438,7 +442,13 @@
+   };
+ 
+   return (
+-    <div className="flex h-full flex-col">
++    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
++      <LifecycleJourney workflow={current} />
++      <div role="tablist" aria-label="Workflow view" className="flex shrink-0 flex-wrap gap-2 border-b border-border px-4 py-2">
++        {(["design", "hierarchy", "execution"] as const).map(view => <button type="button" role="tab" key={view} aria-selected={mode === view} onClick={() => { setMode(view); setPanel(null); }} className={`rounded-lg px-3 py-2 text-sm ${mode === view ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{view === "design" ? "Design" : view === "hierarchy" ? "Agent hierarchy" : "Execution"}</button>)}
++      </div>
++      {mode === "design" && <>
++      <details className="shrink-0 border-b border-border px-4 py-2 text-xs"><summary className="cursor-pointer font-medium">Review workflow plan</summary><div className="max-h-80 overflow-auto py-2"><PlanReview workflow={{...current,nodes:clean(nodes),edges}} /></div></details>
+       {current.serverVersion && <RevisionHistory key={`${current.id}:${current.serverVersion}`} workflowId={current.id} latest={current.serverVersion} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
+       {/* Toolbar */}
+       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+@@ -467,7 +477,7 @@
+         <button
+           onClick={undo}
+           disabled={!past.length}
+-          className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40 sm:block"
++          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
+           aria-label="Undo"
+         >
+           <Undo2 className="h-4 w-4" />
+@@ -475,7 +485,7 @@
+         <button
+           onClick={redo}
+           disabled={!future.length}
+-          className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40 sm:block"
++          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
+           aria-label="Redo"
+         >
+           <Redo2 className="h-4 w-4" />
+@@ -551,37 +561,33 @@
+             <DropdownMenuLabel className="text-xs text-muted-foreground">
+               Recent runs
+             </DropdownMenuLabel>
+-            {trace.runs.slice(0, 5).map((run) => <DropdownMenuItem key={run.run_id} onSelect={() => trace.selectRun(run.run_id)}>{run.run_id} · {run.status}</DropdownMenuItem>)}
++            <DropdownMenuItem onSelect={() => { setMode("execution"); setPanel(null); }}>Inspect recorded execution</DropdownMenuItem>
+           </DropdownMenuContent>
+         </DropdownMenu>
+       </div>
+ 
+       <div className="shrink-0 border-b border-border px-3 py-3"><WorkflowControls workflow={current} /></div>
+ 
+-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-xs">
+-        <label htmlFor="trace-run" className="font-medium">Execution trace</label>
+-        <select id="trace-run" aria-label="Select workflow run" value={trace.runId} onChange={(event) => trace.selectRun(event.target.value)} disabled={!trace.available || !trace.runs.length} className="min-w-0 max-w-full rounded-md border border-border bg-background p-1.5">
+-          {!trace.runs.length && <option value="">{trace.available ? "No recorded runs" : "Runtime unavailable"}</option>}
+-          {trace.runs.map((run) => <option key={run.run_id} value={run.run_id}>{run.run_id} · v{run.workflow_version} · {run.status}</option>)}
+-        </select>
+-        <span className="text-muted-foreground">Click a step to inspect its execution.</span>
+-        <AgentCommunication workflow={{ ...current, nodes: clean(nodes), edges }} trace={trace} />
+-        {trace.run && trace.run.workflow_version !== current.serverVersion && <span className="text-warning">Historical run · v{trace.run.workflow_version}; canvas shows the current draft.</span>}
+-      </div>
+-      <div className="flex min-h-0 flex-1">
++      <GraphTools nodes={clean(nodes)} edges={edges} onSelect={id => { setSelectedId(id);  setPanel("inspector"); }} onConnect={(source,target,label) => {
++        if (edgesRef.current.some(e => e.source === source && (label ? e.label === label : e.target === target))) { toast.error("This connection or branch outcome is already used. Remove it before reconnecting."); return; }
++        commit({nodes:clean(nodesRef.current),edges:[...edgesRef.current,{id:uid("edge"),source,target,...(label?{label}:{})}]});
++      }} onRemove={id => { if(window.confirm("Remove this connection from the working draft?")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }} />
++      </>}
++      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
++      <div className="flex min-h-[420px] flex-1">
+         {/* Canvas */}
+         <div className="relative min-w-0 flex-1 bg-canvas">
+           {isMobile ? (
+             <ol className="h-full space-y-2 overflow-y-auto p-4 pb-48" aria-label="Workflow steps">
+-              {nodes.map((n, i) => {
++              {dependencyOrder(nodes,edges).map((n, i) => {
+                 const M = NODE_META[n.data.kind];
+-                const st = runState[n.id];
++                const st = undefined;
+                 return (
+                   <li key={n.id}>
+                     <button
+                       onClick={() => {
+                         setSelectedId(n.id);
+-                        setInspectorTab("trace");
++
+                         setPanel("inspector");
+                       }}
+                       className={`flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left ${selectedId === n.id ? "border-primary" : "border-border"}`}
+@@ -621,10 +627,14 @@
+                 onNodesChange={onNodesChange}
+                 onEdgesChange={onEdgesChange}
+                 onConnect={onConnect}
+-                onNodeDragStop={() => commit({ nodes: nodesRef.current, edges: edgesRef.current })}
++                onNodeDragStart={() => { dragStart.current = structuredClone({nodes:clean(nodesRef.current),edges:edgesRef.current}); }}
++                onNodeDragStop={() => {
++                  if (dragStart.current) { const previous = dragStart.current; setPast(p=>[...p.slice(-49),previous]); setFuture([]); dragStart.current=null; }
++                  commit({ nodes: nodesRef.current, edges: edgesRef.current }, {history:false});
++                }}
+                 onNodeClick={(_, n) => {
+                   setSelectedId(n.id);
+-                  setInspectorTab("trace");
++
+                   setPanel("inspector");
+                 }}
+                 onPaneClick={() => {
+@@ -751,11 +761,9 @@
+                     ×
+                   </button>
+                 </div>
+-                <div className="flex gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="Step inspector">
+-                  {(["trace", "configuration"] as const).map((tab) => <button key={tab} role="tab" aria-selected={inspectorTab === tab} onClick={() => setInspectorTab(tab)} className={`rounded-md px-3 py-1.5 text-sm ${inspectorTab === tab ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{tab === "trace" ? "Trace" : "Configuration"}</button>)}
+-                </div>
+                 <div className="flex-1 overflow-y-auto p-4">
+-                  {inspectorTab === "trace" ? <NodeTrace node={selected} trace={trace} /> : selectedAgent ? (
++                  {diagnostics.filter(x=>x.nodeId===selected.id).map((x,i)=><p role="alert" key={i} className="mb-2 rounded border border-destructive/30 p-2 text-xs text-destructive">{x.message}</p>)}
++                  {selectedAgent ? (
+                     <>
+                       <HierarchyBox
+                         node={selected}
+@@ -820,6 +828,7 @@
+           </aside>
+         )}
+       </div>
++      )}
+     </div>
+   );
+ }
+--- a/frontend/src/features/builder/MeshNode.tsx
++++ b/frontend/src/features/builder/MeshNode.tsx
+@@ -4,7 +4,7 @@
+ import { NODE_META } from "./nodeMeta";
+ import { useMesh } from "@/domain/store";
+ import { getModel } from "@/domain/models";
+-import type { WorkflowNodeData } from "@/domain/types";
++import type { Agent, WorkflowNodeData } from "@/domain/types";
+ 
+ export type MeshFlowNode = Node<WorkflowNodeData & { runStatus?: string | undefined; childCount?: number | undefined; parentLabel?: string | undefined }, "mesh">;
+ 
+@@ -14,7 +14,8 @@
+ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
+   const meta = NODE_META[data.kind];
+   const actions = useContext(NodeActions);
+-  const agent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
++  const localAgent = useMesh((s) => (data.agentId ? s.agents.find((a) => a.id === data.agentId) : undefined));
++  const agent = data["readOnly"] ? data["agentPreview"] as Agent | undefined : localAgent;
+   const st = data.runStatus;
+   const tb = data.orientation === "tb";
+   const isMaster = data.role === "master";
+@@ -56,10 +57,11 @@
+           </span>
+         )}
+       </div>
++      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{meta.label}{data.kind === "trigger" ? " · Start" : data.kind === "output" ? " · End" : ""}{Number(data["diagnosticCount"]) > 0 ? ` · ${data["diagnosticCount"]} configuration issues` : ""}</p>
+       {(agent?.purpose || data.description) && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{data.description || agent?.purpose}</p>}
+       {(agent?.paused || (data.childCount ?? 0) > 0) && (
+         <div className="mt-2 flex items-center gap-2">
+-          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Paused</span>}
++          {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Draft paused</span>}
+           {(data.childCount ?? 0) > 0 && (
+             <button
+               onClick={(e) => { e.stopPropagation(); actions.toggleCollapse(id); }}
+--- a/frontend/src/features/builder/NodeTrace.test.tsx
++++ b/frontend/src/features/builder/NodeTrace.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(cleanup);
+ const node = { id: "choose", type: "mesh" as const, position: { x: 0, y: 0 }, data: { kind: "condition" as const, label: "Choose" } };
+ const run = { run_id: "run_one", workflow_id: "workflow", workflow_version: 1, status: "completed" as const, approvals: [] };
+-const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, selectRun: () => {} } satisfies WorkflowTrace;
++const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
+ test("historical missing evidence is explicit and unrelated nodes are excluded", () => {
+   render(<NodeTrace node={node} trace={{ ...trace, events: [{ event_id: "evt", run_id: run.run_id, workflow_id: "workflow", workflow_version: 1, timestamp: "2026-10-11T09:00:00Z", source: "runtime", event_type: "node.completed", details: { node_id: "other", output: "unrelated private data" } }] }} />);
+   expect(screen.getAllByText("Not captured for this run.").length).toBeGreaterThan(0);
+--- a/frontend/src/features/builder/NodeTrace.tsx
++++ b/frontend/src/features/builder/NodeTrace.tsx
+@@ -14,7 +14,7 @@
+   const last = events.at(-1);
+   const status = trace.runState[node.id];
+   const first = events.find((event) => event.event_type === "node.observed" || event.event_type === "node.started");
+-  const duration = first && last && completed ? Math.max(0, Date.parse(last.timestamp) - Date.parse(first.timestamp)) : undefined;
++  const duration = first && last && completed ? Number.isFinite(Date.parse(last.timestamp) - Date.parse(first.timestamp)) && Date.parse(last.timestamp) >= Date.parse(first.timestamp) ? Date.parse(last.timestamp) - Date.parse(first.timestamp) : undefined : undefined;
+   const retries = events.filter((event) => event.event_type === "node.retry").length;
+   const decision = completed?.["outcome"] ?? (status === "skipped" ? "Skipped" : status === "paused" ? "Waiting for approval" : status === "failed" || status === "blocked" ? last?.details?.["error_code"] : completed ? "Completed" : undefined);
+   const explanation = completed?.["explanation"] ?? (status === "skipped" ? last?.details?.["explanation"] : completed && completed["output"] !== undefined && node.data.kind === "agent" ? "The agent returned the recorded output below. Any explanation supplied by the agent is included in that output; no additional rationale was recorded." : completed && Array.isArray(completed["selected_edges"]) ? "The step completed and selected the recorded successor edges." : undefined);
+@@ -22,9 +22,11 @@
+     <ApiFeedback error={trace.error} />
+     {!trace.available ? <p className="text-sm text-muted-foreground">Execution traces require a connected runtime and permission to view runs.</p> : !trace.runId ? <p className="text-sm text-muted-foreground">No recorded runs for this workflow yet.</p> : !trace.run ? <p role="status" className="text-sm">{trace.loading ? "Loading execution trace…" : "Execution trace unavailable."}</p> : <>
+       <p className="break-all text-xs text-muted-foreground">{trace.run.run_id} · revision v{trace.run.workflow_version}</p>
+-      <StatusPill status={status ?? "not executed"} />
++      <StatusPill status={status ?? "No recorded status"} />
+       {!events.length && <p className="text-sm text-muted-foreground">This step has no recorded events in the selected run. It may not have been reached or may belong to a different revision.</p>}
+       <p className="text-xs text-muted-foreground">{duration === undefined ? "Timing not recorded or execution pending" : `${duration} ms recorded duration`} · {retries} retries</p>
++      <Evidence title="Recorded failure" value={events.filter(event => ["node.failed", "approval.rejected", "approval.timed_out"].includes(event.event_type)).at(-1)?.details} />
++      <Evidence title="Safe recorded inputs" value={observed?.["input"] ?? observed?.["inputs"]} />
+       <Evidence title="Observation" value={observed?.["observation"]} />
+       <Evidence title="Decision" value={decision} />
+       <Evidence title="How the decision was made" value={completed?.["expression"] !== undefined ? { expression: completed["expression"], evaluated_value: completed["evaluated_value"] } : observed ? { kind: observed["kind"], agent_id: observed["agent_id"], tool_id: observed["tool_id"], policy: observed["policy"] } : undefined} />
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -3,16 +3,18 @@
+ import { useBackend } from "@/api/state";
+ import { reconcileEvents } from "@/api/control";
+ import type { RunEvent } from "@/api/contracts.generated";
++import { fromCanonical } from "@/api/mapping";
+ import type { StepStatus } from "@/domain/types";
+ 
+-export function useWorkflowTrace(workflowId: string) {
++export function useWorkflowTrace(workflowId: string, enabled = true) {
+   const backend = useBackend();
+-  const available = backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
++  const available = enabled && backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
+   const [runs, setRuns] = useState<RunRecord[]>([]);
+   const [selection, setSelection] = useState("");
+-  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[] } | null>(null);
++  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[]; revision: ReturnType<typeof fromCanonical> } | null>(null);
+   const [error, setError] = useState<Error | null>(null);
+   const [loading, setLoading] = useState(false);
++  const [attempt, setAttempt] = useState(0);
+   const runId = selection || runs[0]?.run_id || "";
+   useEffect(() => {
+     if (!available) return;
+@@ -28,28 +30,31 @@
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, workflowId]);
++  }, [available, workflowId, attempt]);
+   useEffect(() => {
+     if (!available || !runId) return;
+     let disposed = false;
+     let timer: ReturnType<typeof setTimeout>;
+     const refresh = async () => {
+       setLoading(true);
++      let terminal = false;
+       try {
+         const result = await api.request("get_run", { run_id: runId });
++        terminal = ["completed", "failed", "blocked", "rejected", "cancelled"].includes(result.run.status);
+         if (result.run.workflow_id !== workflowId) throw new Error("This run belongs to another workflow.");
+-        const timeline = await api.request("list_run_events", { run_id: runId });
++        const [timeline, historical] = await Promise.all([api.request("list_run_events", { run_id: runId }), api.request("get_workflow", { workflow_id: workflowId, workflow_version: result.run.workflow_version })]);
++        if (historical.workflow.workflow_id !== workflowId || historical.workflow.version !== result.run.workflow_version) throw new Error("The server returned a different historical revision.");
+         const events = reconcileEvents([], timeline.items, result.run);
+-        if (!disposed) { setRecord({ run: result.run, events }); setError(null); }
++        if (!disposed) { setRecord({ run: result.run, events, revision: fromCanonical(historical.workflow) }); setError(null); }
+       } catch (caught) {
+         if (!disposed) { setRecord(null); setError(caught instanceof Error ? caught : new Error("Trace loading failed.")); }
+       } finally {
+-        if (!disposed) { setLoading(false); timer = setTimeout(() => void refresh(), 3000); }
++        if (!disposed) { setLoading(false); if (!terminal) timer = setTimeout(() => void refresh(), 3000); }
+       }
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, runId, workflowId]);
++  }, [available, runId, workflowId, attempt]);
+   const current = available && record?.run.run_id === runId && record.run.workflow_id === workflowId ? record : null;
+   const events = useMemo(() => current?.events ?? [], [current]);
+   const runState = useMemo(() => {
+@@ -69,6 +74,6 @@
+     return states;
+   }, [events]);
+   const activeEdges = useMemo(() => new Set(events.flatMap((event) => Array.isArray(event.details?.["selected_edges"]) ? event.details["selected_edges"].filter((id): id is string => typeof id === "string") : [])), [events]);
+-  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, events, runState, activeEdges, error, loading };
++  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error, loading, retry: () => setAttempt(n => n + 1) };
+ }
+ export type WorkflowTrace = ReturnType<typeof useWorkflowTrace>;
+--- a/frontend/src/screens/app.index.tsx
++++ b/frontend/src/screens/app.index.tsx
+@@ -8,12 +8,18 @@
+ import { api, type PlanningJob } from "@/api/client";
+ import { toast } from "sonner";
+ import { useBackend } from "@/api/state";
++import { PlanReview } from "@/features/workflows/PlanReview";
++import { hasWorkflowEdits } from "@/api/mapping";
++import { useRef } from "react";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ 
+ export default function Overview() {
+   const navigate = useNavigate();
+   const workflows = useMesh((s) => s.workflows);
+   const [description, setDescription] = useState("");
++  const [inputMode,setInputMode] = useState<"automatic" | "manual">("automatic");
++  const generationLock = useRef(false);
++  const [result, setResult] = useState<Awaited<ReturnType<typeof createWorkflow>> | null>(null);
+   const [planning, setPlanning] = useState(false);
+   const [planningJob, setPlanningJob] = useState<PlanningJob | null>(null);
+   const [cancelling, setCancelling] = useState(false);
+@@ -28,13 +34,15 @@
+   const [apiError, setApiError] = useState<Error | null>(null);
+   const generate = async () => {
+     const prompt = description.trim();
+-    if (planning || !prompt) return;
++    if (generationLock.current || !prompt) return;
++    if (result && !window.confirm("Generate another proposal? The saved draft will be preserved, and this review will be replaced.")) return;
++    generationLock.current = true;
+     setPlanning(true); setPlanningJob(null); setApiError(null);
+     try {
+       const context = {
+         generation_mode: "hierarchy",
+         delegation_mode: "runtime_v1",
+-        execution_input_mode: "automatic",
++        execution_input_mode: inputMode,
+       };
+       await useBackend.getState().initialize();
+       const currentBackend = useBackend.getState();
+@@ -43,25 +51,35 @@
+       if (!currentBackend.session?.planning_available) throw new Error("The backend has not enabled the workflow planner. Check its model configuration.");
+       const saved = await createWorkflow({ objective: prompt, context });
+       if (saved.existing) toast.info("Opened the existing saved workflow for this request. Your previous revision was preserved.");
+-      useMesh.getState().acceptWorkflow(saved.workflow);
+-      navigate({ to: "/app/workflows/$id", params: { id: saved.workflow.workflow_id } });
++      setResult(saved);
+     } catch (caught) { setApiError(caught instanceof Error ? caught : new Error("Workflow generation failed.")); }
+-    finally { setPlanning(false); }
++    finally { generationLock.current = false; setPlanning(false); }
++  };
++  const openResult = () => {
++    if (!result) return;
++    const state = useMesh.getState(); const current = state.workflows.find(w => w.id === result.workflow.workflow_id);
++    if (current && hasWorkflowEdits(current, state.agents)) {
++      if (!window.confirm("This workflow has unsaved edits in this browser. Open and keep those edits? The generated result will not overwrite them.")) return;
++    } else state.acceptWorkflow(result.workflow);
++    navigate({ to: "/app/workflows/$id", params: { id: result.workflow.workflow_id } });
+   };
+   return <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
+     <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-5xl font-semibold tracking-tight md:text-6xl">What should we automate today?</motion.h1>
+     <p className="mt-3 text-lg text-muted-foreground">Describe the process, when it should run, and its data sources in one prompt. MESH saves the setup and drafts the agents, tools and approvals.</p>
+     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
+       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+-      <p className="mt-4 text-sm text-muted-foreground">Include the source URL and any range or trigger details here. Published event workflows receive new data automatically.</p>
++      <p className="mt-4 text-sm text-muted-foreground">Include the source URL and any range or trigger details here. Event workflows receive data only after their release and trigger bindings are active.</p>
++      <label className="mt-4 block text-sm">Input source<select aria-label="Workflow input source" disabled={planning} value={inputMode} onChange={e=>setInputMode(e.target.value as "automatic" | "manual")} className="mt-1 block w-full rounded-lg border border-border bg-background p-2"><option value="automatic">Automatic — configured event or saved source</option><option value="manual">Manual — provide inputs when starting a run</option></select></label>
++      <p className="mt-2 text-xs text-muted-foreground">{inputMode === "automatic" ? "Include the event provider, source URL and mappings in your prompt. Missing automatic sources block planning; nothing becomes operational before activation." : "The generated draft may declare run inputs. Review them before publication; Run published will ask for those values."}</p>
+       <div className="mt-6 flex flex-wrap items-center gap-3">
+       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
+         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}
+-      <button type="button" disabled={planning || !description.trim()} onClick={() => void generate()} className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Sparkles className="h-4 w-4" />{planning ? "Generating…" : "Generate workflow"}</button></div>
++      <button type="button" disabled={planning || !description.trim()} onClick={() => void generate()} className="ml-auto inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Sparkles className="h-4 w-4" />{planning ? "Generating…" : apiError ? "Retry generation" : "Generate workflow"}</button></div>
+       {planningJob && <p role="status" className="mt-3 break-all text-xs text-muted-foreground">Generation {planningJob.state} · Job {planningJob.job_id}</p>}
+       {planningJob?.state === "cancelled" && <p className="mt-1 text-xs text-muted-foreground">Cancellation discards the result. Model usage already incurred cannot be undone.</p>}
+       <ApiFeedback error={apiError} />
+     </section>
++    {result && <section className="mt-6 space-y-3" aria-label="Generation result"><p role="status" className="text-sm">{result.existing ? "Existing saved revision found. Review it before opening; it has not been regenerated or overwritten." : "Draft saved. Review the generated proposal before editing or validating."}</p><PlanReview document={result.workflow} generated={!result.existing} /><button type="button" disabled={planning} onClick={openResult} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Review and edit workflow</button></section>}
+     <section className="mt-12"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium">Recent workflows</h2><Link to="/app/workflows" className="text-sm text-primary">View all</Link></div>{workflows.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Generate a workflow above to see it here.</p> : <div className="divide-y divide-border rounded-xl border border-border">{workflows.slice(0, 5).map((w) => <Link key={w.id} to="/app/workflows/$id" params={{ id: w.id }} className="flex items-center justify-between px-4 py-3 hover:bg-canvas"><span><span className="block font-medium">{w.name}</span><span className="text-xs text-muted-foreground">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : "local draft"}</span></span><ArrowRight className="h-4 w-4 text-primary" /></Link>)}</div>}</section>
+   </div>;
+ }
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -92,6 +92,7 @@
+         </div>
+         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
+       </div>
++      <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted-foreground">Describe → generate → review and edit → configure → save → validate → approve → publish → activate → run and monitor. Open a workflow for its lifecycle guidance. Draft revision and active release are separate.</p>
+       {backend.status === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading server workflows…</p>}
+       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+         <span className={`h-2 w-2 rounded-full ${backend.liveStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -199,7 +199,12 @@
+     def events(self, run_id, auth):
+         with self.store.transaction(write=False) as db:
+             self.load(db, run_id, auth)
+-            items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
++            rows = db.execute('SELECT sequence, document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id)).fetchall()
++            items = []
++            for sequence, document in rows:
++                event = json.loads(document)
++                event['details'] = {**event.get('details', {}), 'recorded_sequence': sequence}
++                items.append(event)
+             return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+ 
+     def monitoring(self, auth):
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -247,6 +247,14 @@
+         except (ValueError, TypeError):
+             return error('INVALID_REQUEST', 'The lifecycle request is invalid.', 400)
+ 
++    @app.get('/workflows/{workflow_id}/release-state')
++    async def release_state(workflow_id: str):
++        if auth.get('decision') != 'allow' or 'workflow.view' not in auth['permissions']:
++            return error('OPERATION_NOT_AUTHORIZED', 'Workflow read permission is required.', 403)
++        from .release_read import read_release_state
++        data = await run_in_threadpool(read_release_state, workflow_service.store, auth['subject']['workspace_id'], workflow_id)
++        return JSONResponse(workflow_service.envelope(request_reference.get(), 200, data))
++
+     @app.post('/workflows/{workflow_id}/releases')
+     async def activate_release(workflow_id: str, request: Request):
+         return await lifecycle_dispatch(request, 'activate_release', {'workflow_id': workflow_id})

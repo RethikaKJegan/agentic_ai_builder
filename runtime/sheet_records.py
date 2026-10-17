@@ -282,7 +282,9 @@ class GoogleSheetsRecordConnector:
                 except HTTPError as exc:
                     if exc.code in {401, 403}:
                         raise RuntimeFailure('SHEETS_ACCESS_DENIED', 'Google denied access to the configured table.', 403) from None
-                    raise RuntimeFailure('SHEETS_RECORD_FAILED', 'The record provider request failed; no automatic replay is allowed.', 502) from None
+                    category = ('SHEETS_RATE_LIMITED' if exc.code == 429 else
+                                'SHEETS_PROVIDER_UNAVAILABLE' if exc.code >= 500 else 'SHEETS_REQUEST_REJECTED')
+                    raise RuntimeFailure(category, 'Google rejected the record request; inspect the tracking projection before retrying.', 502) from None
                 except RuntimeFailure:
                     raise
                 except Exception:

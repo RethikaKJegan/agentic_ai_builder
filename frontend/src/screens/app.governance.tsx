@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useBackend } from "@/api/state";
 import { useMesh } from "@/domain/store";
-import { can, effectivePolicy, roleLabel, type GuardrailKey, type Policy, type PolicyRule } from "@/domain/governance";
+import { effectivePolicy, roleLabel, type GuardrailKey, type Policy, type PolicyRule } from "@/domain/governance";
 import { MODELS, getModel } from "@/domain/models";
 import { uid } from "@/domain/ids";
 import { PageHeader } from "@/features/runs/RunTrace";
@@ -23,8 +24,9 @@ function describe(r: PolicyRule) {
 }
 
 export default function Governance() {
-  const { policies, role, upsertPolicy, removePolicy, audit } = useMesh();
-  const allowed = can(role, "policy.manage");
+  const { policies, upsertPolicy, removePolicy, audit } = useMesh();
+  const backend=useBackend();
+  const allowed=backend.status==="connected" && backend.session?.auth.decision==="allow" && backend.session.auth.roles.includes("admin");
   const eff = effectivePolicy(policies);
   const [type, setType] = useState<PolicyRule["type"]>("block-model");
   const [modelId, setModelId] = useState("gpt-5");
@@ -32,10 +34,11 @@ export default function Governance() {
   const [usd, setUsd] = useState("0.5");
 
   const add = () => {
+    if(!allowed)return;
     const rule: PolicyRule = type === "block-model" ? { type, modelId } : type === "require-guardrail" ? { type, guardrail: guard } : { type, usd: Math.max(0.001, Number(usd) || 0.5) };
     const p: Policy = { id: uid("pol"), scope: "workspace", name: describe(rule), description: "Added by workspace admin.", rule, enabled: true };
     upsertPolicy(p);
-    toast.success("Workspace policy added");
+    toast.success("Local policy draft added");
   };
 
   const Section = ({ scope }: { scope: Policy["scope"] }) => (
@@ -49,7 +52,7 @@ export default function Governance() {
               <p className="text-xs text-muted-foreground">{describe(p.rule)} · {p.description}</p>
             </div>
             <Switch checked={p.enabled} disabled={!allowed} onCheckedChange={(v) => upsertPolicy({ ...p, enabled: v })} aria-label={`Toggle ${p.name}`} />
-            {scope === "workspace" && allowed && <button onClick={() => removePolicy(p.id)} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4" /></button>}
+            {scope === "workspace" && allowed && <button onClick={() => { if (window.confirm(`Delete local policy draft "${p.name}"?`)) removePolicy(p.id); }} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4" /></button>}
           </div>
         ))}
       </div>
@@ -59,12 +62,13 @@ export default function Governance() {
   return (
     <div className="mx-auto max-w-5xl p-6 md:p-10">
       <PageHeader title="Governance" sub="Live server guardrails and audit records, alongside local policy drafts." />
-      {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: only Organization Admins can change policies.</p>}
+      {!allowed && <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: a server-authenticated administrator is required to edit these browser drafts. Enforced production rules are read-only.</p>}
       <Tabs defaultValue="usage">
-        <TabsList className="flex-wrap"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Live governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
+        <TabsList className="h-auto flex-wrap justify-start gap-1"><TabsTrigger value="control">Draft agent controls</TabsTrigger><TabsTrigger value="usage">Enforced governance & usage</TabsTrigger><TabsTrigger value="policies">Draft policies</TabsTrigger><TabsTrigger value="effective">Draft rules</TabsTrigger><TabsTrigger value="audit">Draft audit log</TabsTrigger></TabsList>
         <TabsContent value="control" className="mt-4"><AgentControlTab /></TabsContent>
         <TabsContent value="usage" className="mt-4"><LiveRuntimePanel /></TabsContent>
         <TabsContent value="policies" className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">Browser-only policy drafts. These changes do not enforce server policy. Production policy editing is unavailable until authenticated backend persistence and validation are implemented.</p>
           <Section scope="organization" />
           <Section scope="workspace" />
           {allowed && (

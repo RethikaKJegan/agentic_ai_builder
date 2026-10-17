@@ -1,0 +1,49 @@
+--- a/frontend/e2e/project-agent-communication.spec.ts
++++ b/frontend/e2e/project-agent-communication.spec.ts
+@@ -54,6 +54,7 @@
+       await route.fulfill({ json: { request_id: "req_project_diagram", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+     await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -582,7 +582,7 @@
+         commit({nodes:clean(nodesRef.current),edges:[...edgesRef.current,{id:uid("edge"),source,target,...(label?{label}:{})}]});
+       }} onRemove={id => { if(window.confirm("Remove this connection from the working draft?")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }} />
+       </>}
+-      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
++      {mode === "execution" ? <div className="min-h-[480px] flex-1"><ExecutionView trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="min-h-0 flex-1"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setSelectedId(id);setPanel("inspector");}} /></div> : (
+       <div className="flex min-h-[420px] flex-1">
+         {/* Canvas */}
+         <div className="relative min-w-0 flex-1 bg-canvas">
+--- a/frontend/src/features/builder/ExecutionView.tsx
++++ b/frontend/src/features/builder/ExecutionView.tsx
+@@ -7,6 +7,7 @@
+   MiniMap,
+   MarkerType,
+ } from "@xyflow/react";
++import type { Workflow } from "@/domain/types";
+ import type { WorkflowTrace } from "./useWorkflowTrace";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ import { MeshNode, type MeshFlowNode } from "./MeshNode";
+@@ -15,7 +16,7 @@
+ import { dependencyOrder } from "@/domain/graph-review";
+ import { AgentCommunication } from "./AgentCommunication";
+ const nodeTypes = { mesh: MeshNode };
+-export function ExecutionView({ trace, onDesign }: { trace: WorkflowTrace; onDesign: () => void }) {
++export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void }) {
+   const [selected, setSelected] = useState("");
+   const graph = trace.revision?.workflow;
+   const nodes = useMemo(
+@@ -89,7 +90,7 @@
+             {trace.run.status}
+           </p>
+         )}
+-        {graph && <AgentCommunication workflow={graph} trace={trace} />}
++        {(graph || (!trace.runId && workflow)) && <AgentCommunication workflow={graph ?? workflow!} trace={trace} />}
+       </div>
+       <ApiFeedback error={trace.error} />
+       {!trace.available ? (

@@ -1,0 +1,11 @@
+--- a/frontend/src/screens/app.workflows.$id.tsx
++++ b/frontend/src/screens/app.workflows.$id.tsx
+@@ -24,7 +24,7 @@
+     const existing = useMesh.getState().workflows.find((w) => w.id === id);
+     if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
+     api.request("get_workflow", { workflow_id: id }).then((result) => {
+-      if (active) { useMesh.getState().observeWorkflows([result.workflow]); setLoadedId(id); setError(null); }
++      if (active) { useMesh.getState().observeWorkflows([result.workflow]); if(result.registry_review)useBackend.getState().acceptReview(result.registry_review); setLoadedId(id); setError(null); }
+     }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoadedId(id); } });
+     return () => { active = false; };
+   }, [id, backendStatus, attempt]);

@@ -385,7 +385,7 @@ class PublishedDraftTests(unittest.TestCase):
             with (patch('workflow_api.live_providers.REGISTRY', path / 'registry.json'),
                   patch('runtime.connectors._google_credentials', return_value=SimpleNamespace(token='offline-only', scopes=['https://www.googleapis.com/auth/spreadsheets'])),
                   patch('runtime.connectors.urlopen', side_effect=transport)):
-                app = create_configured_app(env, path / 'runs.sqlite3', client=client, model_factory=factory)
+                app = create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, path / 'runs.sqlite3', client=client, model_factory=factory)
                 service, auth = app.state.workflow_service, app.state.live_operator_auth
                 def call(operation, payload, key):
                     response = service.handle(dict(request_id=key, idempotency_key=key, operation=operation, payload=payload), auth)
@@ -448,7 +448,7 @@ class PublishedDraftTests(unittest.TestCase):
                 self.assertEqual(context['sheet_record_tool']['availability'], 'enabled')
                 self.assertEqual(context['sheet_record_tool']['approval_required'], action_approval)
                 # Reconstruct Registry/auth and checkpoint from durable storage.
-                restarted = create_configured_app(env, path / 'runs.sqlite3', client=client, model_factory=factory)
+                restarted = create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, path / 'runs.sqlite3', client=client, model_factory=factory)
                 restarted.state.live_workers[0].tick()
                 with restarted.state.workflow_service.store.transaction() as db:
                     self.assertEqual(db.execute('SELECT COUNT(*) FROM runtime_runs').fetchone()[0], 1)

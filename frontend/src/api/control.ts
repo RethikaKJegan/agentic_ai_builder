@@ -27,7 +27,16 @@ export function reconcileEvents(existing: RunEvent[], incoming: RunEvent[], refe
     if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(event)) throw new Error("The runtime reused an event ID with different data.");
     events.set(event.event_id, event);
   }
-  return [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const result = [...events.values()];
+  const sequence = (event: RunEvent) => event.details?.["recorded_sequence"];
+  if (result.every(event => Number.isSafeInteger(sequence(event)))) {
+    const unique = new Set(result.map(sequence));
+    if (unique.size !== result.length) throw new Error("The runtime reused an event sequence.");
+    result.sort((a, b) => Number(sequence(a)) - Number(sequence(b)));
+  }
+  // Legacy responses already arrive in database sequence order. Equal/skewed
+  // timestamps must never reorder causal events or manufacture completion.
+  return result;
 }
 export function assertWorkflowReferences(workflow: CanonicalWorkflow) {
   const nodes = new Set(workflow.nodes.map((n) => n.node_id));

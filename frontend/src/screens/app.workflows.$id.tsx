@@ -17,23 +17,24 @@ export default function WorkflowEditor() {
   const workflow = useMesh((s) => s.workflows.find((w) => w.id === id));
   const backendStatus = useBackend((s) => s.status);
   const [error, setError] = useState<Error | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedId, setLoadedId] = useState("");
+  const [attempt,setAttempt]=useState(0);
   useEffect(() => {
     let active = true;
     const existing = useMesh.getState().workflows.find((w) => w.id === id);
     if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
     api.request("get_workflow", { workflow_id: id }).then((result) => {
-      if (active) { useMesh.getState().acceptWorkflow(result.workflow); setLoaded(true); }
-    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoaded(true); } });
+      if (active) { useMesh.getState().observeWorkflows([result.workflow]); if(result.registry_review)useBackend.getState().acceptReview(result.registry_review); setLoadedId(id); setError(null); }
+    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoadedId(id); } });
     return () => { active = false; };
-  }, [id, backendStatus]);
+  }, [id, backendStatus, attempt]);
   if (!workflow) {
-    if (backendStatus === "loading" || (backendStatus === "connected" && !loaded)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
+    if (backendStatus === "loading" || (backendStatus === "connected" && loadedId !== id)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <p className="font-display text-xl font-medium">Workflow not found</p>
         <p className="text-sm text-muted-foreground">This workflow could not be loaded from the server or this browser.</p>
-        <ApiFeedback error={error} />
+        <ApiFeedback error={error} onRetry={()=>setAttempt(n=>n+1)} />
         <Link to="/app/workflows" className="text-sm text-primary">Back to workflows</Link>
       </div>
     );

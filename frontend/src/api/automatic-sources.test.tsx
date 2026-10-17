@@ -1,0 +1,23 @@
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { InputError } from "./feedback";
+import Overview from "@/screens/app.index";
+import { useBackend } from "./state";
+import { useMesh } from "@/domain/store";
+import * as creation from "./create-workflow";
+vi.mock("@/lib/navigation", () => ({ useNavigate: () => vi.fn(), Link: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+it("accepts only the requirement prompt and delegates input selection automatically", async () => {
+  useMesh.setState({ workflows: [], agents: [] });
+  useBackend.setState({ status: "connected", error: null, session: { mode: "local-development", planning_available: true, runtime_available: true, approval_service_available: true, auth: { subject: { subject_id: "test", workspace_id: "local-workspace" }, roles: ["builder"], permissions: ["workflow.plan", "workflow.view"], scopes: [], decision: "allow" } } });
+  vi.spyOn(useBackend.getState(), "initialize").mockResolvedValue(undefined);
+  const create = vi.spyOn(creation, "createWorkflow").mockRejectedValue(new InputError("Offline model"));
+  render(<Overview />);
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  const objective = "Answer customer questions using our saved support knowledge and https://docs.google.com/spreadsheets/d/additional_source/edit";
+  fireEvent.change(screen.getByLabelText("Process description"), { target: { value: objective } });
+  fireEvent.click(screen.getByRole("button", { name: "Generate workflow" }));
+  await waitFor(() => expect(create).toHaveBeenCalledWith({ objective, context: { generation_mode: "hierarchy", delegation_mode: "runtime_v1", execution_input_mode: "automatic" } }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Offline model"));
+  expect(screen.getByLabelText("Process description")).toHaveValue(objective);
+});

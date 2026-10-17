@@ -1,0 +1,144 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -185,6 +185,11 @@
+     return result.data;
+   }
+ 
++  async knowledge() {
++    const parsed = z.object({ items: z.array(z.record(z.string(), z.unknown())), total: z.number() }).safeParse(await this.read("workspace/knowledge"));
++    if (!parsed.success) return fail("INVALID_API_DATA", "The knowledge response is invalid.");
++    return parsed.data;
++  }
+   async settings() {
+     const parsed = z.object({ items: z.array(z.object({ key: z.string(), value: z.unknown(), updated_at: z.string() })), total: z.number() }).safeParse(await this.read("workspace/settings"));
+     if (!parsed.success) return fail("INVALID_API_DATA", "The settings response is invalid.");
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -98,7 +98,7 @@
+         const w = get().workflows.find((x) => x.id === id);
+         if (!w) return;
+         const copyId = uid("wf"); const at = new Date().toISOString();
+-        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, origin: undefined, updatedAt: at }));
++        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, updatedAt: at }));
+         const remap = new Map(get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map((agent, index) => [agent.id, clones[index]!.id]));
+         const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
+         if (canonical) {
+--- a/frontend/src/features/runs/ReplyCases.tsx
++++ b/frontend/src/features/runs/ReplyCases.tsx
+@@ -1,5 +1,7 @@
+ "use client";
+-import { useEffect, useState } from "react";
++import { useEffect, useRef, useState } from "react";
++import { ApiResponseSchema } from "@/api/contracts.generated";
++import { containsSecret } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ 
+ type Kind = "customer_followup" | "manager_notice" | "confirm_closure";
+@@ -23,13 +25,20 @@
+   const [error, setError] = useState("");
+   const [monitor, setMonitor] = useState("");
+   const [busy, setBusy] = useState(false);
++  const [refreshing, setRefreshing] = useState(false);
++  const pending = useRef(false); const reading = useRef(false);
+   const refresh = async () => {
++    if (reading.current) return;
++    reading.current = true; setRefreshing(true);
+     try {
+       const response = await fetch("/api/backend/cases", { cache: "no-store" });
+-      const result = await response.json() as Envelope;
+-      if (!response.ok || !result.data.items) throw new Error(result.data.error?.message || "Cases unavailable");
++      const raw: unknown = await response.json();
++      if (containsSecret(raw) || !ApiResponseSchema.safeParse(raw).success) throw new Error("The case response is invalid.");
++      const result = raw as Envelope;
++      if (!response.ok || result.status >= 400 || !Array.isArray(result.data.items)) throw new Error(result.data.error?.message || "Cases unavailable");
+       setCases(result.data.items); setMonitor(result.data.monitor?.state || "unknown"); setError("");
+     } catch (failure) { setError(failure instanceof Error ? failure.message : "Cases unavailable"); }
++    finally { reading.current = false; setRefreshing(false); }
+   };
+   useEffect(() => {
+     if (backend.status !== "connected") return;
+@@ -38,25 +47,28 @@
+     return () => window.clearInterval(timer);
+   }, [backend.status]);
+   const act = async (caseId: string, replyId: string, kind: Kind) => {
+-    if (busy) return;
+-    setBusy(true);
++    if (pending.current || !backend.can("workflow.approve")) return;
++    pending.current = true; setBusy(true);
+     try {
+       const response = await fetch(`/api/backend/cases/${encodeURIComponent(caseId)}/actions`, {
+         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reply_id: replyId, kind }),
+       });
+-      const result = await response.json() as Envelope;
+-      if (!response.ok) throw new Error(result.data.error?.message || "Email submission failed");
++      const raw: unknown = await response.json();
++      if (containsSecret(raw) || !ApiResponseSchema.safeParse(raw).success) throw new Error("The case response is invalid.");
++      const result = raw as Envelope;
++      if (!response.ok || result.status >= 400) throw new Error(result.data.error?.message || "Email submission failed");
+       await refresh();
+     } catch (failure) { setError(failure instanceof Error ? failure.message : "Email submission failed"); }
+-    finally { setBusy(false); }
++    finally { pending.current = false; setBusy(false); }
+   };
+   if (backend.status !== "connected") return null;
+   return <section className="mt-8 space-y-4" aria-label="Customer reply cases">
+     <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Customer replies</h2>
+-      <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void refresh()}>Refresh</button></div>
++      <button type="button" className="rounded border px-3 py-1 text-sm" disabled={refreshing || busy} onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button></div>
+     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+     {monitor === "error" && <p role="alert" className="text-sm text-red-600">Inbox polling failed. Check the backend Gmail IMAP connection.</p>}
+-    {cases.length === 0 && !error && <p className="text-sm text-muted-foreground">No sent customer cases yet.</p>}
++    {!backend.can("workflow.approve") && <p className="text-xs text-muted-foreground">workflow.approve permission is required for reply actions.</p>}
++    {cases.length === 0 && !refreshing && !error && <p className="text-sm text-muted-foreground">No sent customer cases yet.</p>}
+     {cases.map((item) => <article key={item.case_id} className="space-y-3 rounded-lg border p-4">
+       <p className="font-medium">{item.review_id || item.case_id} · {item.order_id} · {item.status}</p>
+       <p className="text-sm">Customer: {item.customer_email}</p>
+--- a/frontend/src/features/workflows/ProcurementReview.test.tsx
++++ b/frontend/src/features/workflows/ProcurementReview.test.tsx
+@@ -60,7 +60,7 @@
+   render(<ProcurementReview workflow={workflow} />);
+   fireEvent.click(screen.getByText("Procurement setup & status"));
+   fireEvent.click(screen.getByText("Start procurement"));
+-  await waitFor(() => expect(request).toHaveBeenCalledWith("execute_workflow", { workflow_id: "workflow_demo", workflow_version: 1, inputs: {} }, expect.any(String)));
++  await waitFor(() => expect(request).toHaveBeenCalledWith("execute_workflow", { workflow_id: "workflow_demo", workflow_version: 1, inputs: {} }));
+   expect(screen.getByText(/No new spreadsheet row is needed/)).toBeInTheDocument();
+ });
+ 
+--- a/frontend/src/features/workflows/SheetAccessReview.test.tsx
++++ b/frontend/src/features/workflows/SheetAccessReview.test.tsx
+@@ -10,7 +10,7 @@
+     { spreadsheet_id: "factory-sheet", range: "Followups!A1:F1000", identity_column: "case_id", writable_columns: ["draft", "findings"], allow_create: true },
+   ]} />);
+   expect(screen.getByText("Sheet write access")).toBeInTheDocument();
+-  expect(screen.getByText(/Publishing approves these write destinations/)).toBeInTheDocument();
++  expect(screen.getByText(/Review these destinations before approving and publishing/)).toBeInTheDocument();
+   expect(screen.getByRole("link", { name: "factory-sheet", hidden: true })).toHaveAttribute("href", "https://docs.google.com/spreadsheets/d/factory-sheet/edit");
+   expect(screen.getByText("Writable columns: status")).toBeInTheDocument();
+   expect(screen.getByText("Existing records only")).toBeInTheDocument();
+--- a/frontend/src/screens/app.knowledge.tsx
++++ b/frontend/src/screens/app.knowledge.tsx
+@@ -1,4 +1,23 @@
+ "use client";
+ import { useEffect, useState } from "react";
+ import { PageHeader } from "@/features/runs/RunTrace";
+-export default function Screen() { const [items, setItems] = useState<Record<string, unknown>[]>([]); useEffect(() => { void fetch("/api/backend/workspace/knowledge", { credentials: "same-origin" }).then((r) => r.json()).then((b) => setItems(b?.data?.items ?? [])); }, []); return <div className="mx-auto max-w-5xl p-6 md:p-10"><PageHeader title="Knowledge" sub="Persisted workspace knowledge sources." /><div className="rounded-2xl border border-border">{items.length ? items.map((item, i) => <pre key={i} className="border-b border-border p-4 text-xs last:border-0">{JSON.stringify(item, null, 2)}</pre>) : <p className="p-10 text-center text-sm text-muted-foreground">No knowledge sources available. Add sources through the workspace API.</p>}</div></div>; }
++import { api } from "@/api/client";
++import { useBackend } from "@/api/state";
++import { ApiFeedback } from "@/features/workflows/ApiFeedback";
++export default function Screen() {
++  const backend = useBackend(); const [items, setItems] = useState<Record<string, unknown>[]>([]);
++  const [error, setError] = useState<Error>(); const [loading, setLoading] = useState(true); const [reload, setReload] = useState(0);
++  useEffect(() => {
++    if (backend.status !== "connected") return;
++    let active = true;
++    api.knowledge().then(result => { if (active) { setItems(result.items); setError(undefined); } })
++      .catch(caught => { if (active) setError(caught instanceof Error ? caught : new Error("Knowledge sources could not be loaded.")); })
++      .finally(() => { if (active) setLoading(false); });
++    return () => { active = false; };
++  }, [backend.status, reload]);
++  return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Knowledge" sub="Persisted workspace knowledge sources." />
++    <ApiFeedback error={error ?? backend.error} /><button disabled={loading || backend.status !== "connected"} type="button" onClick={() => { setLoading(true); setReload(value => value + 1); }} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">Refresh sources</button>
++    {loading && <p role="status">Loading sources…</p>}<div className="rounded-2xl border border-border">{items.map((item, index) => <pre key={index} className="border-b border-border p-4 text-xs last:border-0">{JSON.stringify(item, null, 2)}</pre>)}
++      {!loading && !error && !items.length && <p className="p-10 text-center text-sm text-muted-foreground">No knowledge sources available. Source ingestion is unavailable in this UI.</p>}
++    </div></div>;
++}

@@ -1,0 +1,125 @@
+--- a/frontend/e2e/agent-communication.spec.ts
++++ b/frontend/e2e/agent-communication.spec.ts
+@@ -187,6 +187,7 @@
+       await route.fulfill({ json: { request_id: "req_communication_test", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_hierarchy_v2");
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/delegated-tools.spec.ts
++++ b/frontend/e2e/delegated-tools.spec.ts
+@@ -26,6 +26,7 @@
+       await route.fulfill({ json: { request_id: "req_delegated_tools", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/dynamic-delegation.spec.ts
++++ b/frontend/e2e/dynamic-delegation.spec.ts
+@@ -30,6 +30,7 @@
+       await route.fulfill({ json: { request_id: "req_dynamic_browser", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/multitask-delegation.spec.ts
++++ b/frontend/e2e/multitask-delegation.spec.ts
+@@ -29,6 +29,7 @@
+       await route.fulfill({ json: { request_id: "req_multitask_browser", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
+     await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
+--- a/frontend/e2e/workflow-traces.spec.ts
++++ b/frontend/e2e/workflow-traces.spec.ts
+@@ -26,20 +26,19 @@
+       await route.fulfill({ json: { request_id: "req_trace_test", status: 200, data } });
+     });
+     await page.goto(`/app/workflows/${workflow.workflow_id}`);
++    await page.getByRole("tab", { name: "Execution", exact: true }).click();
+     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_latest");
+-    if (mobile) await page.getByRole("button", { name: /Open refund ticket/ }).click();
+-    else await page.locator('.react-flow__node[data-id="choose"]').click();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T002/).first()).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText("yes", { exact: true })).toBeVisible();
+-    await page.getByRole("tab", { name: "Configuration", exact: true }).click();
+-    await expect(page.getByLabel("Condition expression")).toBeVisible();
+-    await page.getByRole("tab", { name: "Trace", exact: true }).click();
+-    await page.getByRole("button", { name: "Close inspector" }).click();
++    await page.getByRole("button", { name: /Open refund ticket.*condition/ }).click();
++    const trace=page.getByLabel("Node execution trace");
++    await expect(trace.getByText(/T002/).first()).toBeVisible();
++    await expect(trace.getByText("yes", {exact:true})).toBeVisible();
++    await expect(page.getByText(/Read-only historical revision v1/)).toBeVisible();
+     await page.getByLabel("Select workflow run").selectOption("run_older");
+-    if (mobile) await page.getByRole("button", { name: /Open refund ticket/ }).click();
+-    else await page.locator('.react-flow__node[data-id="choose"]').click();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T001/).first()).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText("no", { exact: true })).toBeVisible();
+-    await expect(page.getByLabel("Node execution trace").getByText(/T002/)).toHaveCount(0);
++    await expect(trace.getByText(/T001/).first()).toBeVisible();
++    await expect(trace.getByText("no", {exact:true})).toBeVisible();
++    await expect(trace.getByText(/T002/)).toHaveCount(0);
++    await page.getByRole("button", {name:"Return to editable draft"}).click();
++    await page.getByRole("button", {name:/Workflow outline and connections/}).count();
++    await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
+   });
+ }
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -1,19 +1,30 @@
+ import { defineConfig } from "@playwright/test";
+-process.env.PLAYWRIGHT_BROWSERS_PATH = ".browser-cache";
++import path from "node:path";
++process.env.PLAYWRIGHT_BROWSERS_PATH = path.resolve(import.meta.dirname, ".browser-cache");
++const directory = process.env["BUILDER_E2E_FRONTEND_DIR"] ?? import.meta.dirname;
++const repository = path.resolve(import.meta.dirname, "..");
+ export default defineConfig({
+   testDir: "./e2e",
+   fullyParallel: false,
+-  use: { baseURL: "http://127.0.0.1:3100", headless: true },
++  workers: 1,
++  timeout: 60000,
++  use: { baseURL: "http://127.0.0.1:3100", headless: true, trace: "retain-on-failure" },
+   webServer: [{
+-    command: "../.venv-integrations/bin/python ../scripts/serve_ui_test_api.py",
++    command: `${repository}/.venv-integrations/bin/python ${repository}/scripts/serve_ui_test_api.py`,
++    cwd: repository,
+     url: "http://127.0.0.1:8011/session",
+     reuseExistingServer: false,
+     timeout: 60000,
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_DEV_AUTH: "1", BUILDER_REAL_CONNECTORS: "0",
++      BUILDER_TEST_DATABASE_DIR: process.env["BUILDER_E2E_DATABASE_DIR"] ?? path.join(repository, ".local/browser-phase7"),
++      BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }, {
+     command: "npm run start -- --hostname 127.0.0.1 --port 3100",
++    cwd: directory,
+     url: "http://127.0.0.1:3100",
+     reuseExistingServer: false,
+     timeout: 60000,
+-    env: { BUILDER_API_URL: "http://127.0.0.1:8011" },
++    env: { BUILDER_ENVIRONMENT: "test", BUILDER_API_URL: "http://127.0.0.1:8011",
++      BUILDER_UI_ORIGINS: "http://127.0.0.1:3100,http://localhost:3100" },
+   }],
+ });
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -39,7 +39,9 @@
+ 
+ if __name__ == '__main__':
+     (ROOT / '.local').mkdir(exist_ok=True)
+-    directory = ROOT / '.local' / 'browser-ui'
++    directory = Path(os.getenv('BUILDER_TEST_DATABASE_DIR', str(ROOT / '.local' / 'browser-ui'))).resolve()
++    if not directory.is_relative_to(ROOT / '.local'):
++        raise RuntimeError('Browser test databases must stay under this repository .local directory.')
+     directory.mkdir(exist_ok=True)
+     with nullcontext(directory):
+         # Explicit browser-only configured registry; never used by product startup.

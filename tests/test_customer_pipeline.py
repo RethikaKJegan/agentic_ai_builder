@@ -108,7 +108,7 @@ class CustomerPipelineTests(unittest.TestCase):
                  'BUILDER_EMAIL_RECIPIENTS':'owner@example.com','BUILDER_EMAIL_DIRECT_SEND':'1','BUILDER_REPLY_MONITOR':'1'}
             client=SimpleNamespace(responses=SimpleNamespace(create=plan))
             with patch('workflow_api.live_providers.REGISTRY',path/'registry.json'), patch('runtime.connectors._google_credentials',return_value=SimpleNamespace(token='test-only')), patch('runtime.connectors.urlopen',side_effect=http):
-                app=create_configured_app(env,path/'workflows.sqlite3',client=client,model_factory=factory)
+                app=create_configured_app({**env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'},path/'workflows.sqlite3',client=client,model_factory=factory)
                 service=app.state.workflow_service;auth=app.state.live_operator_auth
                 service.runtime_runner.connectors['smtp_send_email'].transport=FakeSMTP
                 service.reply_cases.smtp_factory=FakeSMTP;FakeSMTP.messages=[]

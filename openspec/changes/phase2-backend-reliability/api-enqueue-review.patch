@@ -1,0 +1,31 @@
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -161,7 +161,8 @@
+                 runtime = self.runtime_runner.runtime
+                 if operation == 'execute_workflow':
+                     run = runtime.create_run(request, auth)
+-                    run = self.runtime_runner.advance(run['run_id'], auth)
++                    if not getattr(self,'background_execution',False):
++                        run = self.runtime_runner.advance(run['run_id'], auth)
+                     data = {'run': run}
+                 elif operation == 'get_run':
+                     data = {'run': runtime.get_run(payload.get('run_id'), auth)}
+@@ -169,7 +170,7 @@
+                     data = runtime.events(payload.get('run_id'), auth)
+                 else:
+                     run = self.runtime_runner.decide(request, auth)
+-                    if run['status'] == 'running':
++                    if run['status'] == 'running' and not getattr(self,'background_execution',False):
+                         with self.store.transaction(write=False) as db:
+                             execution_subject = db.execute(
+                                 'SELECT subject FROM runtime_runs WHERE workspace=? AND run_id=?',
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -276,6 +276,7 @@
+                      environment_name=mode, ui_origins=allowed_origins,
+                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+     service = app.state.workflow_service
++    service.background_execution=process_role=='api'
+     service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
+     from openai import OpenAI
+     from planner import PlannerService

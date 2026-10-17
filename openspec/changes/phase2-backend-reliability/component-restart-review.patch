@@ -1,0 +1,43 @@
+--- a/connector_extension/procurement/routes.py
++++ b/connector_extension/procurement/routes.py
+@@ -69,12 +69,18 @@
+     def __init__(self, service):
+         import threading
+         self.service=service;self.stop_event=threading.Event();self.thread=None
++        self.health={'state':'starting','last_success':None,'last_error':None}
+     def start(self):
+-        import threading
++        import threading,time
++        if self.thread and self.thread.is_alive():return
++        self.stop_event.clear()
+         def run():
+             while not self.stop_event.wait(3):
+-                try:self.service.tick()
++                try:
++                    self.service.tick()
++                    self.health={'state':'ready','last_success':time.time(),'last_error':None}
+                 except Exception:
++                    self.health['state'],self.health['last_error']='error','PROCUREMENT_WORKER_FAILED'
+                     import logging
+                     logging.getLogger(__name__).warning('Procurement worker tick failed; durable state retained.')
+         self.thread=threading.Thread(target=run,daemon=True,name='extension-procurement');self.thread.start()
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -394,10 +394,17 @@
+     app.state.live_workers = workers
+ 
+     class ReplyWorker:
++        def __init__(self):self.stop_event=reply_stop;self.thread=None
++        @property
++        def health(self):
++            state=service.reply_monitor_health
++            return {'state':state.get('state','starting'),'last_success':state.get('last_success'),'last_error':state.get('error_code')}
+         def start(self):
+             nonlocal reply_thread
++            if reply_thread and reply_thread.is_alive():return
+             reply_stop.clear()
+             reply_thread=Thread(target=poll_replies,name='builder-reply-monitor',daemon=True)
++            self.thread=reply_thread
+             reply_thread.start()
+         def stop(self):
+             reply_stop.set()

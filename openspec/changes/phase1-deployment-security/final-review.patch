@@ -1,0 +1,48 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -103,11 +103,12 @@
+   }
+ }
+ 
+-async function retryKey(operation: string, payload: unknown): Promise<string> {
++async function retryKey(operation: string, payload: unknown, reset = false): Promise<string> {
+   // Store only a digest and retry key, never workflow documents, prompts or credentials.
+   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ operation, payload })));
+   const slot = "mesh-api-retry-v1:" + Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
+   try {
++    if (reset) localStorage.removeItem(slot);
+     const existing = localStorage.getItem(slot);
+     if (existing) return existing;
+     const key = crypto.randomUUID();
+@@ -278,6 +279,12 @@
+       await new Promise((resolve) => setTimeout(resolve, 1500));
+       job = schema.parse(await this.read(`planning-jobs/${encodeURIComponent(job.job_id)}`));
+     }
++    // A confirmed terminal failure/cancellation permits the next explicit user retry
++    // to create a new job. Unknown transport outcomes keep the existing retry key.
++    if (job.state === "failed" || job.state === "cancelled") {
++      const request = JSON.parse(String(options.body)) as { payload: unknown };
++      await retryKey("plan_workflow", request.payload, true);
++    }
+     if (job.state === "cancelled") return fail("PLANNING_CANCELLED", "Workflow generation was cancelled. Your prompt was preserved.");
+     if (!job.result) return fail("INVALID_API_DATA", "The planning job has no confirmed result.");
+     if (job.result.status >= 400) {
+--- a/frontend/src/features/workflows/ApiFeedback.tsx
++++ b/frontend/src/features/workflows/ApiFeedback.tsx
+@@ -4,11 +4,11 @@
+     ? error.error.details["requirements"].filter((item): item is string => typeof item === "string") : [];
+   return <>
+     {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+-      {error instanceof ApiError && error.error.error_code === "AUTHENTICATION_REQUIRED"
+-        ? "Your session is unavailable or expired. Reconnect the local workspace to recover your session."
+-        : error instanceof ApiError && error.error.error_code === "OPERATION_NOT_AUTHORIZED"
+-          ? "Your account does not have permission for this action. Contact your workspace administrator."
+-          : error.message}
++      {error.message}
++      {error instanceof ApiError && error.error.error_code === "AUTHENTICATION_REQUIRED" &&
++        <p className="mt-1">Reconnect the local workspace to recover your session.</p>}
++      {error instanceof ApiError && error.error.error_code === "OPERATION_NOT_AUTHORIZED" &&
++        <p className="mt-1">Your account lacks permission for this action. Contact your workspace administrator.</p>}
+       {requirements.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">
+         {requirements.map((requirement, index) => <li key={index}>{requirement}</li>)}
+       </ul>}

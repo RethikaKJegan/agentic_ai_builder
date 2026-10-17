@@ -1,0 +1,20 @@
+--- a/frontend/e2e/phase7.spec.ts
++++ b/frontend/e2e/phase7.spec.ts
+@@ -35,7 +35,7 @@
+   expect((await(await page.request.get(`/api/backend/runs?workflow_id=${id}`)).json()).data.total).toBe(0);
+   // Changed executable agent definitions require an explicit trusted operator
+   // Registry review. The fixture invokes the real registration/validation API.
+-  const review=await page.request.post(`/api/backend/__test__/registry-review/${id}/2`);expect(review.status(),await review.text()).toBe(200);expect((await review.json()).tool_grants_issued).toBe(false);
++  const review=await page.request.post(`/api/backend/__test__/registry-review/${id}/2`);expect(review.status(),await review.text()).toBe(200);expect((await review.json()).data.tool_grants_issued).toBe(false);
+   await actions.getByRole('button',{name:'Submit for approval',exact:true}).click();await expect(actions.getByText(/Submit for approval confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Approve',exact:true}).click();await expect(actions.getByText(/Approve confirmed/)).toBeVisible();
+   await actions.getByRole('button',{name:'Publish',exact:true}).click();await expect(actions.getByText(/Publish confirmed/)).toBeVisible();
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -208,5 +208,5 @@
+                     if response['status'] != 200:return JSONResponse(response,status_code=response['status'])
+                     service.registry_adapter.agents[candidate['agent_id']] = response['data']['agent']
+                     reviewed.append(candidate['agent_id'])
+-                return {'reviewed_agent_ids':reviewed,'tool_grants_issued':False}
++                return JSONResponse(service.envelope('req_test_registry_review',200,{'reviewed_agent_ids':reviewed,'tool_grants_issued':False}))
+         uvicorn.run(app, host='127.0.0.1', port=int(os.getenv('BUILDER_TEST_API_PORT', '8011')), log_level='warning')

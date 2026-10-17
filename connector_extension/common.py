@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+from workflow_api.auxiliary_database import connection as database_connection
 import time
 from urllib.parse import urlparse
 from urllib.request import Request, build_opener, HTTPRedirectHandler
@@ -71,16 +72,20 @@ class JSONTransport:
 
 class EffectJournal:
     """Commit intent before writes; unknown results can never be replayed silently."""
-    def __init__(self, root):
+    def __init__(self, root, database_url=None):
+        self.database_url=database_url
         self.path = Path(root) / 'effects.sqlite3'
         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'The effect journal cannot be a symlink.')
-        with sqlite3.connect(self.path) as db:
+        with self.connection() as db:
             db.execute('CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT)')
-        os.chmod(self.path, 0o600)
+        if self.path.exists():os.chmod(self.path, 0o600)
+
+    def connection(self,write=True):
+        return database_connection(self.path,write=write,database_url=self.database_url)
 
     def perform(self, tool_id, effect_id, inputs, action):
         key = digest([tool_id, effect_id]); fingerprint = digest(inputs)
-        with sqlite3.connect(self.path, timeout=10) as db:
+        with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
             old = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
             if old:
@@ -96,11 +101,11 @@ class EffectJournal:
             category=exc.code if isinstance(exc,RuntimeFailure) and isinstance(exc.code,str) and re.fullmatch(r'[A-Z][A-Z0-9_]{1,99}',exc.code) else 'PROVIDER_ACTION_FAILED'
             diagnostic={'failure_category':category}
             if isinstance(exc,RuntimeFailure) and hasattr(exc,'provider_diagnostic'):diagnostic['provider_diagnostic']=exc.provider_diagnostic
-            with sqlite3.connect(self.path) as db:
+            with self.connection() as db:
                 db.execute("UPDATE effects SET result=? WHERE key=? AND state='started'",
                            (json.dumps(diagnostic),key))
             denied('UNKNOWN_INVOCATION_RESULT', 'The external write result is uncertain; no automatic replay is permitted.', 502)
-        with sqlite3.connect(self.path) as db:
+        with self.connection() as db:
             db.execute("UPDATE effects SET state='completed',result=? WHERE key=?", (json.dumps(result), key))
         return result
 

@@ -1,0 +1,24 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -211,8 +211,8 @@
+     const count=z.number().finite().nonnegative();
+     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+-      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().optional()})).optional(),
+-      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
++      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional()})).optional(),
++      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+       audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+     const result=schema.safeParse(await this.read("monitoring"));
+     if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+--- a/frontend/src/screens/app.monitoring.test.tsx
++++ b/frontend/src/screens/app.monitoring.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+ 
+ it("shows pre-run source failures and server guardrails in the shared live panel", async () => {
+-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
++  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ request_id:"req_monitoring_test", status:200, data: {
+     runs: { total: 0, active: 0, completed: 0, failed: 0 }, events: 0,
+     usage: { llm_calls: 0, tool_calls: 0, tokens: 0, retries: 0, estimated_cost_usd: 0 }, latest: [],
+     sources: [{ binding_id: "bind_test", workflow_id: "wf_test", provider_id: "google_sheets", health: "error", error_code: "EVENT_MAPPING_FAILED", baseline_ready: true }],

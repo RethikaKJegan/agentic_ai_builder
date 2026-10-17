@@ -1,0 +1,14 @@
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -543,9 +543,10 @@
+                 summary = run_summaries.get(workflow_id, {
+                     'active_run_count': 0, 'latest_run_id': None,
+                     'latest_run_status': None, 'pending_approval_count': 0})
++                published_row=db.execute("SELECT MAX(version) FROM revisions WHERE workspace=? AND workflow_id=? AND json_extract(document,'$.status')='published'",(workspace,workflow_id)).fetchone()
+                 items.append(dict(workflow_id=workflow_id, name=workflow["name"],
+                                   draft_version=workflow["version"] if workflow["status"] == "draft" else None,
+-                                  published_version=release["revision"]["workflow_version"] if release else None,
++                                  published_version=published_row[0],
+                                   release_id=release["release_id"] if release else None,
+                                   activation_state=release["state"] if release else None,
+                                   **summary, updated_at=now_iso(self.clock)))

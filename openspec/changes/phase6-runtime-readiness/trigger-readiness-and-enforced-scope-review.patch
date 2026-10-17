@@ -1,0 +1,144 @@
+--- a/frontend/src/screens/app.integrations.tsx
++++ b/frontend/src/screens/app.integrations.tsx
+@@ -22,6 +22,7 @@
+   };
+   return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1>
+     <p className="mt-2 text-sm text-muted-foreground">Configuration and verified connectivity are separate. Credentials remain on the server. Read-only checks never send email or modify provider resources.</p>
++    <p className="mt-3 rounded-lg border p-3 text-sm">Setup: register each required tool, configure its server credential and source resource, review exact revision grants, then activate the published release. A configured or verified connection alone does not activate a trigger. See Monitoring for preparation, release and poll health.</p>
+     <ApiFeedback error={backend.error} />
+     {backend.status !== "connected" && <p role="status" className="mt-4 text-sm text-muted-foreground">Connect to the backend to inspect registered integrations.</p>}
+     <div className="mt-8 grid gap-4 md:grid-cols-2">{tools.map(tool => {
+@@ -34,6 +35,7 @@
+         {result?.live_test_supported && <button type="button" disabled={pending[provider] || !admin || !result.configured} className="ml-2 mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "connection")}>Verify connection</button>}
+         {!backend.can("tools.read") && <p className="mt-2 text-xs">tools.read permission is required.</p>}
+         {result?.live_test_supported && !admin && <p className="mt-2 text-xs">An administrator must verify connections.</p>}
++        {!configured && <p className="mt-2 text-xs">Required setup: configure enabled server tools and their credentials, then check configuration again.</p>}
+         {result && <p role="status" className="mt-2 text-xs text-muted-foreground">{result.message}</p>}
+         <ApiFeedback error={errors[provider]} />
+       </section>;
+--- a/frontend/src/screens/app.monitoring.tsx
++++ b/frontend/src/screens/app.monitoring.tsx
+@@ -2,6 +2,7 @@
+ import { useEffect, useState } from "react";
+ import { api } from "@/api/client";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
++import { ServerRunView } from "@/features/runs/ServerRunView";
+ import { PageHeader } from "@/features/runs/RunTrace";
+ 
+ type Monitoring=Awaited<ReturnType<typeof api.monitoring>>;
+@@ -9,33 +10,36 @@
+ export function LiveRuntimePanel() {
+   const [data, setData] = useState<Monitoring | null>(null);
+   const [error, setError] = useState<Error | null>(null);
++  const [cursor,setCursor]=useState<string|undefined>();
+   useEffect(() => {
+     let cancelled = false;
+     let timer:ReturnType<typeof setTimeout>;
+     const load = async () => {
+       try {
+-        const result=await api.monitoring();
++        const result=await api.monitoring(cursor);
+         if (!cancelled) { setData(result); setError(null); }
+       } catch (caught) { if (!cancelled) setError(caught instanceof Error ? caught : new Error("Monitoring is unavailable.")); }
+       finally {if(!cancelled)timer=setTimeout(()=>void load(),5000);}
+     };
+     void load();
+     return () => { cancelled = true; clearTimeout(timer); };
+-  }, []);
++  }, [cursor]);
+   return <div className="space-y-6">
++    <p className="text-xs text-muted-foreground">Bounded polling every 15 seconds; persisted records remain authoritative. Enforced policies are read-only and scoped to the displayed revision.</p>
+     <ApiFeedback error={error} />
+     {!error && !data && <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Loading monitoring data…</p>}
+     {data && <><div className="grid gap-3 md:grid-cols-4">{[["Runs", data.runs.total], ["Active", data.runs.active], ["Completed", data.runs.completed], ["Failed", data.runs.failed]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-border p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>)}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime usage</p><p className="mt-2 text-sm text-muted-foreground">{data.events} events · {data.usage.tool_calls} tool calls · {data.usage.llm_calls} model calls · {data.usage.tokens} tokens · ${Number(data.usage.estimated_cost_usd).toFixed(4)} estimated</p></div>
+-      <div className="rounded-xl border border-border p-4"><p className="font-medium">Live trigger health</p>{(data.sources ?? []).map(source => <div key={source.binding_id} className="mt-3 text-sm"><p>{source.workflow_id} · {source.provider_id} · {source.health}</p>{source.error_code && <p className="text-destructive">{source.error_code}: polling failed before dispatch. The checkpoint is retained for retry.</p>}<p className="text-xs text-muted-foreground">{source.baseline_ready ? "Baseline established" : "Waiting for baseline"} · Last successful poll: {source.last_successful_poll ?? "none"}</p></div>)}{!data.sources?.length && <p className="mt-2 text-sm text-muted-foreground">No registered triggers.</p>}</div>
+-      <div className="rounded-xl border border-border p-4"><p className="font-medium">Reviewed workflow guardrails</p>{(data.policies ?? []).map(policy => <div key={policy.workflow_id} className="mt-3 text-sm"><p>{policy.workflow_id} · v{policy.version} · {policy.action_approval_required ? "Action approval required" : "No workflow action approval gate"}</p>{policy.agents.map(agent => <div key={agent.agent_id} className="mt-2 text-xs text-muted-foreground"><p>{agent.agent_id}</p><p>{Object.entries(agent.guardrails ?? {}).map(([key, enabled]) => `${key}: ${enabled ? "on" : "off"}`).join(" · ")}</p><p>Model calls ≤ {agent.limits.max_llm_calls} · Tool calls ≤ {agent.limits.max_tool_calls} · Retries ≤ {agent.limits.max_retries}</p></div>)}</div>)}</div>
++      <div className="rounded-xl border border-border p-4"><p className="font-medium">Live trigger health</p>{(data.sources ?? []).map(source => <div key={source.binding_id} className="mt-3 text-sm"><p>{source.workflow_id} · {source.provider_id} · {source.health}</p><p className="text-xs text-muted-foreground">Release: {source.release_state ?? "unknown"} · v{source.workflow_version ?? "unknown"} · Trigger: {source.delivery ?? "unknown"} / {source.event_type ?? "unknown"} · Source: {source.source ?? "not provided"}</p><p className="text-xs text-muted-foreground">Preparation: {source.preparation_succeeded ? "succeeded" : "not ready"}{source.schedule ? ` · Schedule: ${source.schedule} (${source.timezone ?? "timezone missing"})` : ""}</p>{source.release_state !== "active" && <p className="text-xs">This release cannot receive active automation events.</p>}{source.error_code && <p className="text-destructive">{source.error_code}: polling failed before dispatch. The checkpoint is retained for retry.</p>}<p className="text-xs text-muted-foreground">{source.baseline_ready ? "Baseline established" : "Waiting for baseline"} · Last successful poll: {source.last_successful_poll ?? "none"}</p></div>)}{!data.sources?.length && <p className="mt-2 text-sm text-muted-foreground">No registered triggers.</p>}</div>
++      <div className="rounded-xl border border-border p-4"><p className="font-medium">Backend-enforced revision guardrails</p>{(data.policies ?? []).map(policy => <div key={policy.workflow_id} className="mt-3 text-sm"><p>{policy.workflow_id} · v{policy.version} · {policy.scope ?? "current workspace"} · {policy.enforcement ?? "approved revision"} · Policy version {policy.policy_version ?? "revision-bound"} · {policy.action_approval_required ? "Action approval required" : "No workflow action approval gate"}</p>{policy.agents.map(agent => <div key={agent.agent_id} className="mt-2 text-xs text-muted-foreground"><p>{agent.agent_id}</p><p>{Object.entries(agent.guardrails ?? {}).map(([key, enabled]) => `${key}: ${enabled ? "on" : "off"}`).join(" · ")}</p><p>Model calls ≤ {agent.limits.max_llm_calls} · Tool calls ≤ {agent.limits.max_tool_calls} · Retries ≤ {agent.limits.max_retries}</p></div>)}</div>)}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime audit</p>{(data.audit ?? []).map(event => <p key={event.event_id} className="mt-2 text-xs text-muted-foreground">{event.timestamp} · {event.event_type} · {event.run_id}</p>)}{!data.audit?.length && <p className="mt-2 text-sm text-muted-foreground">No runtime audit events yet.</p>}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Run status distribution</p><div className="mt-4 space-y-2">{Object.entries(data.status_breakdown ?? {}).map(([status, count]) => <div key={status} className="flex items-center gap-3 text-xs"><span className="w-32 text-muted-foreground">{status}</span><div className="h-2 flex-1 rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${data.runs.total ? Math.max(2, (count / data.runs.total) * 100) : 0}%` }} /></div><span>{count}</span></div>)}</div><p className="mt-4 text-xs text-muted-foreground">Average completed duration: {Number(data.duration_seconds?.avg ?? 0).toFixed(2)}s</p></div>
+       <div className="rounded-xl border border-border"><p className="border-b border-border p-4 font-medium">Recent traces</p>{data.latest.length === 0 ? <p className="p-6 text-sm text-muted-foreground">No runtime traces yet.</p> : data.latest.map((run) => <div key={run.run_id} className="border-b border-border p-4 last:border-0"><p className="text-sm font-medium">{run.run_id} · {run.status}</p><p className="mt-1 text-xs text-muted-foreground">{run.correlation_id} · {run.trace_reference}</p></div>)}</div>
++      <div className="flex flex-wrap gap-2"><button type="button" disabled={!cursor} onClick={()=>setCursor(undefined)} className="rounded border px-3 py-2 text-xs disabled:opacity-40">First readiness page</button>{data.source_next_cursor && <button type="button" onClick={()=>setCursor(data.source_next_cursor??undefined)} className="rounded border px-3 py-2 text-xs">More triggers</button>}{data.policy_next_cursor && <button type="button" onClick={()=>setCursor(data.policy_next_cursor??undefined)} className="rounded border px-3 py-2 text-xs">More enforced revisions</button>}</div>
+     </>}
+   </div>;
+ }
+ 
+ export default function Screen() {
+-  return <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-10"><PageHeader title="Monitoring" sub="Workspace-scoped runtime usage, source health, guardrails and audit events." /><LiveRuntimePanel /></div>;
++  return <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-10"><PageHeader title="Monitoring" sub="Workspace-scoped runtime usage, source health, guardrails and audit events." /><LiveRuntimePanel /><section className="space-y-4"><h2 className="text-lg font-medium">Filtered run history</h2><ServerRunView /></section></div>;
+ }
+--- a/workflow_api/activation.py
++++ b/workflow_api/activation.py
+@@ -142,6 +142,11 @@
+         db.execute('INSERT INTO lifecycle_preparations VALUES (?,?,?)', (operation['operation_id'],workspace,json.dumps(preparation)))
+     try:
+         for binding in bindings:
++            trigger_validator = getattr(lifecycle.workflows, 'trigger_configuration_validator', None)
++            if trigger_validator:
++                trigger_validator(binding, workflow, auth)
++            if binding['provider_id'] == 'generic_hmac_webhook' and not lifecycle.trigger_secrets.get(binding.get('credential_reference')):
++                raise Failure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure the server webhook signing secret before activation.', 400)
+             reference = lifecycle.adapter.prepare(deepcopy(binding))
+             with lifecycle.store.transaction() as db:
+                 current = _read_preparation(lifecycle,db,preparation['operation_id'])
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -318,7 +318,9 @@
+     if direct_write:
+         runner.direct_write_tools |= {'google_sheets_upsert_record'}
+     runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(rates, client, tokenizers))
+-    service.trigger_poller = ProviderTriggerSource(service, runner.connectors).poll
++    source = ProviderTriggerSource(service, runner.connectors)
++    service.trigger_poller = source.poll
++    service.trigger_configuration_validator = source.validate_configuration
+     service.planner = PlannerService(provider=LivePlannerProvider(model, recipients(env), client, direct_send,
+         targets, direct_write, planner_timeout, runner.connectors['google_sheets_read_rows'].discover,
+         env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -408,8 +408,11 @@
+             if workflow_service.runtime_runner is None:
+                 return error('SERVICE_UNAVAILABLE', 'The runtime and monitoring service is not connected.', 503)
+             workflow_service.runtime_runner.runtime.authorize(auth, 'runs.view', {'admin', 'builder', 'viewer', 'approver'})
+-            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth, **__import__('runtime.history', fromlist=['query_options']).query_options(dict(request.query_params), 'monitoring'))
++            from runtime.history import query_options
++            data = await run_in_threadpool(workflow_service.runtime_runner.runtime.monitoring, auth, **query_options(dict(request.query_params), 'monitoring'))
+             return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
++        except __import__('runtime.service', fromlist=['RuntimeFailure']).RuntimeFailure as exc:
++            return error(exc.code, str(exc), exc.status)
+         except Exception:
+             return error('SERVICE_UNAVAILABLE', 'Monitoring data is unavailable.', 503)
+ 
+--- a/workflow_api/trigger_sources.py
++++ b/workflow_api/trigger_sources.py
+@@ -20,6 +20,29 @@
+     def __init__(self, service, connectors, default_resources=None):
+         self.service, self.connectors = service, connectors
+         self.default_resources = dict(default_resources or {})
++
++    def validate_configuration(self, binding, workflow, auth):
++        """Local readiness only; never poll, subscribe, or call a provider."""
++        from .lifecycle import LifecycleFailure
++        provider = binding['provider_id']
++        if binding['delivery'] != 'poll':
++            if provider in {'generic_hmac_webhook', 'slack_events'}:
++                return
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Install and configure the incoming provider adapter before activation.', 400)
++        tool_id = self.TOOL_BY_PROVIDER.get(provider)
++        if not tool_id or tool_id not in self.connectors:
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure the provider polling connector before activation.', 400)
++        grants = self.service.registry_adapter.execution_assignments(workflow, auth)
++        if not any(grant['tool_id'] == tool_id for grant in grants):
++            raise LifecycleFailure('ASSIGNMENT_REVALIDATION_FAILED', 'Review current registry authorization for the trigger polling tool.', 403)
++        resource = binding['resource_id']
++        if resource == 'configured_default':
++            resource = self.default_resources.get(provider)
++        if not isinstance(resource, str) or not resource:
++            raise LifecycleFailure('TRIGGER_CONFIGURATION_REQUIRED', 'Configure an explicit trigger source resource before activation.', 400)
++        if provider == 'google_sheets':
++            from runtime.connectors import google_spreadsheet_id
++            google_spreadsheet_id(resource)
+ 
+     def _authority(self, binding):
+         with self.service.store.transaction(write=False) as db:

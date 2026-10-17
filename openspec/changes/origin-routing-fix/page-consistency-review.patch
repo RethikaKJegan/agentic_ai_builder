@@ -1,0 +1,44 @@
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -103,6 +103,8 @@
+                 return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
+             logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
++        except ApiFailure as exc:
++            return self.failure(request_id, exc)
+         except LifecycleFailure as exc:
+             if operation in {'activate_release', 'disable_release', 'delete_workflow'}:
+                 try:
+@@ -223,7 +225,7 @@
+                 with self.store.transaction(write=False) as db:
+                     if operation == 'list_workflows':
+                         from .workflow_pages import read_page
+-                        return self.envelope(request_id, 200, read_page(self.store, workspace, read_cursor))
++                        return self.envelope(request_id, 200, read_page(self.store, workspace, read_cursor, connection=db))
+                     workflow = self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version'))
+                     if not workflow:
+                         raise ApiFailure('WORKFLOW_NOT_FOUND', 'This workflow revision was not found.', 404)
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -519,7 +519,7 @@
+                 items = [json.loads(row[0]) for row in rows]
+                 return {"items": items, "next_sequence": items[-1]["sequence"] if items else after_sequence, "has_more": len(items) == 200}
+             from .workflow_pages import read_page
+-            page = read_page(self.store, workspace, cursor)
++            page = read_page(self.store, workspace, cursor, connection=db)
+             documents = page['items']
+             identities = [item['workflow_id'] for item in documents]
+             run_summaries = {}
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -47,7 +47,9 @@
+     if(overviewRefresh)return overviewRefresh;
+     overviewRefresh=(async()=>{
+     try {
+-      const snapshot = await api.overview(undefined,get().workflowCursor);
++      const cursor = get().workflowCursor;
++      const snapshot = await api.overview(undefined,cursor);
++      if (get().workflowCursor !== cursor) return;
+       if ((get().status === "connected" || get().status === "unavailable") && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
+         const session = await api.session();
+         set({ session, status: "connected" });

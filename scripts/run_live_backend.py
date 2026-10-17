@@ -68,7 +68,7 @@ def main():
             raise SystemExit(1 if check(env, args.sheet, args.range) else 0)
         app = create_configured_app(env)
     except ValueError:
-        raise SystemExit('Provider configuration is incomplete or invalid. See docs/sheets-gmail.md and run --check.') from None
+        raise SystemExit('Local authentication or provider configuration is invalid. See docs/phase1-deployment.md; Google Workspace production login is deferred.') from None
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=args.port)
 

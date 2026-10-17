@@ -1,0 +1,29 @@
+--- a/frontend/e2e/phase7.spec.ts
++++ b/frontend/e2e/phase7.spec.ts
+@@ -43,7 +43,7 @@
+   const release=(await(await page.request.get(`/api/backend/workflows/${id}/release-state`)).json()).data.release;expect(release.state).toBe('active');expect(release.workflow_version).toBe(2);
+   const inputValues=Object.fromEntries(saved.inputs.map((field:{name:string;type:string})=>[field.name,field.type==='boolean'?true:field.type==='object'?{}:field.type==='array'?[]:field.type==='integer'||field.type==='number'?1:'Review this support request']));
+   const key=crypto.randomUUID();const executed=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect(executed.status(),await executed.text()).toBe(200);
+-  const run=(await executed.json()).data.run;expect(run.status).toBe('completed');
++  const run=(await executed.json()).data.run;const firstEvents=(await(await page.request.get(`/api/backend/runs/${run.run_id}/events?limit=500`)).json()).data.items;expect(run.status,JSON.stringify(firstEvents.filter((event:{event_type:string})=>['node.failed','runtime.denied','run.failed','run.blocked'].includes(event.event_type)))).toBe('completed');
+   const repeat=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect((await repeat.json()).data.run.run_id).toBe(run.run_id);
+   await page.getByRole('tab',{name:'Execution',exact:true}).click();await page.getByRole('button',{name:'Refresh trace',exact:true}).click();
+   await expect(page.getByText(new RegExp(`Read-only historical revision v2 · Run ${run.run_id}`))).toBeVisible();
+--- a/scripts/serve_ui_test_api.py
++++ b/scripts/serve_ui_test_api.py
+@@ -36,7 +36,14 @@
+ 
+ def _offline_model_factory(definition):
+     from runtime.model import BoundedLLM
+-    return BoundedLLM(definition, lambda messages, cap, duration: ('{}', 0, 0), lambda messages: 1, 0, 0)
++    def provider(messages, cap, duration):
++        if definition.get('hierarchy_role') == 'master':
++            result = {'action':'finish','reason':'Explicit offline provider fixture; no connector invocation.',
++                      'output':{'summary':'Offline fixture result'}}
++        else:
++            result = {}
++        return json.dumps(result), 0, 0
++    return BoundedLLM(definition, provider, lambda messages: 1, 0, 0)
+ 
+ if __name__ == '__main__':
+     (ROOT / '.local').mkdir(exist_ok=True)

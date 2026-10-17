@@ -1,5 +1,6 @@
 "use client";
 import NextLink from "next/link";
+import { confirmDraftNavigation } from "@/features/workflows/unsaved";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from "react";
 
@@ -13,17 +14,17 @@ export function routeHref({ to = "/", params = {}, search }: Destination) {
 type LinkProps = Omit<ComponentProps<typeof NextLink>, "href"> & Destination & {
   activeOptions?: { exact?: boolean }; activeProps?: { className?: string };
 };
-export function Link({ to, params, search, activeOptions, activeProps, className, ...props }: LinkProps) {
+export function Link({ to, params, search, activeOptions, activeProps, className, onNavigate, ...props }: LinkProps) {
   const pathname = usePathname();
   const href = routeHref({ ...(to ? { to } : {}), ...(params ? { params } : {}), ...(search ? { search } : {}) });
   const path = href.split("?")[0]!;
   const active = activeOptions?.exact ? pathname === path : pathname === path || pathname.startsWith(path + "/");
-  return <NextLink href={href} className={[className, active ? activeProps?.className : ""].filter(Boolean).join(" ")} aria-current={active ? "page" : undefined} {...props} />;
+  return <NextLink href={href} onNavigate={event => { if (!confirmDraftNavigation()) event.preventDefault(); else onNavigate?.(event); }} className={[className, active ? activeProps?.className : ""].filter(Boolean).join(" ")} aria-current={active ? "page" : undefined} {...props} />;
 }
 export function useNavigate(_options?: { from?: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  return useCallback((destination: Destination) => router.push(routeHref({ ...destination, to: destination.to ?? pathname })), [router, pathname]);
+  return useCallback((destination: Destination) => { if (confirmDraftNavigation()) router.push(routeHref({ ...destination, to: destination.to ?? pathname })); }, [router, pathname]);
 }
 export function useRouteSearch(): Record<string, string | undefined> {
   return Object.fromEntries(useSearchParams().entries());

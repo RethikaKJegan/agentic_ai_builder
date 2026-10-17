@@ -1,0 +1,50 @@
+--- a/etc/nginx/sites-available/praxi.bellcorpstudio.com
++++ b/etc/nginx/sites-available/praxi.bellcorpstudio.com
+@@ -1,10 +1,47 @@
++# Builder private-preview gateway. Validate browser origin before trusted forwarding.
++map $http_origin $builder_preview_origin_ok {
++    default 0;
++    "" 1;
++    "https://praxi.bellcorpstudio.com" 1;
++}
++map "$request_method:$http_origin" $builder_preview_csrf_ok {
++    default 0;
++    ~^(GET|HEAD|OPTIONS): 1;
++    "POST:https://praxi.bellcorpstudio.com" 1;
++    "PUT:https://praxi.bellcorpstudio.com" 1;
++    "PATCH:https://praxi.bellcorpstudio.com" 1;
++    "DELETE:https://praxi.bellcorpstudio.com" 1;
++}
+ server {
+     server_name praxi.bellcorpstudio.com;
++
++    auth_basic "MESH private workspace";
++    auth_basic_user_file /etc/nginx/builder-preview.htpasswd;
++
++    location /api/backend/ {
++        if ($builder_preview_origin_ok = 0) { return 403; }
++        if ($builder_preview_csrf_ok = 0) { return 403; }
++        if ($http_sec_fetch_site = cross-site) { return 403; }
++        proxy_pass http://127.0.0.1:3001;
++        proxy_http_version 1.1;
++        proxy_set_header Host 127.0.0.1:3001;
++        proxy_set_header Origin http://127.0.0.1:3001;
++        proxy_set_header X-Forwarded-Proto http;
++        proxy_set_header X-Forwarded-Host 127.0.0.1:3001;
++        proxy_set_header Sec-Fetch-Site same-origin;
++        proxy_set_header Authorization "";
++        proxy_set_header X-Real-IP $remote_addr;
++        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
++        proxy_cookie_flags builder_dev_session secure httponly samesite=strict;
++        proxy_buffering off;
++        proxy_read_timeout 1230s;
++    }
+ 
+     location / {
+         proxy_pass http://127.0.0.1:3001;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
++        proxy_set_header Authorization "";
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;

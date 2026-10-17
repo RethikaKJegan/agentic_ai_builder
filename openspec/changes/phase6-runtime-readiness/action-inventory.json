@@ -1,0 +1,3062 @@
+{
+  "format": "phase6-action-inventory-v1",
+  "note": "Every source control/handler; JSX loops and delegated primitives are recorded once with their expression. See action-audit-matrix.md for behavior, permissions and coverage.",
+  "controls": [
+    {
+      "file": "frontend/src/components/mesh/Logo.tsx",
+      "line": 17,
+      "kind": "Link",
+      "label": "\"MESH home\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/components/ui/calendar.tsx",
+      "line": 153,
+      "kind": "Button",
+      "label": "Button",
+      "handlers": {},
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/carousel.tsx",
+      "line": 120,
+      "kind": "div",
+      "label": " {children} ",
+      "handlers": {
+        "onKeyDownCapture": "{handleKeyDown}"
+      },
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/carousel.tsx",
+      "line": 182,
+      "kind": "Button",
+      "label": " <ArrowLeft className=\"h-4 w-4\" /> <span className=\"sr-only\">Previous slide</span> ",
+      "handlers": {
+        "onClick": "{scrollPrev}"
+      },
+      "disabled": "{!canScrollPrev}",
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/carousel.tsx",
+      "line": 210,
+      "kind": "Button",
+      "label": " <ArrowRight className=\"h-4 w-4\" /> <span className=\"sr-only\">Next slide</span> ",
+      "handlers": {
+        "onClick": "{scrollNext}"
+      },
+      "disabled": "{!canScrollNext}",
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/input.tsx",
+      "line": 8,
+      "kind": "input",
+      "label": "input",
+      "handlers": {},
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/pagination.tsx",
+      "line": 35,
+      "kind": "a",
+      "label": "a",
+      "handlers": {},
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/sidebar.tsx",
+      "line": 191,
+      "kind": "Sheet",
+      "label": " <SheetContent data-sidebar=\"sidebar\" data-mobile=\"true\" className=\"w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden\" style={ { \"--sidebar-width\": SIDEB",
+      "handlers": {
+        "onOpenChange": "{setOpenMobile}"
+      },
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/sidebar.tsx",
+      "line": 267,
+      "kind": "Button",
+      "label": " <PanelLeft /> <span className=\"sr-only\">Toggle Sidebar</span> ",
+      "handlers": {
+        "onClick": "{(event) => {\n        onClick?.(event);\n        toggleSidebar();\n      }}"
+      },
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/sidebar.tsx",
+      "line": 291,
+      "kind": "button",
+      "label": "\"Toggle Sidebar\"",
+      "handlers": {
+        "onClick": "{toggleSidebar}"
+      },
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/sidebar.tsx",
+      "line": 336,
+      "kind": "Input",
+      "label": "Input",
+      "handlers": {},
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/components/ui/textarea.tsx",
+      "line": 8,
+      "kind": "textarea",
+      "label": "textarea",
+      "handlers": {},
+      "disabled": null,
+      "spread": true
+    },
+    {
+      "file": "frontend/src/features/agents/AgentControlsCard.tsx",
+      "line": 40,
+      "kind": "Switch",
+      "label": "\"Agent active\"",
+      "handlers": {
+        "onCheckedChange": "{(v) => setPaused(agent.id, !v)}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentControlsCard.tsx",
+      "line": 43,
+      "kind": "Link",
+      "label": "{parent.name}",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentControlsCard.tsx",
+      "line": 47,
+      "kind": "input",
+      "label": " <label htmlFor={`budget-${agent.id}`}>Max execution budget<span className=\"block text-[11px] text-muted-foreground\">Estimated USD, lifetime · empty = no cap</span></label> <input ",
+      "handlers": {
+        "onChange": "{(e) => update(agent.id, { budgetUsd: e.target.value === \"\" ? null : Math.max(0, Number(e.target.value)) })}",
+        "onBlur": "{() => audited(\"Set agent budget\", `${agent.name} → ${agent.budgetUsd == null ? \"no cap\" : `$${agent.budgetUsd}`}`)}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentControlsCard.tsx",
+      "line": 58,
+      "kind": "Switch",
+      "label": "\"Require approval\"",
+      "handlers": {
+        "onCheckedChange": "{(v) => { update(agent.id, { requireApproval: v }); audited(v ? \"Required approval for agent\" : \"Removed agent approval\", agent.name); }}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentControlsCard.tsx",
+      "line": 62,
+      "kind": "summary",
+      "label": "Usage & history <ChevronDown className=\"h-3 w-3 transition-transform group-open:rotate-180\" />",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 44,
+      "kind": "TabsTrigger",
+      "label": "{t}",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 49,
+      "kind": "input",
+      "label": "<label className={lbl} htmlFor=\"ag-name\">Name</label> <input id=\"ag-name\" className={field} disabled={agent.origin === \"backend\"} value={agent.name} onChange={(e) => set({ name: e.",
+      "handlers": {
+        "onChange": "{(e) => set({ name: e.target.value })}"
+      },
+      "disabled": "{agent.origin === \"backend\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 50,
+      "kind": "input",
+      "label": "<label className={lbl} htmlFor=\"ag-role\">Role</label> <input id=\"ag-role\" className={field} value={agent.role} onChange={(e) => set({ role: e.target.value })} />",
+      "handlers": {
+        "onChange": "{(e) => set({ role: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 51,
+      "kind": "textarea",
+      "label": "<label className={lbl} htmlFor=\"ag-purpose\">Purpose</label> <textarea id=\"ag-purpose\" rows={2} className={field} value={agent.purpose} onChange={(e) => set({ purpose: e.target.valu",
+      "handlers": {
+        "onChange": "{(e) => set({ purpose: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 52,
+      "kind": "textarea",
+      "label": "<label className={lbl} htmlFor=\"ag-ins\">Instructions</label> <textarea id=\"ag-ins\" rows={6} className={`${field} font-mono text-xs leading-relaxed`} value={agent.instructions} onCh",
+      "handlers": {
+        "onChange": "{(e) => set({ instructions: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 64,
+      "kind": "button",
+      "label": " <div className=\"min-w-0 flex-1\"> <p className=\"text-sm font-medium\">{m.name} <span className=\"text-xs font-normal text-muted-foreground\">· {m.provider}</span></p> <p className=\"mt",
+      "handlers": {
+        "onClick": "{() => pickModel(m.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 79,
+      "kind": "Slider",
+      "label": "\"Temperature\"",
+      "handlers": {
+        "onValueChange": "{([v]) => set({ temperature: v ?? 0 })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 81,
+      "kind": "button",
+      "label": "Advanced <ChevronDown className={`h-3 w-3 transition-transform ${advanced ? \"rotate-180\" : \"\"}`} /> ",
+      "handlers": {
+        "onClick": "{() => setAdvanced((a) => !a)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 86,
+      "kind": "input",
+      "label": "<label className={lbl} htmlFor=\"ag-max\">Max tokens</label> <input id=\"ag-max\" type=\"number\" min={64} max={32000} className={field} value={agent.maxTokens} onChange={(e) => set({ ma",
+      "handlers": {
+        "onChange": "{(e) => set({ maxTokens: Math.max(64, Number(e.target.value) || 64) })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 88,
+      "kind": "select",
+      "label": " {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)} ",
+      "handlers": {
+        "onChange": "{(e) => set({ fallbackModelId: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 93,
+      "kind": "select",
+      "label": " <option value=\"none\">None</option> <option value=\"session\">Per run</option> <option value=\"long-term\">Long-term</option> ",
+      "handlers": {
+        "onChange": "{(e) => set({ memory: e.target.value as Agent[\"memory\"] })}"
+      },
+      "disabled": "{agent.origin === \"backend\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 97,
+      "kind": "textarea",
+      "label": "<label className={lbl} htmlFor=\"ag-schema\">Output schema</label> <textarea id=\"ag-schema\" rows={3} className={`${field} font-mono text-xs`} value={agent.outputSchema} onChange={(e)",
+      "handlers": {
+        "onChange": "{(e) => set({ outputSchema: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 113,
+      "kind": "Switch",
+      "label": " <span>{t} <span className={`text-[11px] ${toolStatus(t) === \"connected\" ? \"text-success\" : toolStatus(t) === \"error\" ? \"text-destructive\" : \"text-muted-foreground\"}`}>· {toolStatu",
+      "handlers": {
+        "onCheckedChange": "{() => toggle(\"tools\", t)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 116,
+      "kind": "Link",
+      "label": "Manage integrations",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 123,
+      "kind": "Switch",
+      "label": " <span>{k.name} <span className=\"text-[11px] text-muted-foreground\">· {k.collection}{k.status !== \"ready\" ? ` · ${k.status}` : \"\"}</span></span> <Switch checked={agent.knowledge.in",
+      "handlers": {
+        "onCheckedChange": "{() => toggle(\"knowledge\", k.name)}"
+      },
+      "disabled": "{k.status === \"failed\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 126,
+      "kind": "Link",
+      "label": "Open knowledge library",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/agents/AgentInspector.tsx",
+      "line": 138,
+      "kind": "Switch",
+      "label": " <span><span className=\"block text-sm\">{l}</span><span className=\"text-xs text-muted-foreground\">{d}</span></span> <Switch checked={agent.guardrails[k]} disabled={agent.origin === ",
+      "handlers": {
+        "onCheckedChange": "{(v) => set({ guardrails: { ...agent.guardrails, [k]: v } })}"
+      },
+      "disabled": "{agent.origin === \"backend\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/AgentCommunication.tsx",
+      "line": 35,
+      "kind": "Dialog",
+      "label": " <DialogTrigger className=\"inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs hover:border-primary\"> <Network className=\"h-3.5 w-3",
+      "handlers": {
+        "onOpenChange": "{setOpen}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/AgentCommunication.tsx",
+      "line": 36,
+      "kind": "DialogTrigger",
+      "label": " <Network className=\"h-3.5 w-3.5\" /> Agent communication ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/AgentCommunication.tsx",
+      "line": 110,
+      "kind": "select",
+      "label": " <option value=\"configured\">Workflow plan</option> <option value=\"run\" disabled={!trace.runId}> Recorded run </option> ",
+      "handlers": {
+        "onChange": "{(e) => setMode(e.target.value as \"configured\" | \"run\")}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/AgentCommunication.tsx",
+      "line": 122,
+      "kind": "select",
+      "label": "\"Communication run\"",
+      "handlers": {
+        "onChange": "{(e) => trace.selectRun(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 457,
+      "kind": "button",
+      "label": "{view === \"design\" ? \"Design\" : view === \"hierarchy\" ? \"Agent hierarchy\" : \"Execution\"}",
+      "handlers": {
+        "onClick": "{() => { setMode(view); setPanel(null); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 460,
+      "kind": "summary",
+      "label": "Review workflow plan",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 461,
+      "kind": "RevisionHistory",
+      "label": "RevisionHistory",
+      "handlers": {
+        "onClose": "{() => setHistoryOpen(false)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 464,
+      "kind": "Link",
+      "label": "\"Back to workflows\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 471,
+      "kind": "input",
+      "label": "\"Workflow name\"",
+      "handlers": {
+        "onChange": "{(e) => store.renameWorkflow(workflow.id, e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 486,
+      "kind": "button",
+      "label": "\"Undo\"",
+      "handlers": {
+        "onClick": "{undo}"
+      },
+      "disabled": "{!past.length}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 494,
+      "kind": "button",
+      "label": "\"Redo\"",
+      "handlers": {
+        "onClick": "{redo}"
+      },
+      "disabled": "{!future.length}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 503,
+      "kind": "DropdownMenuTrigger",
+      "label": "\"Add step\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 511,
+      "kind": "DropdownMenuItem",
+      "label": " <M.icon className=\"mr-2 h-4 w-4\" /> {k === \"agent\" ? \"New AI agent\" : M.label} ",
+      "handlers": {
+        "onSelect": "{() => addNode(k)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 522,
+      "kind": "DropdownMenuItem",
+      "label": " {p.name} {\" \"} <span className=\"ml-auto pl-2 text-[10px] text-muted-foreground\"> {p.description} </span> ",
+      "handlers": {
+        "onSelect": "{() => insertPatternAt(p.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 536,
+      "kind": "DropdownMenuItem",
+      "label": " {a.name} ",
+      "handlers": {
+        "onSelect": "{() => addNode(\"agent\", a.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 543,
+      "kind": "DropdownMenuTrigger",
+      "label": "\"More actions\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 550,
+      "kind": "DropdownMenuItem",
+      "label": " <LayoutTemplate className=\"mr-2 h-4 w-4\" /> Auto-layout ",
+      "handlers": {
+        "onSelect": "{tidy}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 554,
+      "kind": "DropdownMenuItem",
+      "label": " <Copy className=\"mr-2 h-4 w-4\" /> Duplicate ",
+      "handlers": {
+        "onSelect": "{() => {\n                const id = store.duplicateWorkflow(workflow.id);\n                if (id) navigate({ to: \"/app/workflows/$id\", params: { id } });\n              }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 567,
+      "kind": "DropdownMenuItem",
+      "label": "View saved revisions",
+      "handlers": {
+        "onSelect": "{() => setHistoryOpen(true)}"
+      },
+      "disabled": "{!current.serverVersion}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 573,
+      "kind": "DropdownMenuItem",
+      "label": "Inspect recorded execution",
+      "handlers": {
+        "onSelect": "{() => { setMode(\"execution\"); setPanel(null); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 580,
+      "kind": "GraphTools",
+      "label": "GraphTools",
+      "handlers": {
+        "onSelect": "{id => { setSelectedId(id);  setPanel(\"inspector\"); }}",
+        "onConnect": "{(source,target,label) => {\n        if (edgesRef.current.some(e => e.source === source && (label ? e.label === label : e.target === target))) { toast.error(\"This connection or branch outcome is already used. Remove it before reconnecting.\"); return; }\n        commit({nodes:clean(nodesRef.current),edges:[...edgesRef.current,{id:uid(\"edge\"),source,target,...(label?{label}:{})}]});\n      }}",
+        "onRemove": "{id => { if(window.confirm(\"Remove this connection from the working draft?\")) commit({nodes:clean(nodesRef.current),edges:edgesRef.current.filter(e=>e.id!==id)}); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 585,
+      "kind": "ExecutionView",
+      "label": "<ExecutionView trace={trace} onDesign={() => setMode(\"design\")} />",
+      "handlers": {
+        "onDesign": "{() => setMode(\"design\")}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 585,
+      "kind": "HierarchyView",
+      "label": "<HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode(\"design\");setSelectedId(id);setPanel(\"inspector\");}} />",
+      "handlers": {
+        "onEdit": "{id=>{setMode(\"design\");setSelectedId(id);setPanel(\"inspector\");}}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 596,
+      "kind": "button",
+      "label": " <span className=\"w-5 text-xs text-muted-foreground\">{i + 1}</span> <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${M.tone}`} > <M.icon className=\"",
+      "handlers": {
+        "onClick": "{() => {\n                        setSelectedId(n.id);\n\n                        setPanel(\"inspector\");\n                      }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 624,
+      "kind": "PatternsPanel",
+      "label": " <PatternsPanel onInsert={(k) => insertPatternAt(k)} /> <ReactFlow onDragOver={(e) => { if (e.dataTransfer.types.includes(PATTERN_MIME)) { e.preventDefault(); e.dataTransfer.dropEf",
+      "handlers": {
+        "onInsert": "{(k) => insertPatternAt(k)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 625,
+      "kind": "ReactFlow",
+      "label": " <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color=\"var(--border)\" /> <Controls showInteractive={false} className=\"!rounded-lg !border !border-border !shadow-s",
+      "handlers": {
+        "onDragOver": "{(e) => {\n                  if (e.dataTransfer.types.includes(PATTERN_MIME)) {\n                    e.preventDefault();\n                    e.dataTransfer.dropEffect = \"copy\";\n                  }\n                }}",
+        "onDrop": "{onDrop}",
+        "onNodesChange": "{onNodesChange}",
+        "onEdgesChange": "{onEdgesChange}",
+        "onConnect": "{onConnect}",
+        "onNodeDragStart": "{() => { dragStart.current = structuredClone({nodes:clean(nodesRef.current),edges:edgesRef.current}); }}",
+        "onNodeDragStop": "{() => {\n                  if (dragStart.current) { const previous = dragStart.current; setPast(p=>[...p.slice(-49),previous]); setFuture([]); dragStart.current=null; }\n                  commit({ nodes: nodesRef.current, edges: edgesRef.current }, {history:false});\n                }}",
+        "onNodeClick": "{(_, n) => {\n                  setSelectedId(n.id);\n\n                  setPanel(\"inspector\");\n                }}",
+        "onPaneClick": "{() => {\n                  setSelectedId(null);\n                  setPanel((p) => (p === \"inspector\" ? null : p));\n                }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 665,
+      "kind": "Controls",
+      "label": " <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color=\"var(--border)\" /> <Controls showInteractive={false} className=\"!rounded-lg !border !border-border !shadow-s",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 683,
+      "kind": "button",
+      "label": " <Sparkles className=\"h-3.5 w-3.5 text-primary\" /> Local editing commands {\" \"} <span className=\"text-muted-foreground/70\">· draft edits</span> <span className=\"flex-1\" /> {compose",
+      "handlers": {
+        "onClick": "{() => setComposerOpen((o) => !o)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 698,
+      "kind": "form",
+      "label": " <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder=\"e.g. Add human approval before sending emails\" aria-label=\"Instruction\" className=\"min-w-0 flex-1 rounded-",
+      "handlers": {
+        "onSubmit": "{(e) => {\n                      e.preventDefault();\n                      runCommand();\n                    }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 705,
+      "kind": "input",
+      "label": "\"Instruction\"",
+      "handlers": {
+        "onChange": "{(e) => setCmd(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 712,
+      "kind": "button",
+      "label": "Apply ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 721,
+      "kind": "button",
+      "label": " {c} ",
+      "handlers": {
+        "onClick": "{() => runCommand(c)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 752,
+      "kind": "input",
+      "label": "\"Step name\"",
+      "handlers": {
+        "onChange": "{(e) => updateNodeData({ label: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 758,
+      "kind": "button",
+      "label": "\"Delete step\"",
+      "handlers": {
+        "onClick": "{() => onNodesChange([{ type: \"remove\", id: selected.id }])}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 765,
+      "kind": "button",
+      "label": "\"Close inspector\"",
+      "handlers": {
+        "onClick": "{() => setPanel(null)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 777,
+      "kind": "HierarchyBox",
+      "label": "HierarchyBox",
+      "handlers": {
+        "onSelect": "{(id) => setSelectedId(id)}",
+        "onAdd": "{() => addChild(selected.id)}",
+        "onRemove": "{() => removeChild(selected.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 787,
+      "kind": "Link",
+      "label": " {selectedAgent.name} ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 807,
+      "kind": "textarea",
+      "label": " <label htmlFor=\"node-desc\" className=\"mb-1.5 block text-xs font-medium text-muted-foreground\" > Description </label> <textarea id=\"node-desc\" rows={3} value={selected.data.descrip",
+      "handlers": {
+        "onChange": "{(e) => updateNodeData({ description: e.target.value })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 817,
+      "kind": "input",
+      "label": "\"Condition expression\"",
+      "handlers": {
+        "onChange": "{(e) => updateNodeData({ condition: { condition_id: String(selected.data[\"conditionId\"] ?? `condition_${selected.id}`), outcomes: (selected.data[\"condition\"] as { outcomes?: string[] } | undefined)?.outcomes ?? [\"critical\", \"standard\"], expression: e.target.value } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 818,
+      "kind": "input",
+      "label": "\"Condition outcomes\"",
+      "handlers": {
+        "onChange": "{(e) => updateNodeData({ condition: { condition_id: String(selected.data[\"conditionId\"] ?? `condition_${selected.id}`), expression: String((selected.data[\"condition\"] as { expression?: string } | undefined)?.expression ?? \"\"), outcomes: e.target.value.split(\",\").map((value) => value.trim()).filter(Boolean) } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 876,
+      "kind": "button",
+      "label": "Remove sub-agent ",
+      "handlers": {
+        "onClick": "{onRemove}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 887,
+      "kind": "button",
+      "label": " {parent.data.label} ",
+      "handlers": {
+        "onClick": "{() => onSelect(parent.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 896,
+      "kind": "button",
+      "label": "↳ {k.data.label} ",
+      "handlers": {
+        "onClick": "{() => onSelect(k.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/Builder.tsx",
+      "line": 906,
+      "kind": "button",
+      "label": " <Plus className=\"h-3.5 w-3.5\" /> Add sub-agent ",
+      "handlers": {
+        "onClick": "{onAdd}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 38,
+      "kind": "div",
+      "label": "{`${card.label}${data.task ? ` · Task ${data.task}` : \"\"} · ${card.spawned ? \"Spawned helper · \" : \"\"}${card.status}`}",
+      "handlers": {
+        "onKeyDown": "{(e) => {\n        if (e.key === \"Enter\" || e.key === \" \") {\n          e.preventDefault();\n          data.inspect();\n        }\n      }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 111,
+      "kind": "button",
+      "label": " {connection?.label} {connection?.active ? \" · Live\" : \"\"} ",
+      "handlers": {
+        "onClick": "{(e) => {\n            e.stopPropagation();\n            data?.inspect();\n          }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 218,
+      "kind": "summary",
+      "label": "Technical details",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 282,
+      "kind": "summary",
+      "label": "Technical details",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 349,
+      "kind": "ReactFlow",
+      "label": " <Background gap={24} /> <Controls showInteractive={false} /> <FitNewAgents signature={signature} /> ",
+      "handlers": {
+        "onNodeClick": "{(_, node) => setSelection({ kind: \"node\", id: node.id })}",
+        "onEdgeClick": "{(_, edge) => setSelection({ kind: \"connection\", id: edge.id })}",
+        "onPaneClick": "{() => setSelection(undefined)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 366,
+      "kind": "Controls",
+      "label": " <Background gap={24} /> <Controls showInteractive={false} /> <FitNewAgents signature={signature} /> ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationDiagram.tsx",
+      "line": 375,
+      "kind": "button",
+      "label": "\"Close details\"",
+      "handlers": {
+        "onClick": "{() => setSelection(undefined)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/CommunicationEvidence.tsx",
+      "line": 16,
+      "kind": "summary",
+      "label": "View nested information",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 55,
+      "kind": "select",
+      "label": "\"Select workflow run\"",
+      "handlers": {
+        "onChange": "{(e) => {\n            setSelected(\"\");\n            trace.selectRun(e.target.value);\n          }}"
+      },
+      "disabled": "{!trace.available || !trace.runs.length}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 73,
+      "kind": "button",
+      "label": "Older workflow runs",
+      "handlers": {
+        "onClick": "{trace.loadMoreRuns}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 75,
+      "kind": "button",
+      "label": "Refresh trace ",
+      "handlers": {
+        "onClick": "{trace.retry}"
+      },
+      "disabled": "{trace.loading}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 83,
+      "kind": "button",
+      "label": "Return to editable draft ",
+      "handlers": {
+        "onClick": "{onDesign}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 112,
+      "kind": "ReactFlow",
+      "label": " <Background /> <Controls showInteractive={false} /> <MiniMap pannable zoomable /> ",
+      "handlers": {
+        "onNodeClick": "{(_, n) => setSelected(n.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 128,
+      "kind": "Controls",
+      "label": " <Background /> <Controls showInteractive={false} /> <MiniMap pannable zoomable /> ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 140,
+      "kind": "button",
+      "label": " {i + 1} . {n.data.label} · {n.data.kind} · {\" \"} {trace.runState[n.id] ?? \"No recorded status\"} ",
+      "handlers": {
+        "onClick": "{() => setSelected(n.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/ExecutionView.tsx",
+      "line": 158,
+      "kind": "summary",
+      "label": "Run timeline · {trace.events.length} events",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 30,
+      "kind": "summary",
+      "label": "Workflow outline and connections · {\" \"} {issues.length ? `${issues.length} issues to review` : \"No local topology issues\"} ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 43,
+      "kind": "button",
+      "label": " {x.message} ",
+      "handlers": {
+        "onClick": "{() => onSelect(x.nodeId!)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 63,
+      "kind": "button",
+      "label": " {i + 1} . {n.data.label} · {n.data.kind} {n.data.kind === \"trigger\" ? \" · Start\" : n.data.kind === \"output\" ? \" · End\" : \"\"} ",
+      "handlers": {
+        "onClick": "{() => onSelect(n.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 74,
+      "kind": "form",
+      "label": " <label> From step <select aria-label=\"Connection source\" value={source} onChange={(e) => { setSource(e.target.value); setLabel(\"\"); }} className=\"block max-w-48 rounded border bg-",
+      "handlers": {
+        "onSubmit": "{(e) => {\n          e.preventDefault();\n          if (source && target && (!outcomes.length || label))\n            onConnect(source, target, label || undefined);\n        }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 84,
+      "kind": "select",
+      "label": "\"Connection source\"",
+      "handlers": {
+        "onChange": "{(e) => {\n              setSource(e.target.value);\n              setLabel(\"\");\n            }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 105,
+      "kind": "select",
+      "label": "\"Connection target\"",
+      "handlers": {
+        "onChange": "{(e) => setTarget(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 124,
+      "kind": "select",
+      "label": "\"Connection outcome\"",
+      "handlers": {
+        "onChange": "{(e) => setLabel(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 137,
+      "kind": "button",
+      "label": "Connect steps ",
+      "handlers": {},
+      "disabled": "{!source || !target || (outcomes.length > 0 && !label)}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/GraphTools.tsx",
+      "line": 151,
+      "kind": "button",
+      "label": "{`Remove connection ${e.id}`}",
+      "handlers": {
+        "onClick": "{() => onRemove(e.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/HierarchyView.tsx",
+      "line": 93,
+      "kind": "button",
+      "label": "Edit in Design ",
+      "handlers": {
+        "onClick": "{() => onEdit(row.node!.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/HierarchyView.tsx",
+      "line": 101,
+      "kind": "Link",
+      "label": "Edit agent configuration ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/MeshNode.tsx",
+      "line": 66,
+      "kind": "button",
+      "label": "{data.collapsed ? `Expand ${data.label}` : `Collapse ${data.label}`}",
+      "handlers": {
+        "onClick": "{(e) => { e.stopPropagation(); actions.toggleCollapse(id); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/NodeTrace.tsx",
+      "line": 37,
+      "kind": "summary",
+      "label": "Recorded details",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/PatternsPanel.tsx",
+      "line": 13,
+      "kind": "button",
+      "label": "\"Show patterns\"",
+      "handlers": {
+        "onClick": "{() => setOpen(true)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/PatternsPanel.tsx",
+      "line": 22,
+      "kind": "button",
+      "label": "\"Hide patterns\"",
+      "handlers": {
+        "onClick": "{() => setOpen(false)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/builder/PatternsPanel.tsx",
+      "line": 29,
+      "kind": "button",
+      "label": "\"Drag onto the canvas, or press Enter to insert\"",
+      "handlers": {
+        "onDragStart": "{(e) => { e.dataTransfer.setData(PATTERN_MIME, p.id); e.dataTransfer.effectAllowed = \"copy\"; }}",
+        "onClick": "{() => onInsert(p.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 53,
+      "kind": "Switch",
+      "label": "{`${scope} agent execution`}",
+      "handlers": {
+        "onCheckedChange": "{(v) => set(scope, { executionEnabled: v })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 58,
+      "kind": "input",
+      "label": " <label htmlFor={`${scope}-${n.key}`}>{n.label}<span className=\"block text-xs text-muted-foreground\">{n.hint}{scope === \"workspace\" ? ` · org max ${controls.organization[n.key]}` :",
+      "handlers": {
+        "onBlur": "{(e) => { const v = Number(e.target.value); if (!Number.isFinite(v) || v < 0) { toast.error(\"Enter a number of 0 or more\"); e.target.value = String(c[n.key]); return; } if (v !== c[n.key]) set(scope, { [n.key]: v }); }}",
+        "onKeyDown": "{(e) => { if (e.key === \"Enter\") (e.target as HTMLInputElement).blur(); }}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 69,
+      "kind": "Switch",
+      "label": "{`${scope} approval for sensitive actions`}",
+      "handlers": {
+        "onCheckedChange": "{(v) => set(scope, { approvalForSensitive: v })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 72,
+      "kind": "summary",
+      "label": "Tools & models · {c.allowedTools ? `${c.allowedTools.length} tools allowed` : \"all tools\"} · {c.blockedModels.length} models restricted",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 73,
+      "kind": "Switch",
+      "label": "{`${scope} restrict tools`}",
+      "handlers": {
+        "onCheckedChange": "{(v) => set(scope, { allowedTools: v ? [...TOOL_CATALOG] : null })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 78,
+      "kind": "button",
+      "label": "{t}",
+      "handlers": {
+        "onClick": "{() => set(scope, { allowedTools: on ? c.allowedTools!.filter((x) => x !== t) : [...c.allowedTools!, t] })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/AgentControlTab.tsx",
+      "line": 86,
+      "kind": "button",
+      "label": "{m.name}",
+      "handlers": {
+        "onClick": "{() => set(scope, { blockedModels: on ? c.blockedModels.filter((x) => x !== m.id) : [...c.blockedModels, m.id] })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/UsageTab.tsx",
+      "line": 55,
+      "kind": "button",
+      "label": " {label} {sort.key === k && (sort.dir === 1 ? <ArrowUp className=\"h-3 w-3\" /> : <ArrowDown className=\"h-3 w-3\" />)} ",
+      "handlers": {
+        "onClick": "{() => setSort((s) => ({ key: k, dir: s.key === k ? (s.dir === 1 ? -1 : 1) : k === \"cost\" || k === \"runs\" ? -1 : 1 }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/UsageTab.tsx",
+      "line": 71,
+      "kind": "input",
+      "label": " <span className=\"sr-only\">Search agents</span> <Search className=\"pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground\" /> <input value={q} onChange={(e) =>",
+      "handlers": {
+        "onChange": "{(e) => setQ(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/UsageTab.tsx",
+      "line": 74,
+      "kind": "select",
+      "label": " <option value=\"all\">All statuses</option> <option value=\"active\">Active</option> <option value=\"paused\">Paused</option> ",
+      "handlers": {
+        "onChange": "{(e) => setStatus(e.target.value as typeof status)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/UsageTab.tsx",
+      "line": 96,
+      "kind": "button",
+      "label": "{r.agent.paused ? \"Resume\" : \"Pause\"}",
+      "handlers": {
+        "onClick": "{() => setAgentPaused(r.agent.id, !r.agent.paused)}"
+      },
+      "disabled": "{!mayControl}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/governance/UsageTab.tsx",
+      "line": 97,
+      "kind": "Link",
+      "label": "Open",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/landing/cinematic/CinematicHero.tsx",
+      "line": 40,
+      "kind": "EngineScene",
+      "label": " <EngineScene mobile={cap.mobile} animate={!cap.reducedMotion} active={active} onContextLost={() => setLost(true)} onFirstFrame={() => setShown(true)} /> ",
+      "handlers": {
+        "onContextLost": "{() => setLost(true)}",
+        "onFirstFrame": "{() => setShown(true)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/landing/cinematic/CinematicHero.tsx",
+      "line": 100,
+      "kind": "Link",
+      "label": "Launch Workspace {\" \"} <ArrowRight className=\"h-4 w-4 transition-transform group-hover:translate-x-0.5\" /> ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/landing/cinematic/EngineScene.tsx",
+      "line": 426,
+      "kind": "Canvas",
+      "label": " <Scene mobile={mobile} animate={animate} /> <FirstFrame onReady={onFirstFrame} /> ",
+      "handlers": {
+        "onCreated": "{({ gl }) => {\n        gl.toneMapping = THREE.ACESFilmicToneMapping;\n        gl.toneMappingExposure = 0.95;\n        gl.domElement.addEventListener(\"webglcontextlost\", (e) => {\n          e.preventDefault();\n          onContextLost();\n        });\n      }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/landing/cinematic/EngineScene.tsx",
+      "line": 442,
+      "kind": "FirstFrame",
+      "label": " <Scene mobile={mobile} animate={animate} /> <FirstFrame onReady={onFirstFrame} /> ",
+      "handlers": {
+        "onReady": "{onFirstFrame}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ReplyCases.tsx",
+      "line": 67,
+      "kind": "button",
+      "label": "{refreshing ? \"Refreshing…\" : \"Refresh\"}",
+      "handlers": {
+        "onClick": "{() => void refresh()}"
+      },
+      "disabled": "{refreshing || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ReplyCases.tsx",
+      "line": 88,
+      "kind": "button",
+      "label": "{labels[kind]}",
+      "handlers": {
+        "onClick": "{() => void act(item.case_id, reply.reply_id, kind)}"
+      },
+      "disabled": "{busy || !backend.can(\"workflow.approve\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 31,
+      "kind": "button",
+      "label": "{decision === \"approved\" ? \"Approve\" : \"Reject\"}",
+      "handlers": {
+        "onClick": "{() => void decide(decision)}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 76,
+      "kind": "input",
+      "label": "\"Filter workflow\"",
+      "handlers": {
+        "onChange": "{e=>{setCursor(undefined);setFilters({...filters,workflow_id:e.target.value});}}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 77,
+      "kind": "select",
+      "label": "\"Filter status\"",
+      "handlers": {
+        "onChange": "{e=>{setCursor(undefined);setFilters({...filters,status:e.target.value});}}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 78,
+      "kind": "input",
+      "label": "\"Filter from date\"",
+      "handlers": {
+        "onChange": "{e=>{setCursor(undefined);setFilters({...filters,from_date:e.target.value});}}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 79,
+      "kind": "input",
+      "label": "\"Filter to date\"",
+      "handlers": {
+        "onChange": "{e=>{setCursor(undefined);setFilters({...filters,to_date:e.target.value?e.target.value+\"T23:59:59.999Z\":\"\"});}}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 83,
+      "kind": "button",
+      "label": " <p className=\"text-sm font-medium\">{item.run_id} · {item.status}</p> <p className=\"text-xs text-muted-foreground\">{item.workflow_id} · revision v{item.workflow_version} · {item.ap",
+      "handlers": {
+        "onClick": "{() => void loadRun(item.run_id)}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 88,
+      "kind": "button",
+      "label": "Newest runs",
+      "handlers": {
+        "onClick": "{()=>setCursor(undefined)}"
+      },
+      "disabled": "{!cursor}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 88,
+      "kind": "button",
+      "label": "Older runs",
+      "handlers": {
+        "onClick": "{()=>setCursor(next??undefined)}"
+      },
+      "disabled": "{!next}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 89,
+      "kind": "form",
+      "label": " <input aria-label=\"Run ID\" disabled={busy} value={runId} onChange={(event) => setRunId(event.target.value)} className=\"min-w-0 flex-1 rounded-lg border border-border px-3 py-2 tex",
+      "handlers": {
+        "onSubmit": "{(event) => { event.preventDefault(); void load(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 90,
+      "kind": "input",
+      "label": "\"Run ID\"",
+      "handlers": {
+        "onChange": "{(event) => setRunId(event.target.value)}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 91,
+      "kind": "button",
+      "label": "{busy ? \"Loading…\" : \"Load run\"}",
+      "handlers": {},
+      "disabled": "{busy || !runId.trim()}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/runs/ServerRunView.tsx",
+      "line": 99,
+      "kind": "ApprovalControl",
+      "label": "ApprovalControl",
+      "handlers": {
+        "onUpdated": "{() => void loadRun(run.run_id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 29,
+      "kind": "CommandDialog",
+      "label": " <CommandInput placeholder=\"Search workflows, agents, or actions…\" /> <CommandList> <CommandEmpty>No results.</CommandEmpty> <CommandGroup heading=\"Actions\"> <CommandItem onSelect=",
+      "handlers": {
+        "onOpenChange": "{onOpenChange}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 34,
+      "kind": "CommandItem",
+      "label": " <Plus className=\"mr-2 h-4 w-4\" /> Create draft ",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 39,
+      "kind": "CommandItem",
+      "label": "<LayoutGrid className=\"mr-2 h-4 w-4\" /> Overview",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 40,
+      "kind": "CommandItem",
+      "label": "<WfIcon className=\"mr-2 h-4 w-4\" /> Workflows",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/workflows\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 41,
+      "kind": "CommandItem",
+      "label": "<Bot className=\"mr-2 h-4 w-4\" /> Agents",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/agents\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 42,
+      "kind": "CommandItem",
+      "label": "<Store className=\"mr-2 h-4 w-4\" /> Marketplace",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/marketplace\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 43,
+      "kind": "CommandItem",
+      "label": "<Plug className=\"mr-2 h-4 w-4\" /> Integrations",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/integrations\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 44,
+      "kind": "CommandItem",
+      "label": "<BookOpen className=\"mr-2 h-4 w-4\" /> Knowledge",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/knowledge\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 45,
+      "kind": "CommandItem",
+      "label": "<Inbox className=\"mr-2 h-4 w-4\" /> Approvals",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/approvals\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 46,
+      "kind": "CommandItem",
+      "label": "<History className=\"mr-2 h-4 w-4\" /> Runs",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/runs\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 47,
+      "kind": "CommandItem",
+      "label": "<Activity className=\"mr-2 h-4 w-4\" /> Monitoring",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/monitoring\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 48,
+      "kind": "CommandItem",
+      "label": "<ShieldCheck className=\"mr-2 h-4 w-4\" /> Governance",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/governance\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 49,
+      "kind": "CommandItem",
+      "label": "<Settings className=\"mr-2 h-4 w-4\" /> Settings",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/settings\" }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 54,
+      "kind": "CommandItem",
+      "label": " <WfIcon className=\"mr-2 h-4 w-4\" /> {w.name} ",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/workflows/$id\", params: { id: w.id } }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/CommandPalette.tsx",
+      "line": 63,
+      "kind": "CommandItem",
+      "label": " <Bot className=\"mr-2 h-4 w-4\" /> {a.name} ",
+      "handlers": {
+        "onSelect": "{() => go(() => navigate({ to: \"/app/agents\", search: { agent: a.id } }))}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/shell/Shortcuts.tsx",
+      "line": 49,
+      "kind": "Dialog",
+      "label": " <DialogContent className=\"max-w-md\"> <DialogHeader><DialogTitle>Keyboard shortcuts</DialogTitle></DialogHeader> {groups.map((g) => ( <div key={g}> <p className=\"mb-1 text-xs font-",
+      "handlers": {
+        "onOpenChange": "{onOpenChange}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ApiFeedback.tsx",
+      "line": 21,
+      "kind": "button",
+      "label": "{retrying?\"Loading…\":\"Retry read\"}",
+      "handlers": {
+        "onClick": "{onRetry}"
+      },
+      "disabled": "{retrying}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/CustomerAutomationReview.tsx",
+      "line": 8,
+      "kind": "summary",
+      "label": "Automatic email policy",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 103,
+      "kind": "button",
+      "label": "Keep this tab's draft ",
+      "handlers": {
+        "onClick": "{() =>\n              useMesh.setState((s) => ({\n                workflows: s.workflows.map((w) =>\n                  w.id === workflow.id ? { ...w, tabConflict: undefined } : w,\n                ),\n              }))\n            }"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 117,
+      "kind": "button",
+      "label": "Check latest revision ",
+      "handlers": {
+        "onClick": "{() => void run(\"check\")}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 125,
+      "kind": "button",
+      "label": "Rebase non-overlapping edits ",
+      "handlers": {
+        "onClick": "{() => void run(\"rebase\")}"
+      },
+      "disabled": "{busy || !workflow.remote || !workflow.canonical}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 133,
+      "kind": "button",
+      "label": "Discard and reload latest ",
+      "handlers": {
+        "onClick": "{() => void run(\"reload\")}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 141,
+      "kind": "button",
+      "label": "Export working draft ",
+      "handlers": {
+        "onClick": "{() => {\n            try {\n              const state = useMesh.getState();\n              setExported(\n                JSON.stringify(\n                  {\n                    format: \"mesh-working-draft-recovery-v1\",\n                    workflow,\n                    agents: state.agents.filter((a) => ownsAgent(workflow, a)),\n                  },\n                  null,\n                  2,\n                ),\n              );\n            } catch (caught) {\n              setError(caught instanceof Error ? caught : new Error(\"Export unavailable.\"));\n            }\n          }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 168,
+      "kind": "summary",
+      "label": "Compare server and loaded baseline",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/DraftConflict.tsx",
+      "line": 178,
+      "kind": "textarea",
+      "label": "\"Working draft export\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/LifecycleJourney.tsx",
+      "line": 201,
+      "kind": "button",
+      "label": "Retry release state ",
+      "handlers": {
+        "onClick": "{() => setAttempt((n) => n + 1)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/LifecycleJourney.tsx",
+      "line": 206,
+      "kind": "summary",
+      "label": "Workflow lifecycle · 14 stages",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/LifecycleJourney.tsx",
+      "line": 232,
+      "kind": "Link",
+      "label": "Review integrations ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/LifecycleJourney.tsx",
+      "line": 236,
+      "kind": "Link",
+      "label": "Approval queue ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/LifecycleJourney.tsx",
+      "line": 240,
+      "kind": "Link",
+      "label": "Workflows and manual runs ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/PlanReview.tsx",
+      "line": 76,
+      "kind": "summary",
+      "label": "Major steps and branches",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/PlanReview.tsx",
+      "line": 96,
+      "kind": "summary",
+      "label": "Agent responsibilities and required tools ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 98,
+      "kind": "input",
+      "label": "{field === \"buyer_email\" ? \"Buyer receiving email\" : \"Manager notification email\"} <input type=\"email\" disabled={disabled} className=\"w-full rounded border p-1\" value={value[field]",
+      "handlers": {
+        "onChange": "{e => change({ ...value, [field]: e.target.value })}"
+      },
+      "disabled": "{disabled}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 100,
+      "kind": "input",
+      "label": "{field.replaceAll(\"_\", \" \")} <input type=\"number\" min={1} max={720} disabled={disabled} className=\"w-full rounded border p-1\" value={value[field]} onChange={e => change({ ...value,",
+      "handlers": {
+        "onChange": "{e => change({ ...value, [field]: Number(e.target.value) })}"
+      },
+      "disabled": "{disabled}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 101,
+      "kind": "input",
+      "label": "<input type=\"checkbox\" disabled={disabled} checked={value.allow_delivery_reschedule} onChange={e => change({ ...value, allow_delivery_reschedule: e.target.checked })} /> Allow repo",
+      "handlers": {
+        "onChange": "{e => change({ ...value, allow_delivery_reschedule: e.target.checked })}"
+      },
+      "disabled": "{disabled}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 105,
+      "kind": "summary",
+      "label": "Procurement setup &amp; status",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 109,
+      "kind": "button",
+      "label": "Close project setup",
+      "handlers": {
+        "onClick": "{e => e.currentTarget.closest(\"details\")?.removeAttribute(\"open\")}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 118,
+      "kind": "input",
+      "label": "Table range <input disabled={!editable || busy} className=\"mt-1 w-full rounded border p-1\" value={source.range} onChange={e => setDraft({ ...draft, [kind]: { ...source, range: e.ta",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, [kind]: { ...source, range: e.target.value } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 121,
+      "kind": "input",
+      "label": " <span>{field}</span> <input disabled={!editable || busy} className=\"w-1/2 rounded border p-1\" value={header} onChange={e => setDraft({ ...draft, [kind]: { ...source, columns: { ..",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, [kind]: { ...source, columns: { ...source.columns, [field]: e.target.value } } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 125,
+      "kind": "input",
+      "label": " {field.replaceAll(\"_\", \" \")} <input disabled={!editable || busy} className=\"mt-1 w-full rounded border p-1\" value={value ?? \"\"} placeholder=\"Required project information\" onChange",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, context: { ...draft.context, [field]: e.target.value || null } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 131,
+      "kind": "input",
+      "label": "Calendar <input disabled={!editable || busy} className=\"w-full rounded border p-1\" value={draft.phase2.calendar_id} onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, ",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, phase2: { ...draft.phase2!, calendar_id: e.target.value } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 133,
+      "kind": "input",
+      "label": "Reminder minutes <input type=\"number\" min={0} max={40320} disabled={!editable || busy} className=\"w-full rounded border p-1\" value={draft.phase2.reminder_minutes} onChange={e => se",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, phase2: { ...draft.phase2!, reminder_minutes: Number(e.target.value) } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 135,
+      "kind": "input",
+      "label": "Total project spending limit ( {draft.context[\"comparison_currency\"]} ) <input disabled={!editable || busy} className=\"w-full rounded border p-1\" value={draft.phase2.purchasing_lim",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, phase2: { ...draft.phase2!, purchasing_limit: e.target.value || null } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 137,
+      "kind": "input",
+      "label": "<input type=\"checkbox\" disabled={!editable || busy} checked={draft.phase2.allow_single_offer} onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.target.checked } })}"
+      },
+      "disabled": "{!editable || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 141,
+      "kind": "input",
+      "label": "<input type=\"checkbox\" checked={!!draft.phase3} onChange={e => setDraft({ ...draft, phase3: e.target.checked ? fulfilment : null })} /> Enable Phase 3 after PO release",
+      "handlers": {
+        "onChange": "{e => setDraft({ ...draft, phase3: e.target.checked ? fulfilment : null })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 144,
+      "kind": "button",
+      "label": "Save project settings",
+      "handlers": {
+        "onClick": "{() => void save()}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 150,
+      "kind": "button",
+      "label": "{busy ? \"Working…\" : \"Start procurement\"}",
+      "handlers": {
+        "onClick": "{() => void start()}"
+      },
+      "disabled": "{busy || !publishedVersion || !backend.can(\"workflow.execute\") || !backend.session?.runtime_available}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 151,
+      "kind": "button",
+      "label": "Refresh project status",
+      "handlers": {
+        "onClick": "{() => void load()}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 162,
+      "kind": "button",
+      "label": "Activate fulfilment monitoring",
+      "handlers": {
+        "onClick": "{() => void activateFulfilment()}"
+      },
+      "disabled": "{busy || !backend.can(\"workflow.approve\") || !fulfilment.buyer_email || !fulfilment.manager_email}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 178,
+      "kind": "input",
+      "label": "<input type=\"checkbox\" disabled={!c.email || busy} checked={selected.includes(c.candidate_id)} onChange={e => setSelected(e.target.checked ? [...selected, c.candidate_id] : selecte",
+      "handlers": {
+        "onChange": "{e => setSelected(e.target.checked ? [...selected, c.candidate_id] : selected.filter(id => id !== c.candidate_id))}"
+      },
+      "disabled": "{!c.email || busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 181,
+      "kind": "a",
+      "label": "Source",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 184,
+      "kind": "button",
+      "label": "Approve selected suppliers",
+      "handlers": {
+        "onClick": "{() => void reviewSuppliers(\"approved\")}"
+      },
+      "disabled": "{busy || !backend.can(\"workflow.approve\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 185,
+      "kind": "button",
+      "label": "Reject shortlist",
+      "handlers": {
+        "onClick": "{() => void reviewSuppliers(\"rejected\")}"
+      },
+      "disabled": "{busy || !backend.can(\"workflow.approve\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 188,
+      "kind": "a",
+      "label": "Open tracking spreadsheet",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/ProcurementReview.tsx",
+      "line": 190,
+      "kind": "a",
+      "label": "Open action approvals",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RevisionHistory.tsx",
+      "line": 18,
+      "kind": "Dialog",
+      "label": "<DialogContent className=\"max-h-[85vh] w-[calc(100vw-2rem)] overflow-y-auto\"><DialogHeader><DialogTitle>Saved workflow revisions</DialogTitle><DialogDescription>View server revisio",
+      "handlers": {
+        "onOpenChange": "{value => { if (!value) onClose(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RevisionHistory.tsx",
+      "line": 19,
+      "kind": "form",
+      "label": "<label className=\"text-sm\">Revision<input aria-label=\"Saved revision number\" type=\"number\" min={1} max={latest} value={version} onChange={event => setVersion(event.target.value)} c",
+      "handlers": {
+        "onSubmit": "{event => { event.preventDefault(); void load(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RevisionHistory.tsx",
+      "line": 19,
+      "kind": "input",
+      "label": "\"Saved revision number\"",
+      "handlers": {
+        "onChange": "{event => setVersion(event.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RevisionHistory.tsx",
+      "line": 19,
+      "kind": "button",
+      "label": "{busy ? \"Loading…\" : \"View revision\"}",
+      "handlers": {},
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 33,
+      "kind": "Dialog",
+      "label": " <DialogContent className=\"max-h-[85vh] w-[calc(100vw-2rem)] overflow-y-auto\" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (",
+      "handlers": {
+        "onOpenChange": "{open => { if (!open && !submitting.current) onClose(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 34,
+      "kind": "DialogContent",
+      "label": " <DialogHeader><DialogTitle>Run {workflow.name}</DialogTitle><DialogDescription>Published revision v{workflow.version}. Submission starts real execution subject to its approval and",
+      "handlers": {
+        "onEscapeKeyDown": "{event => { if (busy) event.preventDefault(); }}",
+        "onPointerDownOutside": "{event => { if (busy) event.preventDefault(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 37,
+      "kind": "form",
+      "label": " {workflow.inputs.map(field => <label key={field.name} className=\"block text-sm\">{field.name}{field.required ? \" (required)\" : \" (optional)\"}<span className=\"block text-xs text-mut",
+      "handlers": {
+        "onSubmit": "{event => { event.preventDefault(); void submit(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 39,
+      "kind": "select",
+      "label": "{field.name}",
+      "handlers": {
+        "onChange": "{event => setValues(current => ({ ...current, [field.name]: event.target.value }))}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 40,
+      "kind": "textarea",
+      "label": "{field.name}",
+      "handlers": {
+        "onChange": "{event => setValues(current => ({ ...current, [field.name]: event.target.value }))}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 41,
+      "kind": "input",
+      "label": "{field.name}",
+      "handlers": {
+        "onChange": "{event => setValues(current => ({ ...current, [field.name]: event.target.value }))}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 44,
+      "kind": "button",
+      "label": "{busy ? \"Submitting…\" : \"Start run\"}",
+      "handlers": {},
+      "disabled": "{busy || !!blocker}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 47,
+      "kind": "Link",
+      "label": "View run details",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/RunWorkflowDialog.tsx",
+      "line": 48,
+      "kind": "button",
+      "label": "{run ? \"Close\" : \"Cancel\"}",
+      "handlers": {
+        "onClick": "{onClose}"
+      },
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/SheetAccessReview.tsx",
+      "line": 21,
+      "kind": "summary",
+      "label": "\"Sheet write access\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/SheetAccessReview.tsx",
+      "line": 26,
+      "kind": "a",
+      "label": "{target.spreadsheet_id}",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/WorkflowControls.tsx",
+      "line": 85,
+      "kind": "button",
+      "label": "{busy === action ? `${labels[action]}…` : labels[action]}",
+      "handlers": {
+        "onClick": "{() => void act(action)}"
+      },
+      "disabled": "{!!busy || !!reason}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/WorkflowControls.tsx",
+      "line": 88,
+      "kind": "button",
+      "label": "{blocker(\"reload\")}",
+      "handlers": {
+        "onClick": "{() => void act(\"reload\")}"
+      },
+      "disabled": "{!!busy || !!blocker(\"reload\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/WorkflowReviewQueue.tsx",
+      "line": 35,
+      "kind": "Link",
+      "label": "{workflow.name} · v {workflow.version}",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/features/workflows/WorkflowReviewQueue.tsx",
+      "line": 36,
+      "kind": "button",
+      "label": "{busy === workflow.workflow_id ? \"Approving…\" : \"Approve revision\"}",
+      "handlers": {
+        "onClick": "{() => void approve(workflow)}"
+      },
+      "disabled": "{!!busy || !backend.can(\"workflow.approve\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.agents.tsx",
+      "line": 31,
+      "kind": "Link",
+      "label": "Browse marketplace",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.agents.tsx",
+      "line": 32,
+      "kind": "button",
+      "label": "<Plus className=\"h-4 w-4\" /> New agent",
+      "handlers": {
+        "onClick": "{() => navigate({ search: { agent: createAgent() } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.agents.tsx",
+      "line": 37,
+      "kind": "Link",
+      "label": "Create one",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.agents.tsx",
+      "line": 46,
+      "kind": "button",
+      "label": " <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMaster ? \"bg-primary-deep\" : \"bg-primary\"} text-primary-foreground`}>{isMaster ? <Network classN",
+      "handlers": {
+        "onClick": "{() => navigate({ search: { agent: a.id } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.agents.tsx",
+      "line": 55,
+      "kind": "button",
+      "label": "{a.paused ? `Resume ${a.name}` : `Pause ${a.name}`}",
+      "handlers": {
+        "onClick": "{() => setPaused(a.id, !a.paused)}"
+      },
+      "disabled": "{!mayControl}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 54,
+      "kind": "Switch",
+      "label": "{`Toggle ${p.name}`}",
+      "handlers": {
+        "onCheckedChange": "{(v) => upsertPolicy({ ...p, enabled: v })}"
+      },
+      "disabled": "{!allowed}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 55,
+      "kind": "button",
+      "label": "{`Delete ${p.name}`}",
+      "handlers": {
+        "onClick": "{() => { if (window.confirm(`Delete local policy draft \"${p.name}\"?`)) removePolicy(p.id); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 67,
+      "kind": "TabsTrigger",
+      "label": "Draft agent controls",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 67,
+      "kind": "TabsTrigger",
+      "label": "Enforced governance & usage",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 67,
+      "kind": "TabsTrigger",
+      "label": "Draft policies",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 67,
+      "kind": "TabsTrigger",
+      "label": "Draft rules",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 67,
+      "kind": "TabsTrigger",
+      "label": "Draft audit log",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 76,
+      "kind": "select",
+      "label": "<option value=\"block-model\">Block a model</option> <option value=\"require-guardrail\">Require a guardrail</option> <option value=\"max-run-cost\">Cap run cost</option>",
+      "handlers": {
+        "onChange": "{(e) => setType(e.target.value as PolicyRule[\"type\"])}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 77,
+      "kind": "select",
+      "label": "{MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}",
+      "handlers": {
+        "onChange": "{(e) => setModelId(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 78,
+      "kind": "select",
+      "label": "{Object.entries(GUARDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}",
+      "handlers": {
+        "onChange": "{(e) => setGuard(e.target.value as GuardrailKey)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 79,
+      "kind": "input",
+      "label": "USD per run <input value={usd} onChange={(e) => setUsd(e.target.value)} inputMode=\"decimal\" className=\"mt-1 block h-9 w-28 rounded-lg border border-border bg-background px-2 text-s",
+      "handlers": {
+        "onChange": "{(e) => setUsd(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.governance.tsx",
+      "line": 80,
+      "kind": "button",
+      "label": "<Plus className=\"h-4 w-4\" /> Add workspace policy",
+      "handlers": {
+        "onClick": "{add}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 71,
+      "kind": "textarea",
+      "label": "\"Process description\"",
+      "handlers": {
+        "onChange": "{(e) => setDescription(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 73,
+      "kind": "select",
+      "label": "\"Workflow input source\"",
+      "handlers": {
+        "onChange": "{e=>setInputMode(e.target.value as \"automatic\" | \"manual\")}"
+      },
+      "disabled": "{planning}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 77,
+      "kind": "button",
+      "label": "{cancelling ? \"Cancelling…\" : \"Cancel generation\"}",
+      "handlers": {
+        "onClick": "{() => void cancel()}"
+      },
+      "disabled": "{cancelling}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 78,
+      "kind": "button",
+      "label": "<Sparkles className=\"h-4 w-4\" /> {planning ? \"Generating…\" : apiError ? \"Retry generation\" : \"Generate workflow\"}",
+      "handlers": {
+        "onClick": "{() => void generate()}"
+      },
+      "disabled": "{planning || !description.trim()}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 83,
+      "kind": "button",
+      "label": "Review and edit workflow",
+      "handlers": {
+        "onClick": "{openResult}"
+      },
+      "disabled": "{planning}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 84,
+      "kind": "Link",
+      "label": "View all",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.index.tsx",
+      "line": 84,
+      "kind": "Link",
+      "label": "<span><span className=\"block font-medium\">{w.name}</span><span className=\"text-xs text-muted-foreground\">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.integrations.tsx",
+      "line": 34,
+      "kind": "button",
+      "label": "{pending[provider] ? \"Checking…\" : \"Check configuration\"}",
+      "handlers": {
+        "onClick": "{() => void check(provider, \"configuration\")}"
+      },
+      "disabled": "{pending[provider] || !backend.can(\"tools.read\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.integrations.tsx",
+      "line": 35,
+      "kind": "button",
+      "label": "Verify connection",
+      "handlers": {
+        "onClick": "{() => void check(provider, \"connection\")}"
+      },
+      "disabled": "{pending[provider] || !admin || !result.configured}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.knowledge.tsx",
+      "line": 19,
+      "kind": "button",
+      "label": "Refresh sources",
+      "handlers": {
+        "onClick": "{() => { setLoading(true); setReload(value => value + 1); }}"
+      },
+      "disabled": "{loading || backend.status !== \"connected\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.marketplace.tsx",
+      "line": 67,
+      "kind": "input",
+      "label": "\"Search marketplace\"",
+      "handlers": {
+        "onChange": "{(e) => setQ(e.target.value)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.marketplace.tsx",
+      "line": 69,
+      "kind": "button",
+      "label": " <Building2 className=\"h-4 w-4\" /> Workspace library only ",
+      "handlers": {
+        "onClick": "{() => setOrgOnly((o) => !o)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.marketplace.tsx",
+      "line": 75,
+      "kind": "button",
+      "label": "{k.label}",
+      "handlers": {
+        "onClick": "{() => setKind(k.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.marketplace.tsx",
+      "line": 86,
+      "kind": "button",
+      "label": " <span className=\"flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-accent bg-background text-primary\"><Icon className=\"h-4 w-4\" /></span> <div clas",
+      "handlers": {
+        "onClick": "{() => navigate({ search: { asset: a.id } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.marketplace.tsx",
+      "line": 134,
+      "kind": "button",
+      "label": " {isInstalled(sel) ? <><Check className=\"h-4 w-4\" />Installed</> : sel.kind === \"workflow\" ? \"Use template\" : sel.kind === \"guardrail\" ? \"Apply to drafts\" : \"Add to drafts\"} ",
+      "handlers": {
+        "onClick": "{() => doInstall(sel)}"
+      },
+      "disabled": "{isInstalled(sel)}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.monitoring.tsx",
+      "line": 38,
+      "kind": "button",
+      "label": "First readiness page",
+      "handlers": {
+        "onClick": "{()=>setCursor({})}"
+      },
+      "disabled": "{!cursor.source_cursor && !cursor.policy_cursor}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.monitoring.tsx",
+      "line": 38,
+      "kind": "button",
+      "label": "More triggers",
+      "handlers": {
+        "onClick": "{()=>setCursor({...cursor,source_cursor:data.source_next_cursor??undefined})}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.monitoring.tsx",
+      "line": 38,
+      "kind": "button",
+      "label": "More enforced revisions",
+      "handlers": {
+        "onClick": "{()=>setCursor({...cursor,policy_cursor:data.policy_next_cursor??undefined})}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.settings.tsx",
+      "line": 34,
+      "kind": "button",
+      "label": "Reload settings",
+      "handlers": {
+        "onClick": "{() => { if (value !== saved && !window.confirm(\"Reload settings and discard unsaved changes?\")) return; setLoading(true); setReload(current => current + 1); }}"
+      },
+      "disabled": "{busy || backend.status !== \"connected\"}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.settings.tsx",
+      "line": 35,
+      "kind": "form",
+      "label": " <label className=\"text-sm\">Notification preference<input disabled={!loaded || loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(even",
+      "handlers": {
+        "onSubmit": "{event => { event.preventDefault(); void save(); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.settings.tsx",
+      "line": 36,
+      "kind": "input",
+      "label": "Notification preference <input disabled={!loaded || loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(event.target.value); setSuccess",
+      "handlers": {
+        "onChange": "{event => { setValue(event.target.value); setSuccess(\"\"); }}"
+      },
+      "disabled": "{!loaded || loading || busy || !administrative}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.settings.tsx",
+      "line": 39,
+      "kind": "button",
+      "label": "{busy ? \"Saving…\" : \"Save setting\"}",
+      "handlers": {},
+      "disabled": "{!loaded || loading || busy || !administrative || value === saved}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 64,
+      "kind": "Link",
+      "label": "\"MESH home\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 70,
+      "kind": "Link",
+      "label": "\"Create workflow\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 80,
+      "kind": "Link",
+      "label": "{it.label}",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 97,
+      "kind": "button",
+      "label": "{collapsed ? \"Expand sidebar\" : \"Collapse sidebar\"}",
+      "handlers": {
+        "onClick": "{() => setCollapsed((c) => !c)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 105,
+      "kind": "Link",
+      "label": "<LogoMark />",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 113,
+      "kind": "button",
+      "label": " <Search className=\"h-3.5 w-3.5\" /> <span className=\"hidden flex-1 text-left sm:inline\">Search or jump to…</span> <kbd className=\"hidden rounded border border-border bg-background ",
+      "handlers": {
+        "onClick": "{() => setCmd(true)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 118,
+      "kind": "button",
+      "label": "\"Keyboard shortcuts\"",
+      "handlers": {
+        "onClick": "{() => setHelp(true)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 120,
+      "kind": "PopoverTrigger",
+      "label": "\"Notifications\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 125,
+      "kind": "Link",
+      "label": "{pending} run {pending > 1 ? \"s\" : \"\"} waiting for approval <span className=\"text-primary\">Review →</span>",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 130,
+      "kind": "button",
+      "label": " <p>{a.message}</p> <p className=\"text-xs text-muted-foreground\">{new Date(a.at).toLocaleString()}</p> ",
+      "handlers": {
+        "onClick": "{() => a.workflowId && navigate({ to: \"/app/workflows/$id\", params: { id: a.workflowId } })}"
+      },
+      "disabled": "{!a.workflowId}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 139,
+      "kind": "DropdownMenuTrigger",
+      "label": "\"User menu\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 146,
+      "kind": "DropdownMenuItem",
+      "label": "<Link to=\"/\">Back to website</Link>",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 146,
+      "kind": "Link",
+      "label": "Back to website",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 155,
+      "kind": "Link",
+      "label": " <it.icon className=\"h-4 w-4\" /> {it.label} ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 159,
+      "kind": "button",
+      "label": "<Menu className=\"h-4 w-4\" /> More",
+      "handlers": {
+        "onClick": "{() => setMore(true)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 161,
+      "kind": "Sheet",
+      "label": " <SheetContent side=\"bottom\" className=\"max-h-[80vh] overflow-y-auto\"> <SheetHeader><SheetTitle>All pages</SheetTitle></SheetHeader> {NAV.map((g) => ( <div key={g.group} className=",
+      "handlers": {
+        "onOpenChange": "{setMore}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 169,
+      "kind": "Link",
+      "label": " <it.icon className=\"h-4 w-4\" /> {it.label} ",
+      "handlers": {
+        "onClick": "{() => setMore(false)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 179,
+      "kind": "CommandPalette",
+      "label": "CommandPalette",
+      "handlers": {
+        "onOpenChange": "{setCmd}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.tsx",
+      "line": 180,
+      "kind": "ShortcutsDialog",
+      "label": " <aside className={`hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 md:flex ${collapsed || inBuilder ? \"w-[60px]\" : \"w-[60px] lg:w-60\"}`}",
+      "handlers": {
+        "onOpenChange": "{setHelp}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.$id.tsx",
+      "line": 37,
+      "kind": "ApiFeedback",
+      "label": " <p className=\"font-display text-xl font-medium\">Workflow not found</p> <p className=\"text-sm text-muted-foreground\">This workflow could not be loaded from the server or this brows",
+      "handlers": {
+        "onRetry": "{()=>setAttempt(n=>n+1)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.$id.tsx",
+      "line": 38,
+      "kind": "Link",
+      "label": "Back to workflows",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 86,
+      "kind": "Link",
+      "label": "<Plus className=\"h-4 w-4\" /> New",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 96,
+      "kind": "RunWorkflowDialog",
+      "label": "RunWorkflowDialog",
+      "handlers": {
+        "onClose": "{() => setRunDocument(undefined)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 98,
+      "kind": "Link",
+      "label": "Create your first draft",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 106,
+      "kind": "Link",
+      "label": " <p className=\"truncate font-medium\">{w.name}</p> <p className=\"truncate text-xs text-muted-foreground\">{w.nodes.length} steps · {live?.active_run_count ?? count} active runs · {li",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 113,
+      "kind": "DropdownMenuTrigger",
+      "label": "{`Actions for ${w.name}`}",
+      "handlers": {},
+      "disabled": "{busy}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 115,
+      "kind": "DropdownMenuItem",
+      "label": "<Play className=\"mr-2 h-4 w-4\" /> Run published",
+      "handlers": {
+        "onSelect": "{() => void run(w.id)}"
+      },
+      "disabled": "{busy || !live?.published_version || !backend.session?.runtime_available || !backend.can(\"workflow.execute\")}",
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 117,
+      "kind": "DropdownMenuItem",
+      "label": "<Pencil className=\"mr-2 h-4 w-4\" /> Edit draft",
+      "handlers": {
+        "onSelect": "{() => navigate({ to: \"/app/workflows/$id\", params: { id: w.id } })}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 118,
+      "kind": "DropdownMenuItem",
+      "label": "<Power className=\"mr-2 h-4 w-4\" /> Disable",
+      "handlers": {
+        "onSelect": "{() => void disable(w.id)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 119,
+      "kind": "DropdownMenuItem",
+      "label": "<Copy className=\"mr-2 h-4 w-4\" /> Duplicate",
+      "handlers": {
+        "onSelect": "{() => { const id = dup(w.id); if (id) toast(\"Duplicated as a local draft. Save draft to persist it on the server.\"); if (id) navigate({ to: \"/app/workflows/$id\", params: { id } }); }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 120,
+      "kind": "DropdownMenuItem",
+      "label": "<Trash2 className=\"mr-2 h-4 w-4\" /> Delete workflow",
+      "handlers": {
+        "onSelect": "{() => void remove(w.id, w.name)}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/app.workflows.index.tsx",
+      "line": 121,
+      "kind": "DropdownMenuItem",
+      "label": "<Trash2 className=\"mr-2 h-4 w-4\" /> Delete local draft",
+      "handlers": {
+        "onSelect": "{() => { if (window.confirm(`Delete local draft \"${w.name}\" from this browser?`)) { del(w.id); toast(`Deleted local draft \"${w.name}\"`); } }}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 79,
+      "kind": "a",
+      "label": "\"MESH — back to top\"",
+      "handlers": {
+        "onClick": "{toTop}"
+      },
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 93,
+      "kind": "Link",
+      "label": "\"Launch Workspace\"",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 150,
+      "kind": "Link",
+      "label": "Start building {\" \"} <ArrowRight className=\"h-4 w-4 transition-transform group-hover:translate-x-0.5\" /> ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 233,
+      "kind": "Link",
+      "label": " <Sparkles className=\"h-3.5 w-3.5\" /> Open workspace ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 417,
+      "kind": "Link",
+      "label": " <p className=\"text-xs font-medium text-primary\">{k}</p> <p className=\"mt-3 font-display text-lg font-medium\">{n}</p> <div className=\"mt-6 flex items-center justify-between text-xs",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    },
+    {
+      "file": "frontend/src/screens/index.tsx",
+      "line": 509,
+      "kind": "Link",
+      "label": "Launch Workspace <ArrowRight className=\"h-4 w-4\" /> ",
+      "handlers": {},
+      "disabled": null,
+      "spread": false
+    }
+  ]
+}

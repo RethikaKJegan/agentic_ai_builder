@@ -1,0 +1,13 @@
+# Shared website origin routing
+
+The owner explicitly selected a shared website without a MESH login or password gate. Google authorization is for connected tools (Drive, Calendar, Sheets, etc.), not website sign-in. Anyone able to reach this website can use its configured shared workspace and existing workspace permissions. This configuration does not provide individual user identities.
+
+The actual origin failure came from passing the external HTTPS origin into services configured only for loopback UI origins. The Builder TLS virtual host now validates the original browser Origin, cross-site fetch context and same-origin proof for unsafe methods before forwarding `/api/backend/` with the application's exact configured loopback Host/Origin/protocol. Secure HttpOnly SameSite cookies remain enabled. The API remains loopback-only, defaults and private origin guards are unchanged, and no wildcard origin is allowed.
+
+The temporary HTTP password challenge, its password file and private login credentials were removed. The unfinished WorkspaceAccess component and its shell wrapper/tests were reverted. That component was never deployed; the currently serving frontend artifact already matches the restored source. The origin-only correction required a scoped Nginx reload after its configuration test. Restoring access then exposed a separate timeout over 56,050 stored workflow identities: bounded first/next pages and matching overview snapshots were added, tested and deployed with a new frontend artifact and backend restart. The worker and existing data were preserved.
+
+Earlier Phase 1/7 and automatic-source verification reports accurately recorded then-current public denial, but that denial is superseded by this owner-authorized shared-site routing. Google Workspace login is not required for the requested setup. Connector OAuth authorization, Registry tool grants, publication and action approvals remain separate and unchanged.
+
+Review and live evidence: `openspec/changes/origin-routing-fix/`. No workflow save, publication, activation, execution, provider probe, email or Sheets write was performed. A deliberately empty planning request is used only to verify valid-origin canonical validation rejects before any model call.
+
+Workflow discovery uses stable workflow-ID cursors, fifty latest revisions per page and the actual workspace total. Overview and navigation badges describe the loaded page; Runs/Approvals/Monitoring retain their independent collection scopes. Page changes ignore stale in-flight overview responses. Direct workflow links and editing remain available independently of discovery pages.

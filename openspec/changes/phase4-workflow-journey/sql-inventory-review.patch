@@ -1,0 +1,150 @@
+--- a/openspec/changes/phase2-backend-reliability/sql-inventory.json
++++ b/openspec/changes/phase2-backend-reliability/sql-inventory.json
+@@ -943,61 +943,61 @@
+       "file": "runtime/service.py",
+       "line": 202,
+       "kind": "execute",
+-      "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence",
+-      "dynamic": false
+-    },
+-    {
+-      "file": "runtime/service.py",
+-      "line": 210,
+-      "kind": "execute",
+-      "sql": "SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC",
+-      "dynamic": false
+-    },
+-    {
+-      "file": "runtime/service.py",
+-      "line": 211,
+-      "kind": "execute",
+-      "sql": "SELECT COUNT(*) FROM runtime_events WHERE workspace=?",
+-      "dynamic": false
+-    },
+-    {
+-      "file": "runtime/service.py",
+-      "line": 212,
+-      "kind": "execute",
+-      "sql": "SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30",
+-      "dynamic": false
+-    },
+-    {
+-      "file": "runtime/service.py",
+-      "line": 214,
+-      "kind": "execute",
+-      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'",
++      "sql": "SELECT sequence, document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence",
+       "dynamic": false
+     },
+     {
+       "file": "runtime/service.py",
+       "line": 215,
+       "kind": "execute",
+-      "sql": "SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?",
++      "sql": "SELECT document FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC",
++      "dynamic": false
++    },
++    {
++      "file": "runtime/service.py",
++      "line": 216,
++      "kind": "execute",
++      "sql": "SELECT COUNT(*) FROM runtime_events WHERE workspace=?",
+       "dynamic": false
+     },
+     {
+       "file": "runtime/service.py",
+       "line": 217,
+       "kind": "execute",
++      "sql": "SELECT document FROM runtime_events WHERE workspace=? ORDER BY sequence DESC LIMIT 30",
++      "dynamic": false
++    },
++    {
++      "file": "runtime/service.py",
++      "line": 219,
++      "kind": "execute",
++      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_triggers'",
++      "dynamic": false
++    },
++    {
++      "file": "runtime/service.py",
++      "line": 220,
++      "kind": "execute",
++      "sql": "SELECT workflow_id, state, document FROM lifecycle_triggers WHERE workspace=?",
++      "dynamic": false
++    },
++    {
++      "file": "runtime/service.py",
++      "line": 222,
++      "kind": "execute",
+       "sql": "SELECT updated_at FROM lifecycle_checkpoints WHERE workspace=? AND binding_id=?",
+       "dynamic": false
+     },
+     {
+       "file": "runtime/service.py",
+-      "line": 254,
++      "line": 259,
+       "kind": "execute",
+       "sql": "SELECT sequence, document FROM runtime_events WHERE sequence NOT IN (SELECT sequence FROM runtime_trace_exports WHERE observer=?) ORDER BY sequence LIMIT ?",
+       "dynamic": false
+     },
+     {
+       "file": "runtime/service.py",
+-      "line": 262,
++      "line": 267,
+       "kind": "execute",
+       "sql": "INSERT OR IGNORE INTO runtime_trace_exports VALUES (?, ?)",
+       "dynamic": false
+@@ -1984,28 +1984,28 @@
+     },
+     {
+       "file": "workflow_api/main.py",
+-      "line": 409,
++      "line": 417,
+       "kind": "execute",
+       "sql": "SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key",
+       "dynamic": false
+     },
+     {
+       "file": "workflow_api/main.py",
+-      "line": 412,
++      "line": 420,
+       "kind": "execute",
+       "sql_expression": "f'SELECT document FROM {table} WHERE workspace=? ORDER BY updated_at DESC'",
+       "dynamic": true
+     },
+     {
+       "file": "workflow_api/main.py",
+-      "line": 440,
++      "line": 448,
+       "kind": "execute",
+       "sql": "INSERT INTO workspace_settings VALUES (?, ?, ?, ?) ON CONFLICT(workspace, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+       "dynamic": false
+     },
+     {
+       "file": "workflow_api/main.py",
+-      "line": 445,
++      "line": 453,
+       "kind": "execute",
+       "sql_expression": "f'INSERT INTO {table} VALUES (?, ?, ?, ?) ON CONFLICT({('source_id' if collection == 'knowledge' else 'policy_id')}) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at'",
+       "dynamic": true
+@@ -2379,6 +2379,20 @@
+       "line": 333,
+       "kind": "execute",
+       "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
++      "dynamic": false
++    },
++    {
++      "file": "workflow_api/release_read.py",
++      "line": 7,
++      "kind": "execute",
++      "sql": "SELECT r.document FROM lifecycle_active a JOIN lifecycle_releases r ON r.release_id=a.release_id WHERE a.workspace=? AND r.workspace=? AND a.workflow_id=?",
++      "dynamic": false
++    },
++    {
++      "file": "workflow_api/release_read.py",
++      "line": 9,
++      "kind": "execute",
++      "sql": "SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1",
+       "dynamic": false
+     },
+     {

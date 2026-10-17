@@ -169,7 +169,7 @@ class LiveProviderTests(unittest.TestCase):
                 output = {'summary': 'Analysed synthetic record'} if definition['agent_id'] == 'analysis' else {'subject': 'Notification', 'body': 'Composed from Analysed synthetic record'}
                 return json.dumps(output), 20, 20
             return BoundedLLM(definition, provider, lambda messages: 100, .0000002, .0000012)
-        app = create_configured_app(self.env, database or self.path / 'workflows.sqlite3', client=SimpleNamespace(), model_factory=factory)
+        app = create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, database or self.path / 'workflows.sqlite3', client=SimpleNamespace(), model_factory=factory)
         runner = app.state.workflow_service.runtime_runner
         runner.connectors['google_sheets_read_rows'].invoke = lambda *args: {'rows': deepcopy(self.rows)}
         runner.connectors['smtp_send_email'].transport = FakeSMTP
@@ -310,7 +310,7 @@ class LiveProviderTests(unittest.TestCase):
         self.assertEqual(FakeSMTP.messages, [])
 
     def test_generic_launcher_does_not_create_workflows(self):
-        app = create_configured_app(self.env, self.path / 'empty.sqlite3', client=SimpleNamespace(), model_factory=lambda definition: None)
+        app = create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, self.path / 'empty.sqlite3', client=SimpleNamespace(), model_factory=lambda definition: None)
         with app.state.workflow_service.store.transaction() as db:
             self.assertEqual(app.state.workflow_service.store.list(db, 'local-workspace'), [])
 

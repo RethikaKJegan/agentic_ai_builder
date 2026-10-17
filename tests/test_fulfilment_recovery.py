@@ -9,6 +9,7 @@ class RecoveryTests(unittest.TestCase):
         self.workflow={'tools':[],'nodes':[{'kind':'trigger'},{'kind':'agent'},{'kind':'output'}]}
         owner=self
         class DB:
+            def __init__(self,*,write=True):owner.assertFalse(write)
             def __enter__(self):return self
             def __exit__(self,*args):pass
             def execute(self,*args):return SimpleNamespace(fetchone=lambda:(json.dumps(owner.workflow),))

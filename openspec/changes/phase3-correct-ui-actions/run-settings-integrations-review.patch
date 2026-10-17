@@ -1,0 +1,407 @@
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -145,6 +145,10 @@
+     setFuture((f) => f.slice(1));
+     commit(next, { history: false });
+   }, [future, commit]);
++
++  useEffect(() => {
++    setNodes(workflow.nodes as MeshFlowNode[]); setEdges(workflow.edges); setPast([]); setFuture([]);
++  }, [workflow.canonical]); // Confirmed server actions/reload reconcile the canvas without dropping newer local edits.
+ 
+   useEffect(() => {
+     const onKey = (e: KeyboardEvent) => {
+@@ -510,7 +514,6 @@
+             ))}
+           </DropdownMenuContent>
+         </DropdownMenu>
+-        <WorkflowControls workflow={current} />
+         <DropdownMenu>
+           <DropdownMenuTrigger
+             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+@@ -559,6 +562,8 @@
+           </DropdownMenuContent>
+         </DropdownMenu>
+       </div>
++
++      <div className="shrink-0 border-b border-border px-3 py-3"><WorkflowControls workflow={current} /></div>
+ 
+       <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-xs">
+         <label htmlFor="trace-run" className="font-medium">Execution trace</label>
+--- a/frontend/src/features/workflows/WorkflowControls.tsx
++++ b/frontend/src/features/workflows/WorkflowControls.tsx
+@@ -1,90 +1,88 @@
+-import { useState } from "react";
+-import { FlaskConical, Rocket, X } from "lucide-react";
+-import { api } from "@/api/client";
++"use client";
++import { useRef, useState } from "react";
++import { api, ApiError } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { toCanonical, hasWorkflowEdits } from "@/api/mapping";
+ import { useMesh } from "@/domain/store";
+ import type { Workflow } from "@/domain/types";
+-import { runTotals, simulateRun, type SimResult } from "@/domain/simulator";
+-import { RunTrace } from "@/features/runs/RunTrace";
+ import { assertWorkflowReferences } from "@/api/control";
+ import { ApiFeedback } from "./ApiFeedback";
+ import { SheetAccessReview } from "./SheetAccessReview";
+ import { CustomerAutomationReview } from "./CustomerAutomationReview";
+ import { ProcurementReview } from "./ProcurementReview";
++import { editSnapshot, acceptConfirmed } from "./workflow-state";
++import { useUnsavedWorkflow } from "./unsaved";
++
++type Action = "save" | "validate" | "submit" | "approve" | "publish" | "activate" | "reload";
++const labels: Record<Action, string> = { save: "Save draft", validate: "Validate", submit: "Submit for approval", approve: "Approve", publish: "Publish", activate: "Activate", reload: "Reload server revision" };
++const permissions: Record<Action, string> = { save: "workflow.edit", validate: "workflow.validate", submit: "workflow.validate", approve: "workflow.approve", publish: "workflow.publish", activate: "workflow.publish", reload: "workflow.view" };
+ 
+ export function WorkflowControls({ workflow }: { workflow: Workflow }) {
+-  const backend = useBackend();
+-  const agents = useMesh((s) => s.agents);
+-  const [busy, setBusy] = useState("");
+-  const [error, setError] = useState<Error>();
+-  const [test, setTest] = useState<SimResult>();
+-  const version = workflow.serverVersion;
+-  const activeRelease = backend.overview[workflow.id];
+-  if (backend.status !== "connected") return null;
++  const backend = useBackend(); const agents = useMesh(state => state.agents);
++  const [busy, setBusy] = useState<Action | "">(""); const pending = useRef(false);
++  const [error, setError] = useState<Error>(); const [message, setMessage] = useState("");
++  useUnsavedWorkflow(workflow.id);
++  const version = workflow.serverVersion; const document = workflow.canonical;
+   const dirty = hasWorkflowEdits(workflow, agents);
+-  let graphError: Error | null = null;
+-  try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught : new Error("Complete the workflow configuration."); }
+-  const saveDraft = async () => {
+-    const state = useMesh.getState();
+-    const current = state.workflows.find((item) => item.id === workflow.id) ?? workflow;
+-    const document = toCanonical(current, state.agents);
+-    const result = await api.request("save_workflow_version", { workflow_id: document.workflow_id,
+-      workflow_version: document.version, base_version: current.serverVersion ?? 0, workflow: document });
+-    useMesh.getState().acceptWorkflow(result.workflow);
+-    if (result.registry_review) backend.acceptReview(result.registry_review);
+-    return result.workflow;
++  let graphError = "";
++  try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught.message : "Complete the workflow configuration."; }
++  const blocker = (action: Action) => {
++    if (backend.status !== "connected") return "Connect to the backend to use this action.";
++    if (!backend.can(permissions[action])) return `${permissions[action]} permission is required.`;
++    if (action === "reload") return version ? "" : "This local draft has no server revision.";
++    if (action === "save") return graphError || (!dirty ? "No unsaved changes." : "");
++    if (dirty) return "Save draft before this action.";
++    if (!version || !document) return "Save this draft first.";
++    if (action === "validate") return document.status === "draft" || document.status === "validated" ? "" : "Save an edited draft to validate a new revision.";
++    if (action === "submit") return document.status !== "validated" ? "Validate this revision first." : document.metadata["approval_submission"] ? "This revision is submitted for review." : "";
++    if (action === "approve") return document.status === "validated" ? "" : "A validated revision is required.";
++    if (action === "publish") return document.status === "approved" ? "" : "Explicit approval is required before publication.";
++    return document.status === "published" ? "" : "Publish this revision before activation.";
+   };
+-  const testWorkflow = () => {
+-    setError(undefined);
+-    if (graphError) { setError(graphError); return; }
+-    const state = useMesh.getState();
+-    const current = state.workflows.find((item) => item.id === workflow.id) ?? workflow;
+-    // This simulation is local. It cannot call a connector, send mail, or modify a provider resource.
+-    setTest(simulateRun(current, state.agents, current.description || "Safe editor test", {}, undefined, state.controlContext(current.id)));
++  const act = async (action: Action) => {
++    if (pending.current || blocker(action)) return;
++    if (action === "reload" && dirty && !window.confirm("Reload the server revision and discard this editor's unsaved changes?")) return;
++    if (action === "activate" && !window.confirm(`Activate published revision v${version}? Configured events will be allowed to start runs under this revision's reviewed policies.`)) return;
++    pending.current = true; setBusy(action); setError(undefined); setMessage("");
++    try {
++      const state = useMesh.getState(); const current = state.workflows.find(item => item.id === workflow.id) ?? workflow;
++      const snapshot = editSnapshot(current, state.agents);
++      const ref = { workflow_id: current.id, workflow_version: current.serverVersion! };
++      if (action === "activate") {
++        const active = useBackend.getState().overview[current.id];
++        const result = await api.activateRelease({ ...ref, expected_release_id: active?.activation_state === "active" ? active.release_id : null, triggers: [] });
++        setMessage(`Activation ${result.operation.state} · release ${result.release.release_id}`);
++      } else {
++        const result = action === "save" ? await api.request("save_workflow_version", { workflow_id: current.id, workflow_version: (current.serverVersion ?? 0) + 1, base_version: current.serverVersion ?? 0, workflow: toCanonical(current, state.agents) })
++          : action === "reload" ? await api.request("get_workflow", { workflow_id: current.id })
++            : action === "submit" ? await api.submitApproval(ref)
++              : action === "validate" ? await api.request("validate_workflow", ref)
++                : await api.request("approve_workflow", { ...ref, action: action === "approve" ? "approve" : "publish" });
++        if (action === "reload") state.acceptWorkflow(result.workflow); else acceptConfirmed(result.workflow, snapshot);
++        if (result.registry_review) backend.acceptReview(result.registry_review);
++        if (action === "validate" && result.workflow.status !== "validated") throw new Error("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
++        setMessage(`${labels[action]} confirmed · v${result.workflow.version} · ${result.workflow.status}`);
++      }
++      await backend.refreshOverview();
++    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); }
++    finally { pending.current = false; setBusy(""); }
+   };
+-  const publish = async () => {
+-    if (busy || graphError || backend.status !== "connected") return;
+-    setBusy("publish"); setError(undefined);
+-    try {
+-      let document = workflow.canonical;
+-      if (dirty || !document || !version) document = await saveDraft();
+-      const ref = { workflow_id: document.workflow_id, workflow_version: document.version };
+-      if (document.status === "draft") {
+-        const validated = await api.request("validate_workflow", ref);
+-        useMesh.getState().acceptWorkflow(validated.workflow);
+-        document = validated.workflow;
+-      }
+-      if (document.status === "validated") {
+-        const approved = await api.request("approve_workflow", { ...ref, action: "approve" });
+-        useMesh.getState().acceptWorkflow(approved.workflow);
+-        document = approved.workflow;
+-      }
+-      if (document.status !== "approved") throw new Error("This revision cannot be published. Resolve its review requirements first.");
+-      const published = await api.request("approve_workflow", { workflow_id: document.workflow_id, workflow_version: document.version, action: "publish" });
+-      useMesh.getState().acceptWorkflow(published.workflow);
+-      await api.activateRelease({ workflow_id: document.workflow_id, workflow_version: document.version,
+-        expected_release_id: activeRelease?.activation_state === "active" ? activeRelease.release_id : null, triggers: [] });
+-      await backend.refreshOverview();
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The workflow could not be published.")); }
+-    finally { setBusy(""); }
+-  };
+-  const saved = workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
+-  const totals = test ? runTotals(test.steps) : null;
+-  return <>
++  const timestamp = document?.metadata["updated_at"];
++  const saved = typeof timestamp === "string" && Number.isFinite(Date.parse(timestamp)) ? new Date(timestamp).toLocaleString() : null;
++  const conflict = error instanceof ApiError && ["REVISION_CONFLICT", "RELEASE_CONFLICT"].includes(error.error.error_code);
++  const review = backend.reviews[workflow.id];
++  return <section aria-label="Workflow actions" className="flex w-full flex-wrap items-start gap-2">
++    <div className="w-full text-xs text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
+     <ProcurementReview workflow={workflow} />
+-    <SheetAccessReview targets={workflow.canonical?.metadata["sheet_write_targets"]} />
+-    <CustomerAutomationReview policy={workflow.canonical?.metadata["customer_automation"]} emailPolicy={workflow.canonical?.metadata["email_recipient_policy"]} />
+-    <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">{dirty ? "Unsaved edits" : `Saved ${saved}`}</span>
+-    <button type="button" onClick={testWorkflow} className="flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 text-sm hover:border-border-accent" aria-label="Test workflow"><FlaskConical className="h-4 w-4" />Test</button>
+-    <button type="button" onClick={() => void publish()} disabled={!!busy || !!graphError || backend.status !== "connected" || !backend.can("workflow.publish")} className="flex h-8 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-40"><Rocket className="h-4 w-4" />{busy ? "Publishing…" : "Publish"}</button>
+-    {error && <div className="absolute right-4 top-14 z-30 max-h-[60vh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto shadow-sm"><ApiFeedback error={error} /></div>}
+-    {test && <div role="dialog" aria-modal="true" aria-label="Safe test run" className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4">
+-      <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl">
+-        <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h2 className="font-display text-xl font-semibold">Test run</h2><p className="mt-1 text-sm text-muted-foreground">Simulated locally. No email, Sheets update, webhook, or external connector was called.</p></div><button onClick={() => setTest(undefined)} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close test run"><X className="h-5 w-5" /></button></div>
+-        <div className="my-4 grid grid-cols-4 gap-2 rounded-xl bg-muted/50 p-3 text-center text-xs"><span><b className="block text-base">{test.status}</b>Status</span><span><b className="block text-base">{test.steps.length}</b>Steps</span><span><b className="block text-base">{totals?.tokens ?? 0}</b>Tokens</span><span><b className="block text-base">${totals?.cost.toFixed(4) ?? "0.0000"}</b>Estimated</span></div>
+-        <RunTrace steps={test.steps} />
+-      </div>
+-    </div>}
+-  </>;
++    <SheetAccessReview targets={document?.metadata["sheet_write_targets"]} />
++    <CustomerAutomationReview policy={document?.metadata["customer_automation"]} emailPolicy={document?.metadata["email_recipient_policy"]} />
++    {(["save", "validate", "submit", "approve", "publish", "activate"] as const).map(action => { const reason = blocker(action); return <div key={action} className="max-w-48">
++      <button type="button" disabled={!!busy || !!reason} aria-describedby={`${workflow.id}-${action}-reason`} onClick={() => void act(action)} className={`rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40 ${action === "save" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"}`}>{busy === action ? `${labels[action]}…` : labels[action]}</button>
++      <p id={`${workflow.id}-${action}-reason`} className="mt-1 text-[11px] text-muted-foreground">{reason}</p>
++    </div>; })}
++    <button type="button" disabled={!!busy || !!blocker("reload")} title={blocker("reload")} onClick={() => void act("reload")} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Reload server revision</button>
++    {review && !review.ready && <p role="status" className="w-full text-sm text-destructive">Registry blockers: {review.reason_codes.join(", ") || "Review the tool assignments."}</p>}
++    {conflict && <p role="alert" className="w-full text-sm">The server changed. Your edits are retained. Copy any changes you want to keep before choosing Reload server revision, then reapply them to the latest draft.</p>}
++    <div className="w-full"><ApiFeedback error={error} />{message && <p role="status" className="text-sm text-emerald-700">{message}</p>}</div>
++  </section>;
+ }
+--- a/frontend/src/screens/app.integrations.tsx
++++ b/frontend/src/screens/app.integrations.tsx
+@@ -1,14 +1,41 @@
+ "use client";
+-import { useState } from "react";
+-import { SEED_CONNECTORS } from "@/domain/catalog";
++import { useRef, useState } from "react";
++import { api } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
++type Check = Awaited<ReturnType<typeof api.integrationCheck>>;
+ export default function Integrations() {
+-  const backend = useBackend();
+-  const [tested, setTested] = useState<Record<string, string>>({});
+-  const test = async (provider: string) => { try { const response = await fetch(`/api/backend/integrations/${encodeURIComponent(provider)}/test`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: "{}" }); const body = await response.json(); setTested((current) => ({ ...current, [provider]: body?.data?.message ?? "Test complete" })); } catch { setTested((current) => ({ ...current, [provider]: "Connection test unavailable" })); } };
+-  if (backend.status === "connected") return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 text-sm text-muted-foreground">Server-owned connector readiness. Secrets and credential values never enter the browser.</p><ApiFeedback error={backend.error} /><div className="mt-8 grid gap-4 md:grid-cols-2">{backend.tools.length ? backend.tools.map((t) => { const configured = t.credential_configured && t.definition.availability === "enabled"; const status = configured ? "Configured" : t.definition.availability === "disabled" ? "Disabled" : "Needs configuration"; const provider = t.definition.provider_id; return <div key={t.tool_id} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{provider}</p><p className="text-xs text-muted-foreground">{t.tool_id} · v{t.version}</p></div><span className={`rounded-full px-2 py-1 text-[11px] ${configured ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{status}</span></div><p className="mt-3 text-sm text-muted-foreground">{t.definition.description}</p><p className="mt-3 text-xs">Capability: {t.definition.capability} · {t.definition.risk_level} risk · {t.authorization_state}</p><p className="mt-1 text-xs text-muted-foreground">Scopes: {t.definition.authentication.scopes?.join(", ") || "none"}{t.definition.approval_required ? " · approval required" : ""}</p><button className="mt-4 rounded-lg border border-border px-3 py-2 text-xs" onClick={() => void test(provider)}>Test server connection</button>{tested[provider] && <p className="mt-2 text-xs text-muted-foreground">{tested[provider]}</p>}</div>; }) : <p className="p-8 text-sm text-muted-foreground">No registered tools are visible to this session. Connector configuration is managed by the backend owner.</p>}</div></div>;
+-  return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1><p className="mt-2 max-w-xl text-sm text-muted-foreground">Connector catalog preview. Registry discovery and secure configuration are awaiting backend integration.</p>
+-    <div className="mt-8 divide-y divide-border rounded-xl border border-border">{SEED_CONNECTORS.map((c) => <div key={c.id} className="flex items-center gap-4 px-4 py-4"><span className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-canvas font-display text-sm font-semibold">{c.name.slice(0, 2)}</span><div className="min-w-0 flex-1"><p className="font-medium">{c.name}</p><p className="text-xs text-muted-foreground">{c.description}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">Not configured</span></div>)}</div>
+-  </div>;
++  const backend = useBackend(); const [checks, setChecks] = useState<Record<string, Check>>({});
++  const [errors, setErrors] = useState<Record<string, Error>>({}); const [pending, setPending] = useState<Record<string, boolean>>({}); const locks = useRef(new Set<string>());
++  const tools = [...new Map(backend.tools.map(tool => [tool.definition.provider_id, tool])).values()];
++  const admin = backend.session?.auth.roles.includes("admin") && backend.session.auth.decision === "allow";
++  const check = async (provider: string, mode: "configuration" | "connection") => {
++    if (locks.current.has(provider) || !backend.can("tools.read") || (mode === "connection" && !admin)) return;
++    locks.current.add(provider); setPending(current => ({ ...current, [provider]: true }));
++    setErrors(current => { const next = { ...current }; delete next[provider]; return next; });
++    if (mode === "connection") setChecks(current => { const next = { ...current }; delete next[provider]; return next; });
++    try { const result = await api.integrationCheck(provider, mode); setChecks(current => ({ ...current, [provider]: result })); }
++    catch (caught) {
++      setChecks(current => { const next = { ...current }; delete next[provider]; return next; });
++      setErrors(current => ({ ...current, [provider]: caught instanceof Error ? caught : new Error("The check could not be completed.") }));
++    } finally { locks.current.delete(provider); setPending(current => ({ ...current, [provider]: false })); }
++  };
++  return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1>
++    <p className="mt-2 text-sm text-muted-foreground">Configuration and verified connectivity are separate. Credentials remain on the server. Read-only checks never send email or modify provider resources.</p>
++    <ApiFeedback error={backend.error} />
++    {backend.status !== "connected" && <p role="status" className="mt-4 text-sm text-muted-foreground">Connect to the backend to inspect registered integrations.</p>}
++    <div className="mt-8 grid gap-4 md:grid-cols-2">{tools.map(tool => {
++      const provider = tool.definition.provider_id; const result = checks[provider];
++      const configured = tool.definition.availability === "enabled" && (tool.credential_configured || tool.definition.authentication.mode === "none");
++      const label = result?.state === "verified" ? "Verified" : result?.state === "connection_failed" ? "Connection failed" : (result ? result.configured : configured) ? "Configured · not verified" : "Not configured";
++      return <section key={provider} aria-label={`${provider} integration`} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><h2 className="font-medium">{provider}</h2><span className={`rounded-full px-2 py-1 text-xs ${result?.verified ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{label}</span></div>
++        <p className="mt-3 text-sm text-muted-foreground">{tool.definition.description}</p><p className="mt-2 text-xs">{backend.tools.filter(item => item.definition.provider_id === provider).map(item => item.tool_id).join(", ")}</p>
++        <button type="button" disabled={pending[provider] || !backend.can("tools.read")} className="mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "configuration")}>{pending[provider] ? "Checking…" : "Check configuration"}</button>
++        {result?.live_test_supported && <button type="button" disabled={pending[provider] || !admin || !result.configured} className="ml-2 mt-4 rounded-lg border px-3 py-2 text-xs disabled:opacity-40" onClick={() => void check(provider, "connection")}>Verify connection</button>}
++        {!backend.can("tools.read") && <p className="mt-2 text-xs">tools.read permission is required.</p>}
++        {result?.live_test_supported && !admin && <p className="mt-2 text-xs">An administrator must verify connections.</p>}
++        {result && <p role="status" className="mt-2 text-xs text-muted-foreground">{result.message}</p>}
++        <ApiFeedback error={errors[provider]} />
++      </section>;
++    })}{backend.status === "connected" && !tools.length && <p className="text-sm text-muted-foreground">No registered integrations are visible to your account.</p>}</div></div>;
+ }
+--- a/frontend/src/screens/app.settings.tsx
++++ b/frontend/src/screens/app.settings.tsx
+@@ -1,4 +1,40 @@
+ "use client";
+-import { useEffect, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { PageHeader } from "@/features/runs/RunTrace";
+-export default function Screen() { const [items, setItems] = useState<{key: string; value: unknown}[]>([]); const [value, setValue] = useState(""); useEffect(() => { void fetch("/api/backend/workspace/settings", { credentials: "same-origin" }).then((r) => r.json()).then((b) => setItems(b?.data?.items ?? [])); }, []); const save = async () => { await fetch("/api/backend/workspace/settings/notifications", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ value }) }); setItems((current) => [...current.filter((i) => i.key !== "notifications"), { key: "notifications", value }]); }; return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Settings" sub="Persisted workspace settings." /><div className="rounded-2xl border border-border p-4"><label className="text-sm">Notification preference<input value={value} onChange={(e) => setValue(e.target.value)} className="mt-2 block w-full rounded-lg border border-border bg-background p-2" placeholder="email" /></label><button onClick={() => void save()} className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">Save setting</button></div><pre className="rounded-2xl border border-border p-4 text-xs">{JSON.stringify(items, null, 2)}</pre></div>; }
++import { api } from "@/api/client";
++import { useBackend } from "@/api/state";
++import { ApiFeedback } from "@/features/workflows/ApiFeedback";
++export default function Screen() {
++  const backend = useBackend(); const [value, setValue] = useState(""); const [saved, setSaved] = useState("");
++  const [timestamp, setTimestamp] = useState(""); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<Error>(); const [success, setSuccess] = useState(""); const pending = useRef(false);
++  const administrative = backend.session?.auth.decision === "allow" && backend.session.auth.roles.includes("admin") && backend.session.auth.scopes.includes("workspace:write");
++  useEffect(() => {
++    if (backend.status !== "connected") return;
++    let active = true;
++    api.settings().then(result => {
++      if (!active) return;
++      const item = result.items.find(item => item.key === "notifications");
++      if (item && typeof item.value !== "string") throw new Error("The notification setting is not text. Ask the administrator to correct it.");
++      const initial = typeof item?.value === "string" ? item.value : "";
++      setValue(initial); setSaved(initial); setTimestamp(item?.updated_at ?? ""); setError(undefined);
++    }).catch(caught => { if (active) setError(caught instanceof Error ? caught : new Error("Settings could not be loaded.")); }).finally(() => { if (active) setLoading(false); });
++    return () => { active = false; };
++  }, [backend.status]);
++  const save = async () => {
++    if (pending.current || loading || !administrative || value === saved) return;
++    pending.current = true; setBusy(true); setError(undefined); setSuccess("");
++    try { const item = await api.saveNotification(value); setSaved(item.value); setTimestamp(item.updated_at); setSuccess("Setting saved on the server."); }
++    catch (caught) { setError(caught instanceof Error ? caught : new Error("The setting was not saved.")); }
++    finally { pending.current = false; setBusy(false); }
++  };
++  return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Settings" sub="Persisted workspace settings." />
++    <ApiFeedback error={error ?? backend.error} />
++    <form onSubmit={event => { event.preventDefault(); void save(); }} className="rounded-2xl border border-border p-4">
++      <label className="text-sm">Notification preference<input disabled={loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(event.target.value); setSuccess(""); }} className="mt-2 block w-full rounded-lg border border-border bg-background p-2 disabled:opacity-40" placeholder="email" /></label>
++      <p role="status" className="mt-2 text-xs text-muted-foreground">{loading ? "Loading confirmed settings…" : value !== saved ? "Unsaved changes" : timestamp ? `Saved ${new Date(timestamp).toLocaleString()}` : "No notification preference saved yet."}</p>
++      {!administrative && <p className="mt-2 text-sm text-muted-foreground">Workspace administrator access is required to save settings.</p>}
++      <button type="submit" disabled={loading || busy || !administrative || value === saved} className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40">{busy ? "Saving…" : "Save setting"}</button>
++      {success && <p role="status" className="mt-2 text-sm text-emerald-700">{success}</p>}
++    </form></div>;
++}
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -8,7 +8,9 @@
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ import { api } from "@/api/client";
+-import { useEffect, useState } from "react";
++import { RunWorkflowDialog } from "@/features/workflows/RunWorkflowDialog";
++import type { CanonicalWorkflow } from "@/api/contracts.generated";
++import { useEffect, useRef, useState } from "react";
+ 
+ 
+ 
+@@ -24,6 +26,9 @@
+   const visibleWorkflows = backend.status === "connected" && backend.lastOverviewUpdate
+     ? workflows.filter((workflow) => !workflow.serverVersion || backend.overview[workflow.id])
+     : workflows;
++  const lock = useRef(false);
++  const [busy, setBusy] = useState(false);
++  const [runDocument, setRunDocument] = useState<CanonicalWorkflow>();
+   const [actionError, setActionError] = useState<Error | null>(null);
+   useEffect(() => {
+     if (backendStatus !== "connected") return;
+@@ -44,50 +49,38 @@
+   }, [backendStatus, refreshOverview]);
+ 
+   const run = async (workflowId: string) => {
+-    const workflow = useMesh.getState().workflows.find((item) => item.id === workflowId);
+-    const overview = useBackend.getState().overview[workflowId];
+-    if (!workflow?.canonical || !overview?.published_version) return;
+-    try {
+-      setActionError(null);
+-      const published = await api.request("get_workflow", { workflow_id: workflowId, workflow_version: overview.published_version });
+-      const automatic = published.workflow.metadata["execution_input_mode"] === "automatic";
+-      const triggers = published.workflow.metadata["trigger_templates"];
+-      if (automatic && Array.isArray(triggers) && triggers.length) {
+-        toast.info(overview.activation_state === "active"
+-          ? "This workflow starts automatically when its configured event arrives. Create a new event in its source, then check Runs."
+-          : "Publish and activate this workflow to start receiving its configured events.");
+-        return;
+-      }
+-      const inputs: Record<string, unknown> = {};
+-      if (!automatic) for (const field of published.workflow.inputs) {
+-        const value = window.prompt(`Run input: ${field.name}${field.required ? " (required)" : ""}`);
+-        if (value === null) return;
+-        if (value || field.required) inputs[field.name] = field.type === "number" || field.type === "integer" ? Number(value) : field.type === "boolean" ? value === "true" : field.type === "object" || field.type === "array" ? JSON.parse(value) : value;
+-      }
+-      const result = await api.request("execute_workflow", { workflow_id: workflowId, workflow_version: overview.published_version, inputs });
+-      toast(`Run ${result.run.run_id} is ${result.run.status}`);
+-      await useBackend.getState().refreshOverview();
+-    } catch (error) { setActionError(error instanceof Error ? error : new Error("Run failed.")); }
++    const state = useBackend.getState(); const overview = state.overview[workflowId];
++    if (lock.current || !overview?.published_version || !state.can("workflow.execute") || !state.session?.runtime_available) return;
++    lock.current = true; setBusy(true); setActionError(null);
++    try { setRunDocument((await api.request("get_workflow", { workflow_id: workflowId, workflow_version: overview.published_version })).workflow); }
++    catch (error) { setActionError(error instanceof Error ? error : new Error("The published revision could not be loaded.")); }
++    finally { lock.current = false; setBusy(false); }
+   };
+ 
+   const remove = async (workflowId: string, name: string) => {
++    if (lock.current) return;
+     const overview = useBackend.getState().overview[workflowId];
+     if (!window.confirm(`Delete "${name}"? Runs and audit evidence will be retained.`)) return;
++    lock.current = true; setBusy(true); setActionError(null);
+     try {
+       await api.deleteWorkflow(workflowId, overview?.release_id ?? null);
+       useMesh.getState().deleteWorkflow(workflowId);
+       await useBackend.getState().refreshOverview();
+       toast(`Deleted "${name}"`);
+     } catch (error) { setActionError(error instanceof Error ? error : new Error("Delete failed.")); }
++    finally { lock.current = false; setBusy(false); }
+   };
+ 
+   const disable = async (workflowId: string) => {
++    if (lock.current || !window.confirm("Disable this workflow and stop accepting new trigger runs? Queued dispatches will be cancelled; run history is retained.")) return;
++    lock.current = true; setBusy(true); setActionError(null);
+     const overview = useBackend.getState().overview[workflowId];
+     try {
+       await api.disableRelease(workflowId, overview?.release_id ?? null);
+       await useBackend.getState().refreshOverview();
+       toast("Workflow disabled");
+     } catch (error) { setActionError(error instanceof Error ? error : new Error("Disable failed.")); }
++    finally { lock.current = false; setBusy(false); }
+   };
+ 
+   return (
+@@ -106,6 +99,7 @@
+         {backend.lastOverviewUpdate && ` · updated ${new Date(backend.lastOverviewUpdate).toLocaleTimeString()}`}
+       </div>
+       <ApiFeedback error={actionError ?? backend.error} />
++      {runDocument && <RunWorkflowDialog workflow={runDocument} onClose={() => setRunDocument(undefined)} />}
+       {visibleWorkflows.length === 0 ? (
+         <p className="mt-8 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No workflows yet. <Link to="/app" className="text-primary">Create your first draft</Link>.</p>
+       ) : (
+@@ -122,14 +116,15 @@
+                 </Link>
+                 <StatusPill status={live?.activation_state ?? `${w.serverVersion ? `v${w.serverVersion} · ` : "local · "}${w.status}`} tone={live?.activation_state === "active" ? "success" : "neutral"} />
+                 <DropdownMenu>
+-                  <DropdownMenuTrigger className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Actions for ${w.name}`}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
++                  <DropdownMenuTrigger disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Actions for ${w.name}`}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
+                   <DropdownMenuContent align="end">
+-                    {live?.published_version && backend.session?.runtime_available && <DropdownMenuItem onSelect={() => void run(w.id)}><Play className="mr-2 h-4 w-4" /> Run published</DropdownMenuItem>}
++                    <DropdownMenuItem disabled={busy || !live?.published_version || !backend.session?.runtime_available || !backend.can("workflow.execute")} onSelect={() => void run(w.id)}><Play className="mr-2 h-4 w-4" /> Run published</DropdownMenuItem>
++                    {(!backend.can("workflow.execute") || !backend.session?.runtime_available || !live?.published_version) && <p className="max-w-56 px-2 py-1 text-xs text-muted-foreground">{!backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : "Publish a revision before running."}</p>}
+                     <DropdownMenuItem onSelect={() => navigate({ to: "/app/workflows/$id", params: { id: w.id } })}><Pencil className="mr-2 h-4 w-4" /> Edit draft</DropdownMenuItem>
+                     {live?.activation_state === "active" && backend.can("workflow.publish") && <DropdownMenuItem onSelect={() => void disable(w.id)}><Power className="mr-2 h-4 w-4" /> Disable</DropdownMenuItem>}
+-                    <DropdownMenuItem onSelect={() => { const id = dup(w.id); if (id) navigate({ to: "/app/workflows/$id", params: { id } }); }}><Copy className="mr-2 h-4 w-4" /> Duplicate</DropdownMenuItem>
++                    <DropdownMenuItem onSelect={() => { const id = dup(w.id); if (id) toast("Duplicated as a local draft. Save draft to persist it on the server."); if (id) navigate({ to: "/app/workflows/$id", params: { id } }); }}><Copy className="mr-2 h-4 w-4" /> Duplicate</DropdownMenuItem>
+                     {w.serverVersion && backend.can("workflow.delete") && <DropdownMenuItem className="text-destructive" onSelect={() => void remove(w.id, w.name)}><Trash2 className="mr-2 h-4 w-4" /> Delete workflow</DropdownMenuItem>}
+-                    {!w.serverVersion && <DropdownMenuItem className="text-destructive" onSelect={() => { del(w.id); toast(`Deleted "${w.name}"`); }}><Trash2 className="mr-2 h-4 w-4" /> Delete local draft</DropdownMenuItem>}
++                    {!w.serverVersion && <DropdownMenuItem className="text-destructive" onSelect={() => { if (window.confirm(`Delete local draft "${w.name}" from this browser?`)) { del(w.id); toast(`Deleted local draft "${w.name}"`); } }}><Trash2 className="mr-2 h-4 w-4" /> Delete local draft</DropdownMenuItem>}
+                   </DropdownMenuContent>
+                 </DropdownMenu>
+               </div>

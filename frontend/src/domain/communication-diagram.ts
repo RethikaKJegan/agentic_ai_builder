@@ -25,6 +25,7 @@ export interface DiagramCard {
   input?: unknown;
   output?: unknown;
   problem?: unknown;
+  configuration?: unknown;
   events: RunEvent[];
   runId?: string | undefined;
   invocationId?: string | undefined;
@@ -139,6 +140,9 @@ export function workflowDiagram(
       spawned: !!spawn,
       parent: name(spawn?.details?.["parent_node_id"] ?? entity.parentNodeId),
       description: entity.node.data.kind === "agent" ? definition?.goal : undefined,
+      configuration: definition ? { role:definition.role, responsibility:definition.goal,
+        model:definition.model, tools:definition.allowed_tool_ids, approval_requirements:definition.approval_requirements,
+        hierarchy_role:definition.hierarchy_role, configuration_status:'Saved definition; execution authority is checked by the server.' } : undefined,
       reason: typeof reason === "string" ? reason : undefined,
       input:
         task?.details?.["receiver_input"] ??

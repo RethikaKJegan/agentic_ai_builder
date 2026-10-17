@@ -1,6 +1,6 @@
 import io
 import json
-import sqlite3
+from workflow_api.auxiliary_database import connection as database_connection
 import tempfile
 import unittest
 from urllib.error import HTTPError
@@ -22,7 +22,7 @@ class DiagnosticsTests(unittest.TestCase):
             with self.assertRaises(RuntimeFailure) as caught:
                 journal.perform('tool_test','effect_test',{},lambda:transport.request('POST','https://example.com/create',{},{}))
             self.assertEqual(caught.exception.code,'UNKNOWN_INVOCATION_RESULT')
-            with sqlite3.connect(journal.path) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
+            with journal.connection(write=False) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
             self.assertEqual(state,'started');self.assertNotIn('other_private_field',result)
             self.assertEqual(json.loads(result)['provider_diagnostic']['http_status'],400)
             self.assertIn('Metadata IDs',json.loads(result)['provider_diagnostic']['message'])
@@ -48,7 +48,7 @@ class TrackingRecoveryTests(slice_tests.SliceTests):
         self.assertEqual(state['recovery_history'][0]['previous_run_id'],old['run_id'])
         self.service.retry_tracking(self.plan['project_id'],old['run_id'],True,self.auth)
         self.assertEqual(self.http.write_count,writes)
-        with sqlite3.connect(self.service.store.path.parent/'effects.sqlite3') as db:
+        with database_connection(self.service.store.path.parent/'effects.sqlite3',write=False) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM effects WHERE state='started'").fetchone()[0],1)
     def test_missing_operator_confirmation_is_rejected(self):
         state=self.setup();old=state['actions']['tracking'];self.http.lose_write_response=True;self.approve(state);self.advance()

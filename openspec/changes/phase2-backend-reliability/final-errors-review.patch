@@ -1,0 +1,90 @@
+--- a/tests/test_fulfilment_recovery.py
++++ b/tests/test_fulfilment_recovery.py
+@@ -9,6 +9,7 @@
+         self.workflow={'tools':[],'nodes':[{'kind':'trigger'},{'kind':'agent'},{'kind':'output'}]}
+         owner=self
+         class DB:
++            def __init__(self,*,write=True):owner.assertFalse(write)
+             def __enter__(self):return self
+             def __exit__(self,*args):pass
+             def execute(self,*args):return SimpleNamespace(fetchone=lambda:(json.dumps(owner.workflow),))
+--- a/workflow_api/storage.py
++++ b/workflow_api/storage.py
+@@ -7,6 +7,15 @@
+ from threading import Lock
+ from contextlib import contextmanager
+ from pathlib import Path
++
++
++def sqlite_category(exc):
++    code=getattr(exc,'sqlite_errorcode',0)&255
++    if code in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED):return 'contention'
++    if code==sqlite3.SQLITE_MISUSE or str(exc).lower() in {
++            'cannot start a transaction within a transaction','cannot commit - no transaction is active',
++            'cannot rollback - no transaction is active'}:return 'transaction_state'
++    return 'database_failure'
+ 
+ 
+ class WorkflowStore:
+@@ -43,6 +52,11 @@
+             try:
+                 with self.database.transaction(write=write) as connection:
+                     yield connection
++            except Exception as exc:
++                from .postgres import DatabaseFailure
++                if isinstance(exc,DatabaseFailure):
++                    with self.metrics_lock:self.metrics['contention' if exc.category=='contention' else 'failures']+=1
++                raise
+             finally:
+                 with self.metrics_lock:
+                     self.metrics['writes' if write else 'reads']+=1
+@@ -61,7 +75,7 @@
+         except Exception as exc:
+             db.rollback()
+             code = getattr(exc, 'sqlite_errorcode', 0) & 255
+-            category = 'contention' if code in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) else 'transaction_state' if code == sqlite3.SQLITE_MISUSE else 'database_failure'
++            category = sqlite_category(exc) if isinstance(exc,sqlite3.DatabaseError) else None
+             logging.getLogger(__name__).warning('Database transaction failed', extra={
+                 'database_category': category, 'database_code': code, 'transaction_write': write,
+                 'transaction_seconds': round(time.monotonic() - started, 4)})
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -16,7 +16,7 @@
+ from registry import RegistryService, WorkspacePolicy
+ from registry.contracts import RegistryError, VERSIONS, schema, validate
+ from registry.safety import reject_secrets
+-from .storage import WorkflowStore
++from .storage import WorkflowStore, sqlite_category
+ from .postgres import DatabaseFailure
+ from .registry_adapter import RegistryAdapter
+ from runtime.service import RuntimeFailure
+@@ -95,10 +95,12 @@
+             return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
+                 'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+-            if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
++            if sqlite_category(exc)=='contention':
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                     'The workflow database is busy. Retry shortly.', 503, retryable=True))
+-            logging.exception("Workflow database error request_id=%s", request_id)
++            if sqlite_category(exc)=='transaction_state':
++                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
++            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
+         except LifecycleFailure as exc:
+             if operation in {'activate_release', 'disable_release', 'delete_workflow'}:
+@@ -250,10 +252,12 @@
+             return self.failure(request_id,ApiFailure(codes.get(exc.category,'INVALID_API_DATA'),
+                 'The database transaction could not complete. Check the current state before retrying.',503 if exc.retryable else 500,retryable=exc.retryable))
+         except sqlite3.OperationalError as exc:
+-            if getattr(exc, 'sqlite_errorcode', 0) & 255 in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
++            if sqlite_category(exc)=='contention':
+                 return self.failure(request_id, ApiFailure('API_DATABASE_BUSY',
+                     'The workflow database is busy. Retry shortly.', 503, retryable=True))
+-            logging.exception("Workflow database error request_id=%s", request_id)
++            if sqlite_category(exc)=='transaction_state':
++                return self.failure(request_id,ApiFailure('API_DATABASE_TRANSACTION_INVALID','The database transaction is invalid.',500))
++            logging.warning("Workflow database error request_id=%s category=%s",request_id,sqlite_category(exc))
+             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The workflow database could not process the request.', 500))
+         except Exception:
+             logging.exception("Unhandled workflow API error request_id=%s", request_id)

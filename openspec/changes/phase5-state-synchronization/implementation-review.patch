@@ -1,0 +1,797 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -1,3 +1,4 @@
++import { safeError } from "./feedback";
+ import { z } from "zod";
+ import { assertWorkflowReferences } from "./control";
+ import {
+@@ -74,10 +75,12 @@
+ export type RunRecord = z.infer<typeof runData>["run"];
+ 
+ export class ApiError extends Error {
+-  constructor(public readonly error: SafeError, public readonly correlationId?: string) { super(error.message); }
++  public readonly error: SafeError;
++  constructor(error: SafeError, public readonly correlationId?: string, public readonly context: {httpStatus?:number;outcome?:"unknown"|"rejected"} = {}) { const sanitized=safeError(error);super(sanitized.message);this.error=sanitized; }
++
+ }
+ function fail(code: string, message: string, requestId = "req_client", retryable = false): never {
+-  throw new ApiError({ error_code: code, message, request_id: requestId, retryable });
++  throw new ApiError({ error_code: code, message, request_id: requestId, retryable },undefined, /setting save|approval submission|release activation|release disable|workflow deletion/.test(message)?{outcome:"unknown"}:{});
+ }
+ export function containsSecret(value: unknown): boolean {
+   if (typeof value === "string") return /\bsk-[\w-]{8,}|Bearer\s+[\w.-]+|:\/\/[^/\s:@]+:[^/\s@]+@|-----BEGIN .*PRIVATE KEY|(?:api[_-]?key|password|secret|token)\s*[:=]\s*\S+/i.test(value);
+@@ -152,10 +155,29 @@
+     return this.sessionRecovery;
+   }
+   private async read(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
++    const headers=new Headers(options.headers);
++    let reference=headers.get("X-Request-ID") ?? new URLSearchParams(path.split("?")[1]).get("request_id");
++    if(!reference&&typeof options.body==="string"){try{const parsed=JSON.parse(options.body);if(typeof parsed.request_id==="string")reference=parsed.request_id;}catch{/* Non-JSON bodies never become references. */}}
++    if(!reference||!/^[\w-]{1,128}$/.test(reference))reference=crypto.randomUUID();
++    headers.set("X-Request-ID",reference);options={...options,headers};
++    const mutation=!!options.method && !["GET","HEAD"].includes(options.method.toUpperCase());
++    for(let attempt=0;;attempt++){
++      try{return await this.readOnce(path,options,recoverSession);}
++      catch(error){
++        if(!(error instanceof ApiError))throw error;
++        if(!mutation && attempt===0 && error.error.retryable && [502,503,504].includes(error.context.httpStatus??0) && ["DATABASE_BUSY","API_DATABASE_BUSY","API_DATABASE_SERIALIZATION_RETRY","API_DATABASE_DEADLOCK","API_DATABASE_UNAVAILABLE","API_TIMEOUT","API_UNAVAILABLE","UPSTREAM_UNAVAILABLE","BACKEND_UNAVAILABLE","PROXY_TIMEOUT","SERVICE_UNAVAILABLE"].includes(error.error.error_code)){
++          await new Promise(resolve=>setTimeout(resolve,200));continue;
++        }
++        if(mutation)throw new ApiError(error.error,error.correlationId,{...error.context,outcome:[400,401,403,404,409,422].includes(error.context.httpStatus??0)?"rejected":"unknown"});
++        throw error;
++      }
++    }
++  }
++  private async readOnce(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
+     const generation = this.sessionGeneration;
+     let response: Response;
+     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
+-    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", "req_client", true); }
++    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", new Headers(options.headers).get("X-Request-ID") ?? "req_client", true); }
+     let raw: unknown;
+     try { raw = await response.json(); } catch { return fail("INVALID_API_RESPONSE", "The API returned an unusable response."); }
+     if (containsSecret(raw)) return fail("UNSAFE_API_RESPONSE", "The API returned unsafe data. Nothing was displayed.");
+@@ -170,10 +192,10 @@
+       if (recoverSession && (this.sessionMode === null || this.sessionMode === "local-development") &&
+           (typeof window === "undefined" || ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) &&
+           path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
+-        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
++        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.readOnce(path, options, false);
+       }
+       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
+-      throw new ApiError(error.data, correlation);
++      throw new ApiError(error.data, correlation, {httpStatus:response.status});
+     }
+     return data;
+   }
+@@ -182,6 +204,18 @@
+     if (!result.success) return fail("INVALID_SESSION", "The session response is invalid.");
+     this.sessionMode = result.data.mode;
+     this.planningJobsAvailable = result.data.planning_jobs_available === true;
++    return result.data;
++  }
++
++  async monitoring() {
++    const count=z.number().finite().nonnegative();
++    const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
++      usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
++      sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional()})).optional(),
++      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
++      audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
++    const result=schema.safeParse(await this.read("monitoring"));
++    if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
+     return result.data;
+   }
+ 
+@@ -252,7 +286,7 @@
+   async procurementSuppliersReview(projectId: string, decision: "approved" | "rejected", candidateIds: string[], digest: string) {
+     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/suppliers-review`, { method: "POST",
+       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+-        operation: "procurement_suppliers_review", idempotency_key: crypto.randomUUID(),
++        operation: "procurement_suppliers_review", idempotency_key: await retryKey("procurement_suppliers_review",{projectId,decision,candidateIds,digest}),
+         payload: { decision, candidate_ids: candidateIds, expected_digest: digest } }) });
+   }
+ 
+@@ -260,7 +294,7 @@
+     settings: { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean }) {
+     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/fulfilment-activate`, { method: "POST",
+       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+-        operation: "procurement_fulfilment_activate", idempotency_key: crypto.randomUUID(),
++        operation: "procurement_fulfilment_activate", idempotency_key: await retryKey("procurement_fulfilment_activate",{projectId,workflowId,version,expectedRevision,settings}),
+         payload: { settings, expected_revision: expectedRevision, workflow_id: workflowId, workflow_version: version } }) });
+   }
+ 
+@@ -289,7 +323,7 @@
+     }
+     const result = responseSchemas[operation].safeParse(operation === "plan_workflow" && this.planningJobsAvailable
+       ? await this.planJob(options) : await this.read(path, options));
+-    if (!result.success) return fail("INVALID_API_DATA", "The returned data does not match the accepted contract.", requestId);
++    if (!result.success) throw new ApiError({error_code:"INVALID_API_DATA",message:"The returned data does not match the accepted contract.",request_id:requestId,retryable:false},undefined,method!=="GET"?{outcome:"unknown"}:{});
+     if ("registry_review" in result.data && result.data.registry_review && "workflow" in result.data) {
+       const review = result.data.registry_review as RegistryReview;
+       const workflow = result.data.workflow as CanonicalWorkflow;
+--- a/frontend/src/api/mapping.ts
++++ b/frontend/src/api/mapping.ts
+@@ -1,9 +1,10 @@
+ import { CanonicalWorkflowSchema, type CanonicalWorkflow } from "./contracts.generated";
+ import type { Agent, Workflow, WorkflowNode } from "@/domain/types";
++import { InputError } from "./feedback";
+ import { MODELS } from "@/domain/models";
+ 
+ export function fromCanonical(document: CanonicalWorkflow): { workflow: Workflow; agents: Agent[] } {
+-  const canonical = CanonicalWorkflowSchema.parse(document);
++  const canonical = structuredClone(CanonicalWorkflowSchema.parse(document));
+   const timestamp = typeof canonical.metadata["updated_at"] === "string" ? canonical.metadata["updated_at"] : new Date().toISOString();
+   const workspaceId = String(canonical.metadata["workspace_id"] ?? "server");
+   const agents: Agent[] = canonical.agents.map((a) => ({
+@@ -12,15 +13,16 @@
+     temperature: a.model.temperature ?? 0, maxTokens: a.limits.max_tokens, tools: a.allowed_tool_ids,
+     knowledge: [], memory: "none", outputSchema: JSON.stringify(a.output_schema, null, 2),
+     guardrails: { piiRedaction: true, injectionDetection: true, outputValidation: true },
++    parentAgentId: a.parent_agent_id ? `${canonical.workflow_id}::${a.parent_agent_id}` : undefined,
+     version: canonical.version, status: "draft", updatedAt: timestamp, origin: "backend",
+   }));
+   const nodes: WorkflowNode[] = canonical.nodes.map((n, index) => ({
+     id: n.node_id, type: "mesh", position: { x: n.layout?.x ?? 80 + index * 240, y: n.layout?.y ?? 120 },
+-    data: { ...(n.configuration?.["ui"] as Record<string, unknown> | undefined),
++    data: { ...structuredClone(n.configuration?.["ui"] as Record<string, unknown> | undefined),
+       kind: n.kind, label: n.label, agentId: n.agent_id ? `${canonical.workflow_id}::${n.agent_id}` : undefined, tool: n.tool_id,
+       conditionId: n.condition_id, approvalGateId: n.approval_gate_id,
+-      condition: canonical.conditions.find((c) => c.condition_id === n.condition_id),
+-      approval: canonical.approval_gates.find((g) => g.approval_gate_id === n.approval_gate_id),
++      condition: structuredClone(canonical.conditions.find((c) => c.condition_id === n.condition_id)),
++      approval: structuredClone(canonical.approval_gates.find((g) => g.approval_gate_id === n.approval_gate_id)),
+       description: typeof n.configuration?.["description"] === "string" ? n.configuration["description"] : "" },
+   }));
+   return { workflow: { id: canonical.workflow_id, workspaceId, name: canonical.name, description: canonical.description,
+@@ -30,15 +32,26 @@
+ }
+ 
+ const limits = { max_llm_calls: 0, max_tool_calls: 0, max_tokens: 1000, max_retries: 0, timeout_seconds: 60 };
++/** Includes delegated templates even when they have no execution graph node. */
++export function olderDocument(incoming: CanonicalWorkflow, baseline?: CanonicalWorkflow) {
++  const rank={draft:0,validated:1,approved:2,published:3,archived:4};
++  return !!baseline && (incoming.version<baseline.version || (incoming.version===baseline.version && rank[incoming.status]<rank[baseline.status]));
++}
++export function ownsAgent(workflow: Workflow, agent: Agent) {
++  return workflow.nodes.some(node => node.data.agentId === agent.id) || !!workflow.canonical?.agents.some(definition => agent.id === `${workflow.id}::${definition.agent_id}`);
++}
++export function stableSnapshot(value: unknown): string {
++  const normalize = (item: unknown): unknown => Array.isArray(item) ? item.map(normalize) : item && typeof item === "object" ? Object.fromEntries(Object.entries(item).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,normalize(v)])) : item;
++  return JSON.stringify(normalize(value));
++}
++export function workflowEditSnapshot(workflow: Workflow, agents: Agent[]) {
++  return stableSnapshot({name:workflow.name,description:workflow.description,nodes:workflow.nodes,edges:workflow.edges,
++    agents:agents.filter(a=>ownsAgent(workflow,a)).map(a=>({id:a.id,role:a.role,purpose:a.purpose,instructions:a.instructions,modelId:a.modelId,temperature:a.temperature,maxTokens:a.maxTokens,outputSchema:a.outputSchema,capabilities:a.capabilities,declaredPermissions:a.declaredPermissions,parentAgentId:a.parentAgentId})).sort((a,b)=>a.id.localeCompare(b.id))});
++}
+ export function hasWorkflowEdits(workflow: Workflow, agents: Agent[]): boolean {
+   if (!workflow.canonical || !workflow.serverVersion) return true;
+-  const baseline = fromCanonical(workflow.canonical);
+-  const snapshot = (w: Workflow, list: Agent[]) => JSON.stringify({ name: w.name, description: w.description,
+-    nodes: w.nodes, edges: w.edges, agents: list.filter((a) => w.nodes.some((n) => n.data.agentId === a.id)).map((a) => ({
+-      id: a.id, role: a.role, purpose: a.purpose, instructions: a.instructions, modelId: a.modelId,
+-      temperature: a.temperature, maxTokens: a.maxTokens, outputSchema: a.outputSchema,
+-    })).sort((a, b) => a.id.localeCompare(b.id)) });
+-  return snapshot(workflow, agents) !== snapshot(baseline.workflow, baseline.agents);
++  const baseline=fromCanonical(workflow.canonical);
++  return workflowEditSnapshot(workflow,agents)!==workflowEditSnapshot(baseline.workflow,baseline.agents);
+ }
+ export function toCanonical(workflow: Workflow, agents: Agent[], nextVersion = (workflow.serverVersion ?? 0) + 1): CanonicalWorkflow {
+   const base = workflow.canonical;
+@@ -48,12 +61,14 @@
+   const definitions = [...agentIds].map((id) => {
+     const original = base?.agents.find((a) => a.agent_id === id);
+     const agent = agents.find((a) => a.id === `${workflow.id}::${id}`) ?? agents.find((a) => a.canonicalId === id && workflow.nodes.some((n) => n.data.agentId === a.id)) ?? agents.find((a) => a.id === id);
+-    if (!agent) { if (original) return original; throw new Error(`Agent ${id} needs a configuration.`); }
+-    if (!original && agent.tools.length) throw new Error("Local tool names need registry resolution before saving.");
++    if (!agent) { if (original) return original; throw new InputError(`Agent ${id} needs a configuration.`, "agents"); }
++    if (!original && agent.tools.length) throw new InputError("Local tool names need registry resolution before saving.", "tools");
+     let outputSchema: unknown;
+-    try { outputSchema = JSON.parse(agent.outputSchema); } catch { throw new Error("Enter valid JSON in the agent output schema."); }
++    try { outputSchema = JSON.parse(agent.outputSchema); } catch { throw new InputError("Enter valid JSON in the agent output schema.", `agents.${id}.output_schema`); }
+     return { ...(original ?? { agent_id: id, capabilities: [], allowed_tool_ids: [], permissions: ["workflow.read_input"], limits: { ...limits }, approval_requirements: [] }),
+       role: agent.role, goal: agent.purpose, instructions: agent.instructions,
++      capabilities: agent.capabilities ?? original?.capabilities ?? [], permissions: agent.declaredPermissions ?? original?.permissions ?? ["workflow.read_input"],
++      ...(agent.parentAgentId ? {parent_agent_id: agents.find(parent=>parent.id===agent.parentAgentId)?.canonicalId ?? agent.parentAgentId} : {}),
+       model: { ...(original?.model ?? { provider: "openai" }), provider: original && agent.modelId === original.model.model_id ? original.model.provider : MODELS.find((model) => model.id === agent.modelId)?.provider.toLowerCase() ?? original?.model.provider ?? "openai", model_id: agent.modelId, temperature: agent.temperature },
+       input_schema: original?.input_schema ?? { type: "object" }, output_schema: outputSchema,
+       limits: { ...(original?.limits ?? limits), max_tokens: agent.maxTokens } };
+@@ -64,7 +79,7 @@
+     const original = base?.nodes.find((item) => item.node_id === n.id);
+     const node = { ...original, node_id: n.id, kind: n.data.kind, label: n.data.label,
+       layout: { ...n.position }, configuration: { ...original?.configuration, description: n.data.description ?? "",
+-        ui: { role: n.data.role, parentNodeId: n.data.parentNodeId, collapsed: n.data.collapsed, combine: n.data.combine, orientation: n.data.orientation } },
++        ui: { ...(original?.configuration?.["ui"] as Record<string,unknown> | undefined), role: n.data.role, parentNodeId: n.data.parentNodeId, collapsed: n.data.collapsed, combine: n.data.combine, orientation: n.data.orientation } },
+       ...(n.data.agentId ? { agent_id: agents.find((a) => a.id === n.data.agentId)?.canonicalId ?? n.data.agentId } : {}), ...(n.data.tool ? { tool_id: n.data.tool } : {}) };
+     if (n.data.kind === "condition") {
+       const condition = n.data["condition"] as CanonicalWorkflow["conditions"][number] | undefined;
+@@ -96,7 +111,8 @@
+     metadata: { ...base?.metadata, updated_at: workflow.updatedAt } });
+   if (!parsed.success) {
+     const issue = parsed.error.issues[0];
+-    throw new Error(`Complete the workflow configuration at ${issue?.path.join(".") || "workflow"}.`);
++    throw new InputError(`Complete the workflow configuration at ${issue?.path.join(".") || "workflow"}. ${issue?.message ?? ""}`, issue?.path.join(".") || "workflow");
+   }
+-  return parsed.data;
++  for (const key of ["approved_by", "validation_state", "approval_submission"]) delete parsed.data.metadata[key];
++  return structuredClone(parsed.data);
+ }
+--- a/frontend/src/api/phase3-actions.test.tsx
++++ b/frontend/src/api/phase3-actions.test.tsx
+@@ -80,7 +80,7 @@
+   fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+   await waitFor(() => expect(screen.getByText(/Your edits are retained/)).toBeVisible());
+   expect(useMesh.getState().workflows[0]!.name).toBe("Keep my edit"); expect(screen.getByRole("button", { name: "Reload server revision" })).toBeEnabled();
+-  vi.mocked(window.confirm).mockReturnValue(false); fireEvent.click(screen.getByRole("button", { name: "Reload server revision" })); expect(request).toHaveBeenCalledTimes(1);
++  vi.mocked(window.confirm).mockReturnValue(false); const beforeReload=request.mock.calls.length; fireEvent.click(screen.getByRole("button", { name: "Reload server revision" })); expect(request).toHaveBeenCalledTimes(beforeReload);
+ });
+ it("navigation and unload warn while dirty server drafts remain persisted", () => {
+   const original = workflow(); useMesh.getState().acceptWorkflow(original); useMesh.getState().renameWorkflow(original.workflow_id, "Dirty edit"); render(<Controls />);
+--- a/frontend/src/api/phase4-generation.test.tsx
++++ b/frontend/src/api/phase4-generation.test.tsx
+@@ -2,6 +2,7 @@
+ import path from "node:path";
+ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+ import { beforeEach, afterEach, expect, it, vi } from "vitest";
++import { ApiError } from "./client";
+ import Overview from "@/screens/app.index";
+ import { CanonicalWorkflowSchema } from "./contracts.generated";
+ import { useBackend } from "./state";
+@@ -53,7 +54,7 @@
+ it("retains the original prompt on planner failure and supports an explicit retry", async () => {
+   const request = vi
+     .spyOn(creation, "createWorkflow")
+-    .mockRejectedValueOnce(new Error("Validation failed at nodes.1: missing condition."))
++    .mockRejectedValueOnce(new ApiError({error_code:"INVALID_WORKFLOW",message:"A condition is missing.",field:"nodes.1",request_id:"req_generation",retryable:false}))
+     .mockResolvedValueOnce({ workflow: document(), existing: false });
+   render(<Overview />);
+   const prompt = screen.getByLabelText("Process description");
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -1,6 +1,5 @@
+ import { create } from "zustand";
+ import { api, ApiError, type Session, type ToolRecord, type RegistryReview, type WorkflowOverview } from "./client";
+-import { hasWorkflowEdits } from "./mapping";
+ import { useMesh } from "@/domain/store";
+ 
+ interface BackendState {
+@@ -8,6 +7,7 @@
+   session: Session | null;
+   tools: ToolRecord[];
+   error: ApiError | null;
++  overviewError: ApiError | null;
+   reviews: Record<string, RegistryReview>;
+   overview: Record<string, WorkflowOverview>;
+   overviewSequence: number;
+@@ -21,7 +21,7 @@
+ let initialization: Promise<void> | null = null;
+ export const useBackend = create<BackendState>((set, get) => ({
+   status: "loading", session: null, tools: [], error: null, reviews: {}, overview: {}, overviewSequence: 0,
+-  liveStatus: "connecting", lastOverviewUpdate: null,
++  liveStatus: "connecting", lastOverviewUpdate: null, overviewError: null,
+   acceptReview: (review) => set((s) => ({ reviews: { ...s.reviews, [review.workflow_id]: review } })),
+   can: (permission) => get().session?.auth.decision === "allow" && !!get().session?.auth.permissions.includes(permission),
+   refreshOverview: async () => {
+@@ -32,11 +32,12 @@
+         set({ session, status: "connected" });
+       }
+       const overview = Object.fromEntries(snapshot.items.map((item) => [item.workflow_id, item]));
+-      set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
+-        error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" ? null : get().error });
++      const previousOverviewError=get().overviewError;
++      set({ overviewError:null, overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
++        error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" || get().error===previousOverviewError ? null : get().error });
+     } catch (error) {
+       const failure = error instanceof ApiError ? error : get().error;
+-      set({ liveStatus: "stale", error: failure,
++      set({ liveStatus: "stale", error: failure, overviewError: failure,
+         ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, tools: [], reviews: {} } : {}) });
+     }
+   },
+@@ -49,10 +50,7 @@
+         const results = await Promise.allSettled([api.request("list_workflows", {}), api.request("list_tools", {}), api.overview()]);
+         const workflows = results[0];
+         const tools = results[1];
+-        if (workflows?.status === "fulfilled") workflows.value.items.forEach((w) => {
+-          const state = useMesh.getState(); const existing = state.workflows.find(item => item.id === w.workflow_id);
+-          if (!existing || !hasWorkflowEdits(existing, state.agents)) state.acceptWorkflow(w);
+-        });
++        if (workflows?.status === "fulfilled") useMesh.getState().observeWorkflows(workflows.value.items);
+         if (tools?.status === "fulfilled") set({ tools: tools.value.items });
+         const overview = results[2];
+         if (overview?.status === "fulfilled") set({ overview: Object.fromEntries(overview.value.items.map((item) => [item.workflow_id, item])),
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -9,7 +9,8 @@
+ import { makeAgent } from "./templates";
+ import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
+ import type { ControlContext } from "./simulator";
+-import { fromCanonical, hasWorkflowEdits } from "@/api/mapping";
++import { draftStorage } from "./draft-storage";
++import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot, olderDocument } from "@/api/mapping";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export interface AuditEvent { id: string; at: string; actor: string; role: Role; action: string; target: string }
+@@ -23,6 +24,7 @@
+ 
+ interface MeshState {
+   acceptWorkflow: (document: CanonicalWorkflow) => void;
++  observeWorkflows: (documents: CanonicalWorkflow[]) => void;
+   workflows: Workflow[];
+   agents: Agent[];
+   runs: Run[];
+@@ -71,6 +73,24 @@
+         set((s) => ({ workflows: [mapped.workflow, ...s.workflows.filter((w) => w.id !== mapped.workflow.id)],
+           agents: [...mapped.agents, ...s.agents.filter((a) => !mapped.agents.some((incoming) => incoming.id === a.id))] }));
+       },
++      observeWorkflows: (documents) => {
++        const state=get();let changed=false;
++        const workflows=new Map(state.workflows.map(w=>[w.id,w]));const agents=new Map(state.agents.map(a=>[a.id,a]));
++        for(const document of documents){
++          const existing=workflows.get(document.workflow_id);
++          if(olderDocument(document,existing?.canonical))continue;
++          if(existing && hasWorkflowEdits(existing,state.agents)){
++            if((!existing.canonical || stableSnapshot(existing.canonical)!==stableSnapshot(document)) && (!existing.remote || (document.version>=existing.remote.version && stableSnapshot(existing.remote)!==stableSnapshot(document)))){
++              workflows.set(existing.id,{...existing,remote:structuredClone(document)});changed=true;
++            }
++            continue;
++          }
++          if(existing?.canonical && stableSnapshot(existing.canonical)===stableSnapshot(document))continue;
++          const mapped=fromCanonical(document);workflows.set(mapped.workflow.id,mapped.workflow);changed=true;
++          for(const agent of mapped.agents)agents.set(agent.id,agent);
++        }
++        if(changed)set({workflows:[...workflows.values()],agents:[...agents.values()]});
++      },
+       createBlankWorkflow: (name, description = "") => {
+         const at = new Date().toISOString();
+         const trigger = uid("node");
+@@ -98,10 +118,12 @@
+         const w = get().workflows.find((x) => x.id === id);
+         if (!w) return;
+         const copyId = uid("wf"); const at = new Date().toISOString();
+-        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, updatedAt: at }));
+-        const remap = new Map(get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map((agent, index) => [agent.id, clones[index]!.id]));
++        const clones = get().agents.filter(agent => ownsAgent(w,agent)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, parentAgentId: agent.parentAgentId?.replace(`${w.id}::`,`${copyId}::`), tools: [], updatedAt: at }));
++        const remap = new Map(get().agents.filter(agent => ownsAgent(w,agent)).map((agent, index) => [agent.id, clones[index]!.id]));
+         const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
+         if (canonical) {
++          canonical.agents=canonical.agents.map(agent=>({...agent,allowed_tool_ids:[]}));
++          canonical.tools=canonical.tools.map(tool=>({tool_id:tool.tool_id,capability:tool.capability}));
+           canonical.workflow_id = copyId; canonical.version = 1; canonical.status = "draft";
+           for (const key of ["approved_by", "validation_state", "approval_submission"]) delete canonical.metadata[key];
+           const triggers = canonical.metadata["trigger_templates"];
+@@ -167,9 +189,12 @@
+     {
+       name: "mesh-local-drafts-v1",
+       version: 1,
+-      storage: createJSONStorage(() => localStorage),
++      storage: createJSONStorage(() => draftStorage),
+       skipHydration: true,
+-      partialize: (s) => ({ workflows: s.workflows.filter((w) => w.serverVersion === undefined || hasWorkflowEdits(w, s.agents)), agents: s.agents.filter((a) => a.origin !== "backend" || s.workflows.some(w => hasWorkflowEdits(w, s.agents) && w.nodes.some(n => n.data.agentId === a.id))), runs: s.runs, activity: s.activity, connectors: s.connectors, knowledge: s.knowledge, installed: s.installed, role: s.role, policies: s.policies, controls: s.controls, audit: s.audit }),
++      partialize: (s) => {
++        const drafts=s.workflows.filter(w=>w.serverVersion===undefined||hasWorkflowEdits(w,s.agents));
++        return {workflows:drafts.map(w=>({...w,tabConflict:undefined})),agents:s.agents.filter(a=>a.origin!=="backend"||drafts.some(w=>ownsAgent(w,a))),runs:s.runs,activity:s.activity,connectors:s.connectors,knowledge:s.knowledge,installed:s.installed,role:s.role,policies:s.policies,controls:s.controls,audit:s.audit};
++      },
+     },
+   ),
+ );
+--- a/frontend/src/domain/types.ts
++++ b/frontend/src/domain/types.ts
+@@ -52,6 +52,8 @@
+ export interface Workflow {
+   canonical?: import("@/api/contracts.generated").CanonicalWorkflow | undefined;
+   serverVersion?: number | undefined;
++  remote?: import("@/api/contracts.generated").CanonicalWorkflow | undefined;
++  tabConflict?: boolean | undefined;
+   id: string;
+   workspaceId: string;
+   name: string;
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -74,6 +74,10 @@
+ import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
+ import { PlanReview } from "@/features/workflows/PlanReview";
+ 
++import { useDraftSync } from "@/features/workflows/useDraftSync";
++import { DraftConflict } from "@/features/workflows/DraftConflict";
++import { useUnsavedWorkflow } from "@/features/workflows/unsaved";
++import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ const nodeTypes = { mesh: MeshNode };
+ type Graph = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+ 
+@@ -94,6 +98,8 @@
+ }
+ 
+ function Builder({ workflow }: { workflow: Workflow }) {
++  const sync=useDraftSync(workflow.id);
++  useUnsavedWorkflow(workflow.id);
+   const navigate = useNavigate();
+   const { fitView, screenToFlowPosition } = useReactFlow();
+   const store = useMesh();
+@@ -444,6 +450,9 @@
+   return (
+     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+       <LifecycleJourney workflow={current} />
++      <DraftConflict workflow={current} recoveryOnly={sync.storageFailed} />
++      <ApiFeedback error={sync.error} />
++      {sync.storageFailed&&<p role="alert" className="border-b p-3 text-xs text-destructive">A browser draft backup could not be written. Keep this tab open and export your working draft before leaving.</p>}
+       <div role="tablist" aria-label="Workflow view" className="flex shrink-0 flex-wrap gap-2 border-b border-border px-4 py-2">
+         {(["design", "hierarchy", "execution"] as const).map(view => <button type="button" role="tab" key={view} aria-selected={mode === view} onClick={() => { setMode(view); setPanel(null); }} className={`rounded-lg px-3 py-2 text-sm ${mode === view ? "bg-highlight text-primary" : "text-muted-foreground"}`}>{view === "design" ? "Design" : view === "hierarchy" ? "Agent hierarchy" : "Execution"}</button>)}
+       </div>
+--- a/frontend/src/features/workflows/ApiFeedback.tsx
++++ b/frontend/src/features/workflows/ApiFeedback.tsx
+@@ -1,19 +1,25 @@
+ import { ApiError } from "@/api/client";
+-export function ApiFeedback({ error, correlationId }: { error?: Error | null | undefined; correlationId?: string | undefined }) {
+-  const requirements = error instanceof ApiError && Array.isArray(error.error.details?.["requirements"])
+-    ? error.error.details["requirements"].filter((item): item is string => typeof item === "string") : [];
++import { InputError, unsafeText, type FeedbackKind } from "@/api/feedback";
++export function ApiFeedback({ error, correlationId, onRetry, retrying = false }: { error?: Error | null | undefined; correlationId?: string | undefined; onRetry?: (()=>void) | undefined; retrying?: boolean | undefined }) {
++  const apiError=error instanceof ApiError?error:undefined;
++  const code=apiError?.error.error_code;
++  const kind:FeedbackKind=apiError?.context.outcome==="unknown"?"uncertain":code==="AUTHENTICATION_REQUIRED"?"unauthorized":code==="OPERATION_NOT_AUTHORIZED"||code==="ORIGIN_NOT_AUTHORIZED"?"forbidden":code?.includes("CONFLICT")?"conflict":apiError?.error.retryable?"retryable":"error";
++  const message=apiError?.message??(error instanceof InputError&&!unsafeText(error.message)?error.message:"This action could not be confirmed. Keep your edits and use a safe read to check the current state.");
++  const requirements=apiError&&Array.isArray(apiError.error.details?.["requirements"])?apiError.error.details["requirements"].filter((item):item is string=>typeof item==="string"&&!unsafeText(item)):[];
+   return <>
+-    {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+-      {error.message}
+-      {error instanceof ApiError && error.error.error_code === "AUTHENTICATION_REQUIRED" &&
+-        <p className="mt-1">Reconnect the local workspace to recover your session.</p>}
+-      {error instanceof ApiError && error.error.error_code === "OPERATION_NOT_AUTHORIZED" &&
+-        <p className="mt-1">Your account lacks permission for this action. Contact your workspace administrator.</p>}
+-      {requirements.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">
+-        {requirements.map((requirement, index) => <li key={index}>{requirement}</li>)}
+-      </ul>}
+-      {error instanceof ApiError && <p className="mt-1 font-mono text-[11px]">{error.error.error_code}{error.error.field ? ` · ${error.error.field}` : ""} · {error.correlationId ?? error.error.request_id}</p>}
++    {error&&<div role="alert" data-feedback-state={kind} className="rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
++      <p>{message}</p>
++      {kind==="uncertain"&&<p className="mt-1">Outcome unknown. The server may have accepted this action. Check its current revision, operation or run before repeating it. No automatic mutation retry was submitted.</p>}
++      {kind==="unauthorized"&&<p className="mt-1">Your session is unavailable. Reconnect the local workspace to recover it; production login remains separately configured.</p>}
++      {kind==="forbidden"&&<p className="mt-1">Your account or origin lacks access. Contact your workspace administrator; repeating the action will not grant permission.</p>}
++      {kind==="conflict"&&<p className="mt-1">The server state changed. Keep your working draft and compare or reload the latest revision before continuing.</p>}
++      {apiError?.error.field&&<p className="mt-1" aria-label="Validation field">Field: {apiError.error.field}</p>}
++      {error instanceof InputError&&error.field&&<p className="mt-1" aria-label="Validation field">Field: {error.field}</p>}
++      {!!apiError?.error.related_errors?.length&&<ul aria-label="Field errors" className="mt-2 list-disc pl-5">{apiError.error.related_errors.map((item,index)=><li key={index}>{item.field?`${item.field}: `:""}{item.message} · {item.error_code}</li>)}</ul>}
++      {requirements.length>0&&<ul className="mt-2 list-disc space-y-1 pl-5" aria-label="Publication requirements">{requirements.map((item,index)=><li key={index}>{item}</li>)}</ul>}
++      {apiError&&<p className="mt-1 font-mono text-[11px]">{code} · Request {apiError.error.request_id}{apiError.correlationId&&/^[\w-]{1,128}$/.test(apiError.correlationId)?` · Correlation ${apiError.correlationId}`:""}</p>}
++      {onRetry&&kind!=="uncertain"&&kind!=="forbidden"&&<button type="button" disabled={retrying} onClick={onRetry} className="mt-2 rounded border px-3 py-1 text-sm disabled:opacity-40">{retrying?"Loading…":"Retry read"}</button>}
+     </div>}
+-    {correlationId && <p className="text-[11px] text-muted-foreground">Request reference: {correlationId}</p>}
++    {correlationId&&/^[\w-]{1,128}$/.test(correlationId)&&<p className="text-[11px] text-muted-foreground">Request reference: {correlationId}</p>}
+   </>;
+ }
+--- a/frontend/src/features/workflows/RunWorkflowDialog.tsx
++++ b/frontend/src/features/workflows/RunWorkflowDialog.tsx
+@@ -1,4 +1,5 @@
+ "use client";
++import { fieldMessages, InputError } from "@/api/feedback";
+ import { useRef, useState } from "react";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+ import { api, ApiError, type RunRecord } from "@/api/client";
+@@ -18,14 +19,14 @@
+     if (submitting.current || blocker || run) return;
+     try {
+       const inputs = parseRunInputs(workflow.inputs, values); const serialized = JSON.stringify(inputs);
+-      if (submittedPayload.current && submittedPayload.current !== serialized) throw new Error("The earlier run request has an uncertain outcome. Keep these inputs and retry, or check Runs before starting different inputs.");
++      if (submittedPayload.current && submittedPayload.current !== serialized) throw new InputError("The earlier run request has an uncertain outcome. Keep these inputs and retry, or check Runs before starting different inputs.");
+       submitting.current = true; setBusy(true); setError(undefined);
+       submittedPayload.current = serialized;
+       setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs })).run);
+       void backend.refreshOverview();
+     } catch (caught) {
+       if (caught instanceof ApiError && ["INVALID_INPUT", "OPERATION_NOT_AUTHORIZED", "REVISION_CONFLICT", "WORKFLOW_NOT_FOUND", "REVISION_NOT_PUBLISHED"].includes(caught.error.error_code)) submittedPayload.current = undefined;
+-      setError(caught instanceof Error ? caught : new Error("Run submission failed."));
++      setError(caught instanceof Error ? caught : new InputError("Run submission failed."));
+     }
+     finally { submitting.current = false; setBusy(false); }
+   };
+@@ -35,9 +36,10 @@
+       {blocker && <p role="status" className="text-sm text-muted-foreground">{blocker}</p>}
+       {!run && !automatic && <form onSubmit={event => { event.preventDefault(); void submit(); }} className="space-y-3" noValidate>
+         {workflow.inputs.map(field => <label key={field.name} className="block text-sm">{field.name}{field.required ? " (required)" : " (optional)"}<span className="block text-xs text-muted-foreground">{field.description} · {field.type}</span>
+-          {field.type === "boolean" ? <select aria-label={field.name} disabled={busy} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))}><option value="">Choose…</option><option value="true">True</option><option value="false">False</option></select>
+-            : field.type === "array" || field.type === "object" ? <textarea aria-label={field.name} disabled={busy} className="mt-1 w-full rounded border bg-background p-2 font-mono" value={values[field.name] ?? ""} placeholder={field.type === "array" ? "[]" : "{}"} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />
+-              : <input aria-label={field.name} disabled={busy} inputMode={field.type === "integer" ? "numeric" : field.type === "number" ? "decimal" : "text"} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />}
++          {field.type === "boolean" ? <select aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))}><option value="">Choose…</option><option value="true">True</option><option value="false">False</option></select>
++            : field.type === "array" || field.type === "object" ? <textarea aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} className="mt-1 w-full rounded border bg-background p-2 font-mono" value={values[field.name] ?? ""} placeholder={field.type === "array" ? "[]" : "{}"} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />
++              : <input aria-label={field.name} aria-invalid={fieldMessages(error,`inputs.${field.name}`).length>0} aria-describedby={fieldMessages(error,`inputs.${field.name}`).length?`run-input-${field.name}-error`:undefined} disabled={busy} inputMode={field.type === "integer" ? "numeric" : field.type === "number" ? "decimal" : "text"} className="mt-1 w-full rounded border bg-background p-2" value={values[field.name] ?? ""} onChange={event => setValues(current => ({ ...current, [field.name]: event.target.value }))} />}
++          {fieldMessages(error,`inputs.${field.name}`).map((message,index)=><span key={index} id={`run-input-${field.name}-error`} className="mt-1 block text-xs text-destructive">{message}</span>)}
+         </label>)}
+         <button type="submit" disabled={busy || !!blocker} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-40">{busy ? "Submitting…" : "Start run"}</button>
+       </form>}
+--- a/frontend/src/features/workflows/WorkflowControls.tsx
++++ b/frontend/src/features/workflows/WorkflowControls.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+-import { useRef, useState } from "react";
++import { useEffect, useRef, useState } from "react";
++import { InputError } from "@/api/feedback";
+ import { api, ApiError } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { toCanonical, hasWorkflowEdits } from "@/api/mapping";
+@@ -23,6 +24,8 @@
+   const [error, setError] = useState<Error>(); const [message, setMessage] = useState("");
+   useUnsavedWorkflow(workflow.id);
+   const version = workflow.serverVersion; const document = workflow.canonical;
++  const failedAt=useRef<{document:Workflow["canonical"]}|null>(null);
++  useEffect(()=>{if(failedAt.current && failedAt.current.document!==document){failedAt.current=null;setError(undefined);}},[document]);
+   const dirty = hasWorkflowEdits(workflow, agents);
+   let graphError = "";
+   try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught.message : "Complete the workflow configuration."; }
+@@ -30,7 +33,7 @@
+     if (backend.status !== "connected") return "Connect to the backend to use this action.";
+     if (!backend.can(permissions[action])) return `${permissions[action]} permission is required.`;
+     if (action === "reload") return version ? "" : "This local draft has no server revision.";
+-    if (action === "save") return graphError || (!dirty ? "No unsaved changes." : "");
++    if (action === "save") return (workflow.remote ? "Resolve the newer server revision before saving." : "") || graphError || (!dirty ? "No unsaved changes." : "");
+     if (dirty) return "Save draft before this action.";
+     if (!version || !document) return "Save this draft first.";
+     if (action === "validate") return document.status === "draft" || document.status === "validated" ? "" : "Save an edited draft to validate a new revision.";
+@@ -58,13 +61,13 @@
+             : action === "submit" ? await api.submitApproval(ref)
+               : action === "validate" ? await api.request("validate_workflow", ref)
+                 : await api.request("approve_workflow", { ...ref, action: action === "approve" ? "approve" : "publish" });
+-        if (action === "reload") state.acceptWorkflow(result.workflow); else acceptConfirmed(result.workflow, snapshot);
++        if (action === "reload") { const now=useMesh.getState(); const edited=now.workflows.find(w=>w.id===current.id);if(edited&&editSnapshot(edited,now.agents)!==snapshot)throw new InputError("Your draft changed while reload was loading. Edits were retained; review and confirm reload again.");now.acceptWorkflow(result.workflow); } else acceptConfirmed(result.workflow, snapshot);
+         if (result.registry_review) backend.acceptReview(result.registry_review);
+-        if (action === "validate" && result.workflow.status !== "validated") throw new Error("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
++        if (action === "validate" && result.workflow.status !== "validated") throw new InputError("Validation did not pass. Resolve the server validation and Registry blockers, then validate again.");
+         setMessage(`${labels[action]} confirmed · v${result.workflow.version} · ${result.workflow.status}`);
+       }
+       await backend.refreshOverview();
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); }
++    } catch (caught) { failedAt.current={document:useMesh.getState().workflows.find(w=>w.id===workflow.id)?.canonical}; setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); if(caught instanceof ApiError && caught.error.error_code==="REVISION_CONFLICT"){try{const latest=await api.request("get_workflow",{workflow_id:workflow.id});useMesh.getState().observeWorkflows([latest.workflow]);}catch{/* Existing error and working draft remain visible. */}} }
+     finally { pending.current = false; setBusy(""); }
+   };
+   const timestamp = document?.metadata["updated_at"];
+@@ -74,6 +77,7 @@
+   const review = candidateReview?.workflow_version === version ? candidateReview : undefined;
+   return <section aria-label="Workflow actions" className="flex w-full flex-wrap items-start gap-2">
+     <div className="w-full text-xs text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
++    {dirty&&document&&<p className="w-full text-xs text-muted-foreground">Saving creates a new editable revision. Tool authorization must be reviewed again; existing active releases keep their reviewed revision.</p>}
+     <ProcurementReview workflow={workflow} />
+     <SheetAccessReview targets={document?.metadata["sheet_write_targets"]} />
+     <CustomerAutomationReview policy={document?.metadata["customer_automation"]} emailPolicy={document?.metadata["email_recipient_policy"]} />
+--- a/frontend/src/features/workflows/run-inputs.ts
++++ b/frontend/src/features/workflows/run-inputs.ts
+@@ -1,20 +1,22 @@
++import { InputError } from "@/api/feedback";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ export function parseRunInputs(fields: CanonicalWorkflow["inputs"], values: Record<string, string>): Record<string, unknown> {
+   const result: Record<string, unknown> = {};
+   for (const field of fields) {
+     const raw = values[field.name] ?? "";
+-    if (!raw.trim()) { if (field.required) throw new Error(`${field.name} is required.`); continue; }
++    const invalid=(message:string)=>new InputError(message,`inputs.${field.name}`);
++    if (!raw.trim()) { if (field.required) throw invalid(`${field.name} is required.`); continue; }
+     let value: unknown = raw;
+     if (field.type === "number" || field.type === "integer") {
+-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw new Error(`${field.name} must be a number.`);
++      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw invalid(`${field.name} must be a number.`);
+       value = Number(raw);
+-      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw new Error(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
++      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw invalid(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
+     } else if (field.type === "boolean") {
+-      if (!["true", "false"].includes(raw)) throw new Error(`${field.name} must be true or false.`);
++      if (!["true", "false"].includes(raw)) throw invalid(`${field.name} must be true or false.`);
+       value = raw === "true";
+     } else if (field.type === "array" || field.type === "object") {
+-      try { value = JSON.parse(raw); } catch { throw new Error(`${field.name} must contain valid JSON.`); }
+-      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${field.name} must be a JSON ${field.type}.`);
++      try { value = JSON.parse(raw); } catch { throw invalid(`${field.name} must contain valid JSON.`); }
++      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw invalid(`${field.name} must be a JSON ${field.type}.`);
+     }
+     result[field.name] = value;
+   }
+--- a/frontend/src/features/workflows/unsaved.ts
++++ b/frontend/src/features/workflows/unsaved.ts
+@@ -2,6 +2,7 @@
+ import { useMesh } from "@/domain/store";
+ import { hasWorkflowEdits } from "@/api/mapping";
+ let editor: string | null = null;
++const registrations=new Map<string,number>();
+ export function editorIsDirty() {
+   const state = useMesh.getState(); const workflow = state.workflows.find(item => item.id === editor);
+   return !!workflow && hasWorkflowEdits(workflow, state.agents);
+@@ -11,7 +12,7 @@
+ }
+ export function useUnsavedWorkflow(workflowId: string) {
+   useEffect(() => {
+-    editor = workflowId;
++    editor = workflowId; registrations.set(workflowId,(registrations.get(workflowId)??0)+1);
+     const editorUrl = window.location.href; const editorHistory = window.history.state;
+     const back = (event: PopStateEvent) => {
+       if (window.location.href === editorUrl || !editorIsDirty()) return;
+@@ -23,6 +24,6 @@
+     window.addEventListener("popstate", back, true);
+     const unload = (event: BeforeUnloadEvent) => { if (editorIsDirty()) { event.preventDefault(); event.returnValue = ""; } };
+     window.addEventListener("beforeunload", unload);
+-    return () => { if (editor === workflowId) editor = null; window.removeEventListener("beforeunload", unload); window.removeEventListener("popstate", back, true); };
++    return () => { const remaining=(registrations.get(workflowId)??1)-1;registrations.set(workflowId,remaining);if (editor === workflowId && !remaining) editor = null; window.removeEventListener("beforeunload", unload); window.removeEventListener("popstate", back, true); };
+   }, [workflowId]);
+ }
+--- a/frontend/src/features/workflows/workflow-state.ts
++++ b/frontend/src/features/workflows/workflow-state.ts
+@@ -1,15 +1,16 @@
++import { workflowEditSnapshot, olderDocument } from "@/api/mapping";
+ import { useMesh } from "@/domain/store";
+ import type { Workflow, Agent } from "@/domain/types";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export function editSnapshot(workflow: Workflow, agents: Agent[]) {
+-  return JSON.stringify([workflow.name, workflow.description, workflow.nodes, workflow.edges,
+-    agents.filter(agent => workflow.nodes.some(node => node.data.agentId === agent.id))]);
++  return workflowEditSnapshot(workflow,agents);
+ }
+ export function acceptConfirmed(document: CanonicalWorkflow, submittedSnapshot: string) {
+   const state = useMesh.getState();
+   const current = state.workflows.find(workflow => workflow.id === document.workflow_id);
++  if (olderDocument(document,current?.canonical)) return;
+   if (!current || editSnapshot(current, state.agents) === submittedSnapshot) state.acceptWorkflow(document);
+   else useMesh.setState({ workflows: state.workflows.map(workflow => workflow.id === document.workflow_id
+-    ? { ...workflow, canonical: document, serverVersion: document.version, status: document.status } : workflow) });
++    ? { ...workflow, canonical: structuredClone(document), serverVersion: document.version, status: document.status, remote: undefined, tabConflict: undefined } : workflow) });
+ }
+--- a/frontend/src/screens/app.index.tsx
++++ b/frontend/src/screens/app.index.tsx
+@@ -1,4 +1,5 @@
+ "use client";
++import { InputError } from "@/api/feedback";
+ import { useEffect, useState } from "react";
+ import { motion } from "motion/react";
+ import { ArrowRight, Sparkles } from "lucide-react";
+@@ -28,7 +29,7 @@
+     if (!planningJob || cancelling) return;
+     setCancelling(true);
+     try { await api.cancelPlanning(planningJob.job_id); }
+-    catch (error) { setApiError(error instanceof Error ? error : new Error("Cancellation could not be confirmed. Check the job status.")); }
++    catch (error) { setApiError(error instanceof Error ? error : new InputError("Cancellation could not be confirmed. Check the job status.")); }
+     finally { setCancelling(false); }
+   };
+   const [apiError, setApiError] = useState<Error | null>(null);
+@@ -46,13 +47,13 @@
+       };
+       await useBackend.getState().initialize();
+       const currentBackend = useBackend.getState();
+-      if (currentBackend.status !== "connected") throw currentBackend.error ?? new Error("Could not connect to the workflow API. Retry when it is connected.");
+-      if (!currentBackend.can("workflow.plan")) throw new Error("Your current account does not have permission to generate workflows.");
+-      if (!currentBackend.session?.planning_available) throw new Error("The backend has not enabled the workflow planner. Check its model configuration.");
++      if (currentBackend.status !== "connected") throw currentBackend.error ?? new InputError("Could not connect to the workflow API. Retry when it is connected.");
++      if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
++      if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
+       const saved = await createWorkflow({ objective: prompt, context });
+       if (saved.existing) toast.info("Opened the existing saved workflow for this request. Your previous revision was preserved.");
+       setResult(saved);
+-    } catch (caught) { setApiError(caught instanceof Error ? caught : new Error("Workflow generation failed.")); }
++    } catch (caught) { setApiError(caught instanceof Error ? caught : new InputError("Workflow generation failed.")); }
+     finally { generationLock.current = false; setPlanning(false); }
+   };
+   const openResult = () => {
+--- a/frontend/src/screens/app.monitoring.test.tsx
++++ b/frontend/src/screens/app.monitoring.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+ 
+ it("shows pre-run source failures and server guardrails in the shared live panel", async () => {
+-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
++  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ request_id:"req_monitoring_test", status:200, data: {
+     runs: { total: 0, active: 0, completed: 0, failed: 0 }, events: 0,
+     usage: { llm_calls: 0, tool_calls: 0, tokens: 0, retries: 0, estimated_cost_usd: 0 }, latest: [],
+     sources: [{ binding_id: "bind_test", workflow_id: "wf_test", provider_id: "google_sheets", health: "error", error_code: "EVENT_MAPPING_FAILED", baseline_ready: true }],
+--- a/frontend/src/screens/app.monitoring.tsx
++++ b/frontend/src/screens/app.monitoring.tsx
+@@ -1,32 +1,29 @@
+ "use client";
+ import { useEffect, useState } from "react";
++import { api } from "@/api/client";
++import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ import { PageHeader } from "@/features/runs/RunTrace";
+ 
+-type Monitoring = { runs: { total: number; active: number; completed: number; failed: number }; status_breakdown?: Record<string, number>; duration_seconds?: { avg: number }; events: number; usage: { llm_calls: number; tool_calls: number; tokens: number; retries: number; estimated_cost_usd: number }; latest: { run_id: string; status: string; correlation_id: string; trace_reference: string }[];
+-  sources?: { binding_id: string; workflow_id: string; provider_id: string; health: string; error_code?: string; baseline_ready: boolean; last_successful_poll?: string }[];
+-  policies?: { workflow_id: string; version: number; action_approval_required: boolean; agents: { agent_id: string; guardrails: Record<string, boolean>; limits: { max_llm_calls: number; max_tool_calls: number; max_retries: number } }[] }[];
+-  audit?: { event_id: string; event_type: string; run_id: string; timestamp: string }[];
+-};
++type Monitoring=Awaited<ReturnType<typeof api.monitoring>>;
+ 
+ export function LiveRuntimePanel() {
+   const [data, setData] = useState<Monitoring | null>(null);
+-  const [error, setError] = useState<string | null>(null);
++  const [error, setError] = useState<Error | null>(null);
+   useEffect(() => {
+     let cancelled = false;
++    let timer:ReturnType<typeof setTimeout>;
+     const load = async () => {
+       try {
+-        const response = await fetch("/api/backend/monitoring", { credentials: "same-origin", cache: "no-store" });
+-        const envelope = await response.json();
+-        if (!response.ok) throw new Error(envelope?.data?.error?.message ?? "Monitoring is unavailable.");
+-        if (!cancelled) { setData(envelope.data); setError(null); }
+-      } catch (caught) { if (!cancelled) setError(caught instanceof Error ? caught.message : "Monitoring is unavailable."); }
++        const result=await api.monitoring();
++        if (!cancelled) { setData(result); setError(null); }
++      } catch (caught) { if (!cancelled) setError(caught instanceof Error ? caught : new Error("Monitoring is unavailable.")); }
++      finally {if(!cancelled)timer=setTimeout(()=>void load(),5000);}
+     };
+     void load();
+-    const timer = window.setInterval(() => void load(), 5000);
+-    return () => { cancelled = true; window.clearInterval(timer); };
++    return () => { cancelled = true; clearTimeout(timer); };
+   }, []);
+   return <div className="space-y-6">
+-    {error && <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">{error}</p>}
++    <ApiFeedback error={error} />
+     {!error && !data && <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Loading monitoring data…</p>}
+     {data && <><div className="grid gap-3 md:grid-cols-4">{[["Runs", data.runs.total], ["Active", data.runs.active], ["Completed", data.runs.completed], ["Failed", data.runs.failed]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-border p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>)}</div>
+       <div className="rounded-xl border border-border p-4"><p className="font-medium">Runtime usage</p><p className="mt-2 text-sm text-muted-foreground">{data.events} events · {data.usage.tool_calls} tool calls · {data.usage.llm_calls} model calls · {data.usage.tokens} tokens · ${Number(data.usage.estimated_cost_usd).toFixed(4)} estimated</p></div>
+--- a/frontend/src/screens/app.settings.tsx
++++ b/frontend/src/screens/app.settings.tsx
+@@ -1,4 +1,5 @@
+ "use client";
++import { InputError } from "@/api/feedback";
+ import { useEffect, useRef, useState } from "react";
+ import { PageHeader } from "@/features/runs/RunTrace";
+ import { api } from "@/api/client";
+@@ -15,17 +16,17 @@
+     api.settings().then(result => {
+       if (!active) return;
+       const item = result.items.find(item => item.key === "notifications");
+-      if (item && typeof item.value !== "string") throw new Error("The notification setting is not text. Ask the administrator to correct it.");
++      if (item && typeof item.value !== "string") throw new InputError("The notification setting is not text. Ask the administrator to correct it.");
+       const initial = typeof item?.value === "string" ? item.value : "";
+       setLoaded(true); setValue(initial); setSaved(initial); setTimestamp(item?.updated_at ?? ""); setError(undefined);
+-    }).catch(caught => { if (active) setError(caught instanceof Error ? caught : new Error("Settings could not be loaded.")); }).finally(() => { if (active) setLoading(false); });
++    }).catch(caught => { if (active) setError(caught instanceof Error ? caught : new InputError("Settings could not be loaded.")); }).finally(() => { if (active) setLoading(false); });
+     return () => { active = false; };
+   }, [backend.status, reload]);
+   const save = async () => {
+     if (pending.current || !loaded || loading || !administrative || value === saved) return;
+     pending.current = true; setBusy(true); setError(undefined); setSuccess("");
+     try { const item = await api.saveNotification(value); setSaved(item.value); setTimestamp(item.updated_at); setSuccess("Setting saved on the server."); }
+-    catch (caught) { setError(caught instanceof Error ? caught : new Error("The setting was not saved.")); }
++    catch (caught) { setError(caught instanceof Error ? caught : new InputError("The setting was not saved.")); }
+     finally { pending.current = false; setBusy(false); }
+   };
+   return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Settings" sub="Persisted workspace settings." />
+--- a/frontend/src/screens/app.workflows.$id.tsx
++++ b/frontend/src/screens/app.workflows.$id.tsx
+@@ -4,7 +4,6 @@
+ import { ClientOnly } from "@/lib/navigation";
+ import { lazy, Suspense, useEffect, useState } from "react";
+ import { useMesh } from "@/domain/store";
+-import { hasWorkflowEdits } from "@/api/mapping";
+ import { api } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+@@ -18,23 +17,24 @@
+   const workflow = useMesh((s) => s.workflows.find((w) => w.id === id));
+   const backendStatus = useBackend((s) => s.status);
+   const [error, setError] = useState<Error | null>(null);
+-  const [loaded, setLoaded] = useState(false);
++  const [loadedId, setLoadedId] = useState("");
++  const [attempt,setAttempt]=useState(0);
+   useEffect(() => {
+     let active = true;
+     const existing = useMesh.getState().workflows.find((w) => w.id === id);
+-    if (backendStatus !== "connected" || (existing && (!existing.serverVersion || hasWorkflowEdits(existing, useMesh.getState().agents)))) return;
++    if (backendStatus !== "connected" || (existing && !existing.serverVersion)) return;
+     api.request("get_workflow", { workflow_id: id }).then((result) => {
+-      if (active) { useMesh.getState().acceptWorkflow(result.workflow); setLoaded(true); }
+-    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoaded(true); } });
++      if (active) { useMesh.getState().observeWorkflows([result.workflow]); setLoadedId(id); setError(null); }
++    }).catch((caught) => { if (active) { setError(caught instanceof Error ? caught : new Error("Workflow loading failed.")); setLoadedId(id); } });
+     return () => { active = false; };
+-  }, [id, backendStatus]);
++  }, [id, backendStatus, attempt]);
+   if (!workflow) {
+-    if (backendStatus === "loading" || (backendStatus === "connected" && !loaded)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
++    if (backendStatus === "loading" || (backendStatus === "connected" && loadedId !== id)) return <p className="p-6 text-sm text-muted-foreground">Loading workflow…</p>;
+     return (
+       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+         <p className="font-display text-xl font-medium">Workflow not found</p>
+         <p className="text-sm text-muted-foreground">This workflow could not be loaded from the server or this browser.</p>
+-        <ApiFeedback error={error} />
++        <ApiFeedback error={error} onRetry={()=>setAttempt(n=>n+1)} />
+         <Link to="/app/workflows" className="text-sm text-primary">Back to workflows</Link>
+       </div>
+     );

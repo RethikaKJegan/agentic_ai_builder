@@ -58,7 +58,7 @@ function AgentCard({ data, selected }: NodeProps<CardNode>) {
           ) : (
             <Bot className="h-4 w-4" />
           )}
-          {card.role}
+          {card.role==='Coordinator'?'Master agent':card.role==='Helper agent'?'Sub-agent':card.role}
         </span>
         {card.spawned && (
           <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
@@ -191,6 +191,7 @@ function NodeDetails({ card }: { card: DiagramCard }) {
         )}
       </div>
       <Evidence title="Task and purpose" value={card.reason ?? card.description} />
+      {card.configuration!==undefined&&<details className="rounded-lg border p-3"><summary className="cursor-pointer text-xs font-medium">Agent configuration & tool access</summary><ReadableEvidence value={card.configuration}/></details>}
       <Evidence
         title={card.runId ? "Information received" : "Configured inputs"}
         value={card.input}
@@ -344,8 +345,8 @@ export function CommunicationDiagram({ model }: { model: DiagramModel }) {
   }, [model, selectedCard?.id]);
   const signature = model.cards.map((c) => c.id).join(",");
   return (
-    <div className="relative min-h-0 flex-1" aria-label="Agent communication diagram">
-      <ReactFlowProvider>
+    <div className="relative h-full min-h-0 w-full flex-1" aria-label="Agent communication diagram">
+      <div className="absolute inset-0"><ReactFlowProvider>
         <ReactFlow
           nodes={diagram.nodes}
           edges={diagram.edges}
@@ -366,7 +367,7 @@ export function CommunicationDiagram({ model }: { model: DiagramModel }) {
           <Controls showInteractive={false} />
           <FitNewAgents signature={signature} />
         </ReactFlow>
-      </ReactFlowProvider>
+      </ReactFlowProvider></div>
       {(selectedCard || selectedConnection) && (
         <aside
           aria-label="Agent details"

@@ -282,7 +282,7 @@ class ReplyCases:
                     actions = [k for k in actions if k != 'manager_notice'] + ['confirm_closure']
                 uncertain = False
                 for kind in actions:
-                    with self.store.transaction() as db:
+                    with self.store.transaction(write=False) as db:
                         existing = db.execute('SELECT state FROM customer_case_actions WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?',
                                               (workspace,case_id,reply_id,kind)).fetchone()
                     if existing:
@@ -315,7 +315,7 @@ class ReplyCases:
                 raise RuntimeError('IMAP_INBOX_UNAVAILABLE')
             typ, response = imap.response('UIDVALIDITY')
             uidvalidity = str(response[0].decode() if isinstance(response[0], bytes) else response[0]) if typ == 'OK' and response and response[0] else 'unknown'
-            with self.store.transaction() as db:
+            with self.store.transaction(write=False) as db:
                 row = db.execute('SELECT uidvalidity,last_uid FROM customer_mail_cursor WHERE workspace=? AND mailbox_id=?', (workspace, mailbox_id)).fetchone()
             last = row[1] if row and row[0] == uidvalidity else 0
             if last:

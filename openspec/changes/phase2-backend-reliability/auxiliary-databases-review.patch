@@ -1,0 +1,184 @@
+--- a/connector_extension/common.py
++++ b/connector_extension/common.py
+@@ -7,6 +7,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import time
+ from urllib.parse import urlparse
+ from urllib.request import Request, build_opener, HTTPRedirectHandler
+@@ -71,16 +72,20 @@
+ 
+ class EffectJournal:
+     """Commit intent before writes; unknown results can never be replayed silently."""
+-    def __init__(self, root):
++    def __init__(self, root, database_url=None):
++        self.database_url=database_url
+         self.path = Path(root) / 'effects.sqlite3'
+         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'The effect journal cannot be a symlink.')
+-        with sqlite3.connect(self.path) as db:
++        with self.connection() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT)')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
++
++    def connection(self,write=True):
++        return database_connection(self.path,write=write,database_url=self.database_url)
+ 
+     def perform(self, tool_id, effect_id, inputs, action):
+         key = digest([tool_id, effect_id]); fingerprint = digest(inputs)
+-        with sqlite3.connect(self.path, timeout=10) as db:
++        with self.connection() as db:
+             db.execute('BEGIN IMMEDIATE')
+             old = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+             if old:
+@@ -96,11 +101,11 @@
+             category=exc.code if isinstance(exc,RuntimeFailure) and isinstance(exc.code,str) and re.fullmatch(r'[A-Z][A-Z0-9_]{1,99}',exc.code) else 'PROVIDER_ACTION_FAILED'
+             diagnostic={'failure_category':category}
+             if isinstance(exc,RuntimeFailure) and hasattr(exc,'provider_diagnostic'):diagnostic['provider_diagnostic']=exc.provider_diagnostic
+-            with sqlite3.connect(self.path) as db:
++            with self.connection() as db:
+                 db.execute("UPDATE effects SET result=? WHERE key=? AND state='started'",
+                            (json.dumps(diagnostic),key))
+             denied('UNKNOWN_INVOCATION_RESULT', 'The external write result is uncertain; no automatic replay is permitted.', 502)
+-        with sqlite3.connect(self.path) as db:
++        with self.connection() as db:
+             db.execute("UPDATE effects SET state='completed',result=? WHERE key=?", (json.dumps(result), key))
+         return result
+ 
+--- a/connector_extension/sheet_creation.py
++++ b/connector_extension/sheet_creation.py
+@@ -5,6 +5,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import time
+ from urllib.parse import quote, urlencode
+ from jsonschema import Draft202012Validator
+@@ -43,24 +44,25 @@
+ 
+ class SheetResourceStore:
+     """Resource ownership only; this is not the future procurement case database."""
+-    def __init__(self, root):
++    def __init__(self, root, database_url=None):
++        self.database_url=database_url
+         self.path = Path(root) / 'sheet-resources.sqlite3'
+         if self.path.is_symlink(): denied('STATE_PATH_INVALID', 'Resource state cannot be a symlink.')
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             db.execute('CREATE TABLE IF NOT EXISTS resources (workspace TEXT, project TEXT, spreadsheet TEXT, '
+                        'sheet INTEGER, spreadsheet_owned INTEGER, tab_owned INTEGER, manifest TEXT, '
+                        'workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,spreadsheet,sheet))')
+             db.execute('CREATE TABLE IF NOT EXISTS observations (workspace TEXT, project TEXT, marker TEXT, '
+                        'spreadsheet TEXT, workflow TEXT, revision INTEGER, PRIMARY KEY(workspace,project,marker))')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
+ 
+     def observe(self, namespace, project, marker, identifier):
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             db.execute('INSERT OR IGNORE INTO observations VALUES (?,?,?,?,?,?)',
+                        (namespace[0], project, marker, identifier, namespace[1], namespace[2]))
+ 
+     def remember(self, namespace, receipt):
+-        with sqlite3.connect(self.path) as db:
++        with database_connection(self.path,database_url=self.database_url) as db:
+             for table in receipt['tabs']:
+                 db.execute('INSERT INTO resources VALUES (?,?,?,?,?,?,?,?,?) '
+                            'ON CONFLICT(workspace,project,spreadsheet,sheet) DO UPDATE SET '
+@@ -97,7 +99,7 @@
+ 
+     def journal_row(self, value):
+         key = digest([self.definition['tool_id'], self.stable_effect(value)])
+-        with sqlite3.connect(self.journal.path) as db:
++        with self.journal.connection(write=False) as db:
+             row = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+         if row and row[0] != digest(value):
+             denied('EFFECT_REFERENCE_MISMATCH', 'This project creation key belongs to different reviewed inputs.')
+@@ -265,7 +267,7 @@
+         result = self.receipt(value, self.metadata(identifier, deadline), deadline, require_owned=create)
+         if list(Draft202012Validator(self.definition['output_schema']).iter_errors(result)):
+             denied('SHEETS_SETUP_INVALID_RESULT', 'Reconciled setup does not match the output schema.')
+-        with sqlite3.connect(self.journal.path) as db:
++        with self.journal.connection() as db:
+             db.execute('BEGIN IMMEDIATE')
+             current = db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?', (key,)).fetchone()
+             if not current or current[0] != digest(value): denied('EFFECT_REFERENCE_MISMATCH', 'The setup intent changed.')
+--- a/connector_extension/procurement/store.py
++++ b/connector_extension/procurement/store.py
+@@ -9,6 +9,7 @@
+ from pathlib import Path
+ import re
+ import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ from zoneinfo import ZoneInfo
+ from jsonschema import Draft202012Validator, FormatChecker
+ 
+@@ -58,11 +59,12 @@
+     Currency precision is operator supplied; unsupported currencies stop actions.
+     """
+     def __init__(self, state_dir=None, *, authority_check=None, approval_check=None,
+-                 currency_precision=None, clock=None):
++                 currency_precision=None, clock=None, database_url=None):
+         root = Path(state_dir or STATE_ROOT).absolute()
+         require(root.resolve().is_relative_to(STATE_ROOT.resolve()), 'STATE_PATH_INVALID')
+         require(not root.is_symlink(), 'STATE_PATH_INVALID')
+         root.mkdir(parents=True, exist_ok=True, mode=0o700)
++        self.database_url=database_url
+         self.path = root/'procurement.sqlite3'
+         require(not self.path.is_symlink(), 'STATE_PATH_INVALID')
+         self.authority_check, self.approval_check = authority_check, approval_check
+@@ -100,15 +102,12 @@
+                        'PRIMARY KEY(workspace,project,key), FOREIGN KEY(workspace,project,record_id,record_revision) '
+                        'REFERENCES revisions(workspace,project,id,revision))')
+             db.execute('PRAGMA user_version=1')
+-        os.chmod(self.path, 0o600)
++        if self.path.exists():os.chmod(self.path, 0o600)
+ 
+     @contextmanager
+-    def connection(self):
+-        db = sqlite3.connect(self.path, timeout=15)
+-        db.execute('PRAGMA foreign_keys=ON')
+-        try:
+-            with db: yield db
+-        finally: db.close()
++    def connection(self,write=True):
++        with database_connection(self.path,write=write,database_url=self.database_url) as db:
++            yield db
+ 
+     @staticmethod
+     def scope(workspace, project):
+--- a/connector_extension/procurement/service.py
++++ b/connector_extension/procurement/service.py
+@@ -26,7 +26,7 @@
+ class ProcurementService:
+     def __init__(self, workflows, state, currency_precision, auth_supplier):
+         self.workflows,self.auth_supplier=workflows,auth_supplier
+-        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority)
++        self.store=ProcurementStore(state,currency_precision=currency_precision,authority_check=self.source_authority,database_url=getattr(workflows,'auxiliary_database_url',None))
+         self.lock=threading.RLock()
+         self.restored=set()
+         self.cursor=0
+--- a/workflow_api/procurement.py
++++ b/workflow_api/procurement.py
+@@ -525,7 +525,7 @@
+     from connector_extension.app import state_directory
+     state=state_directory(ROOT/env.get('BUILDER_PROCUREMENT_STATE','.local/connector-extension/native-procurement'))
+     token_file=ROOT/env.get('BUILDER_PROCUREMENT_GOOGLE_TOKEN','.local/connector-extension/google-token.json')
+-    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state);artifacts=ArtifactStore(state);resources=SheetResourceStore(state)
++    api=GoogleAPI(GoogleToken(token_file));journal=EffectJournal(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'));artifacts=ArtifactStore(state);resources=SheetResourceStore(state,database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL'))
+     # Approval review adds grants for each exact child action without revoking other reviewed workflows.
+     registry=service.registry_adapter.service
+     old=service.registry_adapter
+--- a/workflow_api/live_providers.py
++++ b/workflow_api/live_providers.py
+@@ -276,6 +276,7 @@
+                      environment_name=mode, ui_origins=allowed_origins,
+                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+     service = app.state.workflow_service
++    service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
+     from openai import OpenAI
+     from planner import PlannerService
+     from runtime.connectors import SMTPConnector, GoogleSheetsConnector

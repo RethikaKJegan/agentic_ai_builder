@@ -74,7 +74,7 @@ class IntegratedTests(unittest.TestCase):
         return BoundedLLM(definition, provider, lambda messages:1000, 0, 0)
 
     def start(self):
-        self.app=create_configured_app(self.env,self.path/'workflows.sqlite3',client=self.sdk,model_factory=self.model_factory)
+        self.app=create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'},self.path/'workflows.sqlite3',client=self.sdk,model_factory=self.model_factory)
         self.service=self.app.state.workflow_service;self.auth=self.app.state.live_operator_auth
         self.service.planner.provider.discoverer=lambda ref:next(c for c in self.catalogs if c['spreadsheet_id']==ref)
         self.procurement=self.app.state.procurement_service

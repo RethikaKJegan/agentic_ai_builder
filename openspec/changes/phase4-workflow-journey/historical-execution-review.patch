@@ -1,0 +1,105 @@
+--- a/frontend/src/api/control.ts
++++ b/frontend/src/api/control.ts
+@@ -27,7 +27,16 @@
+     if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(event)) throw new Error("The runtime reused an event ID with different data.");
+     events.set(event.event_id, event);
+   }
+-  return [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
++  const result = [...events.values()];
++  const sequence = (event: RunEvent) => event.details?.["recorded_sequence"];
++  if (result.every(event => Number.isSafeInteger(sequence(event)))) {
++    const unique = new Set(result.map(sequence));
++    if (unique.size !== result.length) throw new Error("The runtime reused an event sequence.");
++    result.sort((a, b) => Number(sequence(a)) - Number(sequence(b)));
++  }
++  // Legacy responses already arrive in database sequence order. Equal/skewed
++  // timestamps must never reorder causal events or manufacture completion.
++  return result;
+ }
+ export function assertWorkflowReferences(workflow: CanonicalWorkflow) {
+   const nodes = new Set(workflow.nodes.map((n) => n.node_id));
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -3,16 +3,18 @@
+ import { useBackend } from "@/api/state";
+ import { reconcileEvents } from "@/api/control";
+ import type { RunEvent } from "@/api/contracts.generated";
++import { fromCanonical } from "@/api/mapping";
+ import type { StepStatus } from "@/domain/types";
+ 
+-export function useWorkflowTrace(workflowId: string) {
++export function useWorkflowTrace(workflowId: string, enabled = true) {
+   const backend = useBackend();
+-  const available = backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
++  const available = enabled && backend.status === "connected" && !!backend.session?.runtime_available && backend.can("runs.view");
+   const [runs, setRuns] = useState<RunRecord[]>([]);
+   const [selection, setSelection] = useState("");
+-  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[] } | null>(null);
++  const [record, setRecord] = useState<{ run: RunRecord; events: RunEvent[]; revision: ReturnType<typeof fromCanonical> } | null>(null);
+   const [error, setError] = useState<Error | null>(null);
+   const [loading, setLoading] = useState(false);
++  const [attempt, setAttempt] = useState(0);
+   const runId = selection || runs[0]?.run_id || "";
+   useEffect(() => {
+     if (!available) return;
+@@ -28,28 +30,31 @@
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, workflowId]);
++  }, [available, workflowId, attempt]);
+   useEffect(() => {
+     if (!available || !runId) return;
+     let disposed = false;
+     let timer: ReturnType<typeof setTimeout>;
+     const refresh = async () => {
+       setLoading(true);
++      let terminal = false;
+       try {
+         const result = await api.request("get_run", { run_id: runId });
++        terminal = ["completed", "failed", "blocked", "rejected", "cancelled"].includes(result.run.status);
+         if (result.run.workflow_id !== workflowId) throw new Error("This run belongs to another workflow.");
+-        const timeline = await api.request("list_run_events", { run_id: runId });
++        const [timeline, historical] = await Promise.all([api.request("list_run_events", { run_id: runId }), api.request("get_workflow", { workflow_id: workflowId, workflow_version: result.run.workflow_version })]);
++        if (historical.workflow.workflow_id !== workflowId || historical.workflow.version !== result.run.workflow_version) throw new Error("The server returned a different historical revision.");
+         const events = reconcileEvents([], timeline.items, result.run);
+-        if (!disposed) { setRecord({ run: result.run, events }); setError(null); }
++        if (!disposed) { setRecord({ run: result.run, events, revision: fromCanonical(historical.workflow) }); setError(null); }
+       } catch (caught) {
+         if (!disposed) { setRecord(null); setError(caught instanceof Error ? caught : new Error("Trace loading failed.")); }
+       } finally {
+-        if (!disposed) { setLoading(false); timer = setTimeout(() => void refresh(), 3000); }
++        if (!disposed) { setLoading(false); if (!terminal) timer = setTimeout(() => void refresh(), 3000); }
+       }
+     };
+     void refresh();
+     return () => { disposed = true; clearTimeout(timer); };
+-  }, [available, runId, workflowId]);
++  }, [available, runId, workflowId, attempt]);
+   const current = available && record?.run.run_id === runId && record.run.workflow_id === workflowId ? record : null;
+   const events = useMemo(() => current?.events ?? [], [current]);
+   const runState = useMemo(() => {
+@@ -69,6 +74,6 @@
+     return states;
+   }, [events]);
+   const activeEdges = useMemo(() => new Set(events.flatMap((event) => Array.isArray(event.details?.["selected_edges"]) ? event.details["selected_edges"].filter((id): id is string => typeof id === "string") : [])), [events]);
+-  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, events, runState, activeEdges, error, loading };
++  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error, loading, retry: () => setAttempt(n => n + 1) };
+ }
+ export type WorkflowTrace = ReturnType<typeof useWorkflowTrace>;
+--- a/runtime/service.py
++++ b/runtime/service.py
+@@ -199,7 +199,12 @@
+     def events(self, run_id, auth):
+         with self.store.transaction(write=False) as db:
+             self.load(db, run_id, auth)
+-            items = [json.loads(row[0]) for row in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id))]
++            rows = db.execute('SELECT sequence, document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence', (auth['subject']['workspace_id'], run_id)).fetchall()
++            items = []
++            for sequence, document in rows:
++                event = json.loads(document)
++                event['details'] = {**event.get('details', {}), 'recorded_sequence': sequence}
++                items.append(event)
+             return dict(items=items, total=len(items), has_more=False, next_cursor=None)
+ 
+     def monitoring(self, auth):

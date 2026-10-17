@@ -69,12 +69,18 @@ class ProcurementWorker:
     def __init__(self, service):
         import threading
         self.service=service;self.stop_event=threading.Event();self.thread=None
+        self.health={'state':'starting','last_success':None,'last_error':None}
     def start(self):
-        import threading
+        import threading,time
+        if self.thread and self.thread.is_alive():return
+        self.stop_event.clear()
         def run():
             while not self.stop_event.wait(3):
-                try:self.service.tick()
+                try:
+                    self.service.tick()
+                    self.health={'state':'ready','last_success':time.time(),'last_error':None}
                 except Exception:
+                    self.health['state'],self.health['last_error']='error','PROCUREMENT_WORKER_FAILED'
                     import logging
                     logging.getLogger(__name__).warning('Procurement worker tick failed; durable state retained.')
         self.thread=threading.Thread(target=run,daemon=True,name='extension-procurement');self.thread.start()

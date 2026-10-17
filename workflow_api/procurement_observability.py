@@ -2,6 +2,24 @@
 from connector_extension.procurement.store import require,ProcurementError
 
 
+def communication_actions(actions, limit=100):
+    """Keep real agent work visible when frequent inbox polls dominate history."""
+    history=list(actions.items())
+    if len(history)<=limit:return history
+    substantive=[item for item in history if not item[0].startswith(('ful_read_','read_quotes_'))]
+    protected=[item for item in substantive if item[0]=='ingestion']
+    fulfilment=[item for item in substantive if item[0].startswith('ful_extract_')]
+    if fulfilment:protected.append(fulfilment[-1])
+    selected={key:action for key,action in protected}
+    polls=[item for item in history if item[0].startswith(('ful_read_','read_quotes_'))][-min(10,limit//4):]
+    remaining=limit-len(selected)-len(polls)
+    for key,action in [item for item in substantive if item[0] not in selected][-max(0,remaining):]:
+        if len(selected)<limit:selected[key]=action
+    for key,action in polls:
+        if len(selected)<limit:selected[key]=action
+    return list(selected.items())
+
+
 def project_communication(service,procurement,workflow_id,version,auth):
     workspace=procurement.authorize(auth)
     result=service.handle({'request_id':'req_project_graph','operation':'get_workflow',
@@ -24,8 +42,7 @@ def project_communication(service,procurement,workflow_id,version,auth):
         require(root_run['workflow_id']==workflow_id and root_run['workflow_version']==version,'PROCUREMENT_RUN_MISMATCH')
         root_events=service.runtime_runner.runtime.events(job['root_run_id'],auth)['items'][:300]
     history=list(job['actions'].items())
-    selected=history if len(history)<=100 else ([('ingestion',job['actions']['ingestion'])] if 'ingestion' in job['actions'] else [])+[
-        item for item in history if item[0]!='ingestion'][-99:]
+    selected=communication_actions(job['actions'])
     for name,action in selected:
         if not action.get('run_id'):continue
         run=service.runtime_runner.runtime.get_run(action['run_id'],auth)

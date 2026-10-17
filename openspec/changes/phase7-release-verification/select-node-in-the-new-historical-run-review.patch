@@ -1,0 +1,10 @@
+--- a/frontend/e2e/workflow-traces.spec.ts
++++ b/frontend/e2e/workflow-traces.spec.ts
+@@ -34,6 +34,7 @@
+     await expect(trace.getByText("yes", {exact:true})).toBeVisible();
+     await expect(page.getByText(/Read-only historical revision v1/)).toBeVisible();
+     await page.getByLabel("Select workflow run").selectOption("run_older");
++    await page.getByRole("button", { name: /Open refund ticket.*condition/ }).click();
+     await expect(trace.getByText(/T001/).first()).toBeVisible();
+     await expect(trace.getByText("no", {exact:true})).toBeVisible();
+     await expect(trace.getByText(/T002/)).toHaveCount(0);

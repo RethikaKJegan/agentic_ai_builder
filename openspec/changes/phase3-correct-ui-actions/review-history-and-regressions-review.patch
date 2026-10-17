@@ -1,0 +1,183 @@
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -98,7 +98,7 @@
+         const w = get().workflows.find((x) => x.id === id);
+         if (!w) return;
+         const copyId = uid("wf"); const at = new Date().toISOString();
+-        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, origin: "local" as const, updatedAt: at }));
++        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, origin: undefined, updatedAt: at }));
+         const remap = new Map(get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map((agent, index) => [agent.id, clones[index]!.id]));
+         const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
+         if (canonical) {
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -65,6 +65,7 @@
+   removeSubtree,
+ } from "@/domain/hierarchy";
+ import { NODE_META } from "./nodeMeta";
++import { RevisionHistory } from "@/features/workflows/RevisionHistory";
+ import { WorkflowControls } from "@/features/workflows/WorkflowControls";
+ 
+ import { useWorkflowTrace } from "./useWorkflowTrace";
+@@ -109,6 +110,7 @@
+     () => typeof window === "undefined" || window.innerWidth >= 768,
+   );
+   const [cmd, setCmd] = useState("");
++  const [historyOpen, setHistoryOpen] = useState(false);
+   const trace = useWorkflowTrace(workflow.id);
+   const { runState, activeEdges } = trace;
+   const [inspectorTab, setInspectorTab] = useState<"trace" | "configuration">("trace");
+@@ -148,6 +150,7 @@
+ 
+   useEffect(() => {
+     setNodes(workflow.nodes as MeshFlowNode[]); setEdges(workflow.edges); setPast([]); setFuture([]);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [workflow.canonical]); // Confirmed server actions/reload reconcile the canvas without dropping newer local edits.
+ 
+   useEffect(() => {
+@@ -434,6 +437,7 @@
+ 
+   return (
+     <div className="flex h-full flex-col">
++      {current.serverVersion && <RevisionHistory key={`${current.id}:${current.serverVersion}`} workflowId={current.id} latest={current.serverVersion} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
+       {/* Toolbar */}
+       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+         <Link
+@@ -539,21 +543,8 @@
+             <DropdownMenuLabel className="text-xs text-muted-foreground">
+               Versions
+             </DropdownMenuLabel>
+-            {current.versions.length === 0 && (
+-              <p className="px-2 py-1.5 text-sm text-muted-foreground">Not published yet</p>
+-            )}
+-            {current.versions
+-              .slice()
+-              .reverse()
+-              .slice(0, 5)
+-              .map((v) => (
+-                <p key={v.id} className="px-2 py-1.5 text-sm">
+-                  <span className="font-medium">v{v.version}</span>{" "}
+-                  <span className="text-muted-foreground">
+-                    · {new Date(v.publishedAt).toLocaleString()}
+-                  </span>
+-                </p>
+-              ))}
++            <DropdownMenuItem disabled={!current.serverVersion} onSelect={() => setHistoryOpen(true)}>View saved revisions</DropdownMenuItem>
++            {!current.serverVersion && <p className="px-2 py-1.5 text-xs text-muted-foreground">Save draft to create a server revision.</p>}
+             <DropdownMenuSeparator />
+             <DropdownMenuLabel className="text-xs text-muted-foreground">
+               Recent runs
+--- a/frontend/src/features/runs/ServerRunView.tsx
++++ b/frontend/src/features/runs/ServerRunView.tsx
+@@ -1,5 +1,5 @@
+ "use client";
+-import { useEffect, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { api, ApiError, type ApprovalRecord, type RunRecord } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import type { RunEvent } from "@/api/contracts.generated";
+@@ -10,23 +10,25 @@
+ export function ApprovalControl({ approval, emailPreview, onUpdated }: { approval: ApprovalRecord; emailPreview?: unknown; onUpdated?: (() => void) | undefined }) {
+   const backend = useBackend();
+   const [record, setRecord] = useState(approval);
++  const decisionPending = useRef(false);
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState<Error | null>(null);
+   const decide = async (decision: "approved" | "rejected") => {
+-    if (busy) return;
+-    setBusy(true); setError(null);
++    if (decisionPending.current || !backend.can("workflow.approve")) return;
++    decisionPending.current = true; setBusy(true); setError(null);
+     try {
+       const result = await api.request("decide_approval", { approval_id: record.approval_id, workflow_id: record.workflow_id,
+         workflow_version: record.workflow_version, decision });
+       setRecord(result); onUpdated?.();
+     } catch (caught) { setError(caught instanceof Error ? caught : new Error("The decision failed.")); }
+-    finally { setBusy(false); }
++    finally { decisionPending.current = false; setBusy(false); }
+   };
+   return <div className="space-y-2 rounded-lg border border-border p-3">
+     <p className="text-sm">Approval {record.approval_id} · {record.status} · v{record.workflow_version}</p>
+     <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
+     {emailPreview != null && <pre aria-label="Email awaiting approval" className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{JSON.stringify(emailPreview, null, 2)}</pre>}
+-    {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
++    {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
++    {record.status === "pending" && !backend.can("workflow.approve") && <p className="text-xs text-muted-foreground">workflow.approve permission is required to decide this approval.</p>}
+     {record.status === "unmatched" && <p className="text-xs text-muted-foreground">This approval does not match the current workflow revision.</p>}
+     <ApiFeedback error={error} />
+   </div>;
+@@ -56,6 +58,13 @@
+     finally { setBusy(false); }
+   };
+   const load = async () => loadRun(runId);
++  useEffect(() => {
++    if (backend.status !== "connected" || !backend.session?.runtime_available) return;
++    const selected = new URL(window.location.href).searchParams.get("run");
++    if (selected) { setRunId(selected); void loadRun(selected); }
++    // Load the explicit run link once after the session becomes available.
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [backend.status, backend.session?.runtime_available]);
+   useEffect(() => {
+     // AppShell establishes the local development session asynchronously.  Do
+     // not race its /session call from a protected route: a 401 is expected
+--- a/frontend/src/screens/app.approvals.tsx
++++ b/frontend/src/screens/app.approvals.tsx
+@@ -1,3 +1,4 @@
++import { WorkflowReviewQueue } from "@/features/workflows/WorkflowReviewQueue";
+ import { PageHeader } from "@/features/runs/RunTrace";
+ import { ServerRunView } from "@/features/runs/ServerRunView";
+-export default function Screen() { return <div className="mx-auto max-w-5xl p-6 md:p-10"><PageHeader title="Approvals" sub="Approval references and decisions from the trusted runtime service." /><ServerRunView approvalsOnly /></div>; }
++export default function Screen() { return <div className="mx-auto max-w-5xl p-6 md:p-10"><PageHeader title="Approvals" sub="Approval references and decisions from the trusted runtime service." /><WorkflowReviewQueue /><ServerRunView approvalsOnly /></div>; }
+--- a/frontend/src/screens/app.settings.tsx
++++ b/frontend/src/screens/app.settings.tsx
+@@ -6,7 +6,7 @@
+ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+ export default function Screen() {
+   const backend = useBackend(); const [value, setValue] = useState(""); const [saved, setSaved] = useState("");
+-  const [timestamp, setTimestamp] = useState(""); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
++  const [timestamp, setTimestamp] = useState(""); const [loaded, setLoaded] = useState(false); const [reload, setReload] = useState(0); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
+   const [error, setError] = useState<Error>(); const [success, setSuccess] = useState(""); const pending = useRef(false);
+   const administrative = backend.session?.auth.decision === "allow" && backend.session.auth.roles.includes("admin") && backend.session.auth.scopes.includes("workspace:write");
+   useEffect(() => {
+@@ -17,12 +17,12 @@
+       const item = result.items.find(item => item.key === "notifications");
+       if (item && typeof item.value !== "string") throw new Error("The notification setting is not text. Ask the administrator to correct it.");
+       const initial = typeof item?.value === "string" ? item.value : "";
+-      setValue(initial); setSaved(initial); setTimestamp(item?.updated_at ?? ""); setError(undefined);
++      setLoaded(true); setValue(initial); setSaved(initial); setTimestamp(item?.updated_at ?? ""); setError(undefined);
+     }).catch(caught => { if (active) setError(caught instanceof Error ? caught : new Error("Settings could not be loaded.")); }).finally(() => { if (active) setLoading(false); });
+     return () => { active = false; };
+-  }, [backend.status]);
++  }, [backend.status, reload]);
+   const save = async () => {
+-    if (pending.current || loading || !administrative || value === saved) return;
++    if (pending.current || !loaded || loading || !administrative || value === saved) return;
+     pending.current = true; setBusy(true); setError(undefined); setSuccess("");
+     try { const item = await api.saveNotification(value); setSaved(item.value); setTimestamp(item.updated_at); setSuccess("Setting saved on the server."); }
+     catch (caught) { setError(caught instanceof Error ? caught : new Error("The setting was not saved.")); }
+@@ -30,11 +30,12 @@
+   };
+   return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Settings" sub="Persisted workspace settings." />
+     <ApiFeedback error={error ?? backend.error} />
++    <button type="button" disabled={busy || backend.status !== "connected"} onClick={() => { if (value !== saved && !window.confirm("Reload settings and discard unsaved changes?")) return; setLoading(true); setReload(current => current + 1); }} className="rounded border px-3 py-2 text-sm disabled:opacity-40">Reload settings</button>
+     <form onSubmit={event => { event.preventDefault(); void save(); }} className="rounded-2xl border border-border p-4">
+-      <label className="text-sm">Notification preference<input disabled={loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(event.target.value); setSuccess(""); }} className="mt-2 block w-full rounded-lg border border-border bg-background p-2 disabled:opacity-40" placeholder="email" /></label>
++      <label className="text-sm">Notification preference<input disabled={!loaded || loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(event.target.value); setSuccess(""); }} className="mt-2 block w-full rounded-lg border border-border bg-background p-2 disabled:opacity-40" placeholder="email" /></label>
+       <p role="status" className="mt-2 text-xs text-muted-foreground">{loading ? "Loading confirmed settings…" : value !== saved ? "Unsaved changes" : timestamp ? `Saved ${new Date(timestamp).toLocaleString()}` : "No notification preference saved yet."}</p>
+       {!administrative && <p className="mt-2 text-sm text-muted-foreground">Workspace administrator access is required to save settings.</p>}
+-      <button type="submit" disabled={loading || busy || !administrative || value === saved} className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40">{busy ? "Saving…" : "Save setting"}</button>
++      <button type="submit" disabled={!loaded || loading || busy || !administrative || value === saved} className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40">{busy ? "Saving…" : "Save setting"}</button>
+       {success && <p role="status" className="mt-2 text-sm text-emerald-700">{success}</p>}
+     </form></div>;
+ }
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -347,7 +347,7 @@
+             workflow['metadata'].pop('validation_state', None)
+             workflow['metadata'].pop('approved_by', None)
+             workflow['metadata'].pop('approval_submission', None)
+-            workflow['metadata']['updated_at'] = datetime.fromtimestamp(self.clock(),timezone.utc).isoformat()
++            workflow['metadata']['updated_at'] = datetime.fromtimestamp(self.lifecycle.clock(),timezone.utc).isoformat()
+             workflow['metadata'].pop('registry_review', None)
+             workflow['metadata']['workspace_id'] = workspace
+             workflow['metadata']['validation_state'] = 'not_validated'

@@ -86,7 +86,8 @@ class LifecycleService:
         self.workflows, self.store, self.clock = workflows, workflows.store, clock
         self.adapter = adapter or TriggerAdapter()
         self.trigger_secrets = dict(trigger_secrets or {})
-        with self.store.transaction(write=False) as db:
+        self.leased_tokens = {}
+        with self.store.transaction(write=True) as db:
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_releases (workspace TEXT, release_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, generation INTEGER, state TEXT, document TEXT NOT NULL, UNIQUE(workspace, workflow_id, generation))")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_active (workspace TEXT, workflow_id TEXT, release_id TEXT, PRIMARY KEY(workspace, workflow_id))")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_operations (workspace TEXT, operation_id TEXT PRIMARY KEY, subject TEXT, idempotency_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, idempotency_key))")
@@ -97,9 +98,12 @@ class LifecycleService:
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_checkpoints (workspace TEXT, binding_id TEXT, cursor TEXT, updated_at TEXT, PRIMARY KEY(workspace, binding_id))")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_overview_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, workflow_id TEXT, document TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS lifecycle_tombstones (workspace TEXT, workflow_id TEXT, deleted_at TEXT, cleanup_state TEXT, PRIMARY KEY(workspace, workflow_id))")
-            # A crash during preparation cannot authorize dispatch. Reconciliation
-            # deterministically fails the incomplete release and preserves the pointer.
-            db.execute("UPDATE lifecycle_releases SET state='failed', document=json_set(document, '$.state', 'failed') WHERE state='preparing'")
+            db.execute('CREATE TABLE IF NOT EXISTS lifecycle_preparations (operation_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, document TEXT NOT NULL)')
+            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_preparations_workspace ON lifecycle_preparations(workspace)')
+            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_jobs_ready ON lifecycle_jobs(workspace,state,available_at,lease_until)')
+            db.execute('CREATE TABLE IF NOT EXISTS lifecycle_job_claims (job_id TEXT PRIMARY KEY, token TEXT NOT NULL)')
+            db.execute('CREATE INDEX IF NOT EXISTS lifecycle_triggers_active ON lifecycle_triggers(workspace,state,workflow_id)')
+            # Recovery is lease-aware; another API instance may still be preparing.
 
     @staticmethod
     def authorize(auth, permission, roles=("admin",)):
@@ -139,7 +143,7 @@ class LifecycleService:
         if not workspace:
             return
         fingerprint = json_digest({"kind": kind, "payload": payload})
-        with self.store.transaction(write=False) as db:
+        with self.store.transaction(write=True) as db:
             operation, replay = self.operation(db, workspace, auth, kind, key, workflow_id,
                                                payload.get("expected_release_id"), fingerprint)
             if not replay or operation["state"] == "preparing":
@@ -159,91 +163,17 @@ class LifecycleService:
         return event
 
     def activate(self, request, auth):
-        self.authorize(auth, "workflow.publish")
-        payload, key = request.get("payload", {}), request.get("idempotency_key")
-        workflow_id, version = payload.get("workflow_id"), payload.get("workflow_version")
-        expected = payload.get("expected_release_id")
-        triggers = payload.get("triggers", [])
-        if not isinstance(workflow_id, str) or type(version) is not int or not isinstance(triggers, list):
-            raise LifecycleFailure("INVALID_REQUEST", "Activation requires an exact workflow revision and trigger list.", 400)
-        reject_secrets(payload)
-        workspace = auth["subject"]["workspace_id"]
-        fingerprint = json_digest({"kind": "activate_release", "payload": payload})
-        prepared = []
-        with self.store.transaction(write=False) as db:
-            operation, replay = self.operation(db, workspace, auth, "activate_release", key, workflow_id, expected, fingerprint)
-            if replay:
-                return {"operation": operation, "release": self._release_for_operation(db, operation)}
-            if db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone():
-                raise LifecycleFailure("WORKFLOW_DELETED", "A deleted workflow cannot be published.", 410)
-            active = db.execute("SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()
-            active_id = active[0] if active else None
-            if expected != active_id:
-                raise LifecycleFailure("RELEASE_CONFLICT", "The active release changed. Reload before publishing.")
-            workflow = self.store.get(db, workspace, workflow_id, version)
-            if not workflow or workflow.get("status") != "published" or workflow.get("metadata", {}).get("validation_state") != "validated":
-                raise LifecycleFailure("REVISION_NOT_PUBLISHED", "Activate a validated, approved, published revision.")
-            if getattr(self.workflows, 'configuration_validator', None):
-                self.workflows.configuration_validator(workflow)
-            if not triggers:
-                triggers = deepcopy(workflow.get("metadata", {}).get("trigger_templates", []))
-            review = self.workflows.registry_adapter.review(workflow, auth)
-            if not review["ready"]:
-                raise LifecycleFailure("ASSIGNMENT_REVALIDATION_FAILED", "Registry grants are not currently authorized.", 403)
-            grants = self.workflows.registry_adapter.execution_assignments(workflow, auth)
-            generation = (db.execute("SELECT COALESCE(MAX(generation), 0) FROM lifecycle_releases WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()[0] + 1)
-            release_id, identity_id = identifier("rel_"), identifier("auto_")
-            identity = dict(identity_id=identity_id, subject_id="automation:" + workflow_id,
-                            workspace_id=workspace, scopes=["workflow.execute", "trigger.dispatch"],
-                            policy_version=max([g.get("policy_version", 1) for g in grants] or [1]), active=True)
-            authority = deepcopy(auth)
-            authority["subject"] = {"subject_id": identity["subject_id"], "workspace_id": workspace}
-            if grants:
-                authority["_registry_assignment_subject"] = deepcopy(auth["subject"])
-                authority["_registry_approval_auth"] = deepcopy(auth)
-            authority["roles"] = ["admin"]
-            authority["permissions"] = sorted(set(authority["permissions"]) | {"workflow.execute", "runs.view"})
-            binding_ids = []
-            created_at = now_iso(self.clock)
-            try:
-                for index, raw in enumerate(triggers):
-                    trigger = self._normalize_trigger(workspace, release_id, workflow_id, raw, index)
-                    reference = self.adapter.prepare(trigger)
-                    trigger["health"] = "ready"
-                    prepared.append((trigger, reference))
-                    binding_ids.append(trigger["binding_id"])
-            except Exception:
-                for trigger, _reference in reversed(prepared):
-                    try:
-                        self.adapter.cleanup(trigger)
-                    except Exception:
-                        pass
-                raise
-            release = dict(release_id=release_id, workspace_id=workspace,
-                           revision=dict(workflow_id=workflow_id, workflow_version=version), state="preparing",
-                           generation=generation, automation_identity_id=identity_id,
-                           agent_versions={item["agent_id"]: item.get("agent_version", 1) for item in review["items"]},
-                           tool_versions={item["tool_id"]: item.get("tool_version", 1) for item in review["items"] if item.get("tool_id")},
-                           policy_version=identity["policy_version"], trigger_binding_ids=binding_ids, created_at=created_at)
-            db.execute("INSERT INTO lifecycle_releases VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (workspace, release_id, workflow_id, version, generation, "preparing", json.dumps(release)))
-            db.execute("INSERT INTO lifecycle_identities VALUES (?, ?, ?, ?)", (workspace, identity_id, json.dumps(authority), json.dumps(identity)))
-            for trigger, reference in prepared:
-                db.execute("INSERT INTO lifecycle_triggers VALUES (?, ?, ?, ?, ?, ?, ?)",
-                           (workspace, trigger["binding_id"], release_id, workflow_id, "ready", reference, json.dumps(trigger)))
-            release["state"] = "active"
-            db.execute("UPDATE lifecycle_releases SET state='active', document=? WHERE release_id=?", (json.dumps(release), release_id))
-            db.execute("INSERT INTO lifecycle_active VALUES (?, ?, ?) ON CONFLICT(workspace, workflow_id) DO UPDATE SET release_id=excluded.release_id", (workspace, workflow_id, release_id))
-            if active_id:
-                db.execute("UPDATE lifecycle_releases SET state='disabled', document=json_set(document, '$.state', 'disabled') WHERE release_id=?", (active_id,))
-                db.execute("UPDATE lifecycle_triggers SET state='disabled', document=json_set(document, '$.health', 'disabled') WHERE release_id=?", (active_id,))
-            operation["state"] = "succeeded"
-            self.save_operation(db, operation)
-            self.emit(db, workspace, workflow_id, "release.activated")
-            return {"operation": operation, "release": release}
+        from .activation import activate
+        return activate(self, request, auth)
 
     def _release_for_operation(self, db, operation):
-        row = db.execute("SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (operation["workspace_id"], operation["workflow_id"])).fetchone()
+        prepared = db.execute('SELECT document FROM lifecycle_preparations WHERE operation_id=?', (operation['operation_id'],)).fetchone()
+        if prepared:
+            release_id = json.loads(prepared[0])['release_id']
+            row = db.execute('SELECT document FROM lifecycle_releases WHERE workspace=? AND release_id=?', (operation['workspace_id'], release_id)).fetchone()
+        else:
+            # Compatibility for operations persisted before the preparation ledger.
+            row = db.execute("SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (operation["workspace_id"], operation["workflow_id"])).fetchone()
         return json.loads(row[0]) if row else None
 
     def _normalize_trigger(self, workspace, release_id, workflow_id, raw, index):
@@ -323,7 +253,7 @@ class LifecycleService:
 
     def verify_webhook(self, binding_id, provider_id, raw_body, signature, timestamp=None):
         """Verify provider delivery before parsing or dispatching its event."""
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
         if not row or row[0] != "ready":
             raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This trigger binding is not active.", 404)
@@ -388,7 +318,7 @@ class LifecycleService:
                 raise ValueError()
         except Exception:
             raise LifecycleFailure("INVALID_SCHEDULE_TICK", "A schedule tick requires a timezone-aware instant.", 400) from None
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             row = db.execute("SELECT state, document FROM lifecycle_triggers WHERE binding_id=?", (binding_id,)).fetchone()
             if not row or row[0] != "ready":
                 raise LifecycleFailure("TRIGGER_NOT_ACTIVE", "This schedule binding is not active.", 404)
@@ -455,16 +385,35 @@ class LifecycleService:
                 job["state"], job["attempt"] = "leased", job["attempt"] + 1
                 job["lease_until"] = (datetime.fromtimestamp(self.clock(), timezone.utc) + timedelta(seconds=seconds)).isoformat()
                 db.execute("UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?", (job["lease_until"], job["attempt"], json.dumps(job), job_id))
+                token=uuid4().hex
+                db.execute('INSERT INTO lifecycle_job_claims VALUES (?,?) ON CONFLICT(job_id) DO UPDATE SET token=excluded.token',(job_id,token))
+                self.leased_tokens[job_id]=token
                 jobs.append(job)
             return jobs
 
     def poll_bindings(self, workspace):
         """Return active polling bindings without credential material."""
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             rows = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE workspace=? AND state='ready'", (workspace,)).fetchall()
         return [json.loads(encoded) for _binding, encoded in rows if json.loads(encoded).get('delivery') == 'poll']
 
-    def execute_job(self, job_id, runner, max_attempts=3):
+    def execute_job(self, job_id, runner, max_attempts=3, claim=None):
+        from .worker_control import LeaseHeartbeat
+        claim=claim or self.leased_tokens.get(job_id)
+        def renew():
+            with self.store.transaction() as db:
+                row=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
+                current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
+                if not row or row[0]!=claim or not current:return False
+                job=json.loads(current[0])
+                if job['state']!='leased':return False
+                job['lease_until']=(datetime.fromtimestamp(self.clock(),timezone.utc)+timedelta(seconds=120)).isoformat()
+                db.execute('UPDATE lifecycle_jobs SET lease_until=?,document=? WHERE job_id=?',(job['lease_until'],json.dumps(job),job_id))
+            return True
+        with LeaseHeartbeat(renew,interval=10):
+            return self._execute_claimed_job(job_id,runner,max_attempts,claim)
+
+    def _execute_claimed_job(self, job_id, runner, max_attempts, claim):
         with self.store.transaction() as db:
             row = db.execute("SELECT document FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()
             if not row:
@@ -472,28 +421,47 @@ class LifecycleService:
             job = json.loads(row[0])
             if job["state"] == "completed":
                 return job
+            current_claim=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
+            if not claim or not current_claim or current_claim[0]!=claim:
+                raise LifecycleFailure('JOB_LEASE_LOST','This worker no longer owns the dispatch job.')
+            if job['state']!='leased':return job
+            if not job.get('lease_until') or job['lease_until']<=now_iso(self.clock):
+                raise LifecycleFailure('JOB_LEASE_EXPIRED','The dispatch lease expired before execution.')
             release_row = db.execute("SELECT state, document FROM lifecycle_releases WHERE release_id=?", (job["release_id"],)).fetchone()
             identity_row = db.execute("SELECT authority, document FROM lifecycle_identities WHERE identity_id=?", (job["automation_identity_id"],)).fetchone()
             tombstoned = db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (job["workspace_id"], self._job_workflow(db, job_id))).fetchone()
             if not release_row or not identity_row or json.loads(identity_row[1])["active"] is not True or tombstoned:
-                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED")
+                return self._finish_job(db, job, "cancelled", "EXECUTION_AUTHORITY_REVOKED",claim)
             release, auth = json.loads(release_row[1]), json.loads(identity_row[0])
             workflow = self.store.get(db, job["workspace_id"], release["revision"]["workflow_id"], release["revision"]["workflow_version"])
             if not workflow or not self.workflows.registry_adapter.review(workflow, auth)["ready"]:
-                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED")
+                return self._finish_job(db, job, "failed", "ASSIGNMENT_REVALIDATION_FAILED",claim)
+        resolver=getattr(self.workflows,'worker_authenticate',None)
+        if resolver:
+            fresh=resolver(job['workspace_id'],auth['subject']['subject_id'])
+            if fresh is None:
+                with self.store.transaction() as db:return self._finish_job(db,job,'cancelled','EXECUTION_AUTHORITY_REVOKED',claim)
+            auth=fresh
         request = dict(request_id="req_" + job_id, operation="execute_workflow", idempotency_key=job["deduplication_key"],
                        payload={**release["revision"], "inputs": job["inputs"]})
+        run=None
         try:
             run = runner.runtime.create_automation_run(request, auth)
             run = runner.advance(run["run_id"], auth)
             with self.store.transaction() as db:
                 job["run_id"] = run["run_id"]
-                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None)
-        except Exception:
+                return self._finish_job(db, job, "completed" if run["status"] not in {"failed", "blocked", "cancelled"} else "failed", None,claim)
+        except Exception as exc:
             with self.store.transaction() as db:
-                state = "dead_letter" if job["attempt"] >= max_attempts else "queued"
+                token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job_id,)).fetchone()
+                stored=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
+                if not token or token[0]!=claim or json.loads(stored[0])['state']!='leased':return json.loads(stored[0])
+                from .postgres import DatabaseFailure
+                import sqlite3
+                transient=isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
+                state='queued' if run is None and transient and job['attempt']<max_attempts else 'dead_letter'
                 job["lease_until"] = None
-                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED"
+                job["last_error_code"] = "RUNTIME_DISPATCH_FAILED" if transient else "RUNTIME_DISPATCH_UNCERTAIN"
                 db.execute("UPDATE lifecycle_jobs SET state=?, lease_until=NULL, available_at=?, document=? WHERE job_id=?",
                            (state, now_iso(self.clock), json.dumps({**job, "state": state}), job_id))
                 return {**job, "state": state}
@@ -501,7 +469,11 @@ class LifecycleService:
     def _job_workflow(self, db, job_id):
         return db.execute("SELECT workflow_id FROM lifecycle_jobs WHERE job_id=?", (job_id,)).fetchone()[0]
 
-    def _finish_job(self, db, job, state, error):
+    def _finish_job(self, db, job, state, error, claim=None):
+        if claim:
+            current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job['job_id'],)).fetchone()
+            token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job['job_id'],)).fetchone()
+            if not token or token[0]!=claim or json.loads(current[0])['state']!='leased':return json.loads(current[0])
         job["state"], job["lease_until"] = state, None
         if error:
             job["last_error_code"] = error
@@ -530,83 +502,39 @@ class LifecycleService:
         return self._stop(request, auth, deleting=True)
 
     def _stop(self, request, auth, deleting):
-        permission, kind = ("workflow.delete", "delete_workflow") if deleting else ("workflow.publish", "disable_release")
-        self.authorize(auth, permission)
-        payload, key = request.get("payload", {}), request.get("idempotency_key")
-        workflow_id, expected = payload.get("workflow_id"), payload.get("expected_release_id")
-        if deleting and payload.get("confirmed") is not True:
-            raise LifecycleFailure("DELETE_CONFIRMATION_REQUIRED", "Confirm deletion explicitly.", 400)
-        workspace = auth["subject"]["workspace_id"]
-        fingerprint = json_digest({"kind": kind, "payload": payload})
-        with self.store.transaction() as db:
-            operation, replayed = self.operation(db, workspace, auth, kind, key, workflow_id, expected, fingerprint)
-            if replayed:
-                return {"operation": operation}
-            active = db.execute("SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchone()
-            active_id = active[0] if active else None
-            if deleting and active_id is None and expected is not None:
-                latest = db.execute("SELECT release_id FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (workspace, workflow_id)).fetchone()
-                active_id = latest[0] if latest else None
-            if expected != active_id:
-                raise LifecycleFailure("RELEASE_CONFLICT", "The active release changed. Reload before continuing.")
-            if active_id:
-                target_state = "deleting" if deleting else "disabled"
-                db.execute("UPDATE lifecycle_releases SET state=?, document=json_set(document, '$.state', ?) WHERE release_id=?", (target_state, target_state, active_id))
-                bindings = db.execute("SELECT binding_id, document FROM lifecycle_triggers WHERE release_id=?", (active_id,)).fetchall()
-                cleanup_pending = False
-                for binding_id, encoded in bindings:
-                    trigger = json.loads(encoded)
-                    try:
-                        cleaned = self.adapter.cleanup(trigger)
-                    except Exception:
-                        cleaned = False
-                    health = "disabled" if cleaned else "cleanup_pending"
-                    cleanup_pending = cleanup_pending or not cleaned
-                    db.execute("UPDATE lifecycle_triggers SET state=?, document=json_set(document, '$.health', ?) WHERE binding_id=?", (health, health, binding_id))
-                db.execute("DELETE FROM lifecycle_active WHERE workspace=? AND workflow_id=?", (workspace, workflow_id))
-            db.execute("UPDATE lifecycle_jobs SET state='cancelled', lease_until=NULL, document=json_set(document, '$.state', 'cancelled', '$.lease_until', NULL) WHERE workspace=? AND workflow_id=? AND state IN ('queued','leased')", (workspace, workflow_id))
-            if deleting:
-                cleanup_state = "pending" if active_id and cleanup_pending else "complete"
-                db.execute("INSERT INTO lifecycle_tombstones VALUES (?, ?, ?, ?) ON CONFLICT(workspace, workflow_id) DO UPDATE SET cleanup_state=excluded.cleanup_state", (workspace, workflow_id, now_iso(self.clock), cleanup_state))
-                db.execute("UPDATE lifecycle_identities SET document=json_set(document, '$.active', false) WHERE identity_id IN (SELECT json_extract(document, '$.automation_identity_id') FROM lifecycle_releases WHERE workspace=? AND workflow_id=?)", (workspace, workflow_id))
-                if self.workflows.runtime_runner is not None and self._table(db, "runtime_runs"):
-                    runtime = self.workflows.runtime_runner.runtime
-                    rows = db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND workflow_id=?", (workspace, workflow_id)).fetchall()
-                    for row in rows:
-                        run = json.loads(row[0])
-                        if run["status"] in ACTIVE_RUN_STATES:
-                            runtime.transition(db, run, "cancelled")
-            operation["state"] = "cleanup_pending" if active_id and cleanup_pending else "succeeded"
-            self.save_operation(db, operation)
-            self.emit(db, workspace, workflow_id, "workflow.deleted" if deleting else "release.disabled")
-            return {"operation": operation}
+        from .activation import stop
+        return stop(self, request, auth, deleting)
 
     def reconcile_cleanup(self, workspace):
-        """Retry provider cleanup while local dispatch remains denied."""
-        completed = []
-        with self.store.transaction() as db:
-            rows = db.execute("SELECT binding_id, workflow_id, document FROM lifecycle_triggers WHERE workspace=? AND state='cleanup_pending'", (workspace,)).fetchall()
-            for binding_id, workflow_id, encoded in rows:
-                try:
-                    cleaned = self.adapter.cleanup(json.loads(encoded))
-                except Exception:
-                    cleaned = False
-                if cleaned:
-                    db.execute("UPDATE lifecycle_triggers SET state='disabled', document=json_set(document, '$.health', 'disabled') WHERE binding_id=?", (binding_id,))
-                    completed.append(binding_id)
-                    if not db.execute("SELECT 1 FROM lifecycle_triggers WHERE workspace=? AND workflow_id=? AND state='cleanup_pending'", (workspace, workflow_id)).fetchone():
-                        db.execute("UPDATE lifecycle_tombstones SET cleanup_state='complete' WHERE workspace=? AND workflow_id=?", (workspace, workflow_id))
-            return completed
+        from .activation import reconcile, reconcile_cleanup
+        reconcile(self, workspace)
+        return reconcile_cleanup(self, workspace)
 
-    def overview(self, auth, after_sequence=None):
+    def overview(self, auth, after_sequence=None, cursor=None):
         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
         workspace = auth["subject"]["workspace_id"]
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             if after_sequence is not None:
                 rows = db.execute("SELECT document FROM lifecycle_overview_events WHERE workspace=? AND sequence>? ORDER BY sequence LIMIT 200", (workspace, after_sequence)).fetchall()
                 items = [json.loads(row[0]) for row in rows]
                 return {"items": items, "next_sequence": items[-1]["sequence"] if items else after_sequence, "has_more": len(items) == 200}
-            documents = self.store.list(db, workspace)
+            from .workflow_pages import read_page
+            page = read_page(self.store, workspace, cursor, connection=db)
+            documents = page['items']
+            identities = [item['workflow_id'] for item in documents]
+            run_summaries = {}
+            if identities and self._table(db, "runtime_runs"):
+                slots = ','.join('?' for _ in identities)
+                rows = db.execute("""SELECT workflow_id, run_id, json_extract(document, '$.status'),
+                    (SELECT COUNT(*) FROM json_each(runtime_runs.document, '$.approvals') a
+                     WHERE json_extract(a.value, '$.status')='pending')
+                    FROM runtime_runs WHERE workspace=? AND workflow_id IN (""" + slots + ") ORDER BY rowid DESC", (workspace, *identities))
+                for identity, run_id, status, pending in rows:
+                    summary = run_summaries.setdefault(identity, {
+                        'latest_run_id': run_id, 'latest_run_status': status,
+                        'active_run_count': 0, 'pending_approval_count': 0})
+                    summary['active_run_count'] += status in ACTIVE_RUN_STATES
+                    summary['pending_approval_count'] += pending
             items = []
             for workflow in documents:
                 workflow_id = workflow["workflow_id"]
@@ -616,20 +544,18 @@ class LifecycleService:
                 if release_row is None:
                     release_row = db.execute("SELECT document FROM lifecycle_releases WHERE workspace=? AND workflow_id=? ORDER BY generation DESC LIMIT 1", (workspace, workflow_id)).fetchone()
                 release = json.loads(release_row[0]) if release_row else None
-                run_rows = db.execute("SELECT run_id, document FROM runtime_runs WHERE workspace=? AND workflow_id=? ORDER BY rowid DESC", (workspace, workflow_id)).fetchall() if self._table(db, "runtime_runs") else []
-                runs = [json.loads(row[1]) for row in run_rows]
-                pending = sum(1 for run in runs for approval in run.get("approvals", []) if approval.get("status") == "pending")
+                summary = run_summaries.get(workflow_id, {
+                    'active_run_count': 0, 'latest_run_id': None,
+                    'latest_run_status': None, 'pending_approval_count': 0})
+                published_row=db.execute("SELECT MAX(version) FROM revisions WHERE workspace=? AND workflow_id=? AND json_extract(document,'$.status')='published'",(workspace,workflow_id)).fetchone()
                 items.append(dict(workflow_id=workflow_id, name=workflow["name"],
                                   draft_version=workflow["version"] if workflow["status"] == "draft" else None,
-                                  published_version=release["revision"]["workflow_version"] if release else None,
+                                  published_version=published_row[0],
                                   release_id=release["release_id"] if release else None,
                                   activation_state=release["state"] if release else None,
-                                  active_run_count=sum(run["status"] in ACTIVE_RUN_STATES for run in runs),
-                                  latest_run_id=runs[0]["run_id"] if runs else None,
-                                  latest_run_status=runs[0]["status"] if runs else None,
-                                  pending_approval_count=pending, updated_at=now_iso(self.clock)))
+                                  **summary, updated_at=now_iso(self.clock)))
             sequence = db.execute("SELECT COALESCE(MAX(sequence), 0) FROM lifecycle_overview_events WHERE workspace=?", (workspace,)).fetchone()[0]
-            return {"items": items, "next_sequence": sequence, "has_more": False}
+            return {"items": items, "next_sequence": sequence, "has_more": page['has_more'], "next_cursor": page['next_cursor'], "total": page['total']}
 
     @staticmethod
     def _table(db, name):
@@ -637,7 +563,7 @@ class LifecycleService:
 
     def get_operation(self, operation_id, auth):
         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
-        with self.store.transaction() as db:
+        with self.store.transaction(write=False) as db:
             row = db.execute("SELECT document FROM lifecycle_operations WHERE workspace=? AND operation_id=?", (auth["subject"]["workspace_id"], operation_id)).fetchone()
             if not row:
                 raise LifecycleFailure("OPERATION_NOT_FOUND", "The lifecycle operation was not found.", 404)

@@ -1,0 +1,37 @@
+--- a/frontend/src/features/workflows/RunWorkflowDialog.tsx
++++ b/frontend/src/features/workflows/RunWorkflowDialog.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ import { useRef, useState } from "react";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+-import { api, type RunRecord } from "@/api/client";
++import { api, ApiError, type RunRecord } from "@/api/client";
+ import { useBackend } from "@/api/state";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ import { Link } from "@/lib/navigation";
+@@ -11,7 +11,7 @@
+ export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWorkflow; onClose: () => void }) {
+   const backend = useBackend(); const [values, setValues] = useState<Record<string, string>>({});
+   const [busy, setBusy] = useState(false); const [error, setError] = useState<Error>(); const [run, setRun] = useState<RunRecord>();
+-  const submitting = useRef(false); const retryKey = useRef<string | undefined>(undefined); const submittedPayload = useRef<string | undefined>(undefined);
++  const submitting = useRef(false); const submittedPayload = useRef<string | undefined>(undefined);
+   const automatic = eventOnly(workflow);
+   const blocker = !backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : workflow.status !== "published" ? "A published revision is required." : automatic ? "This workflow waits for its configured event. Activate it, create an event in its source, then check Runs." : "";
+   const submit = async () => {
+@@ -20,10 +20,13 @@
+       const inputs = parseRunInputs(workflow.inputs, values); const serialized = JSON.stringify(inputs);
+       if (submittedPayload.current && submittedPayload.current !== serialized) throw new Error("The earlier run request has an uncertain outcome. Keep these inputs and retry, or check Runs before starting different inputs.");
+       submitting.current = true; setBusy(true); setError(undefined);
+-      retryKey.current ??= crypto.randomUUID(); submittedPayload.current = serialized;
+-      setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs }, retryKey.current)).run);
++      submittedPayload.current = serialized;
++      setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs })).run);
+       void backend.refreshOverview();
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("Run submission failed.")); }
++    } catch (caught) {
++      if (caught instanceof ApiError && ["INVALID_INPUT", "OPERATION_NOT_AUTHORIZED", "REVISION_CONFLICT", "WORKFLOW_NOT_FOUND", "REVISION_NOT_PUBLISHED"].includes(caught.error.error_code)) submittedPayload.current = undefined;
++      setError(caught instanceof Error ? caught : new Error("Run submission failed."));
++    }
+     finally { submitting.current = false; setBusy(false); }
+   };
+   return <Dialog open onOpenChange={open => { if (!open && !submitting.current) onClose(); }}>

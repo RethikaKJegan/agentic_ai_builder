@@ -1,0 +1,11 @@
+--- a/planner/provider.py
++++ b/planner/provider.py
+@@ -118,7 +118,7 @@
+                     "Give the master max_llm_calls=4 and max_tokens=16000; give each specialist max_llm_calls=3 and max_tokens=12000. "
+                     "For requirements_first procurement, override the generic hierarchy defaults with enough bounded "
+                     "turns for dependent BOQ, quotation, comparison and document-drafting stages: use max_rounds=8, "
+-                    "max_tasks=12 and master max_llm_calls=8 with max_tokens=32000. Preserve the configured workspace "
++                    "max_tasks=12 and master max_llm_calls=8 with max_tokens=16000. Preserve the configured workspace "
+                     "ceilings and reserve sufficient workflow call/token/cost budgets for the selected specialist pool. "
+                     "Unknown details may be disclosed assumptions in permitted draft-only estimates; do not require "
+                     "a pre-existing BOQ to execute the stage that creates it. Actual issuance remains separately gated. "

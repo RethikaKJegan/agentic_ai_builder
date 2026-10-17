@@ -1,0 +1,1 @@
+Superseded at the explicit request of the owner. The temporary password gateway, credentials and unfinished access UI were removed. Do not reactivate. Current routing and verification: ../origin-routing-fix/ and docs/website-origin-routing.md. Earlier incomplete/failed tests are retained only as historical evidence.

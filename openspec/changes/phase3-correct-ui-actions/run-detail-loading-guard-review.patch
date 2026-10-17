@@ -1,0 +1,43 @@
+--- a/frontend/src/features/runs/ServerRunView.tsx
++++ b/frontend/src/features/runs/ServerRunView.tsx
+@@ -39,12 +39,13 @@
+   const [runId, setRunId] = useState("");
+   const [run, setRun] = useState<RunRecord | null>(null);
+   const [availableRuns, setAvailableRuns] = useState<RunRecord[]>([]);
++  const loadPending = useRef(false);
+   const [events, setEvents] = useState<RunEvent[]>([]);
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState<Error | null>(null);
+   const loadRun = async (selectedRunId: string) => {
+-    if (!selectedRunId.trim() || busy) return;
+-    setBusy(true); setError(null);
++    if (!selectedRunId.trim() || loadPending.current) return;
++    loadPending.current = true; setBusy(true); setError(null);
+     try {
+       const result = await api.request("get_run", { run_id: selectedRunId.trim() });
+       if (run?.run_id === result.run.run_id) {
+@@ -55,7 +56,7 @@
+       const incoming = reconcileEvents(run?.run_id === result.run.run_id ? events : [], timeline.items, result.run);
+       setRun(result.run); setEvents(incoming);
+     } catch (caught) { setError(caught instanceof Error ? caught : new Error("Run loading failed.")); }
+-    finally { setBusy(false); }
++    finally { loadPending.current = false; setBusy(false); }
+   };
+   const load = async () => loadRun(runId);
+   useEffect(() => {
+@@ -91,13 +92,13 @@
+   return <div className="space-y-4">
+     <div className="space-y-2" aria-label={approvalsOnly ? "Pending approvals" : "Recent runs"}>
+       {availableRuns.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">{approvalsOnly ? "No pending approvals." : "No runs yet."}</p>}
+-      {availableRuns.map((item) => <button key={item.run_id} type="button" onClick={() => void loadRun(item.run_id)} className="block w-full rounded-xl border border-border p-3 text-left hover:border-primary">
++      {availableRuns.map((item) => <button key={item.run_id} type="button" disabled={busy} onClick={() => void loadRun(item.run_id)} className="block w-full rounded-xl border border-border p-3 text-left hover:border-primary">
+         <p className="text-sm font-medium">{item.run_id} · {item.status}</p>
+         <p className="text-xs text-muted-foreground">{item.workflow_id} · revision v{item.workflow_version} · {item.approvals.filter((approval) => approval.status === "pending").length} pending approval(s)</p>
+       </button>)}
+     </div>
+     <form onSubmit={(event) => { event.preventDefault(); void load(); }} className="flex gap-2">
+-      <input aria-label="Run ID" value={runId} onChange={(event) => setRunId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm" placeholder="Run ID from an execution response" />
++      <input aria-label="Run ID" disabled={busy} value={runId} onChange={(event) => setRunId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm" placeholder="Run ID from an execution response" />
+       <button disabled={busy || !runId.trim()} className="rounded-lg border border-border px-4 text-sm disabled:opacity-40">{busy ? "Loading…" : "Load run"}</button>
+     </form>
+     <ApiFeedback error={error} />

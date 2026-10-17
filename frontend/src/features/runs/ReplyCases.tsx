@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ApiResponseSchema } from "@/api/contracts.generated";
+import { containsSecret } from "@/api/client";
 import { useBackend } from "@/api/state";
 
 type Kind = "customer_followup" | "manager_notice" | "confirm_closure";
@@ -23,13 +25,20 @@ export function ReplyCases() {
   const [error, setError] = useState("");
   const [monitor, setMonitor] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const pending = useRef(false); const reading = useRef(false);
   const refresh = async () => {
+    if (reading.current) return;
+    reading.current = true; setRefreshing(true);
     try {
       const response = await fetch("/api/backend/cases", { cache: "no-store" });
-      const result = await response.json() as Envelope;
-      if (!response.ok || !result.data.items) throw new Error(result.data.error?.message || "Cases unavailable");
+      const raw: unknown = await response.json();
+      if (containsSecret(raw) || !ApiResponseSchema.safeParse(raw).success) throw new Error("The case response is invalid.");
+      const result = raw as Envelope;
+      if (!response.ok || result.status >= 400 || !Array.isArray(result.data.items)) throw new Error(result.data.error?.message || "Cases unavailable");
       setCases(result.data.items); setMonitor(result.data.monitor?.state || "unknown"); setError("");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Cases unavailable"); }
+    finally { reading.current = false; setRefreshing(false); }
   };
   useEffect(() => {
     if (backend.status !== "connected") return;
@@ -38,25 +47,28 @@ export function ReplyCases() {
     return () => window.clearInterval(timer);
   }, [backend.status]);
   const act = async (caseId: string, replyId: string, kind: Kind) => {
-    if (busy) return;
-    setBusy(true);
+    if (pending.current || !backend.can("workflow.approve")) return;
+    pending.current = true; setBusy(true);
     try {
       const response = await fetch(`/api/backend/cases/${encodeURIComponent(caseId)}/actions`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reply_id: replyId, kind }),
       });
-      const result = await response.json() as Envelope;
-      if (!response.ok) throw new Error(result.data.error?.message || "Email submission failed");
+      const raw: unknown = await response.json();
+      if (containsSecret(raw) || !ApiResponseSchema.safeParse(raw).success) throw new Error("The case response is invalid.");
+      const result = raw as Envelope;
+      if (!response.ok || result.status >= 400) throw new Error(result.data.error?.message || "Email submission failed");
       await refresh();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Email submission failed"); }
-    finally { setBusy(false); }
+    finally { pending.current = false; setBusy(false); }
   };
   if (backend.status !== "connected") return null;
   return <section className="mt-8 space-y-4" aria-label="Customer reply cases">
     <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Customer replies</h2>
-      <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void refresh()}>Refresh</button></div>
+      <button type="button" className="rounded border px-3 py-1 text-sm" disabled={refreshing || busy} onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button></div>
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     {monitor === "error" && <p role="alert" className="text-sm text-red-600">Inbox polling failed. Check the backend Gmail IMAP connection.</p>}
-    {cases.length === 0 && !error && <p className="text-sm text-muted-foreground">No sent customer cases yet.</p>}
+    {!backend.can("workflow.approve") && <p className="text-xs text-muted-foreground">workflow.approve permission is required for reply actions.</p>}
+    {cases.length === 0 && !refreshing && !error && <p className="text-sm text-muted-foreground">No sent customer cases yet.</p>}
     {cases.map((item) => <article key={item.case_id} className="space-y-3 rounded-lg border p-4">
       <p className="font-medium">{item.review_id || item.case_id} · {item.order_id} · {item.status}</p>
       <p className="text-sm">Customer: {item.customer_email}</p>

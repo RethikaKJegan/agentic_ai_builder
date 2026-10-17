@@ -1,0 +1,148 @@
+--- a/frontend/src/app/api/backend/[...path]/route.ts
++++ b/frontend/src/app/api/backend/[...path]/route.ts
+@@ -109,8 +109,12 @@
+     const parsed = ApiResponseSchema.safeParse(raw);
+     if (!parsed.success || parsed.data.status !== response.status || containsSecret(raw)) {
+       if (response.status === 404 && response.headers.get('x-builder-service') !== 'workflow-api') {
+-        const identity = await fetch(new URL('session', config.upstream), { headers, cache: 'no-store', redirect: 'manual', signal: controller.signal });
+-        const builder = identity.headers.get('x-builder-service') === 'workflow-api' || ApiResponseSchema.safeParse(await identity.json()).success;
++        let builder = false;
++        if (route !== 'session') {
++          const identity = await fetch(new URL('session', config.upstream), { headers, cache: 'no-store', redirect: 'manual', signal: controller.signal });
++          builder = identity.headers.get('x-builder-service') === 'workflow-api';
++          if (!builder) { try { builder = ApiResponseSchema.safeParse(await identity.json()).success; } catch { /* Not a Builder envelope. */ } }
++        }
+         return error(builder ? 'API_ROUTE_UNAVAILABLE' : 'API_WRONG_SERVICE', builder ? 'This route is unavailable on the configured Builder backend.' : 'The configured upstream is not the Builder API. Check its service and port.', 503, true);
+       }
+       return error('API_INVALID_CONTRACT', 'The backend response does not match the API contract.', 502);
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -77,12 +77,21 @@
+     app = FastAPI(title='Agentic AI Builder workflow API', docs_url=None, redoc_url=None)
+     app.state.workflow_service = workflow_service
+     app.state.workflow_auth = auth
++    from .planning_jobs import PlanningJobs
++    planning_jobs = PlanningJobs(workflow_service,
++        lambda workspace, subject: auth if auth['subject'] == {'workspace_id': workspace, 'subject_id': subject} else None)
++    app.state.planning_jobs = planning_jobs
+     app.state.workers = workers
+     app.state.allowed_origins = allowed_origins
+     app.state.environment_name = mode
+ 
++    @app.on_event('startup')
++    def start_planning():
++        planning_jobs.start()
++
+     @app.on_event('shutdown')
+     async def stop_workers():
++        planning_jobs.stop()
+         for worker in app.state.workers:
+             worker.stop()
+ 
+@@ -125,7 +134,7 @@
+ 
+     @app.get('/session')
+     def get_session():
+-        data = dict(auth=auth, mode='local-development', planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
++        data = dict(auth=auth, mode='local-development', planning_jobs_available=True, planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
+                     runtime_available=workflow_service.runtime_runner is not None, approval_service_available=workflow_service.runtime_runner is not None)
+         response = JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
+         response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)
+@@ -147,6 +156,32 @@
+             return JSONResponse(result, status_code=result['status'])
+         except Exception:
+             return error('INVALID_REQUEST', 'The request must contain valid JSON and revision references.', 400)
++
++    @app.post('/planning-jobs')
++    async def submit_planning(request: Request):
++        try:
++            job = await run_in_threadpool(planning_jobs.submit, await request.json(), auth)
++            return JSONResponse(workflow_service.envelope(request_reference.get(), 202, job), status_code=202)
++        except ApiFailure as exc:
++            return error(exc.code, str(exc), exc.status)
++        except Exception:
++            return error('INVALID_REQUEST', 'Use a valid canonical planning request.', 400)
++
++    @app.get('/planning-jobs/{job_id}')
++    async def get_planning(job_id: str):
++        try:
++            job = await run_in_threadpool(planning_jobs.get, job_id, auth)
++            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, job))
++        except ApiFailure as exc:
++            return error(exc.code, str(exc), exc.status)
++
++    @app.delete('/planning-jobs/{job_id}')
++    async def cancel_planning(job_id: str):
++        try:
++            job = await run_in_threadpool(planning_jobs.cancel, job_id, auth)
++            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, job))
++        except ApiFailure as exc:
++            return error(exc.code, str(exc), exc.status)
+ 
+     @app.post('/workflows/plan')
+     async def plan(request: Request):
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -28,7 +28,7 @@
+   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
+ const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
+ const approvalData = approvalRecordSchema.extend(metadata);
+-const sessionData = z.object({ auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
++const sessionData = z.object({ planning_jobs_available: z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+ export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
+   published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
+   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
+@@ -120,6 +120,7 @@
+   private sessionRecovery: Promise<boolean> | null = null;
+   private sessionGeneration = 0;
+   private sessionMode: string | null = null;
++  private planningJobsAvailable = false;
+   constructor(private readonly transport: typeof fetch = (...args) => fetch(...args), private readonly base = "/api/backend/") {
+     if (base !== "/api/backend/") throw new Error("Use the relative same-origin workflow API path.");
+   }
+@@ -163,6 +164,7 @@
+     const result = sessionData.safeParse(await this.read("session"));
+     if (!result.success) return fail("INVALID_SESSION", "The session response is invalid.");
+     this.sessionMode = result.data.mode;
++    this.planningJobsAvailable = result.data.planning_jobs_available === true;
+     return result.data;
+   }
+ 
+@@ -237,7 +239,8 @@
+     } else {
+       path += `${path.includes("?") ? "&" : "?"}request_id=${encodeURIComponent(requestId)}`;
+     }
+-    const result = responseSchemas[operation].safeParse(await this.read(path, options));
++    const result = responseSchemas[operation].safeParse(operation === "plan_workflow" && this.planningJobsAvailable
++      ? await this.planJob(options) : await this.read(path, options));
+     if (!result.success) return fail("INVALID_API_DATA", "The returned data does not match the accepted contract.", requestId);
+     if ("registry_review" in result.data && result.data.registry_review && "workflow" in result.data) {
+       const review = result.data.registry_review as RegistryReview;
+@@ -265,6 +268,27 @@
+     return result.data as z.infer<(typeof responseSchemas)[K]>;
+   }
+ 
++  private async planJob(options: RequestInit) {
++    const schema = z.object({ job_id: z.string(), state: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
++      result: ApiResponseSchema.nullable() });
++    let job = schema.parse(await this.read("planning-jobs", options));
++    const until = Date.now() + 45 * 60_000;
++    while (job.state === "queued" || job.state === "running") {
++      if (Date.now() > until) return fail("PLANNING_PENDING", `Planning is still pending. Job reference: ${job.job_id}. Check its status before starting another request.`);
++      await new Promise((resolve) => setTimeout(resolve, 1500));
++      job = schema.parse(await this.read(`planning-jobs/${encodeURIComponent(job.job_id)}`));
++    }
++    if (job.state === "cancelled") return fail("PLANNING_CANCELLED", "Workflow generation was cancelled. Your prompt was preserved.");
++    if (!job.result) return fail("INVALID_API_DATA", "The planning job has no confirmed result.");
++    if (job.result.status >= 400) {
++      const data = job.result.data;
++      const error = SafeErrorSchema.safeParse(data && !Array.isArray(data) ? data["error"] : null);
++      if (!error.success) return fail("INVALID_API_ERROR", "The planning job returned an invalid error.");
++      throw new ApiError(error.data);
++    }
++    return job.result.data;
++  }
++
+   async runs() {
+     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
+     const result = schema.safeParse(await this.read("runs"));

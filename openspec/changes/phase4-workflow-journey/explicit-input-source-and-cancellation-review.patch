@@ -1,0 +1,38 @@
+--- a/frontend/e2e/phase1.spec.ts
++++ b/frontend/e2e/phase1.spec.ts
+@@ -46,6 +46,6 @@
+     await page.getByRole('button', { name: 'Cancel generation' }).click();
+     await expect(page.getByRole('main').getByRole('alert')).toContainText('PLANNING_CANCELLED');
+     await expect(page.getByLabel('Process description')).toHaveValue(prompt);
+-    await expect(page.getByRole('button', { name: 'Generate workflow' })).toBeEnabled();
++    await expect(page.getByRole('button', { name: 'Retry generation' })).toBeEnabled();
+   });
+ }
+--- a/frontend/src/screens/app.index.tsx
++++ b/frontend/src/screens/app.index.tsx
+@@ -17,6 +17,7 @@
+   const navigate = useNavigate();
+   const workflows = useMesh((s) => s.workflows);
+   const [description, setDescription] = useState("");
++  const [inputMode,setInputMode] = useState<"automatic" | "manual">("automatic");
+   const generationLock = useRef(false);
+   const [result, setResult] = useState<Awaited<ReturnType<typeof createWorkflow>> | null>(null);
+   const [planning, setPlanning] = useState(false);
+@@ -41,7 +42,7 @@
+       const context = {
+         generation_mode: "hierarchy",
+         delegation_mode: "runtime_v1",
+-        execution_input_mode: "automatic",
++        execution_input_mode: inputMode,
+       };
+       await useBackend.getState().initialize();
+       const currentBackend = useBackend.getState();
+@@ -68,6 +69,8 @@
+     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
+       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+       <p className="mt-4 text-sm text-muted-foreground">Include the source URL and any range or trigger details here. Event workflows receive data only after their release and trigger bindings are active.</p>
++      <label className="mt-4 block text-sm">Input source<select aria-label="Workflow input source" disabled={planning} value={inputMode} onChange={e=>setInputMode(e.target.value as "automatic" | "manual")} className="mt-1 block w-full rounded-lg border border-border bg-background p-2"><option value="automatic">Automatic — configured event or saved source</option><option value="manual">Manual — provide inputs when starting a run</option></select></label>
++      <p className="mt-2 text-xs text-muted-foreground">{inputMode === "automatic" ? "Include the event provider, source URL and mappings in your prompt. Missing automatic sources block planning; nothing becomes operational before activation." : "The generated draft may declare run inputs. Review them before publication; Run published will ask for those values."}</p>
+       <div className="mt-6 flex flex-wrap items-center gap-3">
+       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
+         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}

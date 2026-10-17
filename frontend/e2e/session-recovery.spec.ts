@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 
+// Recovery may span two documented 15-second polling cycles.
+test.setTimeout(60000);
+
 for (const mobile of [false, true]) {
   test(`open workflows recover a stale session on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
@@ -21,13 +24,13 @@ for (const mobile of [false, true]) {
       await route.fulfill({ status: denied ? 401 : 200, json: { request_id: "req_recovery", status: denied ? 401 : 200, data } });
     });
     await page.goto("/app/workflows");
-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
+    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
     expired = true;
     const authenticationError = page.getByRole("alert").filter({ hasText: "AUTHENTICATION_REQUIRED" });
-    await expect(authenticationError).toContainText("Expired local session", { timeout: 12000 });
+    await expect(authenticationError).toContainText("Expired local session", { timeout: 25000 });
     renewalBlocked = false;
-    await expect(authenticationError).toHaveCount(0, { timeout: 12000 });
-    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 12000 });
+    await expect(authenticationError).toHaveCount(0, { timeout: 25000 });
+    await expect(page.getByText("Live overview", { exact: false })).toBeVisible({ timeout: 25000 });
     expect(renewals).toBe(1);
     expect(errors).toEqual([]);
   });

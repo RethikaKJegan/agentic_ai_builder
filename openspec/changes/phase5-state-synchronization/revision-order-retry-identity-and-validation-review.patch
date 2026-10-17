@@ -1,0 +1,169 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -80,7 +80,7 @@
+ 
+ }
+ function fail(code: string, message: string, requestId = "req_client", retryable = false): never {
+-  throw new ApiError({ error_code: code, message, request_id: requestId, retryable });
++  throw new ApiError({ error_code: code, message, request_id: requestId, retryable },undefined, /setting save|approval submission|release activation|release disable|workflow deletion/.test(message)?{outcome:"unknown"}:{});
+ }
+ export function containsSecret(value: unknown): boolean {
+   if (typeof value === "string") return /\bsk-[\w-]{8,}|Bearer\s+[\w.-]+|:\/\/[^/\s:@]+:[^/\s@]+@|-----BEGIN .*PRIVATE KEY|(?:api[_-]?key|password|secret|token)\s*[:=]\s*\S+/i.test(value);
+@@ -155,6 +155,11 @@
+     return this.sessionRecovery;
+   }
+   private async read(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
++    const headers=new Headers(options.headers);
++    let reference=headers.get("X-Request-ID") ?? new URLSearchParams(path.split("?")[1]).get("request_id");
++    if(!reference&&typeof options.body==="string"){try{const parsed=JSON.parse(options.body);if(typeof parsed.request_id==="string")reference=parsed.request_id;}catch{/* Non-JSON bodies never become references. */}}
++    if(!reference||!/^[\w-]{1,128}$/.test(reference))reference=crypto.randomUUID();
++    headers.set("X-Request-ID",reference);options={...options,headers};
+     const mutation=!!options.method && !["GET","HEAD"].includes(options.method.toUpperCase());
+     for(let attempt=0;;attempt++){
+       try{return await this.readOnce(path,options,recoverSession);}
+@@ -172,7 +177,7 @@
+     const generation = this.sessionGeneration;
+     let response: Response;
+     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
+-    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", "req_client", true); }
++    catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", new Headers(options.headers).get("X-Request-ID") ?? "req_client", true); }
+     let raw: unknown;
+     try { raw = await response.json(); } catch { return fail("INVALID_API_RESPONSE", "The API returned an unusable response."); }
+     if (containsSecret(raw)) return fail("UNSAFE_API_RESPONSE", "The API returned unsafe data. Nothing was displayed.");
+@@ -187,7 +192,7 @@
+       if (recoverSession && (this.sessionMode === null || this.sessionMode === "local-development") &&
+           (typeof window === "undefined" || ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) &&
+           path !== "session" && response.status === 401 && error.data.error_code === "AUTHENTICATION_REQUIRED") {
+-        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.read(path, options, false);
++        if (generation !== this.sessionGeneration || await this.renewLocalSession()) return this.readOnce(path, options, false);
+       }
+       const correlation = data && !Array.isArray(data) && typeof data["correlation_id"] === "string" ? data["correlation_id"] : undefined;
+       throw new ApiError(error.data, correlation, {httpStatus:response.status});
+@@ -269,7 +274,7 @@
+   async procurementSuppliersReview(projectId: string, decision: "approved" | "rejected", candidateIds: string[], digest: string) {
+     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/suppliers-review`, { method: "POST",
+       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+-        operation: "procurement_suppliers_review", idempotency_key: crypto.randomUUID(),
++        operation: "procurement_suppliers_review", idempotency_key: await retryKey("procurement_suppliers_review",{projectId,decision,candidateIds,digest}),
+         payload: { decision, candidate_ids: candidateIds, expected_digest: digest } }) });
+   }
+ 
+@@ -277,7 +282,7 @@
+     settings: { enabled: true; buyer_email: string; manager_email: string; acceptance_hours: number; reminder_hours: number; allow_delivery_reschedule: boolean }) {
+     return this.read(`procurement/projects/${encodeURIComponent(projectId)}/fulfilment-activate`, { method: "POST",
+       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: `req_${crypto.randomUUID()}`,
+-        operation: "procurement_fulfilment_activate", idempotency_key: crypto.randomUUID(),
++        operation: "procurement_fulfilment_activate", idempotency_key: await retryKey("procurement_fulfilment_activate",{projectId,workflowId,version,expectedRevision,settings}),
+         payload: { settings, expected_revision: expectedRevision, workflow_id: workflowId, workflow_version: version } }) });
+   }
+ 
+--- a/frontend/src/api/mapping.ts
++++ b/frontend/src/api/mapping.ts
+@@ -33,6 +33,10 @@
+ 
+ const limits = { max_llm_calls: 0, max_tool_calls: 0, max_tokens: 1000, max_retries: 0, timeout_seconds: 60 };
+ /** Includes delegated templates even when they have no execution graph node. */
++export function olderDocument(incoming: CanonicalWorkflow, baseline?: CanonicalWorkflow) {
++  const rank={draft:0,validated:1,approved:2,published:3,archived:4};
++  return !!baseline && (incoming.version<baseline.version || (incoming.version===baseline.version && rank[incoming.status]<rank[baseline.status]));
++}
+ export function ownsAgent(workflow: Workflow, agent: Agent) {
+   return workflow.nodes.some(node => node.data.agentId === agent.id) || !!workflow.canonical?.agents.some(definition => agent.id === `${workflow.id}::${definition.agent_id}`);
+ }
+--- a/frontend/src/api/phase3-actions.test.tsx
++++ b/frontend/src/api/phase3-actions.test.tsx
+@@ -80,7 +80,7 @@
+   fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+   await waitFor(() => expect(screen.getByText(/Your edits are retained/)).toBeVisible());
+   expect(useMesh.getState().workflows[0]!.name).toBe("Keep my edit"); expect(screen.getByRole("button", { name: "Reload server revision" })).toBeEnabled();
+-  vi.mocked(window.confirm).mockReturnValue(false); fireEvent.click(screen.getByRole("button", { name: "Reload server revision" })); expect(request).toHaveBeenCalledTimes(1);
++  vi.mocked(window.confirm).mockReturnValue(false); const beforeReload=request.mock.calls.length; fireEvent.click(screen.getByRole("button", { name: "Reload server revision" })); expect(request).toHaveBeenCalledTimes(beforeReload);
+ });
+ it("navigation and unload warn while dirty server drafts remain persisted", () => {
+   const original = workflow(); useMesh.getState().acceptWorkflow(original); useMesh.getState().renameWorkflow(original.workflow_id, "Dirty edit"); render(<Controls />);
+--- a/frontend/src/api/phase4-generation.test.tsx
++++ b/frontend/src/api/phase4-generation.test.tsx
+@@ -2,6 +2,7 @@
+ import path from "node:path";
+ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+ import { beforeEach, afterEach, expect, it, vi } from "vitest";
++import { ApiError } from "./client";
+ import Overview from "@/screens/app.index";
+ import { CanonicalWorkflowSchema } from "./contracts.generated";
+ import { useBackend } from "./state";
+@@ -53,7 +54,7 @@
+ it("retains the original prompt on planner failure and supports an explicit retry", async () => {
+   const request = vi
+     .spyOn(creation, "createWorkflow")
+-    .mockRejectedValueOnce(new Error("Validation failed at nodes.1: missing condition."))
++    .mockRejectedValueOnce(new ApiError({error_code:"INVALID_WORKFLOW",message:"A condition is missing.",field:"nodes.1",request_id:"req_generation",retryable:false}))
+     .mockResolvedValueOnce({ workflow: document(), existing: false });
+   render(<Overview />);
+   const prompt = screen.getByLabelText("Process description");
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -10,7 +10,7 @@
+ import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
+ import type { ControlContext } from "./simulator";
+ import { draftStorage } from "./draft-storage";
+-import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot } from "@/api/mapping";
++import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot, olderDocument } from "@/api/mapping";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export interface AuditEvent { id: string; at: string; actor: string; role: Role; action: string; target: string }
+@@ -78,7 +78,7 @@
+           const workflows=new Map(state.workflows.map(w=>[w.id,w]));const agents=new Map(state.agents.map(a=>[a.id,a]));
+           for(const document of documents){
+             const existing=workflows.get(document.workflow_id);
+-            if(existing?.serverVersion && document.version<existing.serverVersion)continue;
++            if(olderDocument(document,existing?.canonical))continue;
+             if(existing && hasWorkflowEdits(existing,state.agents)){
+               if(existing.canonical && stableSnapshot(existing.canonical)!==stableSnapshot(document) && (!existing.remote || document.version>=existing.remote.version))workflows.set(existing.id,{...existing,remote:structuredClone(document)});
+               continue;
+--- a/frontend/src/features/workflows/run-inputs.ts
++++ b/frontend/src/features/workflows/run-inputs.ts
+@@ -1,20 +1,21 @@
++import { InputError } from "@/api/feedback";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ export function parseRunInputs(fields: CanonicalWorkflow["inputs"], values: Record<string, string>): Record<string, unknown> {
+   const result: Record<string, unknown> = {};
+   for (const field of fields) {
+     const raw = values[field.name] ?? "";
+-    if (!raw.trim()) { if (field.required) throw new Error(`${field.name} is required.`); continue; }
++    if (!raw.trim()) { if (field.required) throw new InputError(`${field.name} is required.`); continue; }
+     let value: unknown = raw;
+     if (field.type === "number" || field.type === "integer") {
+-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw new Error(`${field.name} must be a number.`);
++      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim())) throw new InputError(`${field.name} must be a number.`);
+       value = Number(raw);
+-      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw new Error(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
++      if (!Number.isFinite(value) || (field.type === "integer" && !Number.isSafeInteger(value))) throw new InputError(`${field.name} must be a ${field.type === "integer" ? "safe integer" : "finite number"}.`);
+     } else if (field.type === "boolean") {
+-      if (!["true", "false"].includes(raw)) throw new Error(`${field.name} must be true or false.`);
++      if (!["true", "false"].includes(raw)) throw new InputError(`${field.name} must be true or false.`);
+       value = raw === "true";
+     } else if (field.type === "array" || field.type === "object") {
+-      try { value = JSON.parse(raw); } catch { throw new Error(`${field.name} must contain valid JSON.`); }
+-      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${field.name} must be a JSON ${field.type}.`);
++      try { value = JSON.parse(raw); } catch { throw new InputError(`${field.name} must contain valid JSON.`); }
++      if (field.type === "array" ? !Array.isArray(value) : value === null || typeof value !== "object" || Array.isArray(value)) throw new InputError(`${field.name} must be a JSON ${field.type}.`);
+     }
+     result[field.name] = value;
+   }
+--- a/frontend/src/features/workflows/workflow-state.ts
++++ b/frontend/src/features/workflows/workflow-state.ts
+@@ -1,4 +1,4 @@
+-import { workflowEditSnapshot } from "@/api/mapping";
++import { workflowEditSnapshot, olderDocument } from "@/api/mapping";
+ import { useMesh } from "@/domain/store";
+ import type { Workflow, Agent } from "@/domain/types";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+@@ -9,7 +9,7 @@
+ export function acceptConfirmed(document: CanonicalWorkflow, submittedSnapshot: string) {
+   const state = useMesh.getState();
+   const current = state.workflows.find(workflow => workflow.id === document.workflow_id);
+-  if (current?.serverVersion && current.serverVersion > document.version) return;
++  if (olderDocument(document,current?.canonical)) return;
+   if (!current || editSnapshot(current, state.agents) === submittedSnapshot) state.acceptWorkflow(document);
+   else useMesh.setState({ workflows: state.workflows.map(workflow => workflow.id === document.workflow_id
+     ? { ...workflow, canonical: structuredClone(document), serverVersion: document.version, status: document.status, remote: undefined, tabConflict: undefined } : workflow) });

@@ -1,0 +1,40 @@
+--- a/openspec/changes/phase7-release-verification/tasks.md
++++ b/openspec/changes/phase7-release-verification/tasks.md
+@@ -1,8 +1,10 @@
+ # Tasks
+ 
+-- [ ] 1. Repair default browser configuration and obsolete lifecycle tests.
+-- [ ] 2. Add full isolated release journey and negative regression matrix.
+-- [ ] 3. Clean npm ci; types, lint, complete unit/build/browser checks.
+-- [ ] 4. Full backend/connector suite, real PostgreSQL and runtime dependency verification.
+-- [ ] 5. Deployed HTTPS/private API smoke, exact artifact/source evidence and rollback readiness.
+-- [ ] 6. Record release decision and explicitly deferred/unavailable acceptance checks.
++- [x] 1. Repair default browser configuration and obsolete lifecycle tests.
++- [x] 2. Add full isolated release journey and negative regression matrix.
++- [x] 3. Clean npm ci; types, lint, complete unit/build/browser checks.
++- [x] 4. Full backend/connector suite, real PostgreSQL and runtime dependency verification.
++- [x] 5. Deployed HTTPS/private API smoke, exact artifact/source evidence and rollback readiness.
++- [x] 6. Record release decision and explicitly deferred/unavailable acceptance checks.
++
++Completion covers implementation and recorded verification. Production acceptance remains blocked by deferred Google Workspace login and unavailable supported simulation; see verification.md and acceptance-matrix.md.
+--- a/openspec/changes/phase7-release-verification/verification.md
++++ b/openspec/changes/phase7-release-verification/verification.md
+@@ -65,3 +65,18 @@
+ The remaining sheet-access test still expected removed publication wording; after correcting its text assertion, the preserved desktop panel bounds check exposed a real defect: the panel began at x = -230 px. The obsolete desktop absolute positioning override was removed so the existing fixed viewport-bounded positioning applies at desktop/mobile widths. The targeted remaining visual run had 5 passes and this single bounds failure; the final full run is repeated after the production fix. No assertion was removed or weakened.
+ 
+ The all-spec diagnostic before the sheet-panel fix was stopped after exposing the obsolete Sheets text and the preserved bounds assertion. The corrected remaining visual subset passed five scenarios and failed only the desktop bounds check at x=-230. The release artifact was rebuilt after that fix, with a fresh complete browser run required; earlier partial/failed runs do not satisfy the final browser gate.
++
++
++## Final browser and deployed verification
++
++The final complete default browser suite passed **all 55 scenarios across 18 spec files in 3.6 minutes** after the Sheets panel fix. No required case was skipped. The final isolated production artifact **qE8U-c_-I5gXY-qvIVGw6** was loaded into the running frontend and its build identity was verified in the public HTTPS response. Exact four-file production source hashes match the tested checkpoint. The previous build and source originals are retained with a frontend-only rollback script under `.local/phase7-rollout/`; rollback was prepared, not exercised against production.
++
++All **20 live HTTP checks passed**: HTTPS shell 200, HTTP redirect 301, unauthenticated public session/runs 403 without a session cookie, private anonymous runs 401, local authenticated proxy reads, invalid-origin and public-host rejection, invalid-origin mutation rejection before handling, pagination and event sequence bounds, filters, invalid page parameters, monitoring and worker health. These checks do not constitute an authenticated public production journey.
++
++Live Chromium checks passed on **desktop (1440×1000) and mobile (390×844)**: editor Design/hierarchy, exact recorded execution, opening Agent communication, returning to the editable draft, monitoring filters and governance tabs. Public HTTPS shell and expected protected-session denial also passed. No page errors, failed static assets or direct private API browser calls were reported. The selected live workflow had only one communication run, so switching runs was not exercised against production; it is covered by the isolated browser regressions. The Sheets desktop/mobile viewport assertions passed in the complete isolated suite; those screenshots use explicitly mocked visual data, not live provider delivery.
++
++Backend and worker retained their previous PIDs (3906013 and 3906022); only the frontend restarted (3928194). All three services are active with zero automatic restarts. Worker health shows one active worker and four ready components; older stale heartbeat records remain historical. No production workflow/provider mutation or database migration was performed. Private evidence includes `http-smoke.json`, `browser-smoke.json`, `editor-smoke.json`, `services-after.txt`, screenshots and the rollback checkpoint.
++
++## Recorded release decision
++
++Phase 7 implementation, test repair, automated verification and read-only deployed checks are complete. **Production readiness remains false**: Google Workspace production login/authenticated public lifecycle is deferred by the user, and supported side-effect-free product simulation is unavailable. No external provider delivery, real public authenticated lifecycle, production run-switch test or exercised rollback is claimed. The earlier automatic-review usage-limit rejection did not execute its smoke cell; after the user resumed, the authorized checks were executed successfully.

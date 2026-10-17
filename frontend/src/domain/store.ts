@@ -9,7 +9,8 @@ import { applyInstall, type InstallResult } from "./install";
 import { makeAgent } from "./templates";
 import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
 import type { ControlContext } from "./simulator";
-import { fromCanonical } from "@/api/mapping";
+import { draftStorage } from "./draft-storage";
+import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot, olderDocument } from "@/api/mapping";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
 
 export interface AuditEvent { id: string; at: string; actor: string; role: Role; action: string; target: string }
@@ -23,6 +24,7 @@ export const SEED_POLICIES: Policy[] = [
 
 interface MeshState {
   acceptWorkflow: (document: CanonicalWorkflow) => void;
+  observeWorkflows: (documents: CanonicalWorkflow[]) => void;
   workflows: Workflow[];
   agents: Agent[];
   runs: Run[];
@@ -71,6 +73,24 @@ export const useMesh = create<MeshState>()(
         set((s) => ({ workflows: [mapped.workflow, ...s.workflows.filter((w) => w.id !== mapped.workflow.id)],
           agents: [...mapped.agents, ...s.agents.filter((a) => !mapped.agents.some((incoming) => incoming.id === a.id))] }));
       },
+      observeWorkflows: (documents) => {
+        const state=get();let changed=false;
+        const workflows=new Map(state.workflows.map(w=>[w.id,w]));const agents=new Map(state.agents.map(a=>[a.id,a]));
+        for(const document of documents){
+          const existing=workflows.get(document.workflow_id);
+          if(olderDocument(document,existing?.canonical))continue;
+          if(existing && hasWorkflowEdits(existing,state.agents)){
+            if((!existing.canonical || stableSnapshot(existing.canonical)!==stableSnapshot(document)) && (!existing.remote || (document.version>=existing.remote.version && stableSnapshot(existing.remote)!==stableSnapshot(document)))){
+              workflows.set(existing.id,{...existing,remote:structuredClone(document)});changed=true;
+            }
+            continue;
+          }
+          if(existing?.canonical && stableSnapshot(existing.canonical)===stableSnapshot(document))continue;
+          const mapped=fromCanonical(document);workflows.set(mapped.workflow.id,mapped.workflow);changed=true;
+          for(const agent of mapped.agents)agents.set(agent.id,agent);
+        }
+        if(changed)set({workflows:[...workflows.values()],agents:[...agents.values()]});
+      },
       createBlankWorkflow: (name, description = "") => {
         const at = new Date().toISOString();
         const trigger = uid("node");
@@ -97,9 +117,21 @@ export const useMesh = create<MeshState>()(
       duplicateWorkflow: (id) => {
         const w = get().workflows.find((x) => x.id === id);
         if (!w) return;
-        const copyId = uid("wf");
-        const copy: Workflow = { ...w, id: copyId, canonical: w.canonical ? { ...w.canonical, workflow_id: copyId, version: 1, status: "draft" } : undefined, serverVersion: undefined, name: `${w.name} (copy)`, status: "draft", versions: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        set((s) => ({ workflows: [copy, ...s.workflows] }));
+        const copyId = uid("wf"); const at = new Date().toISOString();
+        const clones = get().agents.filter(agent => ownsAgent(w,agent)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, parentAgentId: agent.parentAgentId?.replace(`${w.id}::`,`${copyId}::`), tools: [], updatedAt: at }));
+        const remap = new Map(get().agents.filter(agent => ownsAgent(w,agent)).map((agent, index) => [agent.id, clones[index]!.id]));
+        const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
+        if (canonical) {
+          canonical.agents=canonical.agents.map(agent=>({...agent,allowed_tool_ids:[]}));
+          canonical.tools=canonical.tools.map(tool=>({tool_id:tool.tool_id,capability:tool.capability}));
+          canonical.workflow_id = copyId; canonical.version = 1; canonical.status = "draft";
+          for (const key of ["approved_by", "validation_state", "approval_submission"]) delete canonical.metadata[key];
+          const triggers = canonical.metadata["trigger_templates"];
+          if (Array.isArray(triggers)) canonical.metadata["trigger_templates"] = triggers.map(trigger => { const copy = { ...trigger }; delete copy.binding_id; return copy; });
+        }
+        const copy: Workflow = { ...structuredClone(w), id: copyId, canonical, serverVersion: undefined, name: `${w.name} (copy)`, status: "draft", versions: [], createdAt: at, updatedAt: at,
+          nodes: w.nodes.map(node => ({ ...structuredClone(node), data: { ...node.data, ...(node.data.agentId ? { agentId: remap.get(node.data.agentId) ?? node.data.agentId } : {}) } })) };
+        set((s) => ({ workflows: [copy, ...s.workflows], agents: [...clones, ...s.agents] }));
         return copy.id;
       },
       deleteWorkflow: (id) => set((s) => ({ workflows: s.workflows.filter((w) => w.id !== id) })),
@@ -157,9 +189,12 @@ export const useMesh = create<MeshState>()(
     {
       name: "mesh-local-drafts-v1",
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => draftStorage),
       skipHydration: true,
-      partialize: (s) => ({ workflows: s.workflows.filter((w) => w.serverVersion === undefined), agents: s.agents.filter((a) => a.origin !== "backend"), runs: s.runs, activity: s.activity, connectors: s.connectors, knowledge: s.knowledge, installed: s.installed, role: s.role, policies: s.policies, controls: s.controls, audit: s.audit }),
+      partialize: (s) => {
+        const drafts=s.workflows.filter(w=>w.serverVersion===undefined||hasWorkflowEdits(w,s.agents));
+        return {workflows:drafts.map(w=>({...w,tabConflict:undefined})),agents:s.agents.filter(a=>a.origin!=="backend"||drafts.some(w=>ownsAgent(w,a))),runs:s.runs,activity:s.activity,connectors:s.connectors,knowledge:s.knowledge,installed:s.installed,role:s.role,policies:s.policies,controls:s.controls,audit:s.audit};
+      },
     },
   ),
 );

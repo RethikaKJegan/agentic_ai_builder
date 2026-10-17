@@ -1,0 +1,20 @@
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -35,7 +35,7 @@
+     try {
+       const [page, snapshot] = await Promise.all([api.workflowsPage(cursor), api.overview(undefined,cursor)]);
+       useMesh.getState().observeWorkflows(page.items);
+-      set({workflowCursor:cursor,workflowNextCursor:page.next_cursor,workflowTotal:page.total,
++      set({workflowCursor:cursor,workflowNextCursor:page.next_cursor ?? null,workflowTotal:page.total ?? page.items.length,
+         overview:Object.fromEntries(snapshot.items.map(item=>[item.workflow_id,item])),overviewError:null,error:null,
+         liveStatus:"live",lastOverviewUpdate:new Date().toISOString()});
+     } catch(error) { if(error instanceof ApiError)set({error,overviewError:error}); }
+@@ -77,7 +77,7 @@
+         const tools = results[1];
+         if (workflows?.status === "fulfilled") {
+           useMesh.getState().observeWorkflows(workflows.value.items);
+-          set({workflowCursor:null,workflowNextCursor:workflows.value.next_cursor,workflowTotal:workflows.value.total});
++          set({workflowCursor:null,workflowNextCursor:workflows.value.next_cursor ?? null,workflowTotal:workflows.value.total ?? workflows.value.items.length});
+         }
+         if (tools?.status === "fulfilled") set({ tools: tools.value.items });
+         const overview = results[2];

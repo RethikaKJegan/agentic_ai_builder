@@ -1,0 +1,149 @@
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -1,6 +1,5 @@
+ import { create } from "zustand";
+ import { api, ApiError, type Session, type ToolRecord, type RegistryReview, type WorkflowOverview } from "./client";
+-import { hasWorkflowEdits } from "./mapping";
+ import { useMesh } from "@/domain/store";
+ 
+ interface BackendState {
+@@ -8,6 +7,7 @@
+   session: Session | null;
+   tools: ToolRecord[];
+   error: ApiError | null;
++  overviewError: ApiError | null;
+   reviews: Record<string, RegistryReview>;
+   overview: Record<string, WorkflowOverview>;
+   overviewSequence: number;
+@@ -21,7 +21,7 @@
+ let initialization: Promise<void> | null = null;
+ export const useBackend = create<BackendState>((set, get) => ({
+   status: "loading", session: null, tools: [], error: null, reviews: {}, overview: {}, overviewSequence: 0,
+-  liveStatus: "connecting", lastOverviewUpdate: null,
++  liveStatus: "connecting", lastOverviewUpdate: null, overviewError: null,
+   acceptReview: (review) => set((s) => ({ reviews: { ...s.reviews, [review.workflow_id]: review } })),
+   can: (permission) => get().session?.auth.decision === "allow" && !!get().session?.auth.permissions.includes(permission),
+   refreshOverview: async () => {
+@@ -32,11 +32,12 @@
+         set({ session, status: "connected" });
+       }
+       const overview = Object.fromEntries(snapshot.items.map((item) => [item.workflow_id, item]));
+-      set({ overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
+-        error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" ? null : get().error });
++      const previousOverviewError=get().overviewError;
++      set({ overviewError:null, overview, overviewSequence: Math.max(get().overviewSequence, snapshot.next_sequence), liveStatus: "live", lastOverviewUpdate: new Date().toISOString(),
++        error: get().error?.error.error_code === "AUTHENTICATION_REQUIRED" || get().error===previousOverviewError ? null : get().error });
+     } catch (error) {
+       const failure = error instanceof ApiError ? error : get().error;
+-      set({ liveStatus: "stale", error: failure,
++      set({ liveStatus: "stale", error: failure, overviewError: failure,
+         ...(failure?.error.error_code === "AUTHENTICATION_REQUIRED" ? { session: null, tools: [], reviews: {} } : {}) });
+     }
+   },
+@@ -49,10 +50,7 @@
+         const results = await Promise.allSettled([api.request("list_workflows", {}), api.request("list_tools", {}), api.overview()]);
+         const workflows = results[0];
+         const tools = results[1];
+-        if (workflows?.status === "fulfilled") workflows.value.items.forEach((w) => {
+-          const state = useMesh.getState(); const existing = state.workflows.find(item => item.id === w.workflow_id);
+-          if (!existing || !hasWorkflowEdits(existing, state.agents)) state.acceptWorkflow(w);
+-        });
++        if (workflows?.status === "fulfilled") useMesh.getState().observeWorkflows(workflows.value.items);
+         if (tools?.status === "fulfilled") set({ tools: tools.value.items });
+         const overview = results[2];
+         if (overview?.status === "fulfilled") set({ overview: Object.fromEntries(overview.value.items.map((item) => [item.workflow_id, item])),
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -9,7 +9,8 @@
+ import { makeAgent } from "./templates";
+ import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
+ import type { ControlContext } from "./simulator";
+-import { fromCanonical, hasWorkflowEdits } from "@/api/mapping";
++import { draftStorage } from "./draft-storage";
++import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot } from "@/api/mapping";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export interface AuditEvent { id: string; at: string; actor: string; role: Role; action: string; target: string }
+@@ -23,6 +24,7 @@
+ 
+ interface MeshState {
+   acceptWorkflow: (document: CanonicalWorkflow) => void;
++  observeWorkflows: (documents: CanonicalWorkflow[]) => void;
+   workflows: Workflow[];
+   agents: Agent[];
+   runs: Run[];
+@@ -71,6 +73,22 @@
+         set((s) => ({ workflows: [mapped.workflow, ...s.workflows.filter((w) => w.id !== mapped.workflow.id)],
+           agents: [...mapped.agents, ...s.agents.filter((a) => !mapped.agents.some((incoming) => incoming.id === a.id))] }));
+       },
++      observeWorkflows: (documents) => {
++        set(state => {
++          const workflows=new Map(state.workflows.map(w=>[w.id,w]));const agents=new Map(state.agents.map(a=>[a.id,a]));
++          for(const document of documents){
++            const existing=workflows.get(document.workflow_id);
++            if(existing?.serverVersion && document.version<existing.serverVersion)continue;
++            if(existing && hasWorkflowEdits(existing,state.agents)){
++              if(existing.canonical && stableSnapshot(existing.canonical)!==stableSnapshot(document) && (!existing.remote || document.version>=existing.remote.version))workflows.set(existing.id,{...existing,remote:structuredClone(document)});
++              continue;
++            }
++            const mapped=fromCanonical(document);workflows.set(mapped.workflow.id,mapped.workflow);
++            for(const agent of mapped.agents)agents.set(agent.id,agent);
++          }
++          return {workflows:[...workflows.values()],agents:[...agents.values()]};
++        });
++      },
+       createBlankWorkflow: (name, description = "") => {
+         const at = new Date().toISOString();
+         const trigger = uid("node");
+@@ -98,10 +116,12 @@
+         const w = get().workflows.find((x) => x.id === id);
+         if (!w) return;
+         const copyId = uid("wf"); const at = new Date().toISOString();
+-        const clones = get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, updatedAt: at }));
+-        const remap = new Map(get().agents.filter(agent => w.nodes.some(node => node.data.agentId === agent.id)).map((agent, index) => [agent.id, clones[index]!.id]));
++        const clones = get().agents.filter(agent => ownsAgent(w,agent)).map(agent => ({ ...structuredClone(agent), id: `${copyId}::${agent.canonicalId ?? agent.id}`, canonicalId: agent.canonicalId ?? agent.id, origin: undefined, parentAgentId: agent.parentAgentId?.replace(`${w.id}::`,`${copyId}::`), tools: [], updatedAt: at }));
++        const remap = new Map(get().agents.filter(agent => ownsAgent(w,agent)).map((agent, index) => [agent.id, clones[index]!.id]));
+         const canonical = w.canonical ? structuredClone(w.canonical) : undefined;
+         if (canonical) {
++          canonical.agents=canonical.agents.map(agent=>({...agent,allowed_tool_ids:[]}));
++          canonical.tools=canonical.tools.map(tool=>({tool_id:tool.tool_id,capability:tool.capability}));
+           canonical.workflow_id = copyId; canonical.version = 1; canonical.status = "draft";
+           for (const key of ["approved_by", "validation_state", "approval_submission"]) delete canonical.metadata[key];
+           const triggers = canonical.metadata["trigger_templates"];
+@@ -167,9 +187,12 @@
+     {
+       name: "mesh-local-drafts-v1",
+       version: 1,
+-      storage: createJSONStorage(() => localStorage),
++      storage: createJSONStorage(() => draftStorage),
+       skipHydration: true,
+-      partialize: (s) => ({ workflows: s.workflows.filter((w) => w.serverVersion === undefined || hasWorkflowEdits(w, s.agents)), agents: s.agents.filter((a) => a.origin !== "backend" || s.workflows.some(w => hasWorkflowEdits(w, s.agents) && w.nodes.some(n => n.data.agentId === a.id))), runs: s.runs, activity: s.activity, connectors: s.connectors, knowledge: s.knowledge, installed: s.installed, role: s.role, policies: s.policies, controls: s.controls, audit: s.audit }),
++      partialize: (s) => {
++        const drafts=s.workflows.filter(w=>w.serverVersion===undefined||hasWorkflowEdits(w,s.agents));
++        return {workflows:drafts.map(w=>({...w,tabConflict:undefined})),agents:s.agents.filter(a=>a.origin!=="backend"||drafts.some(w=>ownsAgent(w,a))),runs:s.runs,activity:s.activity,connectors:s.connectors,knowledge:s.knowledge,installed:s.installed,role:s.role,policies:s.policies,controls:s.controls,audit:s.audit};
++      },
+     },
+   ),
+ );
+--- a/frontend/src/features/workflows/workflow-state.ts
++++ b/frontend/src/features/workflows/workflow-state.ts
+@@ -1,15 +1,16 @@
++import { workflowEditSnapshot } from "@/api/mapping";
+ import { useMesh } from "@/domain/store";
+ import type { Workflow, Agent } from "@/domain/types";
+ import type { CanonicalWorkflow } from "@/api/contracts.generated";
+ 
+ export function editSnapshot(workflow: Workflow, agents: Agent[]) {
+-  return JSON.stringify([workflow.name, workflow.description, workflow.nodes, workflow.edges,
+-    agents.filter(agent => workflow.nodes.some(node => node.data.agentId === agent.id))]);
++  return workflowEditSnapshot(workflow,agents);
+ }
+ export function acceptConfirmed(document: CanonicalWorkflow, submittedSnapshot: string) {
+   const state = useMesh.getState();
+   const current = state.workflows.find(workflow => workflow.id === document.workflow_id);
++  if (current?.serverVersion && current.serverVersion > document.version) return;
+   if (!current || editSnapshot(current, state.agents) === submittedSnapshot) state.acceptWorkflow(document);
+   else useMesh.setState({ workflows: state.workflows.map(workflow => workflow.id === document.workflow_id
+-    ? { ...workflow, canonical: document, serverVersion: document.version, status: document.status } : workflow) });
++    ? { ...workflow, canonical: structuredClone(document), serverVersion: document.version, status: document.status, remote: undefined, tabConflict: undefined } : workflow) });
+ }

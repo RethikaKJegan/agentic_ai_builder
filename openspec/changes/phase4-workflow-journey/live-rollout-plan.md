@@ -1,0 +1,12 @@
+# Controlled Phase 4 rollout
+
+Load only the tested Phase 4 source and isolated Next artifact into the existing Builder API, frontend and worker services. Preserve Phase 1–3 and all original user changes. Google Workspace production login remains deferred; public development authentication stays blocked. No nginx/DNS/firewall/credential/database-backend changes occur.
+
+1. Complete unit, type, lint, production build, desktop/mobile browser, relevant backend, real PostgreSQL, schema/validator and OpenSpec verification. Stage a complete tested Next build outside the frontend tree and match BUILD_ID. Preserve earliest Phase 4 existing-source originals with before/after hashes.
+2. Gracefully stop only the Builder worker, confirm it drained, then stop the Builder API. Do not replay uncertain provider effects. Back up the main SQLite database and the three actual native-procurement databases privately, recording preexisting table row counts.
+3. Start only the updated API and confirm session/read health. Compare all preexisting table counts before resuming workers. No migration or data replacement occurs; event sequence is read from the existing runtime_events sequence column.
+4. Stop the Builder frontend, preserve its existing `.next` build intact, rename the tested artifact into `.next`, and start the frontend. Start the existing separate worker service. Ports remain loopback 3001 and 8002.
+5. Read-only smoke: HTTPS HTML/assets, HTTP redirect, local session and authorized proxy/backend reads, new release-state endpoint, invalid origin/Host rejection, public development-session/API rejection, request IDs/no-store, desktop/mobile editor mode navigation, exact historical trace reads, and one active worker with ready components. No live generation, execution, publication, SMTP/provider check, approval, settings/email/Sheets mutation is submitted. Background workers resume their normal configured activity.
+6. On startup/read failure, gracefully stop the three services, verify source hashes, restore only earliest Phase 4 existing-code originals and the previous Next build, restart prior services, and retain all current business data. Never restore a stopped snapshot over post-rollout activity. The concrete private rollback script leaves Phase 2 worker roles and all credentials untouched.
+
+Evidence and honest limitations are recorded in verification.md. Table-count preservation is not a content-hash claim. Unavailable safe simulation is displayed explicitly and is never represented by a fake runtime success.

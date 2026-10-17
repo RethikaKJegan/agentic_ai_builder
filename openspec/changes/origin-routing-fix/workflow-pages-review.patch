@@ -1,0 +1,198 @@
+--- a/workflow_api/service.py
++++ b/workflow_api/service.py
+@@ -74,7 +74,7 @@
+             elif operation == 'delete_workflow':
+                 data = self.lifecycle.delete(request, auth)
+             elif operation == 'list_workflow_overview':
+-                data = self.lifecycle.overview(auth)
++                data = self.lifecycle.overview(auth, cursor=context.get("workflow_cursor"))
+             elif operation == 'subscribe_workflow_overview':
+                 data = self.lifecycle.overview(auth, context.get('after_sequence', 0))
+             elif operation == 'get_lifecycle_operation':
+@@ -140,7 +140,7 @@
+                 permission not in auth['permissions']):
+             raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Your session cannot perform this operation.', 403)
+ 
+-    def handle(self, request, auth):
++    def handle(self, request, auth, read_cursor=None):
+         request_id = f'req_{uuid4().hex}'
+         try:
+             reject_secrets(request)
+@@ -222,8 +222,8 @@
+             if operation in {'get_workflow', 'list_workflows'}:
+                 with self.store.transaction(write=False) as db:
+                     if operation == 'list_workflows':
+-                        items = self.store.list(db, workspace)
+-                        return self.envelope(request_id, 200, dict(items=items, total=len(items), has_more=False, next_cursor=None))
++                        from .workflow_pages import read_page
++                        return self.envelope(request_id, 200, read_page(self.store, workspace, read_cursor))
+                     workflow = self.store.get(db, workspace, payload.get('workflow_id'), payload.get('workflow_version'))
+                     if not workflow:
+                         raise ApiFailure('WORKFLOW_NOT_FOUND', 'This workflow revision was not found.', 404)
+--- a/workflow_api/main.py
++++ b/workflow_api/main.py
+@@ -158,7 +158,10 @@
+                 if key in body['payload'] and body['payload'][key] != value:
+                     return error('REFERENCE_MISMATCH', 'Route and payload revision references must match.', 400)
+                 body['payload'][key] = value
+-            result = await run_in_threadpool(workflow_service.handle, body, auth)
++            if operation == 'list_workflows':
++                result = await run_in_threadpool(workflow_service.handle, body, auth, read_cursor=request.query_params.get('cursor'))
++            else:
++                result = await run_in_threadpool(workflow_service.handle, body, auth)
+             return JSONResponse(result, status_code=result['status'])
+         except Exception:
+             return error('INVALID_REQUEST', 'The request must contain valid JSON and revision references.', 400)
+@@ -241,6 +244,7 @@
+                                              signature=request.headers.get('x-builder-signature'),
+                                              timestamp=request.headers.get('x-builder-timestamp'),
+                                              after_sequence=int(request.query_params.get('after_sequence', '0')),
++                                             workflow_cursor=request.query_params.get('cursor'),
+                                              operation_id=additions.get('operation_id'), binding_id=additions.get('binding_id'),
+                                              job_id=additions.get('job_id'))
+             return JSONResponse(result, status_code=result['status'])
+--- a/workflow_api/lifecycle.py
++++ b/workflow_api/lifecycle.py
+@@ -510,7 +510,7 @@
+         reconcile(self, workspace)
+         return reconcile_cleanup(self, workspace)
+ 
+-    def overview(self, auth, after_sequence=None):
++    def overview(self, auth, after_sequence=None, cursor=None):
+         self.authorize(auth, "workflow.view", ("admin", "builder", "viewer", "approver"))
+         workspace = auth["subject"]["workspace_id"]
+         with self.store.transaction(write=False) as db:
+@@ -518,13 +518,17 @@
+                 rows = db.execute("SELECT document FROM lifecycle_overview_events WHERE workspace=? AND sequence>? ORDER BY sequence LIMIT 200", (workspace, after_sequence)).fetchall()
+                 items = [json.loads(row[0]) for row in rows]
+                 return {"items": items, "next_sequence": items[-1]["sequence"] if items else after_sequence, "has_more": len(items) == 200}
+-            documents = self.store.list(db, workspace)
++            from .workflow_pages import read_page
++            page = read_page(self.store, workspace, cursor)
++            documents = page['items']
++            identities = [item['workflow_id'] for item in documents]
+             run_summaries = {}
+-            if self._table(db, "runtime_runs"):
++            if identities and self._table(db, "runtime_runs"):
++                slots = ','.join('?' for _ in identities)
+                 rows = db.execute("""SELECT workflow_id, run_id, json_extract(document, '$.status'),
+                     (SELECT COUNT(*) FROM json_each(runtime_runs.document, '$.approvals') a
+                      WHERE json_extract(a.value, '$.status')='pending')
+-                    FROM runtime_runs WHERE workspace=? ORDER BY rowid DESC""", (workspace,))
++                    FROM runtime_runs WHERE workspace=? AND workflow_id IN (""" + slots + ") ORDER BY rowid DESC", (workspace, *identities))
+                 for identity, run_id, status, pending in rows:
+                     summary = run_summaries.setdefault(identity, {
+                         'latest_run_id': run_id, 'latest_run_status': status,
+@@ -551,7 +555,7 @@
+                                   activation_state=release["state"] if release else None,
+                                   **summary, updated_at=now_iso(self.clock)))
+             sequence = db.execute("SELECT COALESCE(MAX(sequence), 0) FROM lifecycle_overview_events WHERE workspace=?", (workspace,)).fetchone()[0]
+-            return {"items": items, "next_sequence": sequence, "has_more": False}
++            return {"items": items, "next_sequence": sequence, "has_more": page['has_more'], "next_cursor": page['next_cursor'], "total": page['total']}
+ 
+     @staticmethod
+     def _table(db, name):
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -40,7 +40,7 @@
+   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
+   active_run_count: z.number().int().nonnegative(), latest_run_id: z.string().nullable(),
+   latest_run_status: RunStatusSchema.nullable(), pending_approval_count: z.number().int().nonnegative(), updated_at: z.string() }).strict();
+-const overviewCollectionSchema = z.object({ items: z.array(workflowOverviewSchema), next_sequence: z.number().int().nonnegative(), has_more: z.boolean(), ...metadata });
++const overviewCollectionSchema = z.object({ items: z.array(workflowOverviewSchema), next_sequence: z.number().int().nonnegative(), has_more: z.boolean(), next_cursor: z.string().nullable().optional(), total: z.number().int().nonnegative().optional(), ...metadata });
+ const lifecycleOperationSchema = z.object({ operation_id: z.string(), workspace_id: z.string(), workflow_id: z.string(), subject_id: z.string(),
+   idempotency_key: z.string(), expected_release_id: z.string().nullable(), kind: z.enum(["activate_release", "disable_release", "delete_workflow"]),
+   state: z.enum(["preparing", "succeeded", "failed", "cleanup_pending"]), error_code: z.string().nullable() }).strict();
+@@ -408,8 +408,14 @@
+     return result.data;
+   }
+ 
+-  async overview(afterSequence?: number) {
+-    const path = afterSequence === undefined ? "workflow-overview" : `workflow-overview/events?after_sequence=${afterSequence}`;
++  async workflowsPage(cursor: string | null = null) {
++    const result = workflowsData.safeParse(await this.read("workflows" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : "")));
++    if (!result.success) return fail("INVALID_API_DATA", "The workflow page is invalid.");
++    return result.data;
++  }
++
++  async overview(afterSequence?: number, cursor: string | null = null) {
++    const path = afterSequence === undefined ? "workflow-overview" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : "") : `workflow-overview/events?after_sequence=${afterSequence}`;
+     const result = overviewCollectionSchema.safeParse(await this.read(path));
+     if (!result.success) return fail("INVALID_API_DATA", "The workflow overview response is invalid.");
+     return result.data;
+--- a/frontend/src/api/state.ts
++++ b/frontend/src/api/state.ts
+@@ -13,6 +13,11 @@
+   overviewSequence: number;
+   liveStatus: "connecting" | "live" | "stale";
+   lastOverviewUpdate: string | null;
++  workflowCursor: string | null;
++  workflowNextCursor: string | null;
++  workflowTotal: number | null;
++  workflowPageBusy: boolean;
++  loadWorkflowPage: (cursor?: string | null) => Promise<void>;
+   acceptReview: (review: RegistryReview) => void;
+   refreshOverview: () => Promise<void>;
+   initialize: () => Promise<void>;
+@@ -23,13 +28,26 @@
+ export const useBackend = create<BackendState>((set, get) => ({
+   status: "loading", session: null, tools: [], error: null, reviews: {}, overview: {}, overviewSequence: 0,
+   liveStatus: "connecting", lastOverviewUpdate: null, overviewError: null,
++  workflowCursor: null, workflowNextCursor: null, workflowTotal: null, workflowPageBusy: false,
++  loadWorkflowPage: async (cursor = null) => {
++    if (get().workflowPageBusy) return;
++    set({workflowPageBusy:true});
++    try {
++      const [page, snapshot] = await Promise.all([api.workflowsPage(cursor), api.overview(undefined,cursor)]);
++      useMesh.getState().observeWorkflows(page.items);
++      set({workflowCursor:cursor,workflowNextCursor:page.next_cursor,workflowTotal:page.total,
++        overview:Object.fromEntries(snapshot.items.map(item=>[item.workflow_id,item])),overviewError:null,error:null,
++        liveStatus:"live",lastOverviewUpdate:new Date().toISOString()});
++    } catch(error) { if(error instanceof ApiError)set({error,overviewError:error}); }
++    finally { set({workflowPageBusy:false}); }
++  },
+   acceptReview: (review) => set((s) => ({ reviews: { ...s.reviews, [review.workflow_id]: review } })),
+   can: (permission) => get().session?.auth.decision === "allow" && !!get().session?.auth.permissions.includes(permission),
+   refreshOverview: () => {
+     if(overviewRefresh)return overviewRefresh;
+     overviewRefresh=(async()=>{
+     try {
+-      const snapshot = await api.overview();
++      const snapshot = await api.overview(undefined,get().workflowCursor);
+       if ((get().status === "connected" || get().status === "unavailable") && !get().session && get().error?.error.error_code === "AUTHENTICATION_REQUIRED") {
+         const session = await api.session();
+         set({ session, status: "connected" });
+@@ -55,7 +73,10 @@
+         const results = await Promise.allSettled([api.request("list_workflows", {}), api.request("list_tools", {}), api.overview()]);
+         const workflows = results[0];
+         const tools = results[1];
+-        if (workflows?.status === "fulfilled") useMesh.getState().observeWorkflows(workflows.value.items);
++        if (workflows?.status === "fulfilled") {
++          useMesh.getState().observeWorkflows(workflows.value.items);
++          set({workflowCursor:null,workflowNextCursor:workflows.value.next_cursor,workflowTotal:workflows.value.total});
++        }
+         if (tools?.status === "fulfilled") set({ tools: tools.value.items });
+         const overview = results[2];
+         if (overview?.status === "fulfilled") set({ overview: Object.fromEntries(overview.value.items.map((item) => [item.workflow_id, item])),
+--- a/frontend/src/screens/app.workflows.index.tsx
++++ b/frontend/src/screens/app.workflows.index.tsx
+@@ -81,7 +81,7 @@
+       <div className="flex items-end justify-between gap-4">
+         <div>
+           <h1 className="text-3xl font-semibold">Workflows</h1>
+-          <p className="mt-2 text-sm text-muted-foreground">{visibleWorkflows.filter((w) => w.serverVersion).length} server workflows · {visibleWorkflows.filter((w) => !w.serverVersion).length} local drafts</p>
++          <p className="mt-2 text-sm text-muted-foreground">{visibleWorkflows.filter((w) => w.serverVersion).length}{backend.workflowTotal !== null ? ` of ${backend.workflowTotal}` : ""} server workflows · {visibleWorkflows.filter((w) => !w.serverVersion).length} local drafts</p>
+         </div>
+         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
+       </div>
+@@ -93,6 +93,10 @@
+         {backend.lastOverviewUpdate && ` · updated ${new Date(backend.lastOverviewUpdate).toLocaleTimeString()}`}
+       </div>
+       <ApiFeedback error={actionError ?? backend.error} />
++      {(backend.workflowCursor || backend.workflowNextCursor) && <nav aria-label="Workflow pages" className="mt-4 flex gap-3">
++        <button type="button" disabled={backend.workflowPageBusy || !backend.workflowCursor} onClick={() => void backend.loadWorkflowPage(null)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">First workflows</button>
++        <button type="button" disabled={backend.workflowPageBusy || !backend.workflowNextCursor} onClick={() => void backend.loadWorkflowPage(backend.workflowNextCursor)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{backend.workflowPageBusy ? "Loading workflows…" : "Next workflows"}</button>
++      </nav>}
+       {runDocument && <RunWorkflowDialog workflow={runDocument} onClose={() => setRunDocument(undefined)} />}
+       {visibleWorkflows.length === 0 ? (
+         <p className="mt-8 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No workflows yet. <Link to="/app" className="text-primary">Create your first draft</Link>.</p>

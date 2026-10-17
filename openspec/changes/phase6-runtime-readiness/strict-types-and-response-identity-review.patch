@@ -1,0 +1,113 @@
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -212,7 +212,7 @@
+     return result.data;
+   }
+ 
+-  async monitoring(cursors:{source_cursor?:string;policy_cursor?:string}={}) {
++  async monitoring(cursors:{source_cursor?:string|undefined;policy_cursor?:string|undefined}={}) {
+     const count=z.number().finite().nonnegative();
+     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
+       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
+@@ -388,7 +388,7 @@
+     return job.result.data;
+   }
+ 
+-  async runs(filters: {limit?:number;cursor?:string;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
++  async runs(filters: {limit?:number;cursor?:string|undefined;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
+     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
+     const result = schema.safeParse(await this.read(`runs${queryString(filters)}`));
+     if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");
+--- a/frontend/src/features/builder/NodeTrace.test.tsx
++++ b/frontend/src/features/builder/NodeTrace.test.tsx
+@@ -5,7 +5,7 @@
+ afterEach(cleanup);
+ const node = { id: "choose", type: "mesh" as const, position: { x: 0, y: 0 }, data: { kind: "condition" as const, label: "Choose" } };
+ const run = { run_id: "run_one", workflow_id: "workflow", workflow_version: 1, status: "completed" as const, approvals: [] };
+-const trace = { available: true, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
++const trace = { available: true,hasMoreRuns:false,loadMoreRuns:()=>{},hasMoreEvents:false,loadMoreEvents:()=>{}, runs: [run], runId: run.run_id, run, events: [], runState: {}, activeEdges: new Set<string>(), error: null, loading: false, revision: null, retry: () => {}, selectRun: () => {} } satisfies WorkflowTrace;
+ test("historical missing evidence is explicit and unrelated nodes are excluded", () => {
+   render(<NodeTrace node={node} trace={{ ...trace, events: [{ event_id: "evt", run_id: run.run_id, workflow_id: "workflow", workflow_version: 1, timestamp: "2026-10-11T09:00:00Z", source: "runtime", event_type: "node.completed", details: { node_id: "other", output: "unrelated private data" } }] }} />);
+   expect(screen.getAllByText("Not captured for this run.").length).toBeGreaterThan(0);
+--- a/frontend/src/features/builder/useWorkflowTrace.ts
++++ b/frontend/src/features/builder/useWorkflowTrace.ts
+@@ -23,7 +23,7 @@
+     const refresh = async () => {
+       try {
+         const collection = await api.runs({workflow_id:workflowId,limit:50,cursor:historyPage});
+-        if (!disposed) {setRuns(current=>historyPage?[...new Map([...current,...collection.items].map(run=>[run.run_id,run])).values()]:collection.items);setCursor(collection.next_cursor);setError(null);}
++        if (!disposed) {setRuns(current=>historyPage?[...new Map([...current,...collection.items].map(run=>[run.run_id,run])).values()]:collection.items);setCursor(collection.next_cursor??null);setError(null);}
+       } catch (caught) {
+         if (!disposed) setError(caught instanceof Error ? caught : new Error("Run history could not be loaded."));
+       } finally { if (!disposed) timer = setTimeout(() => void refresh(), 5000); }
+@@ -32,16 +32,18 @@
+     return () => { disposed = true; clearTimeout(timer); };
+   }, [available, workflowId, attempt,historyPage]);
+   const feed=useRunFeed(runId,available,attempt);
++  const historicalRunId=feed.run?.workflow_id===workflowId?feed.run.run_id:undefined;
++  const historicalVersion=feed.run?.workflow_id===workflowId?feed.run.workflow_version:undefined;
+   useEffect(()=>{
+-    if(!feed.run || feed.run.workflow_id!==workflowId)return;
++    if(!historicalRunId || !historicalVersion)return;
+     let disposed=false;
+-    void api.request("get_workflow",{workflow_id:workflowId,workflow_version:feed.run.workflow_version}).then(result=>{
+-      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==feed.run!.workflow_version)throw new Error("The server returned a different historical revision.");
+-      if(!disposed){setRevision({runId:feed.run!.run_id,value:fromCanonical(result.workflow)});setError(null);}
++    void api.request("get_workflow",{workflow_id:workflowId,workflow_version:historicalVersion}).then(result=>{
++      if(result.workflow.workflow_id!==workflowId || result.workflow.version!==historicalVersion)throw new Error("The server returned a different historical revision.");
++      if(!disposed){setRevision({runId:historicalRunId,value:fromCanonical(result.workflow)});setError(null);}
+     }).catch(caught=>{if(!disposed)setError(caught instanceof Error?caught:new Error("Historical revision is unavailable."));});
+     return()=>{disposed=true;};
+-  },[feed.run?.run_id,feed.run?.workflow_version,workflowId,attempt]);
+-  const current=available && feed.run?.workflow_id===workflowId && revision?.runId===runId?{run:feed.run,events:feed.events,revision:revision.value}:null;
++  },[historicalRunId,historicalVersion,workflowId,attempt]);
++  const current=useMemo(()=>available && feed.run?.workflow_id===workflowId && revision?.runId===runId?{run:feed.run,events:feed.events,revision:revision.value}:null,[available,feed.run,feed.events,workflowId,revision,runId]);
+   const events = useMemo(() => current?.events ?? [], [current]);
+   const runState = useMemo(() => {
+     const states: Record<string, StepStatus | "running"> = {};
+--- a/frontend/src/features/runs/ServerRunView.tsx
++++ b/frontend/src/features/runs/ServerRunView.tsx
+@@ -56,18 +56,19 @@
+     // Load the explicit run link once after the session becomes available.
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [backend.status, backend.session?.runtime_available]);
++  const canViewRuns=backend.can("runs.view");
+   useEffect(() => {
+-    if(backend.status!=="connected" || !backend.can("runs.view"))return;
++    if(backend.status!=="connected" || !canViewRuns)return;
+     let cancelled=false;let timer:ReturnType<typeof setTimeout>;
+     const refresh=async()=>{
+       try{
+         const collection=await api.runs({...filters,limit:50,cursor,pending_only:approvalsOnly});
+-        if(!cancelled){setAvailableRuns(collection.items);setNext(collection.next_cursor);setError(null);}
++        if(!cancelled){setAvailableRuns(collection.items);setNext(collection.next_cursor??null);setError(null);}
+       }catch(caught){if(!cancelled)setError(caught instanceof ApiError?caught:new Error("Unable to load server runs."));}
+       finally{if(!cancelled)timer=setTimeout(()=>void refresh(),15000);}
+     };
+     void refresh();return()=>{cancelled=true;clearTimeout(timer);};
+-  },[approvalsOnly,backend.status,filters,cursor]);
++  },[approvalsOnly,backend.status,canViewRuns,filters,cursor]);
+   if (!backend.session?.runtime_available) return <p className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">The runtime API is not connected. No {approvalsOnly ? "approval requests" : "execution records"} are available.</p>;
+   return <div className="space-y-4">
+     <p className="text-xs text-muted-foreground">Persisted events update every 3 seconds while a run is active. Interrupted reads retry with bounded backoff; terminal runs stop refreshing. Run history refreshes every 15 seconds.</p>
+--- a/frontend/src/features/runs/useRunFeed.ts
++++ b/frontend/src/features/runs/useRunFeed.ts
+@@ -27,6 +27,7 @@
+       setLoading(true);let done=false;let more=false;
+       try{
+         const result=await sharedRead(`run:${runId}`,()=>api.request("get_run",{run_id:runId}));
++        if(result.run.run_id!==runId)throw new Error("The runtime returned a different run.");
+         if(previous){
+           if(previous.run.workflow_id!==result.run.workflow_id || previous.run.workflow_version!==result.run.workflow_version)throw new Error("Run revision changed.");
+           assertRunTransition(previous.run.status,result.run.status);
+--- a/frontend/src/screens/app.monitoring.tsx
++++ b/frontend/src/screens/app.monitoring.tsx
+@@ -10,7 +10,7 @@
+ export function LiveRuntimePanel() {
+   const [data, setData] = useState<Monitoring | null>(null);
+   const [error, setError] = useState<Error | null>(null);
+-  const [cursor,setCursor]=useState<{source_cursor?:string;policy_cursor?:string}>({});
++  const [cursor,setCursor]=useState<{source_cursor?:string|undefined;policy_cursor?:string|undefined}>({});
+   useEffect(() => {
+     let cancelled = false;
+     let timer:ReturnType<typeof setTimeout>;

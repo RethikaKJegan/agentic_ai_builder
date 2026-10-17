@@ -1,0 +1,10 @@
+--- a/frontend/e2e/prompt-only.spec.ts
++++ b/frontend/e2e/prompt-only.spec.ts
+@@ -8,6 +8,7 @@
+       if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+       const evidence = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "fixtures/delegated-tools.json"), "utf8"));
+       const published = evidence.workflow;
++      published.status = "published";
+       published.inputs = [];
+       published.metadata.execution_input_mode = "automatic";
+       published.metadata.trigger_templates = mode === "event" ? [{ provider_id: "google_sheets", event_type: "row.created", input_mapping: {} }] : [];

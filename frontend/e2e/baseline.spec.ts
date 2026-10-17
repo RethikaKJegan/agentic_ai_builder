@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { localDraft } from "./helpers";
 
 test("landing and workspace navigation preserve routes without demo controls", async ({ page }) => {
   const errors: string[] = [];
@@ -7,7 +8,7 @@ test("landing and workspace navigation preserve routes without demo controls", a
   await expect(page.getByRole("heading", { name: "An entire AI workforce. One coordinated system." })).toBeVisible();
   await expect(page.getByRole("link", { name: /interactive demo/i })).toHaveCount(0);
   await page.getByRole("link", { name: "Launch Workspace", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: "Create draft", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Generate workflow", exact: true })).toBeVisible();
   await expect(page.getByText("Investor demo")).toHaveCount(0);
   await page.getByRole("button", { name: "Search or jump to…" }).click();
   await page.getByPlaceholder("Search workflows, agents, or actions…").fill("Integrations");
@@ -21,10 +22,7 @@ test("landing and workspace navigation preserve routes without demo controls", a
 test("local draft canvas editing, undo and reload persistence work", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/app");
-  await page.getByLabel("Workflow name", { exact: true }).fill("Review procurement");
-  await page.getByLabel("Process description").fill("Review incoming purchase requests.");
-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
+  await localDraft(page,"Review procurement");
   await expect(page).toHaveURL(/\/app\/workflows\/wf_/);
   await expect(page.getByLabel("Workflow name", { exact: true })).toHaveValue("Review procurement");
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
@@ -49,7 +47,7 @@ test("local draft canvas editing, undo and reload persistence work", async ({ pa
   expect(errors).toEqual([]);
 });
 
-test("all workspace routes load and backend actions stay absent", async ({ page }) => {
+test("all workspace routes load without demo role controls", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const name of ["workflows", "agents", "marketplace", "integrations", "knowledge", "approvals", "runs", "monitoring", "governance", "settings"]) {
@@ -72,9 +70,7 @@ test("mobile navigation and local draft editor remain usable", async ({ page }) 
   await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("dialog").getByRole("link", { name: "Integrations", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/integrations$/);
-  await page.goto("/app");
-  await page.getByLabel("Workflow name", { exact: true }).fill("Mobile draft");
-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
+  await localDraft(page,"Mobile draft");
   await expect(page.getByLabel("Workflow name", { exact: true })).toHaveValue("Mobile draft");
   await expect(page.getByRole("button", { name: "Add step" })).toBeVisible();
 });

@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
+import { useBackend } from "@/api/state";
 import { useMesh } from "@/domain/store";
-import { can, resolveControls, SENSITIVE_TOOLS, usageFrom, type AgentControls } from "@/domain/governance";
+import { resolveControls, SENSITIVE_TOOLS, usageFrom, type AgentControls } from "@/domain/governance";
 import { MODELS, TOOL_CATALOG } from "@/domain/models";
 import { toast } from "sonner";
 
@@ -15,8 +16,9 @@ const NUMERIC: { key: "maxAgentsPerWorkflow" | "maxRunsPerDay" | "maxSpendUsd" |
 ];
 
 export function AgentControlTab() {
-  const { controls, setControls, role, agents, runs, workflows } = useMesh();
-  const allowed = can(role, "policy.manage");
+  const { controls, setControls, agents, runs, workflows } = useMesh();
+  const backend=useBackend();
+  const allowed=backend.status==="connected" && backend.session?.auth.decision==="allow" && backend.session.auth.roles.includes("admin");
   const eff = resolveControls(controls.organization, controls.workspace);
   const usage = useMemo(() => usageFrom(runs), [runs]);
   const totalCost = runs.reduce((a, r) => a + r.steps.reduce((b, s) => b + s.cost, 0), 0);
@@ -44,10 +46,10 @@ export function AgentControlTab() {
     const c = controls[scope];
     return (
       <div className="rounded-2xl border border-border">
-        <p className="border-b border-border px-4 py-3 text-sm font-medium">{scope === "organization" ? "Organization · Acme Corp" : "Workspace · Acme Ops"}</p>
+        <p className="border-b border-border px-4 py-3 text-sm font-medium">{scope === "organization" ? "Draft organization" : "Draft workspace"}</p>
         <div className="divide-y divide-border">
           <label className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-            <span>Agent execution<span className="block text-xs text-muted-foreground">{c.executionEnabled ? "Agents may run" : "All agent runs are blocked"}</span></span>
+            <span>Agent execution<span className="block text-xs text-muted-foreground">{c.executionEnabled ? "Draft execution enabled" : "Draft execution disabled"}</span></span>
             <Switch checked={c.executionEnabled} disabled={!allowed} onCheckedChange={(v) => set(scope, { executionEnabled: v })} aria-label={`${scope} agent execution`} />
           </label>
           {NUMERIC.map((n) => (
@@ -92,6 +94,7 @@ export function AgentControlTab() {
 
   return (
     <div className="space-y-4">
+      <p role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">Local draft controls only. These settings do not change live execution, approvals or server budgets. See Live governance &amp; usage for enforced policies.</p>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {[["Total agents", agents.length], ["Active", agents.length - paused], ["Paused", paused], ["Total runs", runs.length], ["Est. spend", `$${totalCost.toFixed(2)}`]].map(([l, v]) => (
           <div key={l as string} className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">{l}</p><p className="mt-1 font-display text-xl font-semibold">{v}</p></div>
@@ -102,12 +105,12 @@ export function AgentControlTab() {
         {meter("Spend today vs limit", usage.spendToday, eff.maxSpendUsd, (n) => `$${n.toFixed(2)}`)}
       </div>
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-canvas px-4 py-2.5 text-xs">
-        <span className="font-medium">Effective:</span>
+        <span className="font-medium">Effective browser draft:</span>
         <span className={eff.executionEnabled ? "text-success" : "text-destructive"}>{eff.executionEnabled ? "Execution on" : "Execution off"}</span>
         <span className="text-muted-foreground">· ≤{eff.maxAgentsPerWorkflow} agents/workflow · depth ≤{eff.maxDepth} · ≤{eff.maxChildren} children · {eff.allowedTools ? `${eff.allowedTools.length} tools` : "all tools"} · {eff.blockedModels.length} models restricted{eff.approvalForSensitive ? " · approval on sensitive actions" : ""}</span>
         <span className="ml-auto text-muted-foreground">Workflows over limit: {workflows.filter((w) => w.nodes.filter((n) => n.data.kind === "agent").length > eff.maxAgentsPerWorkflow).length}</span>
       </div>
-      {!allowed && <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: only Organization Admins can change agent controls.</p>}
+      {!allowed && <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-muted-foreground">Read-only: a server-authenticated administrator is required to edit browser draft controls.</p>}
       <div className="grid gap-4 lg:grid-cols-2">
         <Column scope="organization" />
         <Column scope="workspace" />

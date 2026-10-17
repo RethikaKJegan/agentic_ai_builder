@@ -179,8 +179,23 @@ class GraphRunner:
         return connector, grant, agent, params, reservation
 
     def advance(self, run_id, auth):
+        import os
+        from workflow_api.worker_control import LeaseHeartbeat
+        seconds=int(os.getenv('BUILDER_RUNTIME_LEASE_SECONDS','120'))
+        if not 30<=seconds<=3600:raise ValueError('Runtime lease must be 30-3600 seconds.')
+        worker='worker_'+uuid4().hex
+        def renew():
+            with self.runtime.store.transaction() as db:
+                run=self.runtime.load(db,run_id,auth,'workflow.execute')
+                if run.get('worker')!=worker or run['status']!='running':return False
+                run['lease_until']=self.runtime.clock()+seconds
+                self.runtime.save(db,run)
+            return True
+        with LeaseHeartbeat(renew,interval=max(1,seconds/3)):
+            return self._advance(run_id,auth,worker,seconds)
+
+    def _advance(self, run_id, auth, worker, lease_seconds):
         runtime = self.runtime
-        worker = 'worker_' + uuid4().hex
         with runtime.store.transaction() as db:
             run = runtime.load(db, run_id, auth, 'workflow.execute')
             if run['subject_id'] != auth['subject']['subject_id']:
@@ -197,7 +212,7 @@ class GraphRunner:
                 self.fail(db, run, 'UNKNOWN_INVOCATION_RESULT', blocked=True)
                 return runtime.public(run)
             run['worker'] = worker
-            run['lease_until'] = runtime.clock() + 3600
+            run['lease_until'] = runtime.clock() + lease_seconds
             if run['status'] == 'queued':
                 runtime.transition(db, run, 'running')
             runtime.save(db, run)
@@ -372,7 +387,7 @@ class GraphRunner:
         if not isinstance(key, str) or not 8 <= len(key) <= 128:
             raise RuntimeFailure('INVALID_IDEMPOTENCY_KEY', 'An approval retry key is required.', 400)
         with runtime.store.transaction() as db:
-            rows = db.execute('SELECT document FROM runtime_runs WHERE workspace=?', (approver['subject']['workspace_id'],)).fetchall()
+            rows = db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND EXISTS (SELECT 1 FROM json_each(runtime_runs.document,'$.approvals') a WHERE json_extract(a.value,'$.approval_id')=?) LIMIT 1", (approver['subject']['workspace_id'], payload.get('approval_id'))).fetchall()
             run = next((json.loads(row[0]) for row in rows if any(a['approval_id'] == payload.get('approval_id') for a in json.loads(row[0])['approvals'])), None)
             if run is None:
                 raise RuntimeFailure('APPROVAL_NOT_FOUND', 'The approval was not found in this workspace.', 404)
@@ -381,9 +396,14 @@ class GraphRunner:
             workflow = runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version'])
             if not workflow or digest(workflow) != run['workflow_digest'] or workflow['status'] not in {'approved', 'published'}:
                 raise RuntimeFailure('REVISION_CHANGED', 'The reviewed approval revision is no longer current.')
-            gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == run['approval_context']['gate_id'])
-            # Run actions can be approved by any authenticated member of this
-            # workspace. Publication and execution keep their own permissions.
+            evidence = db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' AND json_extract(document,'$.details.approval_id')=? ORDER BY sequence LIMIT 1", (run['workspace_id'], run['run_id'], payload.get('approval_id'))).fetchone()
+            node_id = json.loads(evidence[0]).get('details', {}).get('node_id') if evidence else None
+            policy_node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), None)
+            gate = next((g for g in workflow['approval_gates'] if policy_node and g['approval_gate_id'] == policy_node.get('approval_gate_id')), None)
+            if gate is None:
+                raise RuntimeFailure('APPROVAL_POLICY_UNAVAILABLE', 'The exact recorded approval policy is unavailable.')
+            runtime.authorize(approver, 'workflow.approve', set(gate['approver_roles']))
+            # The exact persisted revision gate determines decision authority.
             approval = next(a for a in run['approvals'] if a['approval_id'] == payload['approval_id'])
             decision = payload.get('decision')
             if decision not in {'approved', 'rejected'}:

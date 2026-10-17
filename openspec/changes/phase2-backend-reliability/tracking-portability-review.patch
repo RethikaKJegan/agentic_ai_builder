@@ -1,0 +1,60 @@
+--- a/connector_extension/procurement/service.py
++++ b/connector_extension/procurement/service.py
+@@ -6,7 +6,8 @@
+ import json
+ import re
+ import threading
+-import sqlite3
++import os
++from workflow_api.auxiliary_database import connection as database_connection
+ from uuid import uuid4
+ from jsonschema import Draft202012Validator
+ from runtime.connectors import google_spreadsheet_id
+@@ -297,8 +298,8 @@
+                     failed['state'] in ('blocked','failed') and not job.get('tracking'), 'TRACKING_RETRY_NOT_ALLOWED')
+             require(len(job.get('recovery_history',[]))<2,'TRACKING_RETRY_LIMIT')
+             path=self.store.path.parent/'sheet-resources.sqlite3'
+-            if path.exists():
+-                with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
++            if path.exists() or self.store.database_url or os.getenv('BUILDER_AUXILIARY_DATABASE_URL'):
++                with database_connection(path,write=False,database_url=self.store.database_url) as db:
+                     found=db.execute('SELECT 1 FROM observations WHERE workspace=? AND project=?',(workspace,project)).fetchone()
+                 require(not found,'TRACKING_RESOURCE_RECONCILIATION_REQUIRED')
+             known_rejection=False
+@@ -309,7 +310,7 @@
+                 published=self.call('get_workflow',ref,auth,failed['workflow_id']+'_recovery_read')['workflow']
+                 inputs=setup_inputs(next(n['configuration']['input'] for n in published['nodes'] if n.get('tool_id')=='extension_sheets_create'))
+                 effect='sheet_setup_'+effect_digest([workspace,project,inputs['creation_key']])
+-                with sqlite3.connect('file:'+str(self.store.path.parent/'effects.sqlite3')+'?mode=ro',uri=True) as db:
++                with database_connection(self.store.path.parent/'effects.sqlite3',write=False,database_url=self.store.database_url) as db:
+                     prior=db.execute('SELECT fingerprint,state,result FROM effects WHERE key=?',
+                                      (effect_digest(['extension_sheets_create',effect]),)).fetchone()
+                 known_rejection=bool(prior and prior[0]==effect_digest(inputs) and prior[1]=='started' and prior[2] and
+--- a/connector_extension/tests/test_tracking_recovery.py
++++ b/connector_extension/tests/test_tracking_recovery.py
+@@ -1,6 +1,6 @@
+ import io
+ import json
+-import sqlite3
++from workflow_api.auxiliary_database import connection as database_connection
+ import tempfile
+ import unittest
+ from urllib.error import HTTPError
+@@ -22,7 +22,7 @@
+             with self.assertRaises(RuntimeFailure) as caught:
+                 journal.perform('tool_test','effect_test',{},lambda:transport.request('POST','https://example.com/create',{},{}))
+             self.assertEqual(caught.exception.code,'UNKNOWN_INVOCATION_RESULT')
+-            with sqlite3.connect(journal.path) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
++            with journal.connection(write=False) as db:state,result=db.execute('SELECT state,result FROM effects').fetchone()
+             self.assertEqual(state,'started');self.assertNotIn('other_private_field',result)
+             self.assertEqual(json.loads(result)['provider_diagnostic']['http_status'],400)
+             self.assertIn('Metadata IDs',json.loads(result)['provider_diagnostic']['message'])
+@@ -48,7 +48,7 @@
+         self.assertEqual(state['recovery_history'][0]['previous_run_id'],old['run_id'])
+         self.service.retry_tracking(self.plan['project_id'],old['run_id'],True,self.auth)
+         self.assertEqual(self.http.write_count,writes)
+-        with sqlite3.connect(self.service.store.path.parent/'effects.sqlite3') as db:
++        with database_connection(self.service.store.path.parent/'effects.sqlite3',write=False) as db:
+             self.assertEqual(db.execute("SELECT COUNT(*) FROM effects WHERE state='started'").fetchone()[0],1)
+     def test_missing_operator_confirmation_is_rejected(self):
+         state=self.setup();old=state['actions']['tracking'];self.http.lose_write_response=True;self.approve(state);self.advance()

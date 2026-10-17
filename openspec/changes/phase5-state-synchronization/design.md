@@ -1,0 +1,7 @@
+# Design
+
+Canonical server documents are immutable baselines. A deterministic semantic snapshot tracks supported graph/agent fields against the exact loaded baseline. Incoming reads are observed atomically at response time: accept clean newer state, ignore older state, retain dirty edits and record newer remote state as a conflict. Bulk observations use one store transaction. Confirmed mutations preserve newer in-flight edits. Explicit discard/reload confirms intent; compare/export/rebase uses a three-way comparison, rejects overlapping changes, never saves automatically and clears stale executable grants on the eventual new draft. Browser-tab notices do not confer server authority or replace working data.
+
+Safe errors distinguish loading, unauthorized, forbidden, conflict, retryable and uncertain mutation outcomes. Validate canonical envelopes and safe text, retain correlation/field references, render related field errors, and keep generic exception internals out of UI. Safe GET retries are bounded and opt-in to a recognized transient response; never replay an uncertain mutation. Existing explicit local-session rejection recovery remains exact-body/idempotency preserving.
+
+No schema migration, connector write or live execution is needed for verification. Existing unbounded overview pagination remains later work; atomic bulk reconciliation eliminates repeated per-item store/persistence updates without changing list API semantics.

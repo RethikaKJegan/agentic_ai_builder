@@ -1,0 +1,136 @@
+--- a/connector_extension/procurement/store.py
++++ b/connector_extension/procurement/store.py
+@@ -116,7 +116,7 @@
+ 
+     def get(self, workspace, project, record_id, revision=None):
+         self.scope(workspace, project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             if revision is None:
+                 row=db.execute('SELECT body FROM records WHERE workspace=? AND project=? AND id=?',
+                                (workspace,project,record_id)).fetchone()
+@@ -136,21 +136,21 @@
+ 
+     def history(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute('SELECT transaction_key,record_id,revision,recorded_at FROM activity '
+                             'WHERE workspace=? AND project=? ORDER BY sequence',(workspace,project)).fetchall()
+         return [dict(zip(('transaction_key','record_id','revision','recorded_at'),r)) for r in rows]
+ 
+     def resources(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute('SELECT record_id,provider,resource_type,resource_id,metadata FROM resources '
+                             'WHERE workspace=? AND project=?',(workspace,project)).fetchall()
+         return [dict(record_id=r[0],provider=r[1],resource_type=r[2],resource_id=r[3],metadata=json.loads(r[4])) for r in rows]
+ 
+     def pending_sync(self, workspace, project):
+         self.scope(workspace,project)
+-        with self.connection() as db:
++        with self.connection(write=False) as db:
+             rows=db.execute("SELECT key,record_id,record_revision,target,payload,status FROM sync_intents "
+                             "WHERE workspace=? AND project=? ORDER BY key",(workspace,project)).fetchall()
+         return [dict(key=r[0],record_id=r[1],record_revision=r[2],target=r[3],payload=json.loads(r[4]),status=r[5]) for r in rows]
+--- a/connector_extension/procurement/service.py
++++ b/connector_extension/procurement/service.py
+@@ -40,7 +40,7 @@
+ 
+     def job(self, workspace, project):
+         self.store.scope(workspace,project)
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_jobs WHERE workspace=? AND project=?',(workspace,project)).fetchone()
+         require(row is not None,'PROCUREMENT_PROJECT_NOT_FOUND');return json.loads(row[0])
+ 
+@@ -53,7 +53,7 @@
+         # Source accessibility attests only the selected input table, never buyer,
+         # supplier, compliance or canonical human approval.
+         if role!='OPERATOR' or evidence['data']['provider']!='google_sheets':return False
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_source_proofs WHERE workspace=? AND project=? AND id=?',
+                            (evidence['workspace_id'],evidence['project_id'],evidence['record_id'])).fetchone()
+         return bool(row and json.loads(row[0])==evidence)
+@@ -435,7 +435,7 @@
+             db.execute("UPDATE sync_intents SET status='CONFIRMED' WHERE workspace=? AND project=? AND key=?",(workspace,project,key))
+ 
+     def tick(self):
+-        with self.store.connection() as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
++        with self.store.connection(write=False) as db:jobs=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND "
+             "json_extract(body,'$.phase') NOT IN ('DRAFTS_READY','NEEDS_CLARIFICATION','STOPPED') ORDER BY rowid LIMIT 5",(self.cursor,)).fetchall()
+         if not jobs:self.cursor=0
+         for rowid,workspace,project,body in jobs:
+--- a/workflow_api/reply_cases.py
++++ b/workflow_api/reply_cases.py
+@@ -282,7 +282,7 @@
+                     actions = [k for k in actions if k != 'manager_notice'] + ['confirm_closure']
+                 uncertain = False
+                 for kind in actions:
+-                    with self.store.transaction() as db:
++                    with self.store.transaction(write=False) as db:
+                         existing = db.execute('SELECT state FROM customer_case_actions WHERE workspace=? AND case_id=? AND reply_id=? AND kind=?',
+                                               (workspace,case_id,reply_id,kind)).fetchone()
+                     if existing:
+@@ -315,7 +315,7 @@
+                 raise RuntimeError('IMAP_INBOX_UNAVAILABLE')
+             typ, response = imap.response('UIDVALIDITY')
+             uidvalidity = str(response[0].decode() if isinstance(response[0], bytes) else response[0]) if typ == 'OK' and response and response[0] else 'unknown'
+-            with self.store.transaction() as db:
++            with self.store.transaction(write=False) as db:
+                 row = db.execute('SELECT uidvalidity,last_uid FROM customer_mail_cursor WHERE workspace=? AND mailbox_id=?', (workspace, mailbox_id)).fetchone()
+             last = row[1] if row and row[0] == uidvalidity else 0
+             if last:
+--- a/workflow_api/procurement.py
++++ b/workflow_api/procurement.py
+@@ -335,7 +335,7 @@
+         return result
+ 
+     def tick(self):
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             rows=db.execute("SELECT rowid,workspace,project,body FROM procurement_jobs WHERE rowid>? AND json_extract(body,'$.phase') "
+                             "NOT IN ('COMPLETED','SHORTLIST_REVIEW','NEEDS_CLARIFICATION') "
+                             "AND (json_extract(body,'$.phase')!='STOPPED' OR json_extract(body,'$.fulfilment_policy.revision')=1) "
+--- a/workflow_api/procurement_quotes.py
++++ b/workflow_api/procurement_quotes.py
+@@ -143,7 +143,7 @@
+ 
+     def purchase_authority(self,approval,target,operation):
+         workspace,project=target['workspace_id'],target['project_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row=db.execute('SELECT body FROM procurement_policy_proofs WHERE workspace=? AND project=? AND id=?',
+                            (workspace,project,approval['record_id'])).fetchone()
+         if not row:return False
+@@ -163,7 +163,7 @@
+             return run['status']=='completed' and any(a['status']=='approved' for a in run['approvals'])
+         if proof['mode']!='published_simulation_policy' or not job['plan']['simulation'] or not self.automatic(job):return False
+         if not settings.get('purchasing_limit'):return False
+-        with self.workflows.store.transaction() as db:
++        with self.workflows.store.transaction(write=False) as db:
+             row=db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version=?',
+                            (workspace,owner['workflow_id'],owner['version'])).fetchone()
+         workflow=json.loads(row[0]) if row else {}
+@@ -243,7 +243,7 @@
+ 
+     def process_quote(self,workspace,job,rfq,message,auth):
+         project=job['plan']['project_id'];mid=message['message_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             existing=db.execute('SELECT body FROM procurement_quote_messages WHERE workspace=? AND project=? AND message=?',(workspace,project,mid)).fetchone()
+         if existing:return
+         text=fresh_text(message.get('text',''))
+--- a/workflow_api/procurement_fulfilment.py
++++ b/workflow_api/procurement_fulfilment.py
+@@ -226,7 +226,7 @@
+ 
+     def process_fulfilment_message(self, workspace, job, po, message, role, auth):
+         project = job['plan']['project_id']; mid = message['message_id']
+-        with self.store.connection() as db:
++        with self.store.connection(write=False) as db:
+             row = db.execute('SELECT body FROM procurement_fulfilment_messages WHERE workspace=? AND project=? AND po=? AND message=?', (workspace, project, po['record_id'], mid)).fetchone()
+         if row: state = json.loads(row[0])
+         else:

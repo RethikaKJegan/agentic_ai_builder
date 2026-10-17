@@ -1,0 +1,5 @@
+# Phase 3: confirmed UI actions
+
+Implement correction-plan sections 8–11. Separate save, validate, submit for approval, approve, publish and activate; preserve server authority, Registry checks, optimistic version conflicts and idempotency. Protect unsaved/in-flight edits and navigation. Replace run prompts with typed schema-driven input, permissions, cancellation and run links. Persist settings only after canonical server confirmation. Distinguish configuration from real read-only connectivity verification. Inventory every interactive control with handlers, permissions, state changes, endpoints, feedback and verification.
+
+Preserve Phase 1/2 and all preexisting edits. Google Workspace remains deferred, public development API stays closed, SQLite remains live. No shared v1 contract shapes change; approval submission and workspace/integration transport additions use documented additive envelopes. No test triggers live email, model or connector writes. Show exact existing-code patches before applying them. Build in an isolated frontend directory before a controlled rollout.

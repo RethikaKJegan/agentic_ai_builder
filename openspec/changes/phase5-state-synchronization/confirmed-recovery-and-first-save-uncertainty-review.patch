@@ -1,0 +1,49 @@
+--- a/frontend/src/domain/store.ts
++++ b/frontend/src/domain/store.ts
+@@ -80,7 +80,7 @@
+           const existing=workflows.get(document.workflow_id);
+           if(olderDocument(document,existing?.canonical))continue;
+           if(existing && hasWorkflowEdits(existing,state.agents)){
+-            if(existing.canonical && stableSnapshot(existing.canonical)!==stableSnapshot(document) && (!existing.remote || (document.version>=existing.remote.version && stableSnapshot(existing.remote)!==stableSnapshot(document)))){
++            if((!existing.canonical || stableSnapshot(existing.canonical)!==stableSnapshot(document)) && (!existing.remote || (document.version>=existing.remote.version && stableSnapshot(existing.remote)!==stableSnapshot(document)))){
+               workflows.set(existing.id,{...existing,remote:structuredClone(document)});changed=true;
+             }
+             continue;
+--- a/frontend/src/features/builder/Builder.tsx
++++ b/frontend/src/features/builder/Builder.tsx
+@@ -450,7 +450,7 @@
+   return (
+     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+       <LifecycleJourney workflow={current} />
+-      <DraftConflict workflow={current} />
++      <DraftConflict workflow={current} recoveryOnly={sync.storageFailed} />
+       <ApiFeedback error={sync.error} />
+       {sync.storageFailed&&<p role="alert" className="border-b p-3 text-xs text-destructive">A browser draft backup could not be written. Keep this tab open and export your working draft before leaving.</p>}
+       <div role="tablist" aria-label="Workflow view" className="flex shrink-0 flex-wrap gap-2 border-b border-border px-4 py-2">
+--- a/frontend/src/features/workflows/WorkflowControls.tsx
++++ b/frontend/src/features/workflows/WorkflowControls.tsx
+@@ -1,5 +1,5 @@
+ "use client";
+-import { useRef, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { InputError } from "@/api/feedback";
+ import { api, ApiError } from "@/api/client";
+ import { useBackend } from "@/api/state";
+@@ -24,6 +24,8 @@
+   const [error, setError] = useState<Error>(); const [message, setMessage] = useState("");
+   useUnsavedWorkflow(workflow.id);
+   const version = workflow.serverVersion; const document = workflow.canonical;
++  const failedAt=useRef<{document:Workflow["canonical"]}|null>(null);
++  useEffect(()=>{if(failedAt.current && failedAt.current.document!==document){failedAt.current=null;setError(undefined);}},[document]);
+   const dirty = hasWorkflowEdits(workflow, agents);
+   let graphError = "";
+   try { assertWorkflowReferences(toCanonical(workflow, agents)); } catch (caught) { graphError = caught instanceof Error ? caught.message : "Complete the workflow configuration."; }
+@@ -65,7 +67,7 @@
+         setMessage(`${labels[action]} confirmed · v${result.workflow.version} · ${result.workflow.status}`);
+       }
+       await backend.refreshOverview();
+-    } catch (caught) { setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); if(caught instanceof ApiError && caught.error.error_code==="REVISION_CONFLICT"){try{const latest=await api.request("get_workflow",{workflow_id:workflow.id});useMesh.getState().observeWorkflows([latest.workflow]);}catch{/* Existing error and working draft remain visible. */}} }
++    } catch (caught) { failedAt.current={document:useMesh.getState().workflows.find(w=>w.id===workflow.id)?.canonical}; setError(caught instanceof Error ? caught : new Error("The action could not be confirmed.")); if(caught instanceof ApiError && caught.error.error_code==="REVISION_CONFLICT"){try{const latest=await api.request("get_workflow",{workflow_id:workflow.id});useMesh.getState().observeWorkflows([latest.workflow]);}catch{/* Existing error and working draft remain visible. */}} }
+     finally { pending.current = false; setBusy(""); }
+   };
+   const timestamp = document?.metadata["updated_at"];
