@@ -75,6 +75,10 @@ class ProviderTriggerSource:
         grant = next((item for item in grants if item["tool_id"] == tool_id), None)
         if grant is None:
             raise ValueError("poll tool is not authorized")
+        if binder := getattr(self.service, 'bind_google_connector', None):
+            bind = getattr(connector, 'bind_workflow', None)
+            if callable(bind): connector = bind(workflow)
+            connector = binder(connector, workflow, {}, auth, grant)
         resource_id = binding["resource_id"]
         if resource_id == "configured_default":
             resource_id = self.default_resources.get(provider)

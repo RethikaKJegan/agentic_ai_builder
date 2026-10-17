@@ -1,3 +1,5 @@
+import { relationshipViewSchema } from "./data-relationships";
+import { databaseConnectionSchema, databaseConnectionsSchema, databaseMetadataSchema, type DatabaseConfig } from "./data-sources";
 import { safeError } from "./feedback";
 import { z } from "zod";
 import { assertWorkflowReferences } from "./control";
@@ -79,6 +81,9 @@ export type RegistryReview = z.infer<typeof registryReviewSchema>;
 export type ApprovalRecord = z.infer<typeof approvalRecordSchema>;
 export type RunRecord = z.infer<typeof runData>["run"];
 
+export const GoogleConnectionSchema=z.object({connection_id:z.string().regex(/^gc_[a-f0-9]{32}$/),account_email:z.string(),granted_scopes:z.array(z.string()),status:z.enum(["connected","verification_failed","reconnect_required","disconnected"]),revision:z.number().int().positive(),created_at:z.string(),updated_at:z.string(),last_verified_at:z.string().nullable(),last_error_code:z.string().nullable(),capabilities:z.record(z.string(),z.boolean())});
+export type GoogleConnection=z.infer<typeof GoogleConnectionSchema>;
+
 export class ApiError extends Error {
   public readonly error: SafeError;
   constructor(error: SafeError, public readonly correlationId?: string, public readonly context: {httpStatus?:number;outcome?:"unknown"|"rejected"} = {}) { const sanitized=safeError(error);super(sanitized.message);this.error=sanitized; }
@@ -128,6 +133,34 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async relationships(action?: "build" | "review" | "annotation", itemId?: string, body?: object) {
+    const path = action === "build" ? "data-relationships/build" : action ? `data-relationships/${action}/${encodeURIComponent(itemId ?? "")}` : "data-relationships";
+    const parsed = relationshipViewSchema.safeParse(await this.read(path, action ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body ?? {})} : undefined));
+    if (!parsed.success) return fail("INVALID_API_DATA", "The relationship response is invalid.");
+    return parsed.data;
+  }
+
+  async dataSources() {
+    const parsed=databaseConnectionsSchema.safeParse(await this.read("data-sources"));
+    if(!parsed.success)return fail("INVALID_API_DATA","The database connection response is invalid.");
+    return parsed.data;
+  }
+  async databaseMetadata(connectionId:string) {
+    const parsed=databaseMetadataSchema.safeParse(await this.read(`data-sources/${encodeURIComponent(connectionId)}/metadata`));
+    if(!parsed.success)return fail("INVALID_API_DATA","The database metadata response is invalid.");
+    return parsed.data;
+  }
+  async connectDatabase(config:DatabaseConfig,test=false,connectionId?:string) {
+    const result=await this.read(test?"data-sources/test":connectionId?`data-sources/${encodeURIComponent(connectionId)}/credentials`:"data-sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(config)});
+    const parsed=(test?z.object({success:z.boolean(),message:z.string()}):databaseConnectionSchema).safeParse(result);
+    if(!parsed.success)return fail("INVALID_API_DATA","The database connection result is invalid.");
+    return parsed.data;
+  }
+  async databaseAction(connectionId:string,action:"verify"|"refresh-metadata"|"disconnect") {
+    const parsed=databaseConnectionSchema.safeParse(await this.read(`data-sources/${encodeURIComponent(connectionId)}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The database action result is invalid.");
+    return parsed.data;
+  }
   private sessionRecovery: Promise<boolean> | null = null;
   private sessionGeneration = 0;
   private sessionMode: string | null = null;
@@ -242,6 +275,30 @@ export class WorkflowClient {
     if (!parsed.success || parsed.data.value !== value) return fail("INVALID_API_DATA", "The setting save was not confirmed.");
     return parsed.data;
   }
+  async googleToolCheckDraft(connectionId:string,toolId:string,inputs:Record<string,unknown>,sheetTargets:unknown[]=[]) {
+    const parsed=workflowData.safeParse(await this.read('integrations/google/tool-check-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({connection_id:connectionId,tool_id:toolId,inputs,sheet_targets:sheetTargets})}));
+    if(!parsed.success)return fail('INVALID_API_DATA','The Google tool-check draft was not confirmed.');
+    return parsed.data;
+  }
+  async googleConnections() {
+    const result=z.object({configured:z.boolean(),setup_message:z.string().nullable(),callback_uri:z.string().nullable(),callback_in_client_file:z.boolean(),shared_demo_identity:z.boolean(),capabilities:z.array(z.string()),items:z.array(GoogleConnectionSchema)}).safeParse(await this.read("integrations/google/connections"));
+    if(!result.success)return fail("INVALID_API_DATA","The Google connection list is invalid.");
+    return result.data;
+  }
+  async authorizeGoogle(capabilities:string[],connectionId?:string) {
+    const path=connectionId?`integrations/google/connections/${encodeURIComponent(connectionId)}/authorize`:"integrations/google/authorize";
+    const result=z.object({authorization_url:z.string().url()}).safeParse(await this.read(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({capabilities})}));
+    if(!result.success)return fail("INVALID_API_DATA","Google authorization could not be started.");
+    const target=new URL(result.data.authorization_url);
+    if(target.origin!=="https://accounts.google.com"||target.pathname!=="/o/oauth2/v2/auth")return fail("INVALID_API_DATA","The Google authorization destination is invalid.");
+    return result.data;
+  }
+  async googleConnectionAction(connectionId:string,action:"verify"|"disconnect") {
+    const result=GoogleConnectionSchema.safeParse(await this.read(`integrations/google/connections/${encodeURIComponent(connectionId)}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}));
+    if(!result.success)return fail("INVALID_API_DATA","The Google connection action could not be confirmed.");
+    return result.data;
+  }
+
   async integrationCheck(provider: string, mode: "configuration" | "connection" = "configuration") {
     const parsed = z.object({ provider: z.string(), configured: z.boolean(), verified: z.boolean(), tested: z.boolean(),
       state: z.enum(["not_configured", "configured", "verified", "connection_failed"]), live_test_supported: z.boolean(), message: z.string() })

@@ -74,6 +74,7 @@ import { ExecutionView } from "./ExecutionView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { dependencyOrder, graphIssues } from "@/domain/graph-review";
 import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
+import { GoogleWorkflowConnection } from "@/features/workflows/GoogleWorkflowConnection";
 import { PlanReview } from "@/features/workflows/PlanReview";
 
 import { useDraftSync } from "@/features/workflows/useDraftSync";
@@ -453,6 +454,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
         <StatusPill status={current.status==='published'?`v${current.serverVersion??1} published`:current.status} tone={current.status==='published'?'success':'neutral'}/>
         <Dialog><DialogTrigger className="shrink-0 rounded-lg border px-3 py-2 text-xs hover:bg-muted">Workflow details</DialogTrigger>
           <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>Workflow details</DialogTitle></DialogHeader>
+            <GoogleWorkflowConnection workflow={current}/>
             <section><PlanReview workflow={{...current,nodes:clean(nodes),edges}} /></section>
             <section><h2 className="mb-2 text-sm font-semibold">Lifecycle and release</h2><LifecycleJourney workflow={current}/></section>
           </DialogContent>

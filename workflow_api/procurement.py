@@ -292,7 +292,10 @@ class ProcurementPlanner:
                 if getattr(response,'status','completed')!='completed': raise ValueError('Incomplete plan')
                 plan=json.loads(response.output_text); reject_secrets(plan)
                 normalize_generated_plan(plan,catalogs)
-                plan['project_id']='project_'+hashlib.sha256(objective.encode()).hexdigest()[:24]
+                project_identity=objective
+                if context.get('google_connection_id'):
+                    project_identity+='\n[google-connection:'+context['google_connection_id']+']'
+                plan['project_id']='project_'+hashlib.sha256(project_identity.encode()).hexdigest()[:24]
                 validate_plan(plan,catalogs)
                 w=start_workflow(plan,objective); w['metadata']['sheet_catalog']=catalog_snapshot(catalogs)
                 return w
@@ -389,6 +392,9 @@ class IntegratedProcurement(RFQProjectionRecovery, ProcurementFulfilment, Procur
                                           job.get('discovery_plan',{}).get('action_mode')=='automatic')
 
     def run_action(self,workspace,job,name,workflow,auth):
+        tools = getattr(self.workflows, 'google_tools', None)
+        if tools:
+            workflow = tools.inherit(workspace, job, workflow)
         if name in job.get('rfq_projection_recovery',{}):
             workflow=deepcopy(workflow);workflow['workflow_id']+='_reconcile1';name+='_reconcile1'
         if self.automatic(job):
@@ -639,7 +645,7 @@ def install(app, settings, env, client, model, auth):
                 require(len(edges)==1 and edges[0].get('outcome')=='approved' and nodes[edges[0]['source']]['kind']=='approval','APPROVAL_REQUIRED')
     service.configuration_validator=validate
     original=service.planner.provider
-    service.planner=PlannerService(ProcurementPlanner(original,client,model,runner.connectors['google_sheets_read_rows'].discover))
+    service.planner=PlannerService(ProcurementPlanner(original,client,model,lambda resource: service.google_tools.discover(runner.connectors['google_sheets_read_rows'],resource)))
     register_routes(app,procurement,app.state.workflow_auth)
     from fastapi.responses import JSONResponse
     from uuid import uuid4

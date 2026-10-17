@@ -5,15 +5,15 @@
 4 silly config load:file:/home/raf/agentic-ai-builder/frontend/.npmrc
 5 silly config load:file:/home/raf/.npmrc
 6 silly config load:file:/home/raf/agentic-ai-builder/frontend/etc/npmrc
-7 verbose title npm run lint
-8 verbose argv "--prefix" "frontend" "run" "lint"
-9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T11_55_56_753Z-
-10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T11_55_56_753Z-debug-0.log
+7 verbose title npm test
+8 verbose argv "--prefix" "frontend" "test"
+9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T22_06_58_086Z-
+10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T22_06_58_086Z-debug-0.log
 11 silly logfile start cleaning logs, removing 1 files
 12 silly logfile done cleaning log files
 13 verbose cwd /home/raf/agentic-ai-builder
 14 verbose os Linux 6.17.0-1018-azure
 15 verbose node v22.23.3
 16 verbose npm  v10.9.9
-17 verbose exit 0
-18 info ok
+17 verbose exit 1
+18 verbose code 1

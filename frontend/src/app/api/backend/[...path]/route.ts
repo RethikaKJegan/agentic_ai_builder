@@ -5,7 +5,7 @@ import { containsSecret } from "@/api/client";
 
 export const dynamic = "force-dynamic";
 const safeId = (value: string | null) => value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
-const cookieNames = new Set(["builder_dev_session", "__Secure-builder_session", "__Secure-builder_login"]);
+const cookieNames = new Set(["builder_dev_session", "__Secure-builder_session", "__Secure-builder_login", "builder_google_oauth"]);
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   let reference = safeId(request.headers.get("x-request-id")) || safeId(request.nextUrl.searchParams.get("request_id")) || `req_${crypto.randomUUID()}`;
   const correlation = safeId(request.headers.get("x-correlation-id")) || reference;
@@ -18,11 +18,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (!path.length || path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) return error("INVALID_ROUTE", "Use a supported API route.", 400);
   const route = path.join("/");
   const webhook = route.startsWith("webhooks/");
+  const googleCallback = route === "integrations/google/callback" && request.method === "GET";
   const origin = request.headers.get("origin");
   // NextURL rewrites loopback IPs to localhost; Host retains the actual browser origin.
   const requestOrigin = request.headers.get('host') ? `${request.nextUrl.protocol}//${request.headers.get('host')!.toLowerCase()}` : request.nextUrl.origin;
   if (!config.origins.includes(requestOrigin) || (origin && (!config.origins.includes(origin) || origin !== requestOrigin)) ||
-      (!webhook && request.headers.get("sec-fetch-site") === "cross-site")) return error("ORIGIN_NOT_AUTHORIZED", "This request origin is not authorized.", 403);
+      (!webhook && !googleCallback && request.headers.get("sec-fetch-site") === "cross-site")) return error("ORIGIN_NOT_AUTHORIZED", "This request origin is not authorized.", 403);
   if (process.env['BUILDER_ENVIRONMENT'] === 'production' && !webhook && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !origin)
     return error("ORIGIN_NOT_AUTHORIZED", "An authorized same-origin request is required.", 403);
   const declared = request.headers.get("content-length");
@@ -75,13 +76,15 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const name = cookie.split('=', 1)[0];
       if (name && cookieNames.has(name)) resultHeaders.append('set-cookie', cookie);
     }
-    if ([302, 303].includes(response.status) && ['auth/login', 'auth/callback'].includes(route)) {
+    if ([302, 303].includes(response.status) && ['auth/login', 'auth/callback', 'integrations/google/callback'].includes(route)) {
       const location = response.headers.get('location');
       if (!location) return error('API_INVALID_CONTRACT', 'The login response is invalid.', 502);
       const target = new URL(location);
       if (!(route === 'auth/login' && target.origin === 'https://accounts.google.com' && target.pathname === '/o/oauth2/v2/auth') &&
-          !(route === 'auth/callback' && config.origins.includes(target.origin) && target.pathname === '/app')) return error('API_INVALID_CONTRACT', 'The login destination is invalid.', 502);
+          !(route === 'auth/callback' && config.origins.includes(target.origin) && target.pathname === '/app') &&
+          !(googleCallback && (config.origins.includes(target.origin) || target.origin === config.googleReturnOrigin) && target.pathname === '/app/integrations' && ['connected','cancelled','expired','account_mismatch','failed'].includes(target.searchParams.get('google') || ''))) return error('API_INVALID_CONTRACT', 'The login destination is invalid.', 502);
       resultHeaders.set('location', location);
+      resultHeaders.set('Referrer-Policy', 'no-referrer');
       return new NextResponse(null, { status: response.status, headers: resultHeaders });
     }
     if (response.headers.get('content-type')?.includes('text/event-stream')) {

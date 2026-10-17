@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/data-sources-v1",
+  "title": "Cloud data source metadata v1",
+  "$defs": {
+    "connection": {
+      "type": "object",
+      "required": [
+        "connection_id",
+        "name",
+        "engine",
+        "host",
+        "database",
+        "description",
+        "mode",
+        "connection_status",
+        "profiling_status",
+        "created_at",
+        "updated_at",
+        "schemas",
+        "generation",
+        "metadata_revision",
+        "last_verified_at",
+        "last_profiled_at",
+        "last_error_code",
+        "last_error_message"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "engine": {
+          "enum": [
+            "mongodb",
+            "postgresql"
+          ]
+        },
+        "host": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "connection_status": {
+          "enum": [
+            "connected",
+            "unreachable",
+            "authentication_failed",
+            "disconnected"
+          ]
+        },
+        "profiling_status": {
+          "enum": [
+            "queued",
+            "running",
+            "ready",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metadata_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_verified_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_profiled_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_error_message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "required": [
+        "field_id",
+        "name",
+        "types",
+        "discovery_method"
+      ],
+      "properties": {
+        "field_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "discovery_method": {
+          "enum": [
+            "declared",
+            "sampled"
+          ]
+        },
+        "native_type": {
+          "type": "string"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "default_expression": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "present_in_samples": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "dataset": {
+      "type": "object",
+      "required": [
+        "dataset_id",
+        "name",
+        "database",
+        "schema",
+        "kind",
+        "fields",
+        "indexes",
+        "constraints",
+        "sample_count",
+        "discovery_method"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "discovery_method": {
+          "type": "string"
+        },
+        "schema": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "has_validation_rules": {
+          "type": "boolean"
+        },
+        "validation_schema_json": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "connection_id",
+        "engine",
+        "revision",
+        "discovered_at",
+        "datasets",
+        "warnings",
+        "coverage",
+        "limits",
+        "changes"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string"
+        },
+        "engine": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "discovered_at": {
+          "type": "string"
+        },
+        "datasets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dataset"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverage": {
+          "enum": [
+            "declared",
+            "sampled",
+            "partial"
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "changes": {
+          "type": "object",
+          "required": [
+            "added",
+            "removed",
+            "changed"
+          ],
+          "properties": {
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "connection",
+    "snapshot"
+  ],
+  "properties": {
+    "connection": {
+      "$ref": "#/$defs/connection"
+    },
+    "snapshot": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/snapshot"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

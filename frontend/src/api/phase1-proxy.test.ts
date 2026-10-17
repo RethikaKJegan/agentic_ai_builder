@@ -126,3 +126,29 @@ it('forwards signed Slack webhook bytes unchanged and preserves verification cha
   expect(new TextDecoder().decode(options.body as Uint8Array)).toBe(raw);
   expect(new Headers(options.headers).get('x-slack-signature')).toBe('v0=signed');
 });
+
+it('allows only the Google GET callback cross-site and preserves its binding cookie', async () => {
+  const callback='integrations/google/callback';
+  const fetch=vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'http://127.0.0.1:3001/app/integrations?google=cancelled','set-cookie':'builder_google_oauth=; Path=/api/backend/integrations/google; Max-Age=0; HttpOnly; SameSite=Lax'}}));vi.stubGlobal('fetch',fetch);
+  const result=await GET(new NextRequest(base+callback+'?state=opaque&error=access_denied',{headers:{'sec-fetch-site':'cross-site',cookie:'builder_google_oauth=bound; unrelated=drop'}}),context(callback));
+  expect(result.status).toBe(303);expect(result.headers.get('referrer-policy')).toBe('no-referrer');
+  expect(new Headers(fetch.mock.calls[0]![1].headers).get('cookie')).toBe('builder_google_oauth=bound');
+  expect(result.headers.get('set-cookie')).toContain('builder_google_oauth=');
+  fetch.mockClear();
+  const denied=await GET(new NextRequest(base+'workflows',{headers:{'sec-fetch-site':'cross-site'}}),context('workflows'));
+  expect(denied.status).toBe(403);expect(fetch).not.toHaveBeenCalled();
+});
+
+it('rejects a Google callback redirect outside the configured integrations destination',async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'https://evil.example/app/integrations?google=connected'}})));
+  const result=await GET(new NextRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
+  expect(result.status).toBe(502);
+});
+
+it('supports an explicitly configured public Google return through the loopback gateway',async()=>{
+  vi.stubEnv('BUILDER_GOOGLE_RETURN_ORIGIN','https://praxi.bellcorpstudio.com');
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'https://praxi.bellcorpstudio.com/app/integrations?google=expired'}})));
+  const result=await GET(new NextRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
+  expect(result.status).toBe(303);
+  expect(result.headers.get('location')).toBe('https://praxi.bellcorpstudio.com/app/integrations?google=expired');
+});

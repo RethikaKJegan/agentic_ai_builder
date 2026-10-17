@@ -5,10 +5,10 @@
 4 silly config load:file:/home/raf/agentic-ai-builder/frontend/.npmrc
 5 silly config load:file:/home/raf/.npmrc
 6 silly config load:file:/home/raf/agentic-ai-builder/frontend/etc/npmrc
-7 verbose title npm run test
-8 verbose argv "--prefix" "frontend" "run" "test"
-9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T11_55_35_441Z-
-10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T11_55_35_441Z-debug-0.log
+7 verbose title npm run typecheck
+8 verbose argv "--prefix" "frontend" "run" "typecheck"
+9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T22_26_38_779Z-
+10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-17T22_26_38_779Z-debug-0.log
 11 silly logfile start cleaning logs, removing 1 files
 12 silly logfile done cleaning log files
 13 verbose cwd /home/raf/agentic-ai-builder

@@ -16,8 +16,14 @@ export function backendConfig() {
     if (url.origin !== origin || url.username || url.password || !['http:', 'https:'].includes(url.protocol) ||
         (production ? url.protocol !== 'https:' : !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Configure exact authorized UI origins.');
   }
+  const googleReturnOrigin = process.env['BUILDER_GOOGLE_RETURN_ORIGIN'];
+  if (googleReturnOrigin) {
+    const target = new URL(googleReturnOrigin);
+    if (target.origin !== googleReturnOrigin || target.username || target.password ||
+        (target.protocol !== 'https:' && !(target.protocol === 'http:' && ['localhost','127.0.0.1'].includes(target.hostname)))) throw new Error('Configure an exact Google OAuth return origin.');
+  }
   const plannerSeconds = Number(process.env['BUILDER_PLANNER_TIMEOUT_SECONDS'] || 180);
   // LivePlannerProvider may make two generation attempts, each with a correction.
   if (!Number.isInteger(plannerSeconds) || plannerSeconds < 30 || plannerSeconds > 300) throw new Error('Invalid planner deadline.');
-  return { upstream, origins, normalTimeout: 30_000, plannerTimeout: plannerSeconds * 4_000 + 30_000, maxBody: 2 * 1024 * 1024 };
+  return { upstream, origins, googleReturnOrigin, normalTimeout: 30_000, plannerTimeout: plannerSeconds * 4_000 + 30_000, maxBody: 2 * 1024 * 1024 };
 }

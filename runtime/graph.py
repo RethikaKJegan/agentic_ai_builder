@@ -153,6 +153,8 @@ class GraphRunner:
         bind_run = getattr(connector, 'bind_run', None)
         if callable(bind_run):
             connector = bind_run(workflow, run)
+        if binder := getattr(runtime.workflows, 'bind_google_connector', None):
+            connector = binder(connector, workflow, run, auth, grant)
         direct = grant['tool_id'] in self.direct_write_tools and grant.get('approval_required') is False
         if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or (not passed and not direct)):
             raise RuntimeFailure('APPROVAL_REQUIRED', 'External writes require workflow policy and run approval.', 403)
@@ -306,7 +308,8 @@ class GraphRunner:
                         if not dynamic:
                             self.reserve(db, run, workflow, agent, reservation)
                         run['node_states'][node['node_id']] = 'executing'
-                        runtime.event(db, run, 'node.started', {'node_id': node['node_id'], 'invocation_id': invocation_id})
+                        runtime.event(db, run, 'node.started', {'node_id': node['node_id'], 'invocation_id': invocation_id,
+                            **({'google_connection': invocation[0].google_connection_info} if getattr(invocation[0], 'google_connection_info', None) else {})})
                         runtime.save(db, run)
                 except (RuntimeFailure, RegistryError) as failure:
                     self.fail(db, run, failure.code, blocked=True)

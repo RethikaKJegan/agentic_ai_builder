@@ -1,6 +1,6 @@
 import { useNavigate } from "@/lib/navigation";
 import { useEffect } from "react";
-import { Activity, Bot, BookOpen, History, Inbox, LayoutGrid, Plug, Plus, Settings, ShieldCheck, Store, Workflow as WfIcon } from "lucide-react";
+import { Database, Activity, Bot, BookOpen, History, Inbox, LayoutGrid, Plug, Plus, Settings, ShieldCheck, Store, Workflow as WfIcon } from "lucide-react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useMesh } from "@/domain/store";
 
@@ -41,6 +41,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/agents" }))}><Bot className="mr-2 h-4 w-4" /> Agents</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/marketplace" }))}><Store className="mr-2 h-4 w-4" /> Marketplace</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/integrations" }))}><Plug className="mr-2 h-4 w-4" /> Integrations</CommandItem>
+          <CommandItem onSelect={() => go(() => navigate({ to: "/app/data-intelligence" }))}><Database className="mr-2 h-4 w-4" /> Data Intelligence</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/knowledge" }))}><BookOpen className="mr-2 h-4 w-4" /> Knowledge</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/approvals" }))}><Inbox className="mr-2 h-4 w-4" /> Approvals</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/runs" }))}><History className="mr-2 h-4 w-4" /> Runs</CommandItem>

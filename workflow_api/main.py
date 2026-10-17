@@ -30,7 +30,7 @@ ROLE_PERMISSIONS = {
 
 def create_app(service=None, dev_auth=None, roles=None, database=None, planning_available=None, registry_config=None,
                runtime_enabled=None, lifecycle_adapter=None, trigger_secrets=None, start_workers=True,
-               ui_origins=None, environment_name=None, planner_timeout_seconds=180, planning_worker_enabled=True):
+               ui_origins=None, environment_name=None, planner_timeout_seconds=180, planning_worker_enabled=True, google_oauth_config=None):
     enabled = dev_auth if dev_auth is not None else os.getenv('BUILDER_DEV_AUTH') == '1'
     mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
     allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
@@ -90,11 +90,14 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
 
     @app.on_event('startup')
     def start_planning():
-        if planning_worker_enabled:planning_jobs.start()
+        if planning_worker_enabled:
+            planning_jobs.start()
+            app.state.data_source_worker.start()
 
     @app.on_event('shutdown')
     async def stop_workers():
         planning_jobs.stop()
+        app.state.data_source_worker.stop()
         for worker in app.state.workers:
             worker.stop()
 
@@ -108,6 +111,16 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             return error('PROCUREMENT_UNAVAILABLE', 'Procurement is unavailable in this backend. Enable BUILDER_PROCUREMENT_ENABLED=1 and restart scripts/run_live_backend.py on the frontend configured port.', 503)
         return error('API_ROUTE_UNAVAILABLE', 'This API route is unavailable. Restart the configured Builder backend with the current code.', exc.status_code)
 
+    from .google_connection_routes import install as install_google_connections
+    install_google_connections(app, workflow_service, auth, google_oauth_config or dict(os.environ), lambda: request_reference.get() or f'req_{uuid4().hex}')
+    from .google_tools import install as install_google_tools
+    install_google_tools(workflow_service, app.state.google_connections)
+    from .google_tool_routes import install as install_google_tool_routes
+    install_google_tool_routes(app, workflow_service, auth, lambda: request_reference.get() or f'req_{uuid4().hex}')
+
+    from .data_source_routes import install as install_data_sources
+    install_data_sources(app, workflow_service, auth, google_oauth_config or dict(os.environ), lambda: request_reference.get() or f'req_{uuid4().hex}')
+
     @app.middleware('http')
     async def protect(request, call_next):
         candidate = request.headers.get('x-request-id', '')
@@ -117,15 +130,19 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         correlation = candidate_correlation if re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', candidate_correlation) else reference
         correlation_token = request_correlation.set(correlation)
         try:
+            google_callback = request.method == 'GET' and request.url.path == '/integrations/google/callback'
+            if google_callback:
+                request.state.google_oauth_query = dict(request.query_params)
+                request.scope['query_string'] = b''  # Keep authorization codes out of upstream access logs.
             host = request.url.hostname
             origin = request.headers.get('origin')
             if origin and origin not in allowed_origins:
                 response = error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
             elif not enabled:
                 response = error('AUTHENTICATION_REQUIRED', 'Authentication is not configured. Enable development authentication only for local use.', 401)
-            elif host not in {'localhost', '127.0.0.1', '::1', 'testserver'} or request.headers.get('sec-fetch-site') == 'cross-site':
+            elif host not in {'localhost', '127.0.0.1', '::1', 'testserver'} or (request.headers.get('sec-fetch-site') == 'cross-site' and not google_callback):
                 response = error('DEVELOPMENT_AUTH_LOCAL_ONLY', 'Development sessions are restricted to loopback hosts and origins.', 403)
-            elif request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
+            elif not google_callback and request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
                 response = error('AUTHENTICATION_REQUIRED', 'Your local session expired or is invalid. Reopen the workspace to recover it.', 401)
             else:
                 response = await call_next(request)

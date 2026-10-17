@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://builder.local/contracts/data-sources/query-plan-v1",
+  "type": "object",
+  "properties": {
+    "base_dataset_id": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "joins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "relationship_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "target_dataset_id": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "relationship_id",
+          "target_dataset_id"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 3
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "maxItems": 30
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "op": {
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "is_null",
+              "not_null"
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "field_id",
+          "op",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 20
+    },
+    "group_by": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "maxItems": 10
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "op": {
+            "enum": [
+              "count",
+              "sum",
+              "avg",
+              "min",
+              "max"
+            ]
+          },
+          "expression": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "label",
+          "op",
+          "expression"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 10
+    },
+    "order_by": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "column": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "direction": {
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [
+          "column",
+          "direction"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 5
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "explanation": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "clarification": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "base_dataset_id",
+    "joins",
+    "fields",
+    "filters",
+    "group_by",
+    "metrics",
+    "order_by",
+    "limit",
+    "explanation",
+    "clarification"
+  ],
+  "additionalProperties": false
+}

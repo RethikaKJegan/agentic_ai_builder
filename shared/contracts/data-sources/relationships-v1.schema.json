@@ -1,0 +1,235 @@
+{
+  "type": "object",
+  "properties": {
+    "graph": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "built_at": {
+              "type": "string"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "connection_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "connection_id",
+                  "revision",
+                  "generation"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "connection",
+                      "dataset",
+                      "field"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "connection_id": {
+                    "type": "string"
+                  },
+                  "parent_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "discovery_method": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "node_id",
+                  "kind",
+                  "label",
+                  "connection_id",
+                  "parent_id",
+                  "types",
+                  "discovery_method",
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "relationships": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "relationship_id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "declared",
+                      "suggested"
+                    ]
+                  },
+                  "source_dataset_id": {
+                    "type": "string"
+                  },
+                  "target_dataset_id": {
+                    "type": "string"
+                  },
+                  "field_pairs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source_field_id": {
+                          "type": "string"
+                        },
+                        "target_field_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "source_field_id",
+                        "target_field_id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "evidence_hash": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "declared",
+                      "proposed",
+                      "accepted",
+                      "rejected"
+                    ]
+                  },
+                  "reviewed_at": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "relationship_id",
+                  "kind",
+                  "source_dataset_id",
+                  "target_dataset_id",
+                  "field_pairs",
+                  "evidence",
+                  "evidence_hash",
+                  "status",
+                  "reviewed_at"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "revision",
+            "built_at",
+            "sources",
+            "nodes",
+            "relationships",
+            "warnings"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "build_status": {
+      "enum": [
+        "idle",
+        "queued",
+        "running",
+        "ready",
+        "failed"
+      ]
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "graph",
+    "stale",
+    "build_status",
+    "last_error"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/data-relationships-v1",
+  "title": "Owned metadata relationship graph v1"
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agentic-builder:integrations:google-workflow-binding:v1",
+  "title": "Selected Google connection metadata v1",
+  "description": "Additive metadata reference. Omit the field to retain the existing legacy connection. Ownership, granted scope and runtime authorization are enforced by the backend; this object carries no credentials or authority.",
+  "type": "object",
+  "properties": {"google_connection_id": {"type": "string", "pattern": "^gc_[a-f0-9]{32}$"}},
+  "additionalProperties": true
+}

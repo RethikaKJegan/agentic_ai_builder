@@ -1,0 +1,5 @@
+# Install in the backend/worker environment alongside existing requirements.
+pymongo>=4.10,<5
+dnspython>=2.6,<3
+psycopg[binary]>=3.2,<4
+cryptography>=43

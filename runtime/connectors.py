@@ -35,7 +35,9 @@ def google_spreadsheet_id(resource):
 
 
 def _google_credentials(token_file):
-    """Load and refresh an operator-managed OAuth token without leaking it."""
+    """Load an operator token or an explicitly bound server-owned credential supplier."""
+    if callable(token_file):
+        return token_file()
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request as GoogleRequest
@@ -104,11 +106,16 @@ class SMTPConnector:
                 not all(isinstance(inputs.get(k), str) for k in ('subject', 'body')) or
                 any(c in inputs['subject'] for c in '\r\n')):
             raise RuntimeFailure('DESTINATION_NOT_AUTHORIZED', 'Use one explicitly allowlisted recipient and safe message fields.', 403)
-        configuration = self.resolve(grant['credential_reference'])
         if self.routine_only:
             from .customer_automation import routine_email_allowed
             if not routine_email_allowed(inputs['body']):
                 raise RuntimeFailure('COMPENSATION_REVIEW_REQUIRED', 'A compensation commitment requires manager authorization.', 403)
+        if sender := getattr(self, 'google_sender', None):
+            output = sender(inputs, effect_id)
+            if list(Draft202012Validator(grant['output_schema']).iter_errors(output)):
+                raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'The Google send result does not match the tool schema.')
+            return output
+        configuration = self.resolve(grant['credential_reference'])
         if (configuration.get('host') not in self.allowed_hosts or configuration.get('port') != 587 or
                 not all(isinstance(configuration.get(k), str) and configuration[k] for k in ('username', 'password', 'sender')) or
                 any(c in configuration['sender'] for c in '\r\n')):
@@ -524,11 +531,7 @@ class GoogleAPIConnector(HTTPJSONConnector):
         if configuration.get('provider_id') != self.provider_id:
             raise RuntimeFailure('GOOGLE_API_NOT_CONFIGURED', 'Configure the requested Google API credential.', 503)
         try:
-            from google.oauth2.credentials import Credentials
-            from google.auth.transport.requests import Request as GoogleRequest
-            credentials = Credentials.from_authorized_user_file(str(self.token_file))
-            if not credentials.valid:
-                credentials.refresh(GoogleRequest())
+            credentials = _google_credentials(self.token_file)
             self.headers['Authorization'] = 'Bearer ' + credentials.token
             return super().invoke(grant, inputs, effect_id)
         except RuntimeFailure:

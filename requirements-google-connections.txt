@@ -1,0 +1,3 @@
+-r requirements.txt
+cryptography>=43,<47
+google-auth[requests]>=2.35,<3

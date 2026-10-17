@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agentic-builder:integrations:google-connections:v1",
+  "title": "Google connection public record v1",
+  "description": "Additive Phase 1 connection response; existing workflow, agent and tool contracts remain unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connection_id", "account_email", "granted_scopes", "status", "revision", "created_at", "updated_at", "last_verified_at", "last_error_code", "capabilities"],
+  "properties": {
+    "connection_id": {"type": "string", "pattern": "^gc_[a-f0-9]{32}$"},
+    "account_email": {"type": "string"},
+    "granted_scopes": {"type": "array", "items": {"type": "string"}},
+    "status": {"enum": ["connected", "verification_failed", "reconnect_required", "disconnected"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string"}, "updated_at": {"type": "string"},
+    "last_verified_at": {"type": ["string", "null"]}, "last_error_code": {"type": ["string", "null"]},
+    "capabilities": {"type": "object", "required": ["gmail_read", "gmail_draft", "gmail_send", "sheets_read", "sheets_write", "calendar_read", "calendar_write"], "additionalProperties": {"type": "boolean"}}
+  }
+}

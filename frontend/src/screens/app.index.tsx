@@ -1,4 +1,5 @@
 "use client";
+import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { InputError } from "@/api/feedback";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
@@ -18,6 +19,7 @@ export default function Overview() {
   const navigate = useNavigate();
   const workflows = useMesh((s) => s.workflows);
   const [description, setDescription] = useState("");
+  const [googleConnection,setGoogleConnection]=useState("");
   const generationLock = useRef(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof createWorkflow>> | null>(null);
   const [planning, setPlanning] = useState(false);
@@ -40,6 +42,7 @@ export default function Overview() {
     setPlanning(true); setPlanningJob(null); setApiError(null);
     try {
       const context = {
+        ...(googleConnection?{google_connection_id:googleConnection}:{}),
         generation_mode: "hierarchy",
         delegation_mode: "runtime_v1",
         execution_input_mode: "automatic",
@@ -67,7 +70,8 @@ export default function Overview() {
     <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-5xl font-semibold tracking-tight md:text-6xl">What should we automate today?</motion.h1>
     <p className="mt-3 text-lg text-muted-foreground">Describe your requirement in one prompt. MESH uses available sources and knowledge to draft the workflow, agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+      <div className="mb-4"><GoogleAccountSelect value={googleConnection} onChange={setGoogleConnection} disabled={planning}/></div>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="w-full resize-none border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
       <p className="mt-4 text-sm text-muted-foreground">Describe what you need. MESH identifies relevant connected sources and saved knowledge automatically. Include any additional source links or details in your prompt.</p>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&

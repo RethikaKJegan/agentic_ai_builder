@@ -23,6 +23,7 @@ export function NodeTrace({ node, trace }: { node: WorkflowNode; trace: Workflow
     {!trace.available ? <p className="text-sm text-muted-foreground">Execution traces require a connected runtime and permission to view runs.</p> : !trace.runId ? <p className="text-sm text-muted-foreground">No recorded runs for this workflow yet.</p> : !trace.run ? <p role="status" className="text-sm">{trace.loading ? "Loading execution trace…" : "Execution trace unavailable."}</p> : <>
       <p className="break-all text-xs text-muted-foreground">{trace.run.run_id} · revision v{trace.run.workflow_version}</p>
       <StatusPill status={status ?? "No recorded status"} />
+      {events.some(event=>event.details?.["google_connection"])&&<Evidence title="Google account used" value={events.find(event=>event.details?.["google_connection"])?.details?.["google_connection"]}/>}
       {!events.length && <p className="text-sm text-muted-foreground">This step has no recorded events in the selected run. It may not have been reached or may belong to a different revision.</p>}
       <p className="text-xs text-muted-foreground">{duration === undefined ? "Timing not recorded or execution pending" : `${duration} ms recorded duration`} · {retries} retries</p>
       <Evidence title="Recorded failure" value={events.filter(event => ["node.failed", "approval.rejected", "approval.timed_out"].includes(event.event_type)).at(-1)?.details} />

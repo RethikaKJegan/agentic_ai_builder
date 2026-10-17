@@ -1,0 +1,5 @@
+# Phase 3: bounded read-only data questions
+
+Connect natural-language questions to the owned Phase 1 catalog and current Phase 2 graph. Generate a strict structured plan using the configured model, show the plan before execution, then execute only compiled projections and deterministic calculations. No model-generated SQL or MongoDB programs execute.
+
+The initial release supports up to four datasets, graph-backed equality joins, scalar filters, arithmetic aggregates, grouping, sorting and explicit result limits. Accepted suggestions require fresh complete bounded key checks at execution; review alone grants no trust. Duplicate target keys, null/unmatched source keys, unsupported types, stale plans and incomplete source reads fail without results. Reads are capped at 5,000 rows per dataset and 2 MB in total; larger data requires a future pushdown executor. Row values/results are never persisted or sent to the planning model. Existing workflow/agent/tool contracts are unchanged; an additive data-query contract defines this feature. No contributor acceptance is inferred.

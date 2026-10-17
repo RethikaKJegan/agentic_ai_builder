@@ -289,7 +289,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
                      registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
                      environment_name=mode, ui_origins=allowed_origins,
-                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False)
+                     planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False, google_oauth_config=env)
     service = app.state.workflow_service
     service.background_execution=process_role=='api'
     from .integration_checks import smtp_probe
@@ -339,7 +339,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     service.trigger_poller = source.poll
     service.trigger_configuration_validator = source.validate_configuration
     service.planner = PlannerService(provider=LivePlannerProvider(model, recipients(env), client, direct_send,
-        targets, direct_write, planner_timeout, runner.connectors['google_sheets_read_rows'].discover,
+        targets, direct_write, planner_timeout, lambda resource: service.google_tools.discover(runner.connectors['google_sheets_read_rows'], resource),
         env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
     from threading import Event, Thread
     auth = operator_auth(config)
@@ -431,7 +431,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             reply_stop.set()
             if reply_thread:reply_thread.join(timeout=5)
     from .worker_control import WorkerSupervisor
-    components=[*workers,app.state.planning_jobs]
+    components=[*workers,app.state.planning_jobs,app.state.data_source_worker]
     if hasattr(service,'reply_cases'):components.append(ReplyWorker())
     supervisor=WorkerSupervisor(service.store,components,role=process_role)
     app.state.worker_supervisor=supervisor

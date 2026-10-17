@@ -55,6 +55,9 @@ class PlannerService:
             identity_objective = objective + '\n[dynamic-delegation-v1]' if workflow.get('metadata', {}).get('dynamic_delegation') else objective
             if workflow.get('metadata', {}).get('execution_input_mode') == 'automatic':
                 identity_objective += '\n[automatic-inputs-v1]'
+            selected_google = context.get('google_connection_id') if isinstance(context, dict) else None
+            if selected_google:
+                identity_objective += '\n[google-connection:' + str(selected_google) + ']'
             workflow["workflow_id"] = self._workflow_id(workspace_id, identity_objective)
             self._scope_planned_agents(workflow)
             workflow["metadata"] = {**workflow.get("metadata", {}), "contract_versions": CONTRACT_VERSIONS, "unresolved_requirements": workflow.get("metadata", {}).get("unresolved_requirements", [])}

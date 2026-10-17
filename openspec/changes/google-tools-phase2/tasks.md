@@ -1,0 +1,10 @@
+- [x] Add binding validation and account-backed runtime adapters.
+- [x] Propagate immutable bindings to procurement child actions and trigger polls.
+- [x] Add workflow account selection and tool-check draft UI.
+- [x] Verify Phase 1 regressions, isolation, scopes, adapters and UI; build and deploy.
+
+Verification: 15 selected-account tests passed, including an end-to-end native procurement fixture from ingestion through tracking, drafts and four RFQ sends with selected-account credentials and sender. Google HTTP was fake in this fixture; no live send is claimed. Existing Phase 1 and legacy procurement final checks passed (13 tests); the broader runtime/Sheets/security regression run passed 129 tests and 26 subtests before the final targeted corrections, which were covered by the subsequent selected-account suite. Frontend strict types, scoped lint, 33 focused tests, isolated production build, unchanged shared contracts, strict OpenSpec and whitespace checks passed.
+
+Deployment: frontend rollback `.local/ui-rollbacks/google-phase2-20261017-173851`; API and separate worker restarted to load revision-bound adapters. All services active. Public read-only browser checks at desktop 1366×768 and mobile 390×844 found 15 installed check operations plus placeholder, generation and revision account selectors, no mobile horizontal overflow and no page errors. Three Phase 1 connection records remain available; their identities/tokens were not printed or changed. Temporary preview port 3100 stopped. Google real-provider manual write acceptance remains for the user's chosen test resources and recipients.
+
+Implementation corrections found by targeted tests: Gmail send-only scope does not require the legacy sender-profile read when account identity is already known; procurement inheritance was merged into the existing run_action override; ScopedConnector is reconstructed explicitly to preserve its delegated active-release guard rather than using copy reconstruction hooks. Legacy behavior remains covered by the final procurement regression test.

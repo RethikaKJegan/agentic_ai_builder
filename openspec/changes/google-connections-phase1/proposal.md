@@ -1,0 +1,2 @@
+# Google connections Phase 1
+Add web OAuth connection management to the existing Integrations screen. Persist encrypted per-workspace/owner credentials, single-use browser-bound PKCE authorization sessions, actual granted scope/account identity, refresh coordination, safe verification/audit, incremental access, reconnect and local disconnect. Existing execution bindings remain unchanged. The existing shared local-development identity is explicitly not multi-user production login. Google console callback registration is an external prerequisite.

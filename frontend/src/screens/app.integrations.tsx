@@ -1,7 +1,10 @@
 "use client";
+import { DatabaseConnectionsSummary } from "@/features/data-sources/DataIntelligence";
 import { useRef, useState } from "react";
 import { api } from "@/api/client";
 import { useBackend } from "@/api/state";
+import { GoogleToolChecks } from "@/features/workflows/GoogleToolChecks";
+import { GoogleConnections } from "@/features/workflows/GoogleConnections";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 type Check = Awaited<ReturnType<typeof api.integrationCheck>>;
 export default function Integrations() {
@@ -23,6 +26,9 @@ export default function Integrations() {
   return <div className="mx-auto max-w-5xl px-6 py-10"><h1 className="text-3xl font-semibold">Integrations</h1>
     <p className="mt-2 text-sm text-muted-foreground">Configuration and verified connectivity are separate. Credentials remain on the server. Read-only checks never send email or modify provider resources.</p>
     <p className="mt-3 rounded-lg border p-3 text-sm">Setup: register each required tool, configure its server credential and source resource, review exact revision grants, then activate the published release. A configured or verified connection alone does not activate a trigger. See Monitoring for preparation, release and poll health.</p>
+    <GoogleConnections />
+    <GoogleToolChecks />
+    <DatabaseConnectionsSummary />
     <ApiFeedback error={backend.error} />
     {backend.status !== "connected" && <p role="status" className="mt-4 text-sm text-muted-foreground">Connect to the backend to inspect registered integrations.</p>}
     <div className="mt-8 grid gap-4 md:grid-cols-2">{tools.map(tool => {

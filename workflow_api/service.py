@@ -200,7 +200,15 @@ class WorkflowService:
                 trusted['payload']['auth_context'] = {
                     **auth['subject'], 'roles': auth['roles'], 'permissions': auth['permissions']}
                 from .source_context import planning_context
-                result = self.planner.plan(trusted, context_resolver=lambda context: planning_context(self.store, auth, context))
+                from contextlib import nullcontext
+                google_tools = getattr(self, 'google_tools', None)
+                scope = google_tools.planning(auth, trusted['payload'].get('context', {})) if google_tools else nullcontext(None)
+                with scope as selected_google:
+                    result = self.planner.plan(trusted, context_resolver=lambda context: planning_context(self.store, auth, context))
+                if selected_google and result.get('status', 500) < 400:
+                    result['data']['workflow'].setdefault('metadata', {})['google_connection_id'] = selected_google
+                elif result.get('status', 500) < 400:
+                    result['data']['workflow'].setdefault('metadata', {}).pop('google_connection_id', None)
                 if result['status'] >= 400:
                     error = result.get('error') or (result.get('data') or {}).get('error') or {}
                     code = error.get('error_code', 'PLANNER_PROVIDER_FAILED')
@@ -358,6 +366,8 @@ class WorkflowService:
             workflow['metadata'].pop('registry_review', None)
             workflow['metadata']['workspace_id'] = workspace
             workflow['metadata']['validation_state'] = 'not_validated'
+            if validator := getattr(self, 'validate_google_binding', None):
+                validator(workflow, auth, db)
             self.store.put(db, workspace, workflow)
             return self.envelope(request_id, 200, self.document_data(workflow, auth))
         if not current or payload.get('workflow_version') != current['version']:

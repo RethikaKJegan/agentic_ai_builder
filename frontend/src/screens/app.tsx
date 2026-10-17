@@ -2,7 +2,7 @@
 import { usePathname } from "next/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
 import { useCallback, useState, type ReactNode } from "react";
-import { Activity, History, Inbox, Settings as SettingsIcon, ShieldCheck, BookOpen, Plug, Store, Bell, Bot, ChevronsLeft, ChevronsRight, LayoutGrid, Plus, RotateCcw, Search, Workflow as WfIcon } from "lucide-react";
+import { Database, Activity, History, Inbox, Settings as SettingsIcon, ShieldCheck, BookOpen, Plug, Store, Bell, Bot, ChevronsLeft, ChevronsRight, LayoutGrid, Plus, RotateCcw, Search, Workflow as WfIcon } from "lucide-react";
 import { LogoMark } from "@/components/mesh/Logo";
 import { CommandPalette } from "@/features/shell/CommandPalette";
 import { ShortcutsDialog, useGlobalShortcuts } from "@/features/shell/Shortcuts";
@@ -28,6 +28,7 @@ const NAV = [
   ] },
   { group: "Control", items: [
     { to: "/app/integrations", label: "Integrations", icon: Plug, exact: false },
+    { to: "/app/data-intelligence", label: "Data Intelligence", icon: Database, exact: false },
     { to: "/app/knowledge", label: "Knowledge", icon: BookOpen, exact: false },
   ] },
   { group: "Operate", items: [

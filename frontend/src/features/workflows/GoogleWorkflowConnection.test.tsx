@@ -1,0 +1,16 @@
+import { cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { GoogleAccountSelect,GoogleWorkflowConnection } from './GoogleWorkflowConnection';
+import { api } from '@/api/client';
+import { useBackend } from '@/api/state';
+import { useMesh } from '@/domain/store';
+import { CanonicalWorkflowSchema } from '@/api/contracts.generated';
+const connectionId='gc_'+'b'.repeat(32);
+const record={connection_id:connectionId,account_email:'phase2@example.com',status:'connected' as const,granted_scopes:['openid','email'],revision:1,created_at:'2026-10-17',updated_at:'2026-10-17',last_verified_at:null,last_error_code:null,capabilities:{}};
+beforeEach(()=>{useBackend.setState({status:'connected',can:()=>true,refreshOverview:vi.fn().mockResolvedValue(undefined)});vi.spyOn(api,'googleConnections').mockResolvedValue({configured:true,setup_message:null,callback_uri:null,callback_in_client_file:true,shared_demo_identity:true,capabilities:[],items:[record]});useMesh.setState({workflows:[],agents:[]});});
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
+it('requires explicit account selection and retains legacy default',async()=>{const change=vi.fn();render(<GoogleAccountSelect value="" onChange={change}/>);await screen.findByRole('option',{name:/phase2@example.com/});expect(screen.getByRole('combobox')).toHaveValue('');expect(change).not.toHaveBeenCalled();fireEvent.change(screen.getByRole('combobox'),{target:{value:connectionId}});expect(change).toHaveBeenCalledWith(connectionId);});
+it('shows unavailable selected binding rather than switching to another account',async()=>{render(<GoogleAccountSelect value={'gc_'+'a'.repeat(32)} onChange={vi.fn()}/>);expect(screen.getByRole('combobox')).toHaveValue('gc_'+'a'.repeat(32));expect(screen.getByRole('option',{name:'Selected connection unavailable'})).toBeVisible();});
+it('saves binding through normal new draft revision without touching connection management',async()=>{const document=CanonicalWorkflowSchema.parse(JSON.parse(readFileSync(path.resolve(process.cwd(),'../shared/contracts/examples/workflows/support-triage.json'),'utf8')));useMesh.getState().acceptWorkflow(document);const workflow=useMesh.getState().workflows[0]!;const request=vi.spyOn(api,'request').mockImplementation(async(_op,payload)=>({workflow:{...document,version:document.version+1,status:'draft',metadata:{...document.metadata,google_connection_id:(payload as {workflow:typeof document}).workflow.metadata['google_connection_id']}}}) as never);render(<GoogleWorkflowConnection workflow={workflow}/>);await screen.findByRole('option',{name:/phase2@example.com/});fireEvent.change(screen.getByRole('combobox'),{target:{value:connectionId}});fireEvent.click(screen.getByRole('button',{name:'Save account binding'}));await waitFor(()=>expect(request).toHaveBeenCalled());expect(request.mock.calls[0]![0]).toBe('save_workflow_version');const payload=request.mock.calls[0]![1] as {workflow:typeof document};expect(payload.workflow.metadata['google_connection_id']).toBe(connectionId);expect(payload.workflow.status).toBe('draft');});
