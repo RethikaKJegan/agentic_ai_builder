@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
 import type { RefreshView } from "@/api/data-ontology";
@@ -133,7 +134,7 @@ export default function AutomaticRefresh({ canManage }: { canManage: boolean }) 
             >
               {view?.items.map((i) => (
                 <option key={i.connection_id} value={i.connection_id}>
-                  {i.name}
+                  {displayText(i.name)}
                 </option>
               ))}
             </select>
@@ -160,7 +161,7 @@ export default function AutomaticRefresh({ canManage }: { canManage: boolean }) 
           </div>
           {item.last_error_message && (
             <p role="alert" className="text-sm text-destructive">
-              {item.last_error_message} Previous successful metadata is retained. Consecutive
+              {displayText(item.last_error_message)} Previous successful metadata is retained. Consecutive
               failures: {item.consecutive_failures}; retries use backoff.
             </p>
           )}

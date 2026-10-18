@@ -7,6 +7,7 @@ import secrets
 import time
 from pathlib import Path
 from threading import Event, Thread
+from urllib.parse import urlsplit, parse_qs
 
 from cryptography.fernet import Fernet
 
@@ -16,6 +17,18 @@ from .google_connections import GoogleConnections, now
 from .service import ApiFailure
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def endpoint_identity(config):
+    """Server-only identity, independent of labels and password rotation.
+
+    Pooler usernames can identify different projects on the same hostname.
+    Keep principal, port, mode and auth database in the identity as well.
+    """
+    uri = urlsplit(config['uri'])
+    target = [config['engine'], config['host'].lower(), (uri.port or 5432) if config['engine']=='postgresql' else None,
+              uri.username, config['database'], config['mode'], parse_qs(uri.query).get('authSource', ['admin'])[0]]
+    return hashlib.sha256(json.dumps(target, separators=(',', ':')).encode()).hexdigest()
 
 
 def changes(previous, current):
@@ -55,6 +68,7 @@ class DataSources:
             db.execute('CREATE TABLE IF NOT EXISTS data_source_profile_jobs (job_id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, generation INTEGER NOT NULL, state TEXT NOT NULL, token TEXT, lease_until REAL NOT NULL, attempts INTEGER NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS data_source_snapshots (connection_id TEXT NOT NULL, revision INTEGER NOT NULL, document TEXT NOT NULL, PRIMARY KEY(connection_id,revision))')
             db.execute('CREATE TABLE IF NOT EXISTS data_source_audit (event_id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, workspace TEXT NOT NULL, owner TEXT NOT NULL, kind TEXT NOT NULL, created_at TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS data_source_identities (connection_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL)')
 
         self.relationships = DataRelationships(store)
         from .data_refresh import DataRefresh
@@ -118,10 +132,43 @@ class DataSources:
         doc={k:config[k] for k in ('name','engine','database','schemas','description','mode','host')}
         doc.update(connection_id=cid,connection_status='connected',profiling_status='queued',generation=0,metadata_revision=0,created_at=now(),updated_at=now(),last_verified_at=now(),last_profiled_at=None,last_error_code=None,last_error_message=None)
         with self.store.transaction() as db:
+            # Backfill only owned active records using their encrypted config.
+            # Legacy disconnected records have no credentials left; the explicit
+            # reconnect endpoint remains available for those records.
+            rows=db.execute('SELECT connection_id,secret,document FROM data_source_connections WHERE workspace=? AND owner=?',(workspace,owner)).fetchall()
+            matches=[]
+            legacy_matches=[]
+            identity=endpoint_identity(config)
+            for existing_id, encrypted, raw in rows:
+                entry=json.loads(raw)
+                known=db.execute('SELECT fingerprint FROM data_source_identities WHERE connection_id=?',(existing_id,)).fetchone()
+                if not known and encrypted:
+                    known=(endpoint_identity(json.loads(self.cipher.decrypt(encrypted.encode()))),)
+                    db.execute('INSERT INTO data_source_identities VALUES (?,?)',(existing_id,known[0]))
+                if known and known[0]==identity and entry['connection_status']=='disconnected':
+                    matches.append(entry)
+                elif not known and entry['connection_status']=='disconnected' and all(entry.get(k)==config.get(k) for k in ('engine','host','database','mode')):
+                    legacy_matches.append(entry)
+            if len(matches)>1:
+                raise ApiFailure('DATA_SOURCE_RECONNECT_AMBIGUOUS','Several disconnected connections match. Use Reconnect on the intended connection.',409)
+            if not matches and legacy_matches:
+                raise ApiFailure('DATA_SOURCE_RECONNECT_REQUIRED','An older disconnected connection matches this endpoint. Use Reconnect on that connection to preserve its dataset identities, or delete it before adding a replacement.',409)
+            if matches:
+                count=db.execute("SELECT COUNT(*) FROM data_source_connections WHERE workspace=? AND owner=? AND secret IS NOT NULL",(workspace,owner)).fetchone()[0]
+                if count >= 20:
+                    raise ApiFailure('DATA_SOURCE_LIMIT','Disconnect an existing database before adding more than 20 connections.',409)
+                doc=matches[0]
+                doc.update({k:config[k] for k in ('name','schemas','description','mode')})
+                doc.update(connection_status='connected',last_verified_at=now())
+                self.queue(db,doc)
+                db.execute('UPDATE data_source_connections SET secret=? WHERE connection_id=?',(self.cipher.encrypt(json.dumps(config).encode()).decode(),doc['connection_id']))
+                self.save(db,doc);self.audit(db,auth,doc['connection_id'],'reconnected')
+                return doc
             count=db.execute("SELECT COUNT(*) FROM data_source_connections WHERE workspace=? AND owner=? AND secret IS NOT NULL",(workspace,owner)).fetchone()[0]
             if count >= 20:raise ApiFailure('DATA_SOURCE_LIMIT', 'Disconnect an existing database before adding more than 20 connections.',409)
             self.queue(db,doc)
             db.execute('INSERT INTO data_source_connections VALUES (?,?,?,?,?)',(cid,workspace,owner,self.cipher.encrypt(json.dumps(config).encode()).decode(),json.dumps(doc)))
+            db.execute('INSERT INTO data_source_identities VALUES (?,?)',(cid,identity))
             self.refresh.ensure(db,cid)
             self.audit(db,auth,cid,'connected')
         return doc
@@ -131,7 +178,12 @@ class DataSources:
         GoogleConnections.identity(auth, True)
         config = configuration(body)
         with self.store.transaction(write=False) as db:
-            _, previous = self.owned(db, auth, cid)
+            previous_secret, previous = self.owned(db, auth, cid)
+            identity = db.execute('SELECT fingerprint FROM data_source_identities WHERE connection_id=?',(cid,)).fetchone()
+            if not identity and previous_secret:
+                identity=(endpoint_identity(json.loads(self.cipher.decrypt(previous_secret.encode()))),)
+        if identity and identity[0] != endpoint_identity(config):
+            raise ApiFailure('DATA_SOURCE_TARGET_CHANGED','Create a new connection when changing its database endpoint or principal.',409)
         if any(config[k] != previous[k] for k in ('engine', 'host', 'database')):
             raise ApiFailure('DATA_SOURCE_TARGET_CHANGED', 'Create a new connection when changing its database endpoint.', 409)
         try:self.adapter.test(config)
@@ -144,6 +196,7 @@ class DataSources:
             doc.update(connection_status='connected', last_verified_at=now())
             self.queue(db, doc)
             db.execute('UPDATE data_source_connections SET secret=? WHERE connection_id=?', (self.cipher.encrypt(json.dumps(config).encode()).decode(), cid))
+            db.execute('INSERT INTO data_source_identities VALUES (?,?) ON CONFLICT(connection_id) DO UPDATE SET fingerprint=excluded.fingerprint',(cid,endpoint_identity(config)))
             self.save(db, doc);self.audit(db, auth, cid, 'credentials_replaced')
         return doc
 
@@ -151,7 +204,19 @@ class DataSources:
         GoogleConnections.identity(auth,True)
         with self.store.transaction() as db:
             secret, doc=self.owned(db,auth,cid)
+            if action=='delete':
+                # Delete application metadata only. Cloud adapters are never called.
+                doc.update(connection_status='disconnected',profiling_status='cancelled',generation=doc['generation']+1,updated_at=now())
+                for table in ('data_source_identities','data_source_profile_jobs','data_source_auto_jobs','data_source_refresh','data_source_snapshots','data_source_connections'):
+                    db.execute(f'DELETE FROM {table} WHERE connection_id=?',(cid,))
+                self.audit(db,auth,cid,'deleted')
+                self.relationships.enqueue(db,*GoogleConnections.identity(auth))
+                return doc
             if action=='disconnect':
+                if secret:
+                    self.configured()
+                    identity=endpoint_identity(json.loads(self.cipher.decrypt(secret.encode())))
+                    db.execute('INSERT INTO data_source_identities VALUES (?,?) ON CONFLICT(connection_id) DO UPDATE SET fingerprint=excluded.fingerprint',(cid,identity))
                 doc.update(connection_status='disconnected',profiling_status='cancelled',generation=doc['generation']+1,updated_at=now(),last_error_code=None,last_error_message=None)
                 db.execute('UPDATE data_source_connections SET secret=NULL WHERE connection_id=?',(cid,))
                 db.execute("UPDATE data_source_profile_jobs SET state='cancelled',token=NULL WHERE connection_id=? AND state IN ('queued','running')",(cid,))

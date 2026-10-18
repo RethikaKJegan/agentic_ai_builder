@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -37,10 +38,10 @@ export function DatabaseWorkflowReview({ document }: { document: CanonicalWorkfl
         {scope.data.sources.map((source) => (
           <li key={source.dataset_id} className="break-words text-xs">
             <p className="font-medium">
-              {source.label} · {source.engine}
+              {displayText(source.label)} · {source.engine}
             </p>
             <p className="break-all">Dataset: {source.dataset_id}</p>
-            <p>Metadata pinned to {source.context_hash.slice(0, 12)}…</p>
+            <p>Metadata pinned to {displayText(source.context_hash.slice(0, 12))}…</p>
           </li>
         ))}
       </ul>
@@ -48,10 +49,10 @@ export function DatabaseWorkflowReview({ document }: { document: CanonicalWorkfl
         {steps.map((node) => (
           <li key={node.node_id} className="min-w-0 rounded border p-2 text-xs">
             <p className="break-words font-medium">
-              {node.label} · {node.tool_id} · {node.agent_id}
+              {displayText(node.label)} · {node.tool_id} · {node.agent_id}
             </p>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">
-              {JSON.stringify(node.configuration, null, 2)}
+              {displayText(JSON.stringify(node.configuration, null, 2))}
             </pre>
           </li>
         ))}
@@ -120,10 +121,10 @@ export function DatabaseApprovalPreview({
               {operation.steps.map((step, index) => (
                 <div key={index} className="min-w-0 space-y-1">
                   <p className="font-medium">
-                    {step.action} · {step.label}
+                    {step.action} · {displayText(step.label)}
                   </p>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(
+                    {displayText(JSON.stringify(
                       {
                         identity: step.identity,
                         before: step.before,
@@ -132,7 +133,7 @@ export function DatabaseApprovalPreview({
                       },
                       null,
                       2,
-                    )}
+                    ))}
                   </pre>
                 </div>
               ))}

@@ -232,6 +232,20 @@ class WorkflowApiTests(unittest.TestCase):
         self.assertNotIn('authorization_reference', response.text)
         admin.close()
 
+    def test_inventory_link_setup_error_keeps_actionable_message(self):
+        from planner.errors import PlannerFailure
+        from unittest.mock import Mock
+        provider=Mock()
+        provider.generate.side_effect=PlannerFailure('INVENTORY_LINK_REQUIRED',
+            'Inventory needs one confirmed category relationship. Review its linking fields in Data Intelligence.')
+        self.service.planner=PlannerService(provider)
+        response=self.mutate('/workflows/plan','plan_workflow',{'objective':'Review restocking inventory'})
+        self.assertEqual(response.status_code,400)
+        error=response.json()['data']['error']
+        self.assertEqual(error['error_code'],'INVENTORY_LINK_REQUIRED')
+        self.assertIn('category relationship',error['message'])
+        self.assertFalse(error['retryable'])
+
     def test_safe_planner_errors_and_missing_runtime(self):
         invalid = self.mutate('/workflows/plan', 'plan_workflow', {'objective': ''})
         self.assertEqual(invalid.status_code, 400)

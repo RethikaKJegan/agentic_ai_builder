@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { Link } from "@/lib/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
@@ -182,7 +183,7 @@ function Chapter({
     >
       <Reveal className={`min-w-0 lg:col-span-5 ${flip ? "lg:order-2" : ""}`}>
         <p className="font-mono text-xs text-primary">{n}</p>
-        <h2 className="mt-4 text-4xl font-semibold leading-[1.02] md:text-6xl">{title}</h2>
+        <h2 className="mt-4 text-4xl font-semibold leading-[1.02] md:text-6xl">{displayText(title)}</h2>
         <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">{body}</p>
       </Reveal>
       <Reveal delay={0.1} className="min-w-0 lg:col-span-7">
@@ -199,7 +200,7 @@ function Frame({ children, label }: { children: ReactNode; label: string }) {
         <span className="h-2.5 w-2.5 rounded-full bg-border" />
         <span className="h-2.5 w-2.5 rounded-full bg-border" />
         <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="ml-3 font-mono text-[11px] text-muted-foreground">{label}</span>
+        <span className="ml-3 font-mono text-[11px] text-muted-foreground">{displayText(label)}</span>
         <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Preview
         </span>
@@ -223,7 +224,7 @@ function TypingComposer() {
       <div className="p-6 md:p-8">
         <p className="font-display text-2xl font-medium">What should we automate today?</p>
         <div className="mt-5 min-h-[120px] rounded-xl border border-border-accent bg-highlight/40 p-4 text-[15px] leading-relaxed">
-          {text.slice(0, n)}
+          {displayText(text.slice(0, n))}
           <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-primary" />
         </div>
         <div className="mt-4 flex items-center justify-between">
@@ -281,8 +282,8 @@ function MiniGraph() {
                 >
                   <M.icon className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-[11px] font-medium leading-tight">{f.label}</p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">{M.label}</p>
+                <p className="text-[11px] font-medium leading-tight">{displayText(f.label)}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">{displayText(M.label)}</p>
               </motion.div>
             );
           })}

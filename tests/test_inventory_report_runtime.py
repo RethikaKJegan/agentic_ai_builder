@@ -2,6 +2,7 @@
 from copy import deepcopy
 import base64
 from email import message_from_bytes
+from email.policy import default
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -21,7 +22,7 @@ class GoogleProvider(ReportProvider):
         path=urlparse(url).path
         if path.endswith('/profile'):return {'emailAddress':'owner@example.com'}
         if path.endswith('/messages/send'):
-            self.sent.append(message_from_bytes(base64.urlsafe_b64decode(body['raw']+'==')))
+            self.sent.append(message_from_bytes(base64.urlsafe_b64decode(body['raw']+'=='),policy=default))
             return {'id':'sent_report','threadId':'report_thread'}
         if '/calendar/v3/' in path and method=='POST':
             self.events.append(deepcopy(body));return {'id':body['id'],'status':'confirmed'}
@@ -68,7 +69,8 @@ class OfflineAgents:
 
 
 @pytest.mark.parametrize('reject_at',[None,0,1,2])
-def test_native_report_sequence_requires_each_approval_and_uses_actual_url(reject_at):
+@pytest.mark.parametrize('partial',[False,True])
+def test_native_report_sequence_requires_each_approval_and_uses_actual_url(reject_at,partial):
     from tests.test_integrated_procurement import IntegratedTests
     case=IntegratedTests(methodName='test_native_prompt_to_approved_sends_and_tracking');case.setUp()
     try:
@@ -83,6 +85,8 @@ def test_native_report_sequence_requires_each_approval_and_uses_actual_url(rejec
         tools=s.registry.list_tools(case.auth)['data']['items'];defs=[t['definition'] for t in tools]
         catalog=source_catalog()
         context={'google_connection_id':'gc_'+'a'*32,'database_catalog':catalog,'database_workflow_tools':defs,'workflow_google_tools':defs}
+        if partial:
+            context['database_catalog']['relationships']=[e for e in context['database_catalog']['relationships'] if e['target_dataset_id']!='categories']
         w=compile_inventory_report(proposal(),PROMPT,context);w['workflow_id']='offline_report_sequence'
         bind_generated(w,context)
         # Existing DB scope/query guards have their own real-storage tests. This
@@ -111,8 +115,13 @@ def test_native_report_sequence_requires_each_approval_and_uses_actual_url(rejec
         assert len(case.http.books)==len(case.http.sent)==len(case.http.events)==1
         message=case.http.sent[0];event=case.http.events[0]
         assert message['To']=='owner@example.com'
-        assert 'https://docs.google.com/spreadsheets/d/created_1/edit' in message.get_payload(decode=True).decode()
+        assert 'https://docs.google.com/spreadsheets/d/created_1/edit' in message.get_body(preferencelist=('plain',)).get_content()
         assert 'https://docs.google.com/spreadsheets/d/created_1/edit' in event['description']
+        if partial:
+            from workflow_api.inventory_ranking import UNVERIFIED_LOOKUP
+            assert 'Enrichment incomplete' in message.get_body(preferencelist=('plain',)).get_content()
+            assert 'Enrichment incomplete' in event['description']
+            assert case.http.books['created_1']['sheets'][0]['business_rows'][0][2]==UNVERIFIED_LOOKUP
         assert event['start']['dateTime']=='2026-10-19T15:30:00+05:30'
         assert event['end']['dateTime']=='2026-10-19T16:00:00+05:30'
         inventory=case.http.books['created_1']['sheets'][0]['business_rows']
@@ -132,7 +141,7 @@ def test_native_report_sequence_requires_each_approval_and_uses_actual_url(rejec
             second=runner.runtime.get_run(second['run_id'],case.auth)
         assert second['status']=='completed'
         assert len(case.http.books)==len(case.http.sent)==len(case.http.events)==2
-        assert 'https://docs.google.com/spreadsheets/d/created_2/edit' in case.http.sent[1].get_payload(decode=True).decode()
+        assert 'https://docs.google.com/spreadsheets/d/created_2/edit' in case.http.sent[1].get_body(preferencelist=('plain',)).get_content()
         assert 'https://docs.google.com/spreadsheets/d/created_2/edit' in case.http.events[1]['description']
         assert case.http.events[0]['id']!=case.http.events[1]['id']
     finally:case.doCleanups()

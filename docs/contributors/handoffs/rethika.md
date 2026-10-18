@@ -1,5 +1,70 @@
 # Handoff — Rethika
 
+## Workflow Rename menu — 2026-10-19
+
+Added Rename to workflow dropdown with a focused dialog. Owned workspace display
+titles persist in workspace_settings independently of executable revisions. List,
+overview and editor responses project the title. Editing requires workflow.edit;
+empty/long names, deleted workflows and stale title conflicts are rejected. Local
+drafts rename through the existing store. No revision, release, run or approval is
+changed by server rename. User approved minimal integration edits. Six backend and
+28 frontend/API tests passed, build/types/lint and desktop/mobile mocked-write
+checks passed. Deployed; see workflow-rename OpenSpec tasks for evidence.
+
+## Readable Gmail and Calendar briefings — 2026-10-19
+
+Inventory summaries now separate overview, shortages, watchlist, market context
+and coverage. Missing optional enrichment is explained once rather than repeated
+per product. Delivery includes a clear report link, exact IST schedule and calendar
+agenda. Gmail sends safe escaped HTML plus readable plain text; attachments and
+thread handling remain covered by connector tests. General composition guidance
+was updated too. 56 formatting/connector tests, 25 planner/HTML checks and two
+native approval flows passed. Desktop/mobile previews inspected. Backend/worker
+deployed; no real email resent or existing event changed. See readable-report-
+delivery OpenSpec tasks for evidence.
+
+## Nonblocking optional report enrichment — 2026-10-18
+
+User explicitly changed the requested behavior: optional unreviewed relationships
+must not block independent features. Inventory compiler now omits ambiguous or
+unverified category/supplier joins, keeps verified core quantities and lookups,
+and labels unavailable details. Normalization still rejects missing core evidence.
+Coverage notes propagate through spreadsheet, email and meeting summaries;
+report_limitations metadata is informational, not a Registry setup blocker.
+General planner instructions follow the same optional-enrichment policy. No
+proposed join is promoted and external actions retain three approval gates.
+This supersedes the earlier requirement to confirm category before generating
+any inventory report. Full enrichment still needs relationship review.
+69 regression tests and final 33-test compiler checks passed; backend/worker
+deployed. See partial-report-enrichment tasks for evidence.
+
+## Generic connection lifecycle revalidation — 2026-10-18
+
+DataSources now fingerprints verified endpoint/principal identity separately from
+passwords and display labels. Adding a unique matching disconnected owned source
+reuses its connection ID and profiles again; explicit credential updates reject
+endpoint/principal changes. Delete removes identity, so replacement IDs and reviews
+remain fresh. Older active credentials are backfilled on disconnect/reconnect;
+older disconnected records require explicit Reconnect. Unavailable or unverified
+metadata is excluded from planning and graph joins, including retrieval cache
+invalidation on profiling state changes. Workflow scope preflight explains missing,
+unavailable and profiling connections before semantic review checks. Pinned scopes
+still require regeneration and review after revision changes. No relationships,
+grants or write approvals are automatically migrated. See source-lifecycle-
+revalidation tasks for passing regression evidence. Backend/worker deployed;
+frontend and Praxi untouched.
+
+## Inventory relationship setup diagnostics — 2026-10-18
+
+Live generation failed before model correction: current Atlas categories has a
+different dataset identity from the earlier workflow, and the products/categoryID
+relationship is proposed. Supplier FK remains declared. Compiler now reports
+INVENTORY_LINK_REQUIRED with safe review guidance instead of misleading source-ID
+feedback; API preserves that message and nonretryable status. No inferred link is
+automatically accepted. 33 focused tests, contracts and strict spec checks passed;
+backend/worker deployed. User must review the current category relationship in
+Data Intelligence before generating the full joined report.
+
 ## Unchanged model settings and concise inventory planning — 2026-10-18
 
 The UI added temperature:0 while saving generated models that omitted it,

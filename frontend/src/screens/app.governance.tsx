@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -48,11 +49,11 @@ export default function Governance() {
         {policies.filter((p) => p.scope === scope).map((p) => (
           <div key={p.id} className="flex items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{p.name}</p>
-              <p className="text-xs text-muted-foreground">{describe(p.rule)} · {p.description}</p>
+              <p className="text-sm font-medium">{displayText(p.name)}</p>
+              <p className="text-xs text-muted-foreground">{describe(p.rule)} · {displayText(p.description)}</p>
             </div>
-            <Switch checked={p.enabled} disabled={!allowed} onCheckedChange={(v) => upsertPolicy({ ...p, enabled: v })} aria-label={`Toggle ${p.name}`} />
-            {scope === "workspace" && allowed && <button onClick={() => { if (window.confirm(`Delete local policy draft "${p.name}"?`)) removePolicy(p.id); }} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4" /></button>}
+            <Switch checked={p.enabled} disabled={!allowed} onCheckedChange={(v) => upsertPolicy({ ...p, enabled: v })} aria-label={displayText(`Toggle ${p.name}`)} />
+            {scope === "workspace" && allowed && <button onClick={() => { if (window.confirm(`Delete local policy draft "${p.name}"?`)) removePolicy(p.id); }} className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={displayText(`Delete ${p.name}`)}><Trash2 className="h-4 w-4" /></button>}
           </div>
         ))}
       </div>
@@ -74,7 +75,7 @@ export default function Governance() {
           {allowed && (
             <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-border p-4">
               <label className="text-xs text-muted-foreground">Rule<select value={type} onChange={(e) => setType(e.target.value as PolicyRule["type"])} className="mt-1 block h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"><option value="block-model">Block a model</option><option value="require-guardrail">Require a guardrail</option><option value="max-run-cost">Cap run cost</option></select></label>
-              {type === "block-model" && <label className="text-xs text-muted-foreground">Model<select value={modelId} onChange={(e) => setModelId(e.target.value)} className="mt-1 block h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground">{MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+              {type === "block-model" && <label className="text-xs text-muted-foreground">Model<select value={modelId} onChange={(e) => setModelId(e.target.value)} className="mt-1 block h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground">{MODELS.map((m) => <option key={m.id} value={m.id}>{displayText(m.name)}</option>)}</select></label>}
               {type === "require-guardrail" && <label className="text-xs text-muted-foreground">Guardrail<select value={guard} onChange={(e) => setGuard(e.target.value as GuardrailKey)} className="mt-1 block h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground">{Object.entries(GUARDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
               {type === "max-run-cost" && <label className="text-xs text-muted-foreground">USD per run<input value={usd} onChange={(e) => setUsd(e.target.value)} inputMode="decimal" className="mt-1 block h-9 w-28 rounded-lg border border-border bg-background px-2 text-sm text-foreground" /></label>}
               <button onClick={add} className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" />Add workspace policy</button>
@@ -99,7 +100,7 @@ export default function Governance() {
                 <span className="w-40 text-xs text-muted-foreground">{new Date(a.at).toLocaleString()}</span>
                 <span className="font-medium">{a.action}</span>
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">{a.target}</span>
-                <span className="text-xs text-muted-foreground">{a.actor} · {roleLabel(a.role)}</span>
+                <span className="text-xs text-muted-foreground">{a.actor} · {displayText(roleLabel(a.role))}</span>
               </div>
             ))}
           </div>

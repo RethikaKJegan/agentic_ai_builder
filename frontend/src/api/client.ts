@@ -141,7 +141,7 @@ export class WorkflowClient {
   async knowledgeGraph(relationshipId?:string,body?:object) {
     const value=await this.read(relationshipId?`knowledge-graph/review/${encodeURIComponent(relationshipId)}`:"knowledge-graph",relationshipId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
     const parsed=semanticViewSchema.safeParse(value);
-    if(!parsed.success)return fail("INVALID_API_DATA","The semantic Knowledge graph response is invalid.");
+    if(!parsed.success)return fail("INVALID_API_DATA","The semantic Semantic Intelligence response is invalid.");
     return parsed.data;
   }
   async inferKnowledgeGraph() {
@@ -155,7 +155,7 @@ export class WorkflowClient {
   async knowledgePreview(objective:string,selection?:KnowledgeSelection) {
     const value=await this.read("knowledge-graph/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({objective,...(selection?{selection}:{})})});
     const parsed=knowledgePreviewSchema.safeParse(value);
-    if(!parsed.success)return fail("INVALID_API_DATA","The Knowledge graph preview is invalid.");
+    if(!parsed.success)return fail("INVALID_API_DATA","The Semantic Intelligence preview is invalid.");
     return parsed.data;
   }
   async databaseOperations() {
@@ -228,7 +228,7 @@ export class WorkflowClient {
   async ontology(relationshipId?:string,body?:object) {
     const value=await this.read(relationshipId?`data-ontology/${encodeURIComponent(relationshipId)}`:"data-ontology",relationshipId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
     const parsed=ontologySchema.safeParse(value);
-    if(!parsed.success)return fail("INVALID_API_DATA","The knowledge graph response is invalid.");
+    if(!parsed.success)return fail("INVALID_API_DATA","The Semantic Intelligence response is invalid.");
     return parsed.data;
   }
 
@@ -262,7 +262,7 @@ export class WorkflowClient {
     if(!parsed.success)return fail("INVALID_API_DATA","The database connection result is invalid.");
     return parsed.data;
   }
-  async databaseAction(connectionId:string,action:"verify"|"refresh-metadata"|"disconnect") {
+  async databaseAction(connectionId:string,action:"verify"|"refresh-metadata"|"disconnect"|"delete") {
     const parsed=databaseConnectionSchema.safeParse(await this.read(`data-sources/${encodeURIComponent(connectionId)}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}));
     if(!parsed.success)return fail("INVALID_API_DATA","The database action result is invalid.");
     return parsed.data;
@@ -390,6 +390,12 @@ export class WorkflowClient {
     const result=z.object({configured:z.boolean(),setup_message:z.string().nullable(),callback_uri:z.string().nullable(),callback_in_client_file:z.boolean(),shared_demo_identity:z.boolean(),capabilities:z.array(z.string()),items:z.array(GoogleConnectionSchema)}).safeParse(await this.read("integrations/google/connections"));
     if(!result.success)return fail("INVALID_API_DATA","The Google connection list is invalid.");
     return result.data;
+  }
+  async renameWorkflow(workflowId:string,name:string,expectedName:string) {
+    const result=z.object({workflow_id:z.string(),name:z.string().min(1).max(200)}).parse(await this.read(`workflows/${encodeURIComponent(workflowId)}/rename`,{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,expected_name:expectedName})}));
+    if(result.workflow_id!==workflowId)return fail("REFERENCE_MISMATCH","The renamed workflow did not match the selected workflow.");
+    return result;
   }
   async authorizeGoogle(capabilities:string[],connectionId?:string) {
     const path=connectionId?`integrations/google/connections/${encodeURIComponent(connectionId)}/authorize`:"integrations/google/authorize";

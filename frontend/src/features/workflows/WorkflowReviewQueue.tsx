@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
 import { useBackend } from "@/api/state";
@@ -32,7 +33,7 @@ export function WorkflowReviewQueue() {
     <p className="text-sm text-muted-foreground">Review the exact saved revision before approval. Approval does not publish or activate it.</p>
     <ApiFeedback error={error} />{loading && <p role="status">Loading submitted revisions…</p>}
     {!loading && !error && !items.length && <p className="text-sm text-muted-foreground">No submitted revisions await approval.</p>}
-    {items.map(workflow => <div key={workflow.workflow_id} className="flex flex-wrap items-center gap-3 border-t pt-3"><Link to="/app/workflows/$id" params={{ id: workflow.workflow_id }} className="min-w-0 flex-1 text-primary underline">{workflow.name} · v{workflow.version}</Link>
+    {items.map(workflow => <div key={workflow.workflow_id} className="flex flex-wrap items-center gap-3 border-t pt-3"><Link to="/app/workflows/$id" params={{ id: workflow.workflow_id }} className="min-w-0 flex-1 text-primary underline">{displayText(workflow.name)} · v{workflow.version}</Link>
       <button type="button" disabled={!!busy || !backend.can("workflow.approve")} onClick={() => void approve(workflow)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{busy === workflow.workflow_id ? "Approving…" : "Approve revision"}</button>
     </div>)}{!backend.can("workflow.approve") && <p className="text-sm text-muted-foreground">workflow.approve permission is required to approve submitted revisions.</p>}
   </section>;

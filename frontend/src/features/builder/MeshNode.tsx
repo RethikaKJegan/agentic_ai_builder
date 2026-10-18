@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { createContext, memo, useContext } from "react";
 import { Check, ChevronDown, ChevronRight, Loader2, Minus, Network, Pause, PauseCircle, X } from "lucide-react";
@@ -34,7 +35,7 @@ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
       {data.kind !== "trigger" && <Handle type="target" position={tb ? Position.Top : Position.Left} />}
       {(isMaster || isSub) && (
         <p className={`mb-1.5 text-[10px] font-medium uppercase tracking-wider ${isMaster ? "text-primary" : "text-muted-foreground"}`}>
-          {isMaster ? "Master agent" : `Sub-agent${data.parentLabel ? ` · of ${data.parentLabel}` : ""}`}
+          {displayText(isMaster ? "Master agent" : `Sub-agent${data.parentLabel ? ` · of ${data.parentLabel}` : ""}`)}
         </p>
       )}
       <div className="flex items-start gap-2.5">
@@ -42,9 +43,9 @@ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium leading-tight">{data.label}</p>
+          <p className="truncate text-[13px] font-medium leading-tight">{displayText(data.label)}</p>
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {data.kind === "agent" && agent ? `${getModel(agent.modelId).name}${agent.tools.length ? ` · ${agent.tools.length} tool${agent.tools.length > 1 ? "s" : ""}` : ""}` : data.tool ?? meta.label}
+            {displayText(data.kind === "agent" && agent ? `${getModel(agent.modelId).name}${agent.tools.length ? ` · ${agent.tools.length} tool${agent.tools.length > 1 ? "s" : ""}` : ""}` : data.tool ?? meta.label)}
           </p>
         </div>
         {st && (
@@ -57,8 +58,8 @@ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
           </span>
         )}
       </div>
-      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{meta.label}{data.kind === "trigger" ? " · Start" : data.kind === "output" ? " · End" : ""}{Number(data["diagnosticCount"]) > 0 ? ` · ${data["diagnosticCount"]} configuration issues` : ""}</p>
-      {(agent?.purpose || data.description) && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{data.description || agent?.purpose}</p>}
+      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{displayText(meta.label)}{data.kind === "trigger" ? " · Start" : data.kind === "output" ? " · End" : ""}{Number(data["diagnosticCount"]) > 0 ? ` · ${data["diagnosticCount"]} configuration issues` : ""}</p>
+      {(agent?.purpose || data.description) && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{displayText(data.description || agent?.purpose)}</p>}
       {(agent?.paused || (data.childCount ?? 0) > 0) && (
         <div className="mt-2 flex items-center gap-2">
           {agent?.paused && <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"><PauseCircle className="h-3 w-3" />Draft paused</span>}
@@ -67,7 +68,7 @@ function MeshNodeImpl({ id, data, selected }: NodeProps<MeshFlowNode>) {
               onClick={(e) => { e.stopPropagation(); actions.toggleCollapse(id); }}
               className="nodrag ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-primary hover:bg-highlight"
               aria-expanded={!data.collapsed}
-              aria-label={data.collapsed ? `Expand ${data.label}` : `Collapse ${data.label}`}
+              aria-label={displayText(data.collapsed ? `Expand ${data.label}` : `Collapse ${data.label}`)}
             >
               {data.collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               {data.collapsed ? `${data.childCount} hidden` : `${data.childCount} sub-agent${data.childCount! > 1 ? "s" : ""}`}

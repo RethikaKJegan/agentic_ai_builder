@@ -202,7 +202,7 @@ def install(app,service,auth,env,reference):
 
     @app.post('/data-sources/{connection_id}/{action}')
     async def action(connection_id:str,action:str):
-        if action not in {'verify','refresh-metadata','disconnect'}:return await call(bad_input)
+        if action not in {'verify','refresh-metadata','disconnect','delete'}:return await call(bad_input)
         return await call(manager.action,connection_id,action)
 
 

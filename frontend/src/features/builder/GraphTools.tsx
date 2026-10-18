@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useState } from "react";
 import type { WorkflowNode, WorkflowEdge } from "@/domain/types";
 import { dependencyOrder, graphIssues } from "@/domain/graph-review";
@@ -45,7 +46,7 @@ export function GraphTools({
                   className="text-left underline"
                   onClick={() => onSelect(x.nodeId!)}
                 >
-                  {x.message}
+                  {displayText(x.message)}
                 </button>
               ) : (
                 x.message
@@ -65,7 +66,7 @@ export function GraphTools({
               className="rounded-lg border border-border px-2 py-1 text-left"
               onClick={() => onSelect(n.id)}
             >
-              {i + 1}. {n.data.label} · {n.data.kind}
+              {i + 1}. {displayText(n.data.label)} · {n.data.kind}
               {n.data.kind === "trigger" ? " · Start" : n.data.kind === "output" ? " · End" : ""}
             </button>
           </li>
@@ -95,7 +96,7 @@ export function GraphTools({
               .filter((n) => n.data.kind !== "output")
               .map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.data.label}
+                  {displayText(n.data.label)}
                 </option>
               ))}
           </select>
@@ -113,7 +114,7 @@ export function GraphTools({
               .filter((n) => n.id !== source && n.data.kind !== "trigger")
               .map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.data.label}
+                  {displayText(n.data.label)}
                 </option>
               ))}
           </select>
@@ -147,7 +148,7 @@ export function GraphTools({
           <li key={e.id}>
             {nodes.find((n) => n.id === e.source)?.data.label ?? e.source} →{" "}
             {nodes.find((n) => n.id === e.target)?.data.label ?? e.target}
-            {e.label ? ` · ${e.label}` : ""}{" "}
+            {displayText(e.label ? ` · ${e.label}` : "")}{" "}
             <button
               type="button"
               onClick={() => onRemove(e.id)}

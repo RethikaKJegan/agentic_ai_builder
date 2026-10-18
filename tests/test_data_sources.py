@@ -182,6 +182,8 @@ def test_authenticated_routes_do_not_echo_secret_errors(manager):
     response=client.post('/data-sources/test',json=config())
     assert response.status_code==400 and 'private-value' not in response.text
     assert client.post('/data-sources/'+cid+'/disconnect').status_code==200
+    assert client.post('/data-sources/'+cid+'/delete').status_code==200
+    assert client.get('/data-sources/'+cid+'/metadata').status_code==404
 
 
 def test_real_mongo_discovery_records_indexes_without_document_values():
@@ -246,3 +248,104 @@ def test_relationships_follow_profile_and_disconnect(manager):
     assert view['stale'] and view['build_status']=='queued' and not view['graph']['nodes']
     manager.relationships.tick()
     assert manager.relationships.get(auth())['graph']['nodes']==[]
+
+@pytest.mark.parametrize('engine',['mongodb','postgresql'])
+def test_reconnect_reuses_connection_and_profiles_again(manager,engine):
+    cid=manager.connect(auth(),config(engine))['connection_id']
+    manager.tick()
+    manager.action(auth(),cid,'disconnect')
+    restored=manager.credentials(auth(),cid,config(engine))
+    assert restored['connection_id']==cid and restored['connection_status']=='connected'
+    assert restored['profiling_status']=='queued'
+    manager.tick()
+    assert manager.metadata(auth(),cid)['snapshot']['revision']==2
+    assert len(manager.list(auth())['items'])==1
+
+
+@pytest.mark.parametrize('engine',['mongodb','postgresql'])
+def test_add_disconnected_endpoint_restores_ids_and_password_rotation(manager,engine):
+    body=config(engine)
+    cid=manager.connect(auth(),body)['connection_id'];manager.tick()
+    original=manager.metadata(auth(),cid)['snapshot']['datasets'][0]
+    manager.action(auth(),cid,'disconnect')
+    body['name']='Renamed connection'
+    body['uri']=body['uri'].replace('private-value','rotated-value')
+    restored=manager.connect(auth(),body)
+    assert restored['connection_id']==cid and restored['profiling_status']=='queued'
+    manager.tick()
+    current=manager.metadata(auth(),cid)['snapshot']['datasets'][0]
+    assert original['dataset_id']==current['dataset_id']
+    assert original['fields']==current['fields']
+    assert len(manager.list(auth())['items'])==1
+
+
+def test_reconnect_never_matches_another_owner_principal_or_deleted_identity(manager):
+    body=config();cid=manager.connect(auth(),body)['connection_id'];manager.tick()
+    manager.action(auth(),cid,'disconnect')
+    other=manager.connect(auth('bob'),body)['connection_id']
+    assert other!=cid
+    different={**body,'uri':body['uri'].replace('demo:','other:')}
+    assert manager.connect(auth(),different)['connection_id']!=cid
+    with pytest.raises(ApiFailure,match='principal'):
+        manager.credentials(auth(),cid,different)
+    manager.action(auth(),cid,'delete')
+    assert manager.connect(auth(),body)['connection_id']!=cid
+    with manager.store.transaction(write=False) as db:
+        assert not db.execute('SELECT 1 FROM data_source_identities WHERE connection_id=?',(cid,)).fetchone()
+
+
+def test_legacy_active_identity_is_captured_before_disconnect(manager):
+    body=config();cid=manager.connect(auth(),body)['connection_id']
+    with manager.store.transaction() as db:
+        db.execute('DELETE FROM data_source_identities WHERE connection_id=?',(cid,))
+    with pytest.raises(ApiFailure,match='principal'):
+        manager.credentials(auth(),cid,{**body,'uri':body['uri'].replace('demo:','other:')})
+    manager.action(auth(),cid,'disconnect')
+    assert manager.connect(auth(),body)['connection_id']==cid
+
+
+def test_reconnect_failure_keeps_source_disconnected(manager):
+    cid=manager.connect(auth(),config())['connection_id'];manager.tick()
+    manager.action(auth(),cid,'disconnect')
+    manager.adapter.failure=RuntimeError('unavailable')
+    with pytest.raises(ApiFailure):manager.connect(auth(),config())
+    assert manager.metadata(auth(),cid)['connection']['connection_status']=='disconnected'
+
+
+def test_delete_cleans_owned_metadata_and_retains_audit_without_cloud_calls(manager):
+    cid=manager.connect(auth(),config())['connection_id'];manager.tick()
+    before=list(manager.adapter.calls)
+    manager.action(auth(),cid,'delete')
+    assert manager.adapter.calls==before
+    assert manager.list(auth())['items']==[]
+    with manager.store.transaction(write=False) as db:
+        for table in ('data_source_connections','data_source_snapshots','data_source_profile_jobs','data_source_refresh','data_source_auto_jobs'):
+            assert db.execute(f'SELECT COUNT(*) FROM {table} WHERE connection_id=?',(cid,)).fetchone()[0]==0
+        assert db.execute("SELECT 1 FROM data_source_audit WHERE connection_id=? AND kind='deleted'",(cid,)).fetchone()
+    with pytest.raises(ApiFailure,match='not found'):manager.metadata(auth(),cid)
+
+
+def test_delete_requires_write_permission_and_ownership(manager):
+    cid=manager.connect(auth(),config())['connection_id']
+    for other in (auth('bob'),auth(workspace='two'),auth(write=False)):
+        with pytest.raises(ApiFailure):manager.action(other,cid,'delete')
+    assert len(manager.list(auth())['items'])==1
+
+
+def test_delete_during_profile_cannot_publish_or_restore_connection(manager):
+    cid=manager.connect(auth(),config())['connection_id']
+    manager.adapter.hook=lambda:manager.action(auth(),cid,'delete')
+    assert manager.tick()
+    assert manager.list(auth())['items']==[]
+    with manager.store.transaction(write=False) as db:
+        assert db.execute('SELECT COUNT(*) FROM data_source_snapshots WHERE connection_id=?',(cid,)).fetchone()[0]==0
+
+
+def test_legacy_disconnected_add_requires_explicit_reconnect(manager):
+    cid=manager.connect(auth(),config())['connection_id']
+    manager.action(auth(),cid,'disconnect')
+    with manager.store.transaction() as db:
+        db.execute('DELETE FROM data_source_identities WHERE connection_id=?',(cid,))
+    with pytest.raises(ApiFailure) as failure:manager.connect(auth(),config())
+    assert failure.value.code=='DATA_SOURCE_RECONNECT_REQUIRED'
+    assert manager.credentials(auth(),cid,config())['connection_id']==cid

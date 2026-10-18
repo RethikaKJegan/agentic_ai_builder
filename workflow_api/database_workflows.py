@@ -149,7 +149,7 @@ class DatabaseWorkflows:
             rows = db.execute('SELECT connection_id,document FROM data_source_connections WHERE workspace=? AND owner=? ORDER BY connection_id', (workspace, owner)).fetchall()
             for cid, raw in rows:
                 connection = json.loads(raw)
-                if connection['connection_status'] != 'connected':
+                if connection['connection_status'] != 'connected' or connection.get('profiling_status', 'ready') != 'ready':
                     continue
                 row = db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?', (cid, connection['metadata_revision'])).fetchone()
                 for dataset in json.loads(row[0])['datasets'] if row else []:
@@ -236,6 +236,19 @@ class DatabaseWorkflows:
     def scope(self, auth, workflow, requested=()):
         scope = workflow.get('metadata', {}).get('database_scope')
         checked('scope', scope)
+        # Check availability before semantic evidence so connection lifecycle
+        # failures do not masquerade as changed relationship meaning.
+        workspace, owner = GoogleConnections.identity(auth)
+        with self.store.transaction(write=False) as db:
+            for cid in {source['connection_id'] for source in scope['sources']}:
+                row=db.execute('SELECT document FROM data_source_connections WHERE connection_id=? AND workspace=? AND owner=?',(cid,workspace,owner)).fetchone()
+                if not row:
+                    raise ApiFailure('DATABASE_WORKFLOW_SOURCE_MISSING','A workflow connection was deleted or is no longer accessible. Select a current connection, regenerate and review this workflow.',409)
+                connection=json.loads(row[0])
+                if connection['connection_status'] != 'connected':
+                    raise ApiFailure('DATABASE_WORKFLOW_SOURCE_UNAVAILABLE','A workflow connection is disconnected or unavailable. Reconnect or verify it, refresh metadata, then regenerate and review the workflow.',409)
+                if connection.get('profiling_status','ready') != 'ready':
+                    raise ApiFailure('DATABASE_WORKFLOW_SOURCE_PROFILING','A workflow connection has unverified metadata. Wait for profiling to finish, or retry metadata refresh after failure, then regenerate and review.',409)
         semantic_scope=workflow.get('metadata', {}).get('semantic_kg_scope')
         if semantic_scope is not None:
             if not isinstance(semantic_scope,list) or len(semantic_scope)>12:

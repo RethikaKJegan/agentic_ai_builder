@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { ApiFeedback } from "./ApiFeedback";
@@ -191,7 +192,7 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
             aria-current={i === currentIndex ? "step" : undefined}
             className={`rounded-full border px-2 py-1 ${i === currentIndex ? "border-primary bg-highlight" : "border-border"}`}
           >
-            {stages[i]!.title} ·{" "}
+            {displayText(stages[i]!.title)} ·{" "}
             {stages[i]!.done ? "completed" : i === currentIndex ? "current" : "blocked"}
           </li>
         ))}
@@ -220,9 +221,9 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
                 className="rounded-lg border border-border p-2"
               >
                 <p className="font-medium">
-                  {i + 1}. {s.title} · {state}
+                  {i + 1}. {displayText(s.title)} · {state}
                 </p>
-                <p className="mt-1 text-muted-foreground">{s.reason}</p>
+                <p className="mt-1 text-muted-foreground">{displayText(s.reason)}</p>
               </li>
             );
           })}

@@ -57,7 +57,7 @@ it.each([false, true])("navigates exact relationship fields while reviews stay d
   const relationships = within(screen.getByRole("region", { name: "Qualified relationships" }));
   fireEvent.click(relationships.getAllByText(/proposed$/, { selector: "summary" })[0]!);
   expect(relationships.getAllByRole("button", { name: "Accept relationship" })[0]).toBeDisabled();
-  fireEvent.click(relationships.getAllByRole("button", { name: "Postgres / demo / northwind / orders / customerID" })[0]!);
+  fireEvent.click(relationships.getAllByRole("button", { name: "Postgres / demo / Postgres / orders / customerID" })[0]!);
   expect(screen.getByText("Stable ID: pg_orders_customerID")).toBeVisible();
   expect(screen.getByRole("button", { name: "Confirm mapping" })).toBeDisabled();
   fireEvent.click(relationships.getAllByRole("button", { name: "Atlas / demo / customers / customerID" })[0]!);
@@ -69,8 +69,8 @@ it("shows real containment and field metadata without changing IDs", async () =>
   render(<DetailedGraph canManage onChanged={() => {}} />);
   fireEvent.click(await screen.findByRole("button", { name: "Expand Postgres" }));
   fireEvent.click(screen.getByRole("button", { name: "Expand demo" }));
-  fireEvent.click(screen.getByRole("button", { name: "Expand northwind" }));
-  fireEvent.click(screen.getByRole("button", { name: "Expand northwind.orders" }));
+  fireEvent.click(screen.getByRole("button", { name: "Expand Postgres" }));
+  fireEvent.click(screen.getByRole("button", { name: "Expand Postgres.orders" }));
   fireEvent.click(screen.getByRole("button", { name: "customerID (field)" }));
   expect(screen.getByText("Stable ID: pg_orders_customerID")).toBeVisible();
   expect(screen.getByLabelText("Mapping role")).toHaveValue("reference");
@@ -140,7 +140,7 @@ it("searches all technical nodes and preserves declared versus unknown evidence"
   render(<DetailedGraph canManage onChanged={() => {}} />);
   await screen.findByText(/Detailed graph v2/);
   fireEvent.change(screen.getByLabelText("Find graph items"), { target: { value: "orders" } });
-  expect(screen.getByRole("button", { name: "northwind.orders (dataset)" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Postgres.orders (dataset)" })).toBeVisible();
   expect(screen.getByText(/source_references_target/)).toBeInTheDocument();
   expect(screen.getAllByText(/Direction: unknown/).length).toBeGreaterThan(0);
 });

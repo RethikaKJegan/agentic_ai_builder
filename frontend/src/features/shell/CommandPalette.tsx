@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useNavigate } from "@/lib/navigation";
 import { useEffect } from "react";
 import { Database, Activity, Bot, BookOpen, History, Inbox, LayoutGrid, Plug, Plus, Settings, ShieldCheck, Store, Workflow as WfIcon } from "lucide-react";
@@ -53,7 +54,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandGroup heading="Workflows">
             {workflows.map((w) => (
               <CommandItem key={w.id} value={`wf ${w.name} ${w.id}`} onSelect={() => go(() => navigate({ to: "/app/workflows/$id", params: { id: w.id } }))}>
-                <WfIcon className="mr-2 h-4 w-4" /> {w.name}
+                <WfIcon className="mr-2 h-4 w-4" /> {displayText(w.name)}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -62,7 +63,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandGroup heading="Agents">
             {agents.map((a) => (
               <CommandItem key={a.id} value={`agent ${a.name} ${a.id}`} onSelect={() => go(() => navigate({ to: "/app/agents", search: { agent: a.id } }))}>
-                <Bot className="mr-2 h-4 w-4" /> {a.name}
+                <Bot className="mr-2 h-4 w-4" /> {displayText(a.name)}
               </CommandItem>
             ))}
           </CommandGroup>

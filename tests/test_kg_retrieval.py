@@ -245,3 +245,42 @@ def test_enabled_registered_research_and_sheet_setup_reach_planner(coordinator):
     assert {tool['tool_id'] for tool in context['workflow_google_tools']}=={tool['tool_id'] for tool in enabled}
     assert next(tool for tool in context['workflow_google_tools'] if tool['tool_id']=='extension_sheets_create')['approval_required'] is True
     assert {tool['tool_id'] for tool in c.preview_tools(authority(),True)}=={tool['tool_id'] for tool in enabled}
+
+
+@pytest.mark.parametrize('status',['queued','running','failed'])
+def test_retrieval_cache_tracks_profile_availability(coordinator,status):
+    c=coordinator
+    preview,_=c.retrieval.retrieve(authority(),'List orders')
+    assert 'pg_orders' in preview['source_ids']
+    with c.store.transaction() as db:
+        doc=json.loads(db.execute("SELECT document FROM data_source_connections WHERE connection_id='pg'").fetchone()[0])
+        doc['profiling_status']=status
+        db.execute("UPDATE data_source_connections SET document=? WHERE connection_id='pg'",(json.dumps(doc),))
+    preview,_=c.retrieval.retrieve(authority(),'List orders')
+    assert all(source['connection_id']!='pg' for source in preview['candidates'])
+    with c.store.transaction() as db:
+        doc['profiling_status']='ready'
+        db.execute("UPDATE data_source_connections SET document=? WHERE connection_id='pg'",(json.dumps(doc),))
+    preview,_=c.retrieval.retrieve(authority(),'List orders')
+    assert 'pg_orders' in preview['source_ids']
+
+
+@pytest.mark.parametrize('change,code',[
+    ('disconnect','DATABASE_WORKFLOW_SOURCE_UNAVAILABLE'),
+    ('queued','DATABASE_WORKFLOW_SOURCE_PROFILING'),
+    ('delete','DATABASE_WORKFLOW_SOURCE_MISSING'),
+])
+def test_workflow_preflight_explains_lifecycle_before_semantic_scope(coordinator,change,code):
+    c=coordinator
+    _,catalog=c.retrieval.retrieve(authority(),'List orders')
+    scope={'sources':[{k:s[k] for k in ('connection_id','dataset_id','label','engine','context_hash')} for s in catalog['sources']], 'graph_hash':catalog['graph_hash']}
+    workflow={'metadata':{'database_scope':scope,'semantic_kg_scope':{'invalid':'must not mask lifecycle failure'}}}
+    with c.store.transaction() as db:
+        if change=='delete':db.execute("DELETE FROM data_source_connections WHERE connection_id='pg'")
+        else:
+            doc=json.loads(db.execute("SELECT document FROM data_source_connections WHERE connection_id='pg'").fetchone()[0])
+            if change=='disconnect':doc['connection_status']='disconnected'
+            else:doc['profiling_status']=change
+            db.execute("UPDATE data_source_connections SET document=? WHERE connection_id='pg'",(json.dumps(doc),))
+    with pytest.raises(ApiFailure) as failure:c.scope(authority(),workflow)
+    assert failure.value.code==code

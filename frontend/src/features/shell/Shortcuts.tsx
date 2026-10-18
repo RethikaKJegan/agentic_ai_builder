@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useNavigate } from "@/lib/navigation";
 import { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -55,7 +56,7 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
             <div className="divide-y divide-border">
               {SHORTCUTS.filter((s) => s.group === g).map((s) => (
                 <div key={s.keys} className="flex items-center justify-between py-1.5 text-sm">
-                  <span>{s.label}</span>
+                  <span>{displayText(s.label)}</span>
                   <kbd className="rounded border border-border bg-canvas px-1.5 py-0.5 font-mono text-[11px]">{s.keys}</kbd>
                 </div>
               ))}

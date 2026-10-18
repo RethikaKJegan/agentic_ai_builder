@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useMemo, useState } from "react";
 import { Link } from "@/lib/navigation";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
@@ -53,7 +54,7 @@ export function UsageTab() {
   const Th = ({ k, label, right }: { k: SortKey; label: string; right?: boolean }) => (
     <th scope="col" aria-sort={sort.key === k ? (sort.dir === 1 ? "ascending" : "descending") : "none"} className={`px-4 py-2.5 font-medium ${right ? "text-right" : "text-left"}`}>
       <button onClick={() => setSort((s) => ({ key: k, dir: s.key === k ? (s.dir === 1 ? -1 : 1) : k === "cost" || k === "runs" ? -1 : 1 }))} className="inline-flex items-center gap-1 hover:text-foreground">
-        {label}{sort.key === k && (sort.dir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+        {displayText(label)}{sort.key === k && (sort.dir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
       </button>
     </th>
   );
@@ -84,7 +85,7 @@ export function UsageTab() {
           <tbody className="divide-y divide-border">
             {shown.map((r) => (
               <tr key={r.agent.id}>
-                <td className="px-4 py-2.5"><span className="font-medium">{r.agent.name}</span>{r.agent.parentAgentId && <span className="block text-[11px] text-muted-foreground">sub-agent</span>}</td>
+                <td className="px-4 py-2.5"><span className="font-medium">{displayText(r.agent.name)}</span>{r.agent.parentAgentId && <span className="block text-[11px] text-muted-foreground">sub-agent</span>}</td>
                 <td className="max-w-[200px] truncate px-4 py-2.5 text-muted-foreground">{r.workflow}{r.more ? ` +${r.more}` : ""}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{r.runs}</td>
                 <td className="px-4 py-2.5 text-right">

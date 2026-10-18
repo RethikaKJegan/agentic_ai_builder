@@ -170,7 +170,7 @@ class DataRelationships:
         sources, versions = [], []
         for row in rows:
             connection = json.loads(row[0])
-            if connection['connection_status'] == 'disconnected':
+            if connection['connection_status'] != 'connected' or connection.get('profiling_status', 'ready') != 'ready':
                 continue
             snapshot = db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',(connection['connection_id'],connection['metadata_revision'])).fetchone()
             if snapshot:

@@ -52,7 +52,7 @@ class KnowledgeRetrieval:
                 ('kg_semantic_proposals', 'relationship_id,evidence_hash,document', 'relationship_id'),
                 ('kg_semantic_reviews', 'relationship_id,evidence_hash,predicate,reversed,status', 'relationship_id')):
                 stamps.append(db.execute(f'SELECT {columns} FROM {table} WHERE workspace=? AND owner=? ORDER BY {order}', (workspace, owner)).fetchall())
-        revision = fingerprint([[(c['connection_id'],c['generation'],c['metadata_revision'],c['connection_status']) for c in connections], stamps, self.c.operations.policy(), 1])
+        revision = fingerprint([[(c['connection_id'],c['generation'],c['metadata_revision'],c['connection_status'],c.get('profiling_status','ready')) for c in connections], stamps, self.c.operations.policy(), 1])
         return workspace, owner, revision, connections
 
     def sync(self, auth):

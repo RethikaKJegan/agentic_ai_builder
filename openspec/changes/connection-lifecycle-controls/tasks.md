@@ -1,0 +1,4 @@
+- [x] Add owned connection deletion and lifecycle API handling.
+- [x] Expose explicit edit/reconnect/delete UI actions.
+- [x] Verify permissions, reconnect identity, deletion cleanup and in-flight profiling.
+- [x] Build, browser-check and activate the scoped change.

@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,7 +64,7 @@ export function AgentInspector({ agent }: { agent: Agent }) {
               return (
                 <button key={m.id} role="radio" aria-checked={sel} onClick={() => pickModel(m.id)} className={`flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-colors ${sel ? "border-primary bg-highlight" : "border-border hover:border-border-accent"}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{m.name} <span className="text-xs font-normal text-muted-foreground">· {m.provider}</span></p>
+                    <p className="text-sm font-medium">{displayText(m.name)} <span className="text-xs font-normal text-muted-foreground">· {m.provider}</span></p>
                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{m.capabilities.join(" · ")}</p>
                   </div>
                   <span className="font-mono text-xs text-muted-foreground">{m.costTier}</span>
@@ -86,7 +87,7 @@ export function AgentInspector({ agent }: { agent: Agent }) {
             <div><label className={lbl} htmlFor="ag-max">Max tokens</label><input id="ag-max" type="number" min={64} max={32000} className={field} value={agent.maxTokens} onChange={(e) => set({ maxTokens: Math.max(64, Number(e.target.value) || 64) })} /></div>
             {agent.origin !== "backend" && <><div><label className={lbl} htmlFor="ag-fb">Fallback model</label>
               <select id="ag-fb" className={field} value={agent.fallbackModelId} onChange={(e) => set({ fallbackModelId: e.target.value })}>
-                {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {MODELS.map((m) => <option key={m.id} value={m.id}>{displayText(m.name)}</option>)}
               </select>
             </div></>}
             <div><label className={lbl} htmlFor="ag-mem">Memory</label>
@@ -104,7 +105,7 @@ export function AgentInspector({ agent }: { agent: Agent }) {
           <div key={index} className="rounded-lg border border-border p-3 text-xs">
             <p>{item.capability ?? "Agent registration"} · {item.tool_id ?? "No assigned tool"}</p>
             <p className="mt-1">{item.authorization_state}{item.approval_required ? " · Approval required" : ""}</p>
-            {!!item.reason_codes.length && <p className="mt-1 text-muted-foreground">{item.reason_codes.join(", ")}</p>}
+            {!!item.reason_codes.length && <p className="mt-1 text-muted-foreground">{displayText(item.reason_codes.join(", "))}</p>}
           </div>)}
         {agent.origin === "backend" && <div className="rounded-lg border border-border p-3 text-xs"><p>Requested capabilities: {agent.capabilities?.join(", ") || "None"}</p><p className="mt-1">Assigned tools: {agent.tools.join(", ") || "None"}</p><p className="mt-1 text-muted-foreground">Declared permissions: {agent.declaredPermissions?.join(", ") || "None"}</p></div>}
         {backend.status === "connected" ? <>{backend.tools.map((t) => <div key={t.tool_id} className="rounded-lg border border-border p-3 text-xs"><p className="font-medium">{t.definition.capability} · {t.definition.provider_id}</p><p className="mt-1 text-muted-foreground">{t.definition.availability} · {t.definition.risk_level} risk · {t.authorization_state}{t.definition.approval_required ? " · Approval required" : ""}</p></div>)}{!backend.tools.length && <p className="text-xs text-muted-foreground">No authorized tool metadata is available for this session.</p>}<p className="text-xs text-muted-foreground">Requested and assigned tools remain separate. Executable assignments require the trusted registry.</p></> : TOOL_CATALOG.map((t) => (
@@ -119,7 +120,7 @@ export function AgentInspector({ agent }: { agent: Agent }) {
       <TabsContent value="knowledge" className="space-y-1.5 pt-4">
         {knowledge.map((k) => (
           <label key={k.id} className="flex cursor-pointer items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:bg-canvas">
-            <span>{k.name} <span className="text-[11px] text-muted-foreground">· {k.collection}{k.status !== "ready" ? ` · ${k.status}` : ""}</span></span>
+            <span>{displayText(k.name)} <span className="text-[11px] text-muted-foreground">· {k.collection}{k.status !== "ready" ? ` · ${k.status}` : ""}</span></span>
             <Switch checked={agent.knowledge.includes(k.name)} disabled={k.status === "failed"} onCheckedChange={() => toggle("knowledge", k.name)} />
           </label>
         ))}

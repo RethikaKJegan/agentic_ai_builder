@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { useBackend } from "@/api/state";
@@ -36,7 +37,7 @@ export function AgentControlTab() {
     const pct = Math.min(100, limit ? (used / limit) * 100 : 100);
     return (
       <div className="rounded-xl border border-border p-3">
-        <div className="flex justify-between text-xs"><span className="text-muted-foreground">{label}</span><span className="font-medium">{fmt(used)} / {fmt(limit)}</span></div>
+        <div className="flex justify-between text-xs"><span className="text-muted-foreground">{displayText(label)}</span><span className="font-medium">{fmt(used)} / {fmt(limit)}</span></div>
         <div className="mt-2 h-1.5 rounded-full bg-muted"><div className={`h-full rounded-full ${pct >= 100 ? "bg-destructive" : pct >= 80 ? "bg-warning" : "bg-primary"}`} style={{ width: `${pct}%` }} /></div>
       </div>
     );
@@ -54,7 +55,7 @@ export function AgentControlTab() {
           </label>
           {NUMERIC.map((n) => (
             <div key={n.key} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-              <label htmlFor={`${scope}-${n.key}`}>{n.label}<span className="block text-xs text-muted-foreground">{n.hint}{scope === "workspace" ? ` · org max ${controls.organization[n.key]}` : ""}</span></label>
+              <label htmlFor={`${scope}-${n.key}`}>{displayText(n.label)}<span className="block text-xs text-muted-foreground">{n.hint}{scope === "workspace" ? ` · org max ${controls.organization[n.key]}` : ""}</span></label>
               <input
                 id={`${scope}-${n.key}`} type="number" min={0} step={n.step ?? 1} disabled={!allowed}
                 defaultValue={c[n.key]} key={`${scope}-${n.key}-${c[n.key]}`}
@@ -83,7 +84,7 @@ export function AgentControlTab() {
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {MODELS.map((m) => {
                 const on = c.blockedModels.includes(m.id);
-                return <button key={m.id} disabled={!allowed} aria-pressed={on} onClick={() => set(scope, { blockedModels: on ? c.blockedModels.filter((x) => x !== m.id) : [...c.blockedModels, m.id] })} className={`rounded-full border px-2 py-0.5 text-[11px] ${on ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-border text-muted-foreground"}`}>{m.name}</button>;
+                return <button key={m.id} disabled={!allowed} aria-pressed={on} onClick={() => set(scope, { blockedModels: on ? c.blockedModels.filter((x) => x !== m.id) : [...c.blockedModels, m.id] })} className={`rounded-full border px-2 py-0.5 text-[11px] ${on ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-border text-muted-foreground"}`}>{displayText(m.name)}</button>;
               })}
             </div>
           </details>

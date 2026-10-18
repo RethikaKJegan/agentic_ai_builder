@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/api/client";
@@ -28,7 +29,7 @@ function EntitySources({
           className="block break-all text-left text-sm text-primary underline"
           onClick={() => select(mapping.node_id)}
         >
-          {sourceLabel(mapping.node_id)} · {mapping.role} · {mapping.status}
+          {displayText(sourceLabel(mapping.node_id))} · {mapping.role} · {mapping.status}
         </button>
       ))}
       {mappings.length > limit && (
@@ -230,6 +231,7 @@ export default function DetailedGraph({
     }
     return path.length ? path.join(" / ") : id;
   };
+  const nodeText = (n: DetailedNode) => displayText(n.label, /mongo|atlas/i.test(sourceLabel(n.node_id)) ? "mongodb" : "postgresql");
   const disabled = !canManage || busy || !view || view.stale;
   const matches = (n: DetailedNode) =>
     (!connection || n.connection_id === connection) &&
@@ -339,7 +341,7 @@ export default function DetailedGraph({
               type="button"
               className="shrink-0 rounded border px-2 py-1 text-xs"
               aria-expanded={open}
-              aria-label={`${open ? "Collapse" : "Expand"} ${n.label}`}
+              aria-label={`${open ? "Collapse" : "Expand"} ${nodeText(n)}`}
               onClick={() =>
                 setExpanded((s) => {
                   const next = new Set(s);
@@ -358,7 +360,7 @@ export default function DetailedGraph({
             className="min-w-0 break-all rounded px-2 py-1 text-left text-sm hover:bg-muted"
             onClick={() => setSelected(n.node_id)}
           >
-            {n.label} <span className="text-xs text-muted-foreground">({n.kind})</span>
+            {nodeText(n)} <span className="text-xs text-muted-foreground">({n.kind})</span>
           </button>
         </div>
         {open && depth < 8 && (
@@ -377,7 +379,7 @@ export default function DetailedGraph({
     );
   }
   return (
-    <section aria-label="Detailed knowledge graph" className="min-w-0 space-y-4">
+    <section aria-label="Detailed Semantic Intelligence" className="min-w-0 space-y-4">
       <ApiFeedback error={error} onRetry={() => reload.current()} />
       {notice && (
         <p role="status" className="text-sm">
@@ -444,7 +446,7 @@ export default function DetailedGraph({
                   .filter((n) => n.kind === "connection")
                   .map((n) => (
                     <option key={n.node_id} value={n.node_id}>
-                      {n.label}
+                      {nodeText(n)}
                     </option>
                   ))}
               </select>
@@ -466,7 +468,7 @@ export default function DetailedGraph({
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)]">
             <nav
-              aria-label="Knowledge graph explorer"
+              aria-label="Semantic Intelligence explorer"
               className="min-w-0 max-h-[600px] space-y-2 overflow-auto rounded-xl border p-3"
             >
               {business ? (
@@ -481,9 +483,9 @@ export default function DetailedGraph({
                       className="block w-full break-words rounded border p-3 text-left text-sm"
                       onClick={() => setSelected(m.node_id)}
                     >
-                      {m.entity_name} · {m.role}
+                      {displayText(m.entity_name)} · {m.role}
                       <span className="block text-xs">
-                        {sourceLabel(m.node_id)} · {m.status}
+                        {displayText(sourceLabel(m.node_id))} · {m.status}
                       </span>
                     </button>
                   ))}
@@ -503,7 +505,7 @@ export default function DetailedGraph({
                       className="block break-all p-2 text-left text-sm"
                       onClick={() => setSelected(n.node_id)}
                     >
-                      {n.label} ({n.kind})
+                      {nodeText(n)} ({n.kind})
                     </button>
                   ))}
                   {visibleNodes.length > limit && (
@@ -524,7 +526,7 @@ export default function DetailedGraph({
               {node ? (
                 <>
                   <section className="rounded-xl border p-4">
-                    <h3 className="break-all text-lg font-semibold">{node.label}</h3>
+                    <h3 className="break-all text-lg font-semibold">{nodeText(node)}</h3>
                     <p className="text-xs">
                       {node.kind} · {node.discovery_method}
                     </p>
@@ -534,16 +536,16 @@ export default function DetailedGraph({
                         className="mt-2 text-sm text-primary underline"
                         onClick={() => setSelected(node.parent_id!)}
                       >
-                        Parent: {nodes.get(node.parent_id)?.label}
+                        Parent: {displayText(nodes.get(node.parent_id)?.label)}
                       </button>
                     )}
-                    {node.description && <p className="mt-2 text-sm">{node.description}</p>}
+                    {node.description && <p className="mt-2 text-sm">{displayText(node.description)}</p>}
                     <details className="mt-3">
                       <summary className="cursor-pointer text-sm">
                         Discovered metadata and constraints
                       </summary>
                       <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">
-                        {JSON.stringify(node.metadata, null, 2)}
+                        {displayText(JSON.stringify(node.metadata, null, 2))}
                       </pre>
                     </details>
                     {mapping && (
@@ -551,7 +553,7 @@ export default function DetailedGraph({
                         className="mt-3 block text-sm text-primary underline"
                         onClick={() => setSelected(mapping.entity_id)}
                       >
-                        Inspect entity: {mapping.entity_name}
+                        Inspect entity: {displayText(mapping.entity_name)}
                       </button>
                     )}
                     {node.kind === "entity" && (
@@ -610,8 +612,8 @@ export default function DetailedGraph({
                 {related.slice(0, 100).map((e) => (
                   <details key={e.relationship_id} className="rounded-xl border p-3">
                     <summary className="cursor-pointer break-words text-sm">
-                      {nodes.get(e.source_dataset_id)?.label} {e.kind === "declared" ? "→" : "↔"}{" "}
-                      {nodes.get(e.target_dataset_id)?.label} ·{" "}
+                      {displayText(nodes.get(e.source_dataset_id)?.label)} {e.kind === "declared" ? "→" : "↔"}{" "}
+                      {displayText(nodes.get(e.target_dataset_id)?.label)} ·{" "}
                       {e.review_stale ? "needs review" : e.status}
                     </summary>
                     <p className="mt-2 text-xs">
@@ -627,14 +629,14 @@ export default function DetailedGraph({
                           className="text-left text-primary underline"
                           onClick={() => setSelected(p.source_field_id)}
                         >
-                          {sourceLabel(p.source_field_id)}
+                          {displayText(sourceLabel(p.source_field_id))}
                         </button>
                         {e.kind === "declared" ? " → " : " ↔ "}
                         <button
                           className="text-left text-primary underline"
                           onClick={() => setSelected(p.target_field_id)}
                         >
-                          {sourceLabel(p.target_field_id)}
+                          {displayText(sourceLabel(p.target_field_id))}
                         </button>
                       </p>
                     ))}
@@ -660,7 +662,7 @@ export default function DetailedGraph({
                             disabled={disabled || (!e.review_stale && e.status === status)}
                             onClick={() => void reviewRelationship(e.relationship_id, status)}
                           >
-                            {label}
+                            {displayText(label)}
                           </button>
                         ))}
                       </div>

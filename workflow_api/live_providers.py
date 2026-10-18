@@ -216,6 +216,8 @@ class LivePlannerProvider:
                 if seed is None:
                     workflow = compile_inventory_report(workflow, objective, supplied)
             except PlannerFailure as exc:
+                if not exc.retryable:
+                    raise
                 if attempt == 0:
                     supplied['validation_feedback'] = [{'code': exc.code, 'hint': str(exc)}]
                     continue

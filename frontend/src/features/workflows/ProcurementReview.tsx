@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { useBackend } from "@/api/state";
@@ -144,7 +145,7 @@ export function ProcurementReview({ workflow, onStarted }: { workflow: Workflow;
   return <Dialog open={open} onOpenChange={next=>{setOpen(next);if(next){setTab('overview');void load();}}}>
     <DialogTrigger className="inline-flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm hover:bg-muted"><Settings2 className="h-4 w-4"/>Procurement setup &amp; status</DialogTrigger>
     <DialogContent className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
-      <div className="border-b bg-background px-6 py-5 pr-12"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-primary">Procurement workspace</p><DialogTitle className="text-xl">{draft.name}</DialogTitle><DialogDescription className="mt-2 text-xs">{draft.simulation?'Simulation':'Real procurement'} · {draft.action_mode==='automatic'?'Automatic action policy':'Approval-based actions'} · source spreadsheet stays unchanged</DialogDescription></div>
+      <div className="border-b bg-background px-6 py-5 pr-12"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-primary">Procurement workspace</p><DialogTitle className="text-xl">{displayText(draft.name)}</DialogTitle><DialogDescription className="mt-2 text-xs">{draft.simulation?'Simulation':'Real procurement'} · {draft.action_mode==='automatic'?'Automatic action policy':'Approval-based actions'} · source spreadsheet stays unchanged</DialogDescription></div>
       <nav aria-label="Procurement sections" className="flex shrink-0 gap-1 overflow-x-auto border-b bg-background px-4 py-2">{(['overview','setup','vendors','orders','activity'] as const).map(item=><button key={item} onClick={()=>setTab(item)} aria-pressed={tab===item} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm ${tab===item?'bg-primary/5 font-medium text-primary':'text-muted-foreground hover:bg-muted'}`}>{item==='vendors'?'Vendors & quotes':item.charAt(0).toUpperCase()+item.slice(1)}</button>)}</nav>
       <div className="min-h-0 flex-1 overflow-y-auto bg-muted/15 p-4 sm:p-6">
       <div hidden={tab!=='setup'} className="space-y-5 rounded-2xl border bg-background p-5">
@@ -172,7 +173,7 @@ export function ProcurementReview({ workflow, onStarted }: { workflow: Workflow;
           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, calendar_id: e.target.value } })} /></label>
         <label className="block">Reminder minutes<input type="number" min={0} max={40320} disabled={!editable || busy} className="mt-1 w-full rounded-lg border bg-background px-3 py-2" value={draft.phase2.reminder_minutes}
           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, reminder_minutes: Number(e.target.value) } })} /></label>
-        <label className="block">Total project spending limit ({draft.context["comparison_currency"]})<input disabled={!editable || busy} className="mt-1 w-full rounded-lg border bg-background px-3 py-2" value={draft.phase2.purchasing_limit ?? ""}
+        <label className="block">Total project spending limit ({displayText(draft.context["comparison_currency"])})<input disabled={!editable || busy} className="mt-1 w-full rounded-lg border bg-background px-3 py-2" value={draft.phase2.purchasing_limit ?? ""}
           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, purchasing_limit: e.target.value || null } })} /></label>
         <label className="block"><input type="checkbox" disabled={!editable || busy} checked={draft.phase2.allow_single_offer}
           onChange={e => setDraft({ ...draft, phase2: { ...draft.phase2!, allow_single_offer: e.target.checked } })} /> Permit a sole qualifying offer</label>
@@ -190,7 +191,7 @@ export function ProcurementReview({ workflow, onStarted }: { workflow: Workflow;
       {startRun && <p role="status" className="text-sm">Submitted run {startRun}. Check Runs for its progress.</p>}
       <details open={!status||status.phase==='NOT_STARTED'} className="rounded-xl border bg-background p-4"><summary className="cursor-pointer text-xs font-medium">Start & release information</summary><div className="mt-3 space-y-3">
       <p className="text-sm">This workflow starts manually. No new spreadsheet row is needed. Publish and activate, then start procurement here. Runs, Agent communication and Approvals show the actual actions.</p>
-      {startReason && <p role="status" className="text-sm">{startReason}</p>}
+      {startReason && <p role="status" className="text-sm">{displayText(startReason)}</p>}
       <button disabled={busy || !!startReason || !backend.can("workflow.execute") || !backend.session?.runtime_available} onClick={() => void start()} className="rounded border px-3 py-1 text-sm disabled:opacity-40">{busy ? "Working…" : "Start procurement"}</button>
 
       {notStarted && activeRelease && <p role="status" className="text-sm">{startRun ? "The submitted run has not created the project yet. Refresh status after the worker advances it." : "Ready to start. Click Start procurement to read the source sheets and create the project."}</p>}
@@ -202,13 +203,13 @@ export function ProcurementReview({ workflow, onStarted }: { workflow: Workflow;
         <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer text-xs font-medium">Recorded phase and counts</summary><p className="mt-2">{status.phase}</p><p className="mt-1 text-xs">{Object.entries(status.record_counts).map(([kind,count])=>`${kind}: ${count}`).join(' · ')}</p></details>
         </div>
         <div hidden={tab!=='vendors'} className="space-y-3"><h3 className="text-base font-semibold">Supplier offers & selection</h3><ProcurementVendors status={status}/><p className="text-xs text-muted-foreground">Recommendations reflect the backend comparison. An RFQ submission is separate from a qualifying quotation.</p>
-        {(status.recommendations ?? []).map(r => <p key={r.scope_digest}>{r.item_ids.join(", ")}: {r.reason.replaceAll("_", " ")}{r.amount ? ` · ${r.amount} ${r.currency}` : ""}{r.quotation_id ? ` · ${r.quotation_id}` : ""}</p>)}
+        {(status.recommendations ?? []).map(r => <p key={r.scope_digest}>{r.item_ids.join(", ")}: {displayText(r.reason.replaceAll("_", " "))}{r.amount ? ` · ${r.amount} ${r.currency}` : ""}{r.quotation_id ? ` · ${r.quotation_id}` : ""}</p>)}
         {status.phase === "SHORTLIST_REVIEW" && <section className="space-y-2 rounded border p-2">
           <p className="font-medium">Review supplier shortlist</p>
           <p>Published contacts and product claims require your review. Availability and delivery are not verified quotations.</p>
           {status.candidates.map(c => <div key={c.candidate_id} className="rounded border p-2">
             <label><input type="checkbox" disabled={!c.email || busy} checked={selected.includes(c.candidate_id)}
-              onChange={e => setSelected(e.target.checked ? [...selected, c.candidate_id] : selected.filter(id => id !== c.candidate_id))} /> {c.name}</label>
+              onChange={e => setSelected(e.target.checked ? [...selected, c.candidate_id] : selected.filter(id => id !== c.candidate_id))} /> {displayText(c.name)}</label>
             <p>{c.email ?? "No published email — cannot contact"} · {c.categories.join(", ")}</p><p>{c.assessment}</p>
             {c.evidence.map((ev, i) => <p key={i}><a href={ev.url.startsWith("https://") ? ev.url : undefined} target="_blank" rel="noreferrer" className="text-primary underline">Source</a>: {ev.quote}</p>)}
           </div>)}
@@ -239,13 +240,13 @@ export function ProcurementReview({ workflow, onStarted }: { workflow: Workflow;
           {po.tracking_references.length > 0 && <p>Tracking: {po.tracking_references.join(", ")}</p>}
           {po.unresolved_exception_ids.length > 0 && <p>Unresolved exceptions: {po.unresolved_exception_ids.join(", ")}</p>}
         </section>)}
-        {Object.values(status.fulfilment_review ?? {}).map((item, i) => <p key={i}>Clarification requested: {item.po_id} · {item.reason}</p>)}
+        {Object.values(status.fulfilment_review ?? {}).map((item, i) => <p key={i}>Clarification requested: {item.po_id} · {displayText(item.reason)}</p>)}
         </div>
         <div hidden={tab!=='activity'} className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold">Recorded activity</h3><input aria-label="Search activity" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search events, orders or messages…" className="rounded-lg border bg-background px-3 py-2 text-xs"/></div>
         {!(status.activity??[]).length&&<p className="rounded-xl border bg-background p-5 text-muted-foreground">No fulfilment events yet. Activity appears after a valid supplier or buyer reply is processed.</p>}
         {[...(status.activity ?? [])].reverse().filter(e=>JSON.stringify(e).toLowerCase().includes(search.toLowerCase())).map(event => <article key={event.event_id} className="rounded-xl border bg-background p-4"><div className="flex flex-wrap justify-between gap-2"><p className="font-medium capitalize">{event.event_kind.replaceAll('_',' ').toLowerCase()}</p><time className="text-[10px] text-muted-foreground">{new Date(event.observed_at).toLocaleString()}</time></div><p className="mt-2 text-xs leading-5">{event.note}</p><p className="mt-2 text-[10px] text-muted-foreground">{event.actor_role} · {event.purchase_order_id}</p></article>)}
         <details className="rounded-xl border bg-background p-4"><summary className="cursor-pointer text-xs font-medium">All recorded actions & run references</summary>
-        {Object.entries(status.actions).map(([name, action]) => <p key={name}>{name}: {action.state}{action.run_id ? ` · ${action.run_id}` : ""}</p>)}
+        {Object.entries(status.actions).map(([name, action]) => <p key={name}>{displayText(name)}: {action.state}{action.run_id ? ` · ${action.run_id}` : ""}</p>)}
         </details></div>
         <a href="/app/approvals" className="block text-primary underline">Open action approvals</a>
       </div>}

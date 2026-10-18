@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useMemo, useState } from "react";
 import {
   ReactFlow,
@@ -108,7 +109,7 @@ export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTr
           const gate = graph?.nodes.find(candidate => candidate.id === details?.["node_id"]);
           const operationId = details?.["database_operation_id"];
           return <div key={`${trace.runId}:${approval.approval_id}:${approval.status}`} className="min-w-0 space-y-2 break-words">
-            <p className="text-sm font-medium">{gate?.data.label ?? "Pending action"}</p>
+            <p className="text-sm font-medium">{displayText(gate?.data.label ?? "Pending action")}</p>
             <ApprovalControl approval={approval} emailPreview={details?.["email_preview"]} databaseOperationId={typeof operationId === "string" ? operationId : undefined} onUpdated={trace.retry} />
           </div>;
         })}
@@ -163,7 +164,7 @@ export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTr
                     onClick={() => setSelected(n.id)}
                     className={`w-full rounded-lg border p-2 text-left text-sm ${selected === n.id ? "border-primary" : "border-border"}`}
                   >
-                    {i + 1}. {n.data.label} · {n.data.kind} ·{" "}
+                    {i + 1}. {displayText(n.data.label)} · {n.data.kind} ·{" "}
                     {trace.runState[n.id] ?? "No recorded status"}
                   </button>
                 </li>
@@ -171,7 +172,7 @@ export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTr
             </ol>
             {node && (
               <div className="mt-4">
-                <h3 className="mb-2 font-medium">{node.data.label}</h3>
+                <h3 className="mb-2 font-medium">{displayText(node.data.label)}</h3>
                 <NodeTrace node={node} trace={trace} />
               </div>
             )}
@@ -182,7 +183,7 @@ export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTr
                   <li key={e.event_id} className="break-words rounded-lg border p-2 text-xs">
                     {e.event_type} · {e.timestamp}
                     <pre className="overflow-auto whitespace-pre-wrap">
-                      {JSON.stringify(e.details, null, 2)}
+                      {displayText(JSON.stringify(e.details, null, 2))}
                     </pre>
                   </li>
                 ))}

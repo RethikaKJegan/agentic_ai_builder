@@ -14,5 +14,6 @@ def read_page(store, workspace, cursor=None, limit=50, connection=None):
             ORDER BY r.workflow_id LIMIT ?''',(workspace,cursor or '',limit+1)).fetchall()
         total=db.execute('''SELECT COUNT(DISTINCT r.workflow_id) FROM revisions r WHERE r.workspace=?
             AND NOT EXISTS (SELECT 1 FROM lifecycle_tombstones t WHERE t.workspace=r.workspace AND t.workflow_id=r.workflow_id)''',(workspace,)).fetchone()[0]
-    items=[json.loads(row[0]) for row in rows[:limit]]
+        from .workflow_titles import project
+        items=[project(db,workspace,json.loads(row[0])) for row in rows[:limit]]
     return dict(items=items,total=total,has_more=len(rows)>limit,next_cursor=items[-1]['workflow_id'] if len(rows)>limit else None)

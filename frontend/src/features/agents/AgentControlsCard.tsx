@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useMemo } from "react";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 import { Link } from "@/lib/navigation";
@@ -40,7 +41,7 @@ export function AgentControlsCard({ agent }: { agent: Agent }) {
         <Switch checked={!agent.paused} disabled={!allowed} onCheckedChange={(v) => setPaused(agent.id, !v)} aria-label="Agent active" />
       </label>
       <p className="text-[11px] text-muted-foreground">
-        {parent ? <>Sub-agent of <Link to="/app/agents" search={{ agent: parent.id }} className="text-primary">{parent.name}</Link>{parent.paused && <span className="text-warning"> · parent paused</span>}</> : children.length ? `Master agent · ${children.length} sub-agent${children.length > 1 ? "s" : ""}` : "Standalone agent"}
+        {parent ? <>Sub-agent of <Link to="/app/agents" search={{ agent: parent.id }} className="text-primary">{displayText(parent.name)}</Link>{parent.paused && <span className="text-warning"> · parent paused</span>}</> : children.length ? `Master agent · ${children.length} sub-agent${children.length > 1 ? "s" : ""}` : "Standalone agent"}
       </p>
       <div className="flex items-center justify-between gap-3 text-sm">
         <label htmlFor={`budget-${agent.id}`}>Max execution budget<span className="block text-[11px] text-muted-foreground">Estimated USD, lifetime · empty = no cap</span></label>
@@ -62,7 +63,7 @@ export function AgentControlsCard({ agent }: { agent: Agent }) {
         <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-primary">Usage & history <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" /></summary>
         <p className="mt-2 text-xs text-muted-foreground">{usage.runs.length} runs · ${usage.cost.toFixed(4)} estimated · {usage.blocked} blocked <span className="text-muted-foreground/70">(backend pending)</span></p>
         <ul className="mt-1.5 space-y-1">
-          {usage.runs.slice(0, 5).map((r) => <li key={r.id} className="flex items-center gap-2 text-xs"><StatusPill status={r.status} /><span className="min-w-0 flex-1 truncate">{r.workflowName}</span><span className="text-muted-foreground">{new Date(r.startedAt).toLocaleDateString()}</span></li>)}
+          {usage.runs.slice(0, 5).map((r) => <li key={r.id} className="flex items-center gap-2 text-xs"><StatusPill status={r.status} /><span className="min-w-0 flex-1 truncate">{displayText(r.workflowName)}</span><span className="text-muted-foreground">{new Date(r.startedAt).toLocaleDateString()}</span></li>)}
           {usage.runs.length === 0 && <li className="text-xs text-muted-foreground">Run history is awaiting backend integration.</li>}
         </ul>
       </details>

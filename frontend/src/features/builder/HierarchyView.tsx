@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { ProcurementProjectCommunication } from './ProcurementProjectCommunication';
 import { CommunicationDiagram } from './CommunicationDiagram';
 import { workflowDiagram } from '@/domain/communication-diagram';
@@ -69,7 +70,7 @@ export function HierarchyView({
                 style={{ marginLeft: parent ? 12 : 0 }}
               >
                 <h3 className="font-medium">
-                  {role} · {agent?.name ?? definition?.role ?? row.node?.data.label}
+                  {role} · {displayText(agent?.name ?? definition?.role ?? row.node?.data.label)}
                 </h3>
                 <p className="text-sm">
                   Parent: {parent ?? "None declared"}
@@ -79,10 +80,10 @@ export function HierarchyView({
                 </p>
                 <p className="mt-1 text-sm">
                   Responsibility:{" "}
-                  {agent?.purpose ||
+                  {displayText(agent?.purpose ||
                     definition?.goal ||
                     row.node?.data.description ||
-                    "Needs configuration"}
+                    "Needs configuration")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Agent configuration: {agent ? "Defined; server validation required" : "Missing"} ·

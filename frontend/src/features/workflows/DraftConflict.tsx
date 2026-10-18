@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useRef, useState } from "react";
 import { api } from "@/api/client";
 import { fromCanonical, ownsAgent, hasWorkflowEdits, workflowEditSnapshot } from "@/api/mapping";
@@ -167,8 +168,8 @@ export function DraftConflict({
         <details>
           <summary>Compare server and loaded baseline</summary>
           <div className="grid max-h-64 gap-2 overflow-auto sm:grid-cols-2">
-            <pre className="overflow-auto">{JSON.stringify(workflow.canonical, null, 2)}</pre>
-            <pre className="overflow-auto">{JSON.stringify(workflow.remote, null, 2)}</pre>
+            <pre className="overflow-auto">{displayText(JSON.stringify(workflow.canonical, null, 2))}</pre>
+            <pre className="overflow-auto">{displayText(JSON.stringify(workflow.remote, null, 2))}</pre>
           </div>
         </details>
       )}

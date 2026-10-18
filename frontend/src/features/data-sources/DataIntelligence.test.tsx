@@ -11,3 +11,25 @@ it('requires a successful test and invalidates it after editing',async()=>{vi.sp
 it('shows discovered fields and sampling coverage',async()=>{vi.spyOn(api,'databaseMetadata').mockResolvedValue({connection,snapshot:{connection_id:connection.connection_id,engine:'mongodb',revision:1,discovered_at:connection.created_at,datasets:[{dataset_id:'dataset',name:'customers',database:'workshop',schema:null,kind:'collection',fields:[{field_id:'field',name:'customer_id',types:['string'],discovery_method:'sampled',present_in_samples:2}],indexes:[],constraints:[],sample_count:2,discovery_method:'sampled'}],warnings:[],coverage:'sampled',limits:{datasets:100},changes:{added:['customers'],removed:[],changed:[]}}});render(<DataIntelligence/>);fireEvent.click(await screen.findByRole('button',{name:'View metadata'}));expect(await screen.findByText('customer_id')).toBeVisible();expect(screen.getByText(/Observed in 2 sampled documents/)).toBeVisible();});
 it('requires permission for connection management',async()=>{useBackend.setState({can:permission=>permission==='tools.read'});render(<DataIntelligence/>);expect(await screen.findByRole('button',{name:'Connect MongoDB Atlas'})).toBeDisabled();});
 it('clears credentials when connection dialog closes',async()=>{render(<DataIntelligence/>);fireEvent.click(await screen.findByRole('button',{name:'Connect MongoDB Atlas'}));fireEvent.change(screen.getByLabelText('Connection URI'),{target:{value:'secret-value'}});fireEvent.click(screen.getByRole('button',{name:'Close'}));fireEvent.click(screen.getByRole('button',{name:'Connect MongoDB Atlas'}));expect(screen.getByLabelText('Connection URI')).toHaveValue('');});
+
+it('reconnects a disconnected entry using verified replacement credentials and the same ID',async()=>{
+ vi.mocked(api.dataSources).mockResolvedValue({configured:true,shared_demo_identity:false,items:[{...connection,connection_status:'disconnected'}]});
+ const connect=vi.spyOn(api,'connectDatabase').mockResolvedValue({success:true,message:'OK'});
+ render(<DataIntelligence/>);fireEvent.click(await screen.findByRole('button',{name:'Reconnect'}));
+ expect(screen.getByLabelText('Connection URI')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('Connection URI'),{target:{value:'mongodb+srv://u:p@demo.mongodb.net/workshop'}});
+ fireEvent.click(screen.getByRole('button',{name:'Test connection'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Save and profile'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Save and profile'}));
+ await waitFor(()=>expect(connect).toHaveBeenLastCalledWith(expect.objectContaining({database:'workshop'}),false,connection.connection_id));
+});
+it('requires confirmation before deleting and refreshes the connection list',async()=>{
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+ const action=vi.spyOn(api,'databaseAction').mockResolvedValue(connection);
+ render(<DataIntelligence/>);const remove=await screen.findByRole('button',{name:'Delete connection'});
+ fireEvent.click(remove);expect(action).not.toHaveBeenCalled();
+ confirm.mockReturnValue(true);vi.mocked(api.dataSources).mockResolvedValue({configured:true,shared_demo_identity:false,items:[]});
+ fireEvent.click(remove);await waitFor(()=>expect(action).toHaveBeenCalledWith(connection.connection_id,'delete'));
+ expect(await screen.findByText('Connection deleted from the app. Cloud data is unchanged.')).toBeVisible();
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Delete connection'})).toBeNull());
+});

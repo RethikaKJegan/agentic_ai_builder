@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 
@@ -138,7 +139,7 @@ const ChartTooltipContent = React.forwardRef<
 
       if (labelFormatter) {
         return (
-          <div className={cn("font-medium", labelClassName)}>{labelFormatter(value, payload)}</div>
+          <div className={cn("font-medium", labelClassName)}>{displayText(labelFormatter(value, payload))}</div>
         );
       }
 
@@ -163,7 +164,7 @@ const ChartTooltipContent = React.forwardRef<
           className,
         )}
       >
-        {!nestLabel ? tooltipLabel : null}
+        {displayText(!nestLabel ? tooltipLabel : null)}
         <div className="grid gap-1.5">
           {payload
             .filter((item) => item.type !== "none")
@@ -215,9 +216,9 @@ const ChartTooltipContent = React.forwardRef<
                         )}
                       >
                         <div className="grid gap-1.5">
-                          {nestLabel ? tooltipLabel : null}
+                          {displayText(nestLabel ? tooltipLabel : null)}
                           <span className="text-muted-foreground">
-                            {itemConfig?.label || item.name}
+                            {displayText(itemConfig?.label || item.name)}
                           </span>
                         </div>
                         {item.value && (
@@ -286,7 +287,7 @@ const ChartLegendContent = React.forwardRef<
                   }}
                 />
               )}
-              {itemConfig?.label}
+              {displayText(itemConfig?.label)}
             </div>
           );
         })}

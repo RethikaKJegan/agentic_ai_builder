@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dagre from "@dagrejs/dagre";
 import { api } from "@/api/client";
@@ -43,7 +44,7 @@ export default function BusinessOntology({
       }
     } catch (e) {
       if (id === sequence.current)
-        setError(e instanceof Error ? e : new Error("Knowledge graph unavailable."));
+        setError(e instanceof Error ? e : new Error("Semantic Intelligence unavailable."));
     }
   }, [onStatus]);
   const invalidate = useCallback(() => {
@@ -61,7 +62,7 @@ export default function BusinessOntology({
   }, [load, invalidate, refreshToken]);
   const connections = useMemo(
     () => [...new Map((view?.entities ?? []).flatMap(e => e.sources.map(source =>
-      [source.connection_id, source.label.split(" / ")[0]] as const))).entries()], [view]);
+      [source.connection_id, displayText(source.label).split(" / ")[0]] as const))).entries()], [view]);
   const connectionDatasets = new Set((view?.datasets ?? []).filter(d => !connection || d.connection_id === connection).map(d => d.dataset_id));
   const scopedEdges = (view?.relationships ?? []).filter(e => !connection ||
     (connectionDatasets.has(e.source_dataset_id) && connectionDatasets.has(e.target_dataset_id)));
@@ -93,7 +94,7 @@ export default function BusinessOntology({
       );
     dagre.layout(graph);
     return graph;
-    // The knowledge graph revision versions entities, relationships and reviews together.
+    // The Semantic Intelligence revision versions entities, relationships and reviews together.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view?.revision, search, connection,semanticFilter]);
   const width = Math.max(500, layout.graph().width ?? 500),
@@ -123,7 +124,7 @@ export default function BusinessOntology({
     },
   });
   return (
-    <section aria-label="Knowledge graph" className="space-y-4">
+    <section aria-label="Semantic Intelligence" className="space-y-4">
       <ApiFeedback error={error} onRetry={load} />
       {notice && <p role="status" className="text-sm">{notice}</p>}
       {view?.last_error && (
@@ -133,10 +134,10 @@ export default function BusinessOntology({
       )}
       {view?.stale && (
         <p role="status" className="rounded-lg border border-amber-300 p-3 text-sm">
-          This knowledge graph is updating. The latest metadata will appear when rebuilding finishes.
+          This Semantic Intelligence is updating. The latest metadata will appear when rebuilding finishes.
         </p>
       )}
-      {!view && !error && <p role="status">Loading knowledge graph…</p>}
+      {!view && !error && <p role="status">Loading Semantic Intelligence…</p>}
       {view && (
         <>
           <p role="status" className="text-xs text-muted-foreground">
@@ -148,43 +149,43 @@ export default function BusinessOntology({
             <select aria-label="Semantic relationship status" className={control} value={semanticFilter} onChange={e=>setSemanticFilter(e.target.value)}>{["all","inferred","confirmed","ambiguous","needs_review","rejected"].map(status=><option key={status} value={status}>{status==="all"?"All semantic statuses":status.replaceAll("_"," ")}</option>)}</select>
             <input
               className={control}
-              aria-label="Search knowledge graph"
+              aria-label="Search Semantic Intelligence"
               placeholder="Search entities, relationships or sources"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <select
               className={`${control} max-w-full`}
-              aria-label="Knowledge graph connection"
+              aria-label="Semantic Intelligence connection"
               value={connection}
               onChange={(e) => setConnection(e.target.value)}
             >
               <option value="">All connections</option>
               {connections.map(([id, name]) => (
                 <option key={id} value={id}>
-                  {name}
+                  {displayText(name)}
                 </option>
               ))}
             </select>
             <button
               className={control}
               onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.25, c.zoom / 1.3) }))}
-              aria-label="Zoom knowledge graph out"
+              aria-label="Zoom Semantic Intelligence out"
             >
               −
             </button>
-            <output className="self-center text-sm" aria-label="Knowledge graph zoom">
+            <output className="self-center text-sm" aria-label="Semantic Intelligence zoom">
               {Math.round(camera.zoom * 100)}%
             </output>
             <button
               className={control}
               onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(8, c.zoom * 1.3) }))}
-              aria-label="Zoom knowledge graph in"
+              aria-label="Zoom Semantic Intelligence in"
             >
               +
             </button>
             <button className={control} onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>
-              Fit knowledge graph
+              Fit Semantic Intelligence
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -201,7 +202,7 @@ export default function BusinessOntology({
               <svg
                 ref={svg}
                 role="img"
-                aria-label="Knowledge graph"
+                aria-label="Semantic Intelligence"
                 className="h-full w-full touch-none select-none cursor-grab"
                 viewBox={`${(width - width / camera.zoom) / 2 + camera.x} ${(height - height / camera.zoom) / 2 + camera.y} ${width / camera.zoom} ${height / camera.zoom}`}
                 onPointerDown={(e) => {
@@ -252,7 +253,7 @@ export default function BusinessOntology({
                     <g
                       key={e.relationship_id}
                       {...activate(e.relationship_id)}
-                      aria-label={`Relationship ${label(e.source_entity_id)} ${e.predicate??"meaning needs review"} ${label(e.target_entity_id)}`}
+                      aria-label={displayText(`Relationship ${label(e.source_entity_id)} ${e.predicate??"meaning needs review"} ${label(e.target_entity_id)}`)}
                       className={`cursor-pointer ${e.status === "rejected" ? "opacity-30" : ""}`}
                     >
                       <path
@@ -307,7 +308,7 @@ export default function BusinessOntology({
                       key={e.entity_id}
                       {...activate(e.entity_id)}
                       className="cursor-pointer"
-                      aria-label={`Entity ${e.label}`}
+                      aria-label={displayText(`Entity ${e.label}`)}
                     >
                       <ellipse
                         cx={p.x}
@@ -325,7 +326,7 @@ export default function BusinessOntology({
                         fontWeight="600"
                         className="fill-foreground"
                       >
-                        {e.label.length > 23 ? e.label.slice(0, 22) + "…" : e.label}
+                        {displayText(e.label.length > 23 ? e.label.slice(0, 22) + "…" : e.label)}
                       </text>
                       <text
                         x={p.x}
@@ -336,37 +337,37 @@ export default function BusinessOntology({
                       >
                         {e.sources.length} source mappings
                       </text>
-                      <title>{e.label}</title>
+                      <title>{displayText(e.label)}</title>
                     </g>
                   );
                 })}
               </svg>
             </div>
-            <aside aria-label="Knowledge graph details" className="max-h-[650px] min-w-0 space-y-3 overflow-auto rounded-xl border p-4">
+            <aside aria-label="Semantic Intelligence details" className="max-h-[650px] min-w-0 space-y-3 overflow-auto rounded-xl border p-4">
               <h3 className="font-semibold">Inspect</h3>
               {entity ? <>
-                <h4 className="font-medium">{entity.label}</h4>
+                <h4 className="font-medium">{displayText(entity.label)}</h4>
                 <p className="break-all text-xs text-muted-foreground">Entity ID: {entity.entity_id}</p>
                 {entity.sources.map(source => <details key={source.node_id} className="rounded-lg border p-3">
-                  <summary className="cursor-pointer break-words text-sm">{source.label}</summary>
+                  <summary className="cursor-pointer break-words text-sm">{displayText(source.label)}</summary>
                   <p className="mt-2 text-xs">{source.role} · {source.status} · {source.types.join(", ")}</p>
-                  {source.description && <p className="mt-2 text-sm">{source.description}</p>}
-                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify({connection_id: source.connection_id, node_id: source.node_id, metadata: source.metadata}, null, 2)}</pre>
+                  {source.description && <p className="mt-2 text-sm">{displayText(source.description)}</p>}
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{displayText(JSON.stringify({connection_id: source.connection_id, node_id: source.node_id, metadata: source.metadata}, null, 2))}</pre>
                 </details>)}
               </> : edge ? <>
-                <h4 className="font-medium">{label(edge.source_entity_id)} → {edge.predicate ?? "Meaning needs review"} → {label(edge.target_entity_id)}</h4>
+                <h4 className="font-medium">{displayText(label(edge.source_entity_id))} → {edge.predicate ?? "Meaning needs review"} → {displayText(label(edge.target_entity_id))}</h4>
                 <p className="text-sm">Business: {edge.status} · Technical: {edge.technical_status}</p>
                 <KGRelationshipReview
                   key={`${edge.relationship_id}:${edge.semantic_evidence_hash}:${edge.inferred_at}:${edge.reviewed_at}`}
                   edge={edge} disabled={!canManage || busy || view.stale} save={body => void saveReview(body)}
                 />
-                <p className="text-sm">{edge.rationale}</p>
+                <p className="text-sm">{displayText(edge.rationale)}</p>
                 <p className="text-xs text-muted-foreground">Method: {edge.inference_method} · numerical confidence: not measured</p>
                 {edge.alternatives.length > 0 && <p className="text-xs">Alternatives: {edge.alternatives.join("; ")}</p>}
                 <h5 className="text-sm font-medium">Technical linking fields</h5>
-                {edge.field_pairs.map(pair => <p key={pair.source_field_id + pair.target_field_id} className="break-all text-xs">{pair.source_label} → {pair.target_label}</p>)}
+                {edge.field_pairs.map(pair => <p key={pair.source_field_id + pair.target_field_id} className="break-all text-xs">{displayText(pair.source_label)} → {displayText(pair.target_label)}</p>)}
                 <details open className="rounded-lg border p-3"><summary className="cursor-pointer text-sm">Evidence trace</summary>
-                  <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify({relationship_id: edge.relationship_id, graph_revision: view.graph_revision, inferred_at: edge.inferred_at, reviewed_at: edge.reviewed_at, evidence_refs: edge.evidence_refs, provenance: edge.provenance, evidence: edge.evidence, qualification: edge.qualification}, null, 2)}</pre>
+                  <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{displayText(JSON.stringify({relationship_id: edge.relationship_id, graph_revision: view.graph_revision, inferred_at: edge.inferred_at, reviewed_at: edge.reviewed_at, evidence_refs: edge.evidence_refs, provenance: edge.provenance, evidence: edge.evidence, qualification: edge.qualification}, null, 2))}</pre>
                 </details>
               </> : <p className="text-sm text-muted-foreground">Select a node or relationship to inspect its source metadata and evidence trace.</p>}
             </aside>

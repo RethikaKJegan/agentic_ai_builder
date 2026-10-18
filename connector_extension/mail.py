@@ -148,6 +148,8 @@ class MailConnector(Connector):
         if original_id:
             message['In-Reply-To'] = original_id; message['References'] = references
         message.set_content(inputs['body'])
+        from .mail_format import email_html
+        message.add_alternative(email_html(inputs['body']), subtype='html')
         total = 0
         for attachment in inputs.get('attachments', []):
             content = self.artifacts.get(self.namespace, attachment['artifact_id']); total += len(content)

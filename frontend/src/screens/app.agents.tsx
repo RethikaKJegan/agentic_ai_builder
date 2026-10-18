@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useRouteSearch } from "@/lib/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
 import { Bot, Network, Pause, Play, Plus } from "lucide-react";
@@ -46,13 +47,13 @@ export default function AgentsPage() {
                   <button onClick={() => navigate({ search: { agent: a.id } })} className="flex min-w-0 flex-1 items-center gap-4 text-left">
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMaster ? "bg-primary-deep" : "bg-primary"} text-primary-foreground`}>{isMaster ? <Network className="h-4 w-4" /> : <Bot className="h-4 w-4" />}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{a.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{isMaster ? "Master agent" : parent ? `Sub-agent of ${parent.name}` : a.role} · {getModel(a.modelId).name}</p>
+                      <p className="truncate font-medium">{displayText(a.name)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{displayText(isMaster ? "Master agent" : parent ? `Sub-agent of ${parent.name}` : a.role)} · {displayText(getModel(a.modelId).name)}</p>
                     </div>
-                    <span className="hidden text-xs text-muted-foreground md:inline">{uses.length ? `in ${uses[0]!.name}${uses.length > 1 ? ` +${uses.length - 1}` : ""}` : "unused"}</span>
+                    <span className="hidden text-xs text-muted-foreground md:inline">{displayText(uses.length ? `in ${uses[0]!.name}${uses.length > 1 ? ` +${uses.length - 1}` : ""}` : "unused")}</span>
                   </button>
                   <StatusPill status={a.paused ? "paused" : "draft"} tone={a.paused ? "warning" : "neutral"} />
-                  <button disabled={!mayControl} onClick={() => setPaused(a.id, !a.paused)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" aria-label={a.paused ? `Resume ${a.name}` : `Pause ${a.name}`} title={mayControl ? undefined : "Draft configuration only"}>
+                  <button disabled={!mayControl} onClick={() => setPaused(a.id, !a.paused)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" aria-label={displayText(a.paused ? `Resume ${a.name}` : `Pause ${a.name}`)} title={mayControl ? undefined : "Draft configuration only"}>
                     {a.paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                   </button>
                 </div>
@@ -63,7 +64,7 @@ export default function AgentsPage() {
       </div>
       {selected && (
         <aside className="w-full shrink-0 overflow-y-auto border-t border-border p-5 lg:w-[380px] lg:border-l lg:border-t-0">
-          <h2 className="mb-4 text-lg font-medium">{selected.name}</h2>
+          <h2 className="mb-4 text-lg font-medium">{displayText(selected.name)}</h2>
           <AgentInspector agent={selected} />
         </aside>
       )}

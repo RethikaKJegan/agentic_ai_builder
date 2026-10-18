@@ -1,0 +1,4 @@
+- [x] Update tab visibility and Semantic Intelligence terminology.
+- [x] Format source display labels without changing physical identifiers.
+- [x] Enlarge the Overview prompt box.
+- [x] Run relevant frontend checks, contract validation and review the diff.

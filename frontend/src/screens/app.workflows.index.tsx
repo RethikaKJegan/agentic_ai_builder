@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { Link, useNavigate } from "@/lib/navigation";
 import { Copy, MoreHorizontal, Pencil, Play, Plus, Power, Trash2 } from "lucide-react";
 import { useMesh } from "@/domain/store";
@@ -9,6 +10,8 @@ import { useBackend } from "@/api/state";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { api } from "@/api/client";
 import { RunWorkflowDialog } from "@/features/workflows/RunWorkflowDialog";
+import { RenameWorkflowDialog } from "@/features/workflows/RenameWorkflowDialog";
+import type { Workflow } from "@/domain/types";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
 import { useEffect, useRef, useState } from "react";
 
@@ -29,6 +32,7 @@ export default function WorkflowsPage() {
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [runDocument, setRunDocument] = useState<CanonicalWorkflow>();
+  const [renaming,setRenaming]=useState<Workflow>();
   const [actionError, setActionError] = useState<Error | null>(null);
   useEffect(() => {
     if (backendStatus !== "connected") return;
@@ -98,6 +102,7 @@ export default function WorkflowsPage() {
         <button type="button" disabled={backend.workflowPageBusy || !backend.workflowNextCursor} onClick={() => void backend.loadWorkflowPage(backend.workflowNextCursor)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{backend.workflowPageBusy ? "Loading workflows…" : "Next workflows"}</button>
       </nav>}
       {runDocument && <RunWorkflowDialog workflow={runDocument} onClose={() => setRunDocument(undefined)} />}
+      {renaming && <RenameWorkflowDialog workflow={renaming} onClose={()=>setRenaming(undefined)}/>}
       {visibleWorkflows.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No workflows yet. <Link to="/app" className="text-primary">Create your first draft</Link>.</p>
       ) : (
@@ -108,18 +113,19 @@ export default function WorkflowsPage() {
             return (
               <div key={w.id} className="flex items-center gap-4 px-4 py-3.5 hover:bg-canvas">
                 <Link to="/app/workflows/$id" params={{ id: w.id }} className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{w.name}</p>
+                  <p className="truncate font-medium">{displayText(w.name)}</p>
                   <p className="truncate text-xs text-muted-foreground">{w.nodes.length} steps · {live?.active_run_count ?? count} active runs · {live?.pending_approval_count ?? 0} pending approvals</p>
                   <p className="truncate text-xs text-muted-foreground">draft {live?.draft_version ? `v${live.draft_version}` : "—"} · published {live?.published_version ? `v${live.published_version}` : "—"} · latest {live?.latest_run_status ?? "no runs"}</p>
                 </Link>
                 <StatusPill status={live?.activation_state ?? `${w.serverVersion ? `v${w.serverVersion} · ` : "local · "}${w.status}`} tone={live?.activation_state === "active" ? "success" : "neutral"} />
                 <DropdownMenu>
-                  <DropdownMenuTrigger disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Actions for ${w.name}`}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
+                  <DropdownMenuTrigger disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={displayText(`Actions for ${w.name}`)}><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem disabled={busy || !live?.published_version || !backend.session?.runtime_available || !backend.can("workflow.execute")} onSelect={() => void run(w.id)}><Play className="mr-2 h-4 w-4" /> Run published</DropdownMenuItem>
                     {(!backend.can("workflow.execute") || !backend.session?.runtime_available || !live?.published_version) && <p className="max-w-56 px-2 py-1 text-xs text-muted-foreground">{!backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : "Publish a revision before running."}</p>}
                     <DropdownMenuItem onSelect={() => navigate({ to: "/app/workflows/$id", params: { id: w.id } })}><Pencil className="mr-2 h-4 w-4" /> Edit draft</DropdownMenuItem>
-                    {live?.activation_state === "active" && backend.can("workflow.publish") && <DropdownMenuItem onSelect={() => void disable(w.id)}><Power className="mr-2 h-4 w-4" /> Disable</DropdownMenuItem>}
+                    <DropdownMenuItem disabled={busy || live?.activation_state !== "active" || !backend.can("workflow.publish")} title={live?.activation_state !== "active" ? "No active release to disable." : !backend.can("workflow.publish") ? "workflow.publish permission is required." : undefined} onSelect={() => void disable(w.id)}><Power className="mr-2 h-4 w-4" /> Disable</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy || (!!w.serverVersion && !backend.can("workflow.edit"))} onSelect={()=>setRenaming(w)}><Pencil className="mr-2 h-4 w-4" /> Rename</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => { const id = dup(w.id); if (id) toast("Duplicated as a local draft. Save draft to persist it on the server."); if (id) navigate({ to: "/app/workflows/$id", params: { id } }); }}><Copy className="mr-2 h-4 w-4" /> Duplicate</DropdownMenuItem>
                     {w.serverVersion && backend.can("workflow.delete") && <DropdownMenuItem className="text-destructive" onSelect={() => void remove(w.id, w.name)}><Trash2 className="mr-2 h-4 w-4" /> Delete workflow</DropdownMenuItem>}
                     {!w.serverVersion && <DropdownMenuItem className="text-destructive" onSelect={() => { if (window.confirm(`Delete local draft "${w.name}" from this browser?`)) { del(w.id); toast(`Deleted local draft "${w.name}"`); } }}><Trash2 className="mr-2 h-4 w-4" /> Delete local draft</DropdownMenuItem>}

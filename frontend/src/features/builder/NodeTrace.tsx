@@ -1,10 +1,11 @@
+import { displayText } from "@/lib/display-text";
 import type { WorkflowNode } from "@/domain/types";
 import type { WorkflowTrace } from "./useWorkflowTrace";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { StatusPill } from "@/features/shell/StatusPill";
 
 function Evidence({ title, value }: { title: string; value: unknown }) {
-  return <section className="space-y-1"><h3 className="text-sm font-semibold">{title}</h3>{value === undefined ? <p className="text-xs text-muted-foreground">Not captured for this run.</p> : <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 text-xs">{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre>}</section>;
+  return <section className="space-y-1"><h3 className="text-sm font-semibold">{displayText(title)}</h3>{value === undefined ? <p className="text-xs text-muted-foreground">Not captured for this run.</p> : <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 text-xs">{displayText(typeof value === "string" ? value : JSON.stringify(value, null, 2))}</pre>}</section>;
 }
 export function NodeTrace({ node, trace }: { node: WorkflowNode; trace: WorkflowTrace }) {
   const events = trace.events.filter((event) => event.details?.["node_id"] === node.id);
@@ -35,7 +36,7 @@ export function NodeTrace({ node, trace }: { node: WorkflowNode; trace: Workflow
       {decisions.length > 0 && <Evidence title="Delegation decisions" value={decisions.map((event) => ({ invocation_id: event.details?.["invocation_id"], action: event.details?.["action"], explanation: event.details?.["explanation"], decision: event.details?.["output"] }))} />}
       <Evidence title="Result" value={completed?.["output"]} />
       <Evidence title="Next steps" value={completed?.["next_nodes"]} />
-      <section><h3 className="text-sm font-semibold">Timeline · {events.length} events</h3><ol className="mt-2 space-y-2">{events.map((event) => <li key={event.event_id} className="rounded-lg border border-border p-2 text-xs"><p className="font-medium">{event.event_type}</p><time className="text-muted-foreground">{new Date(event.timestamp).toLocaleString()}</time><details className="mt-1"><summary className="cursor-pointer">Recorded details</summary><pre className="overflow-auto whitespace-pre-wrap break-words pt-2">{JSON.stringify(event.details, null, 2)}</pre></details></li>)}</ol></section>
+      <section><h3 className="text-sm font-semibold">Timeline · {events.length} events</h3><ol className="mt-2 space-y-2">{events.map((event) => <li key={event.event_id} className="rounded-lg border border-border p-2 text-xs"><p className="font-medium">{event.event_type}</p><time className="text-muted-foreground">{new Date(event.timestamp).toLocaleString()}</time><details className="mt-1"><summary className="cursor-pointer">Recorded details</summary><pre className="overflow-auto whitespace-pre-wrap break-words pt-2">{displayText(JSON.stringify(event.details, null, 2))}</pre></details></li>)}</ol></section>
     </>}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useEffect, useMemo, useState } from "react";
 import dagre from "@dagrejs/dagre";
 import {
@@ -38,7 +39,7 @@ function AgentCard({ data, selected }: NodeProps<CardNode>) {
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${card.label}${data.task ? ` · Task ${data.task}` : ""} · ${card.spawned ? "Spawned helper · " : ""}${card.status}`}
+      aria-label={displayText(`${card.label}${data.task ? ` · Task ${data.task}` : ""} · ${card.spawned ? "Spawned helper · " : ""}${card.status}`)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -66,13 +67,13 @@ function AgentCard({ data, selected }: NodeProps<CardNode>) {
           </span>
         )}
       </div>
-      <p className="mt-2 line-clamp-1 text-sm font-semibold leading-snug">{card.label}</p>
+      <p className="mt-2 line-clamp-1 text-sm font-semibold leading-snug">{displayText(card.label)}</p>
       <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-        {card.reason ??
+        {displayText(card.reason ??
           card.description ??
           (card.role === "Coordinator"
             ? "Coordinates the workflow and collects results."
-            : "Click to inspect this step’s inputs and results.")}
+            : "Click to inspect this step’s inputs and results."))}
       </p>
       {card.parent && (
         <p className="mt-1 truncate text-[10px] text-muted-foreground">
@@ -121,7 +122,7 @@ export function Connection({ data, ...props }: EdgeProps<ConnectionEdge>) {
             data?.inspect();
           }}
         >
-          {connection?.label}
+          {displayText(connection?.label)}
           {connection?.active ? " · Live" : ""}
         </button>
       </EdgeLabelRenderer>
@@ -144,7 +145,7 @@ function Evidence({ title, value }: { title: string; value: unknown }) {
   return (
     <section>
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
+        {displayText(title)}
       </h4>
       <div className="max-h-72 overflow-auto rounded-lg bg-muted/40 p-3">
         <ReadableEvidence value={value} />
@@ -178,7 +179,7 @@ function NodeDetails({ card }: { card: DiagramCard }) {
         <p className="text-xs font-medium text-primary">
           {card.role} · {card.status}
         </p>
-        <h3 className="mt-1 text-lg font-semibold">{card.label}</h3>
+        <h3 className="mt-1 text-lg font-semibold">{displayText(card.label)}</h3>
         {card.parent && (
           <p className="mt-2 text-sm">
             {card.spawned ? "Started by" : "Configured under"}: <strong>{card.parent}</strong>
@@ -236,7 +237,7 @@ function NodeDetails({ card }: { card: DiagramCard }) {
           )}
         </dl>
         <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words">
-          {JSON.stringify(card.events, null, 2)}
+          {displayText(JSON.stringify(card.events, null, 2))}
         </pre>
       </details>
     </div>
@@ -254,9 +255,9 @@ function ConnectionDetails({
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-medium text-primary">{connection.label}</p>
+        <p className="text-xs font-medium text-primary">{displayText(connection.label)}</p>
         <h3 className="mt-1 text-base font-semibold">
-          {from?.label} → {to?.label}
+          {displayText(from?.label)} → {displayText(to?.label)}
         </h3>
         <p className="mt-2 text-sm text-muted-foreground">
           {connection.recorded
@@ -282,7 +283,7 @@ function ConnectionDetails({
           <details className="text-xs">
             <summary className="cursor-pointer font-medium">Technical details</summary>
             <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words">
-              {JSON.stringify(event, null, 2)}
+              {displayText(JSON.stringify(event, null, 2))}
             </pre>
           </details>
         </section>

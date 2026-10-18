@@ -118,6 +118,24 @@ def test_disconnect_hides_nodes_immediately(manager):
     assert all(e['kind']=='declared' for e in view['graph']['relationships'])
 
 
+@pytest.mark.parametrize('status',['queued','running','failed'])
+def test_unverified_metadata_is_hidden_and_reviews_survive_unchanged_reprofile(manager,status):
+    graph=built(manager)['graph']
+    edge=next(e for e in graph['relationships'] if e['kind']=='suggested')
+    manager.edit(auth(),'review',edge['relationship_id'],dict(revision=graph['revision'],status='accepted'))
+    with manager.store.transaction() as db:
+        raw=db.execute("SELECT document FROM data_source_connections WHERE connection_id='mongo'").fetchone()[0]
+        doc=json.loads(raw);doc['profiling_status']=status;doc['generation']+=1
+        db.execute("UPDATE data_source_connections SET document=? WHERE connection_id='mongo'",(json.dumps(doc),))
+    assert all(n['connection_id']!='mongo' for n in manager.get(auth())['graph']['nodes'])
+    with manager.store.transaction() as db:
+        doc['profiling_status']='ready'
+        db.execute("UPDATE data_source_connections SET document=? WHERE connection_id='mongo'",(json.dumps(doc),))
+    manager.request(auth());manager.tick()
+    current=next(e for e in manager.get(auth())['graph']['relationships'] if e['relationship_id']==edge['relationship_id'])
+    assert current['status']=='accepted'
+
+
 def test_lease_recovery_and_no_obsolete_publication(manager):
     manager.request(auth())
     with manager.store.transaction() as db:db.execute("UPDATE data_relationship_jobs SET state='running',token='expired',lease_until=0,attempts=1")

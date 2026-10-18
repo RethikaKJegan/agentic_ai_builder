@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
@@ -158,7 +159,7 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
                   key={`${t.connection_id}:${t.dataset_id}`}
                   value={`${t.connection_id}:${t.dataset_id}`}
                 >
-                  {t.label}
+                  {displayText(t.label)}
                 </option>
               ))}
             </select>
@@ -202,10 +203,10 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
           {record && (
             <section aria-label="Record read result" className="min-w-0 rounded border p-3 text-sm">
               <p>
-                {record.matched_records} record matched · {record.label}
+                {record.matched_records} record matched · {displayText(record.label)}
               </p>
               <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
-                {JSON.stringify(record.record, null, 2)}
+                {displayText(JSON.stringify(record.record, null, 2))}
               </pre>
             </section>
           )}
@@ -290,11 +291,11 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
                 )?.label ?? step.dataset_id}
               </p>
               <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">
-                {JSON.stringify(
+                {displayText(JSON.stringify(
                   { identity: step.identity, values: step.values, remove: step.unset_fields },
                   null,
                   2,
-                )}
+                ))}
               </pre>
             </div>
           ))}
@@ -335,7 +336,7 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
           {operation.steps.map((step, index) => (
             <article key={index} className="min-w-0 rounded border p-3 text-sm">
               <p className="break-words font-medium">
-                {index + 1}. {step.action} · {step.label}
+                {index + 1}. {step.action} · {displayText(step.label)}
               </p>
               <p className="mt-1 text-xs">
                 {step.tool_id} · {step.state} · matched {step.matched_records} · affected{" "}
@@ -348,7 +349,7 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
               )}
               {operation.preview_available && (
                 <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">
-                  {JSON.stringify(
+                  {displayText(JSON.stringify(
                     {
                       identity: step.identity,
                       changes: step.values,
@@ -358,7 +359,7 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
                     },
                     null,
                     2,
-                  )}
+                  ))}
                 </pre>
               )}
             </article>

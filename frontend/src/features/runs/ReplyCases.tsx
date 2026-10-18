@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { ApiResponseSchema } from "@/api/contracts.generated";
 import { containsSecret } from "@/api/client";
@@ -77,17 +78,17 @@ export function ReplyCases() {
       {item.replies.map((reply) => <div key={reply.reply_id} className="space-y-3 rounded-lg bg-muted p-3">
         <p className="text-sm font-medium">Reply from {reply.from_email} · {reply.decision.replaceAll("_", " ")}</p>
         <p className="whitespace-pre-wrap text-sm">{reply.body}</p>
-        <p className="text-sm">Assessment: {reply.reason}</p>
+        <p className="text-sm">Assessment: {displayText(reply.reason)}</p>
         {reply.job && <p className="text-xs">Processing: {reply.job.state}{reply.job.error_code ? ` · ${reply.job.error_code}` : ""}</p>}
         {(Object.entries(reply.previews) as [Kind, Preview][]).map(([kind, preview]) => <div key={kind} className="rounded border bg-background p-3">
-          <p className="text-sm font-medium">{item.automatic ? kind.replaceAll("_", " ") : labels[kind]}</p>
+          <p className="text-sm font-medium">{displayText(item.automatic ? kind.replaceAll("_", " ") : labels[kind])}</p>
           <p className="text-sm">To: {preview.to}</p><p className="text-sm">Subject: {preview.subject}</p>
           <p className="whitespace-pre-wrap text-sm">{preview.body}</p>
           {reply.actions[kind] ? <p className="text-xs">{reply.actions[kind]}</p> : item.automatic ?
             <p className="text-xs">{reply.job?.state === "blocked" ? "Needs operator attention" : "Handled by the published automation policy"}</p> :
             <button type="button" disabled={busy || !backend.can("workflow.approve")}
               onClick={() => void act(item.case_id, reply.reply_id, kind)}
-              className="mt-2 rounded border px-3 py-1 text-sm disabled:opacity-50">{labels[kind]}</button>}
+              className="mt-2 rounded border px-3 py-1 text-sm disabled:opacity-50">{displayText(labels[kind])}</button>}
         </div>)}
       </div>)}
     </article>)}

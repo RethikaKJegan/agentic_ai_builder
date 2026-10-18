@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { useState } from "react";
 import { ArrowRight, ChevronsLeft, GitBranch, LayoutGrid, Network, Rows3, ShieldCheck, Split } from "lucide-react";
 import { PATTERNS, type PatternKind } from "@/domain/patterns";
@@ -34,7 +35,7 @@ export function PatternsPanel({ onInsert }: { onInsert: (k: PatternKind) => void
                 className="flex w-full cursor-grab items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-border-accent hover:bg-canvas active:cursor-grabbing"
               >
                 <I className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${p.id === "supervisor" ? "text-primary" : "text-muted-foreground"}`} />
-                <span className="min-w-0"><span className="block text-[12px] font-medium leading-tight">{p.name}</span><span className="block text-[10px] leading-snug text-muted-foreground">{p.description}</span></span>
+                <span className="min-w-0"><span className="block text-[12px] font-medium leading-tight">{displayText(p.name)}</span><span className="block text-[10px] leading-snug text-muted-foreground">{displayText(p.description)}</span></span>
               </button>
             </li>
           );

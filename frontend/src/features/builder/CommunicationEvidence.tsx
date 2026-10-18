@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { friendlyLabel } from "@/domain/communication-diagram";
 
 /** Render recorded values as readable fields without interpreting business meaning. */
@@ -15,7 +16,7 @@ export function ReadableEvidence({ value, depth = 0 }: { value: unknown; depth?:
       <details>
         <summary className="cursor-pointer text-xs">View nested information</summary>
         <pre className="overflow-auto whitespace-pre-wrap break-words text-xs">
-          {JSON.stringify(value, null, 2)}
+          {displayText(JSON.stringify(value, null, 2))}
         </pre>
       </details>
     );
@@ -42,7 +43,7 @@ export function ReadableEvidence({ value, depth = 0 }: { value: unknown; depth?:
       {Object.entries(value).map(([key, item]) => (
         <div key={key}>
           <dt className="text-xs font-medium capitalize text-muted-foreground">
-            {friendlyLabel(key)}
+            {displayText(friendlyLabel(key))}
           </dt>
           <dd className="mt-1 border-l-2 border-border pl-3">
             <ReadableEvidence value={item} depth={depth + 1} />

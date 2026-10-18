@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { usePathname } from "next/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
 import { useCallback, useState, type ReactNode } from "react";
@@ -82,12 +83,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   key={it.to}
                   to={it.to}
                   activeOptions={{ exact: it.exact }}
-                  title={it.label}
+                  title={displayText(it.label)}
                   className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   activeProps={{ className: "bg-sidebar-accent !text-sidebar-accent-foreground font-medium" }}
                 >
                   <it.icon className="h-4 w-4 shrink-0" />
-                  {!(collapsed || inBuilder) && <span className="hidden flex-1 lg:inline">{it.label}</span>}
+                  {!(collapsed || inBuilder) && <span className="hidden flex-1 lg:inline">{displayText(it.label)}</span>}
                   {!(collapsed || inBuilder) && it.to === "/app/approvals" && ready && pending > 0 && <span className="hidden rounded-full lg:inline bg-warning/15 px-1.5 text-[11px] font-medium text-warning">{pending}</span>}
                 </Link>
               ))}
@@ -129,7 +130,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 {activity.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nothing yet.</p>}
                 {activity.slice(0, 8).map((a) => (
                   <button key={a.id} disabled={!a.workflowId} onClick={() => a.workflowId && navigate({ to: "/app/workflows/$id", params: { id: a.workflowId } })} className="block w-full border-b border-border px-4 py-2.5 text-left text-sm last:border-0 hover:bg-canvas">
-                    <p>{a.message}</p>
+                    <p>{displayText(a.message)}</p>
                     <p className="text-xs text-muted-foreground">{new Date(a.at).toLocaleString()}</p>
                   </button>
                 ))}
@@ -154,7 +155,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <nav className="flex border-t border-border md:hidden">
           {NAV.flatMap((g) => [...g.items]).filter((it) => ["/app", "/app/workflows", "/app/agents", "/app/approvals", "/app/monitoring"].includes(it.to)).map((it) => (
             <Link key={it.to} to={it.to} activeOptions={{ exact: it.exact }} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-muted-foreground" activeProps={{ className: "!text-primary" }}>
-              <it.icon className="h-4 w-4" />{it.label}
+              <it.icon className="h-4 w-4" />{displayText(it.label)}
             </Link>
           ))}
           <button onClick={() => setMore(true)} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-muted-foreground"><Menu className="h-4 w-4" />More</button>
@@ -168,7 +169,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <div className="grid grid-cols-2 gap-1">
                   {g.items.map((it) => (
                     <Link key={it.to} to={it.to} activeOptions={{ exact: it.exact }} onClick={() => setMore(false)} className="flex items-center gap-2 rounded-lg px-2.5 py-2.5 text-sm hover:bg-muted" activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground font-medium" }}>
-                      <it.icon className="h-4 w-4" />{it.label}
+                      <it.icon className="h-4 w-4" />{displayText(it.label)}
                     </Link>
                   ))}
                 </div>

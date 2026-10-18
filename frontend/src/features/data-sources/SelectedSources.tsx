@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 
 import { useId, useState } from "react";
 import type { SelectionPreview } from "@/api/data-queries";
@@ -45,7 +46,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
               className="stroke-primary"
               strokeWidth="3"
             >
-              <title>{`${labels.get(edge.source_dataset_id)} equals ${labels.get(edge.target_dataset_id)}; ${edge.status}`}</title>
+              <title>{displayText(`${labels.get(edge.source_dataset_id)} equals ${labels.get(edge.target_dataset_id)}; ${edge.status}`)}</title>
             </path>
           );
         })}
@@ -54,7 +55,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
             key={item.dataset_id}
             role="button"
             tabIndex={0}
-            aria-label={`Inspect selected source: ${item.label}`}
+            aria-label={displayText(`Inspect selected source: ${item.label}`)}
             aria-pressed={item.dataset_id === source.dataset_id}
             onClick={() => setSelected(item.dataset_id)}
             onKeyDown={(event) => {
@@ -65,7 +66,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
             }}
             className="cursor-pointer"
           >
-            <title>{item.label}</title>
+            <title>{displayText(item.label)}</title>
             <rect
               x="10"
               y={index * 100 + 20}
@@ -80,7 +81,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
               strokeWidth={item.dataset_id === source.dataset_id ? 3 : 1}
             />
             <text x="24" y={index * 100 + 48} className="fill-foreground" fontSize="16">
-              {item.label.length > 46 ? item.label.slice(0, 43) + "…" : item.label}
+              {displayText(item.label.length > 46 ? item.label.slice(0, 43) + "…" : item.label)}
             </text>
             <text x="24" y={index * 100 + 72} className="fill-foreground" fontSize="14">
               {item.engine} · {item.fields.length} required fields · selected
@@ -99,7 +100,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
       >
         {preview.sources.map((item) => (
           <option key={item.dataset_id} value={item.dataset_id}>
-            {item.label}
+            {displayText(item.label)}
           </option>
         ))}
       </select>
@@ -107,10 +108,10 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
         aria-label="Selected source details"
         className="min-w-0 space-y-2 break-words text-sm"
       >
-        <p className="font-medium">{source.label}</p>
+        <p className="font-medium">{displayText(source.label)}</p>
         <ul className="list-disc space-y-1 pl-5 text-xs">
           {source.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
+            <li key={reason}>{displayText(reason)}</li>
           ))}
         </ul>
         <details open>
@@ -120,7 +121,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
           <ul className="mt-2 max-h-64 space-y-2 overflow-auto text-xs">
             {source.fields.map((field) => (
               <li key={field.field_id}>
-                <span className="break-all">{field.label}</span> · {field.types.join(", ")} ·{" "}
+                <span className="break-all">{displayText(field.label)}</span> · {field.types.join(", ")} ·{" "}
                 {field.purposes.join(", ")}
               </li>
             ))}
@@ -130,8 +131,8 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
           .filter((mapping) => sourceIds.has(mapping.node_id))
           .map((mapping) => (
             <p key={mapping.node_id} className="text-xs">
-              Confirmed concept: {mapping.entity_name} · {mapping.role} ·{" "}
-              {fieldLabels.get(mapping.node_id) ?? source.label}
+              Confirmed concept: {displayText(mapping.entity_name)} · {mapping.role} ·{" "}
+              {displayText(fieldLabels.get(mapping.node_id) ?? source.label)}
             </p>
           ))}
       </section>
@@ -143,12 +144,12 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
         {preview.relationships.map((edge) => (
           <div key={edge.relationship_id} className="rounded border p-2">
             <p>
-              {labels.get(edge.source_dataset_id)} → {labels.get(edge.target_dataset_id)} ·{" "}
+              {displayText(labels.get(edge.source_dataset_id))} → {displayText(labels.get(edge.target_dataset_id))} ·{" "}
               {edge.status}
             </p>
             {edge.field_pairs.map((pair, index) => (
               <p key={index} className="mt-1 break-all">
-                {fieldLabels.get(pair.source_field_id)} = {fieldLabels.get(pair.target_field_id)}
+                {displayText(fieldLabels.get(pair.source_field_id))} = {displayText(fieldLabels.get(pair.target_field_id))}
               </p>
             ))}
           </div>
@@ -163,7 +164,7 @@ export default function SelectedSources({ preview }: { preview: SelectionPreview
           <summary className="cursor-pointer">Metadata coverage warnings</summary>
           <ul className="mt-2 space-y-1">
             {preview.warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
+              <li key={index}>{displayText(warning)}</li>
             ))}
           </ul>
         </details>

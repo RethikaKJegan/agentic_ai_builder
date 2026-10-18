@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import { knowledgePreviewSchema } from "@/api/knowledge-graph";
 import { KnowledgeSourcePreview } from "./KnowledgeSourcePreview";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
@@ -40,7 +41,7 @@ export function PlanReview({
       <dl className="grid gap-3 sm:grid-cols-2">
         <div>
           <dt className="font-medium">Goal</dt>
-          <dd className="break-words text-muted-foreground">{graph.description || graph.name}</dd>
+          <dd className="break-words text-muted-foreground">{displayText(graph.description || graph.name)}</dd>
         </div>
         <div>
           <dt className="font-medium">Data sources and inputs</dt>
@@ -59,9 +60,9 @@ export function PlanReview({
               .join(", ") || "Missing start trigger"}
           </dd>
           <dd className="break-words whitespace-pre-wrap text-xs">
-            {trigger
+            {displayText(trigger
               ? JSON.stringify(trigger, null, 2)
-              : "No event binding declared. Review whether manual input or event configuration is required."}
+              : "No event binding declared. Review whether manual input or event configuration is required.")}
           </dd>
         </div>
         <div>
@@ -83,7 +84,7 @@ export function PlanReview({
         <ol className="mt-2 space-y-1">
           {dependencyOrder(graph.nodes, graph.edges).map((n, i) => (
             <li key={n.id}>
-              {i + 1}. {n.data.label} · {n.data.kind}
+              {i + 1}. {displayText(n.data.label)} · {n.data.kind}
               {graph.edges.some((e) => e.source === n.id && e.label) && (
                 <span className="text-muted-foreground">
                   {" "}
@@ -143,7 +144,7 @@ export function PlanReview({
         {issues.length > 0 && (
           <ul aria-label="Plan issues" className="mt-2 list-disc pl-4 text-destructive">
             {issues.map((x, i) => (
-              <li key={i}>{x.message}</li>
+              <li key={i}>{displayText(x.message)}</li>
             ))}
           </ul>
         )}

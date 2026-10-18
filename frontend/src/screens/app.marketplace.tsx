@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { Link, useRouteSearch } from "@/lib/navigation";
 import { useNavigate } from "@/lib/navigation";
 import { useMemo, useState } from "react";
@@ -72,7 +73,7 @@ export default function Marketplace() {
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5" role="tablist">
           {KINDS.map((k) => (
-            <button key={k.id} role="tab" aria-selected={kind === k.id} onClick={() => setKind(k.id)} className={`rounded-full px-3 py-1 text-sm transition-colors ${kind === k.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}>{k.label}</button>
+            <button key={k.id} role="tab" aria-selected={kind === k.id} onClick={() => setKind(k.id)} className={`rounded-full px-3 py-1 text-sm transition-colors ${kind === k.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}>{displayText(k.label)}</button>
           ))}
         </div>
 
@@ -87,8 +88,8 @@ export default function Marketplace() {
                 <button key={a.id} onClick={() => a.kind === "tool" ? goTo({ to: "/app/integrations" }) : navigate({ search: { asset: a.id } })} className={`flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors ${sel?.id === a.id ? "bg-highlight" : "hover:bg-canvas"}`}>
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-accent bg-background text-primary"><Icon className="h-4 w-4" /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{a.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{KIND_LABEL[a.kind]} · {a.domain}</p>
+                    <p className="truncate font-medium">{displayText(a.name)}</p>
+                    <p className="truncate text-xs text-muted-foreground">{displayText(KIND_LABEL[a.kind])} · {a.domain}</p>
                   </div>
                   {a.orgOwned && <span className="hidden rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground sm:inline">Workspace library</span>}
                   {isInstalled(a) && <span className="flex items-center gap-1 text-xs text-success"><Check className="h-3.5 w-3.5" />Installed</span>}
@@ -101,17 +102,17 @@ export default function Marketplace() {
 
       {sel && (
         <aside className="w-full shrink-0 overflow-y-auto border-t border-border p-6 lg:w-[400px] lg:border-l lg:border-t-0">
-          <p className="text-xs font-medium text-primary">{KIND_LABEL[sel.kind]}</p>
-          <h2 className="mt-2 text-2xl font-semibold">{sel.name}</h2>
+          <p className="text-xs font-medium text-primary">{displayText(KIND_LABEL[sel.kind])}</p>
+          <h2 className="mt-2 text-2xl font-semibold">{displayText(sel.name)}</h2>
           <p className="mt-1 text-xs text-muted-foreground">by {sel.publisher} · {sel.domain}</p>
-          <p className="mt-4 text-sm leading-relaxed">{sel.description}</p>
+          <p className="mt-4 text-sm leading-relaxed">{displayText(sel.description)}</p>
           {sel.kind === "tool" && <Link to="/app/integrations" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"><Plug className="h-4 w-4" />Connect Google</Link>}
 
           {sel.kind === "workflow" && <TemplatePreview templateId={sel.ref} />}
           {sel.kind === "agent" && sel.agent && (
             <dl className="mt-5 space-y-2 rounded-xl border border-border p-4 text-sm">
               <div className="flex justify-between"><dt className="text-muted-foreground">Role</dt><dd>{sel.agent.role}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Default model</dt><dd>{getModel(sel.agent.modelId).name}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">Default model</dt><dd>{displayText(getModel(sel.agent.modelId).name)}</dd></div>
               <div><dt className="text-muted-foreground">Instructions</dt><dd className="mt-1 font-mono text-xs leading-relaxed">{sel.agent.instructions}</dd></div>
             </dl>
           )}
@@ -156,7 +157,7 @@ function TemplatePreview({ templateId }: { templateId?: string | undefined }) {
             <li key={s.key} className="flex items-center gap-2.5">
               <span className="w-4 text-right font-mono text-[10px] text-muted-foreground">{i + 1}</span>
               <span className={`flex h-6 w-6 items-center justify-center rounded-md ${M.tone}`}><M.icon className="h-3 w-3" /></span>
-              <span className="text-sm">{s.label}</span>
+              <span className="text-sm">{displayText(s.label)}</span>
             </li>
           );
         })}

@@ -1,0 +1,6 @@
+- [x] Persist endpoint identity and reuse a unique disconnected owned connection on add.
+- [x] Preserve explicit reconnect identity; reject endpoint/principal changes.
+- [x] Hide unavailable/unprofiled sources and provide lifecycle preflight errors.
+- [x] Verify refresh/reconnect/review/delete boundaries and deploy backend.
+
+Evidence: final integration suite passed 92 tests across data sources, native database workflows, inventory planner and automatic refresh. Retrieval suite passed 20 tests, including cache transitions and lifecycle scope errors. Relationship regressions passed in the earlier 64-test combined suite, including unchanged review survival and changed-evidence rejection. Final credential backfill check passed. Contract schemas/fixtures, strict OpenSpec, Python compilation and diff checks passed. Backend and worker restarted; no cloud connection was changed or deleted for testing. New identity table is additive. Legacy disconnected records without a fingerprint require explicit Reconnect instead of silent identity guessing. Published scopes remain pinned and require regeneration/review after metadata or credentials change. Already deleted/replaced sources and their proposed relationships are not automatically approved.

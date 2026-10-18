@@ -15,31 +15,31 @@ afterEach(() => vi.restoreAllMocks());
 it("shows only essential KG controls and retains graph navigation", async () => {
   vi.spyOn(api, "knowledgeGraph").mockResolvedValue(view());
   render(<BusinessOntology canManage />);
-  await screen.findByRole("img", {name:"Knowledge graph"});
+  await screen.findByRole("img", {name:"Semantic Intelligence"});
   for (const name of ["Actual records", "Entity types", "Generate semantic relationships", "Confirm relationship"])
     expect(screen.queryByRole("button", {name})).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Knowledge graph details")).toHaveTextContent("Inspect");
-  fireEvent.click(screen.getByRole("button", {name:"Zoom knowledge graph in"}));
-  expect(screen.getByLabelText("Knowledge graph zoom")).toHaveTextContent("130%");
-  fireEvent.click(screen.getByRole("button", {name:"Fit knowledge graph"}));
-  expect(screen.getByLabelText("Knowledge graph zoom")).toHaveTextContent("100%");
+  expect(screen.getByLabelText("Semantic Intelligence details")).toHaveTextContent("Inspect");
+  fireEvent.click(screen.getByRole("button", {name:"Zoom Semantic Intelligence in"}));
+  expect(screen.getByLabelText("Semantic Intelligence zoom")).toHaveTextContent("130%");
+  fireEvent.click(screen.getByRole("button", {name:"Fit Semantic Intelligence"}));
+  expect(screen.getByLabelText("Semantic Intelligence zoom")).toHaveTextContent("100%");
 });
 
 it("scopes physical relationships to one connection and restores combined links", async () => {
   vi.spyOn(api,"knowledgeGraph").mockResolvedValue(view());
   const {container}=render(<BusinessOntology canManage />);
-  await screen.findByRole("img",{name:"Knowledge graph"});
+  await screen.findByRole("img",{name:"Semantic Intelligence"});
   const count=()=>container.querySelectorAll('g[aria-label^="Relationship "]').length;
   expect(count()).toBe(4);
-  fireEvent.change(screen.getByLabelText("Knowledge graph connection"), {target:{value:"pg"}});
+  fireEvent.change(screen.getByLabelText("Semantic Intelligence connection"), {target:{value:"pg"}});
   expect(count()).toBe(1);
-  fireEvent.change(screen.getByLabelText("Knowledge graph connection"), {target:{value:"mongo"}});
+  fireEvent.change(screen.getByLabelText("Semantic Intelligence connection"), {target:{value:"mongo"}});
   expect(count()).toBe(0);
-  fireEvent.change(screen.getByLabelText("Knowledge graph connection"), {target:{value:""}});
+  fireEvent.change(screen.getByLabelText("Semantic Intelligence connection"), {target:{value:""}});
   expect(count()).toBe(4);
   fireEvent.change(screen.getByLabelText("Semantic relationship status"), {target:{value:"inferred"}});
   expect(count()).toBe(1);
-  fireEvent.change(screen.getByLabelText("Search knowledge graph"), {target:{value:"unrelated-payroll"}});
+  fireEvent.change(screen.getByLabelText("Search Semantic Intelligence"), {target:{value:"unrelated-payroll"}});
   expect(count()).toBe(0);
   expect(screen.getByText(/No entities match/)).toBeVisible();
 });
@@ -78,13 +78,13 @@ it("inspects relationship provenance and clears details excluded by filters", as
   const relationship=v.relationships[0]!;
   const names=new Map(v.entities.map(e=>[e.entity_id,e.label]));
   fireEvent.click(await screen.findByRole("button", {name:`Relationship ${names.get(relationship.source_entity_id)} ${relationship.predicate} ${names.get(relationship.target_entity_id)}`}));
-  const details=screen.getByLabelText("Knowledge graph details");
+  const details=screen.getByLabelText("Semantic Intelligence details");
   expect(details).toHaveTextContent("Evidence trace");
   expect(details).toHaveTextContent("structural_relationship_id");
   expect(details).toHaveTextContent(relationship.relationship_id);
   expect(details).toHaveTextContent("Business: inferred");
   expect(screen.getByRole("button",{name:"Confirm relationship"})).toBeEnabled();
-  fireEvent.change(screen.getByLabelText("Knowledge graph connection"),{target:{value:"mongo"}});
+  fireEvent.change(screen.getByLabelText("Semantic Intelligence connection"),{target:{value:"mongo"}});
   expect(details).not.toHaveTextContent("Evidence trace");
   expect(details).toHaveTextContent("Select a node or relationship");
   const node=screen.getByRole("button",{name:"Entity Customer"});
@@ -104,7 +104,7 @@ for (const status of ["ambiguous", "needs_review"] as const) it(`corrects ${stat
   fireEvent.click(screen.getByRole("button",{name:"Confirm relationship"}));
   await waitFor(()=>expect(call).toHaveBeenCalledWith(target.relationship_id,{revision:v.revision,predicate:"matches",reversed:!target.reversed,status:"confirmed"}));
   expect(await screen.findByText(/Business relationship review saved/)).toBeVisible();
-  expect(screen.getByLabelText("Knowledge graph details")).toHaveTextContent("Business: confirmed");
+  expect(screen.getByLabelText("Semantic Intelligence details")).toHaveTextContent("Business: confirmed");
 });
 
 for (const stale of [false,true]) it(`disables review for ${stale?"stale":"read-only"} graphs`,async()=>{

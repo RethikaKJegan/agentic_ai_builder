@@ -63,8 +63,9 @@ def inventory_sources(catalog, proposed):
                 neighbors.update(pair - {seed})
         categories = [did for did in neighbors if did in sources and 'categoryname' in names(sources[did])]
         suppliers = [did for did in neighbors if did in sources and names(sources[did]) & {'suppliername','companyname'}]
-        if len(categories) == len(suppliers) == 1:
-            return list(dict.fromkeys([seed, categories[0], suppliers[0]]))
+        # Lookup enrichment is optional; stock evidence remains useful without
+        # it. Never promote proposed joins or pick among ambiguous lookups.
+        return list(dict.fromkeys([seed, *[matches[0] for matches in (categories, suppliers) if len(matches)==1]]))
     if (isinstance(proposed, list) and 1 <= len(proposed) <= 4 and
             all(isinstance(i, str) for i in proposed) and len(set(proposed)) == len(proposed) and not set(proposed) - sources.keys()):
         return proposed
@@ -77,7 +78,7 @@ def inventory_query(catalog, ids):
         for alias in aliases:
             matches = [f for f in source.get('fields', []) if re.sub(r'[^a-z0-9]', '', f['name'].lower()) == alias]
             if len(matches) == 1: return matches[0]['field_id']
-        raise PlannerFailure('INVENTORY_FIELD_REQUIRED', 'Inventory evidence requires exact identity, stock, category and supplier fields in the KG.', retryable=True)
+        raise PlannerFailure('INVENTORY_FIELD_REQUIRED', 'Inventory ranking requires exact product identity, stock, incoming quantity, reorder level and discontinuation fields.', retryable=True)
     stocks = [s for s in sources.values() if any(re.sub(r'[^a-z0-9]', '', f['name'].lower()) == 'unitsinstock' for f in s.get('fields', []))]
     if len(stocks) != 1:
         raise PlannerFailure('INVENTORY_SOURCE_AMBIGUOUS', 'The KG must identify one inventory source.', retryable=True)
@@ -88,6 +89,11 @@ def inventory_query(catalog, ids):
         'reorder_level':['reorderlevel'], 'discontinued':['discontinued']}.items()}
     joins=[]
     for key,aliases in [('category',['categoryname']),('supplier',['suppliername','companyname'])]:
+        try:
+            mapping[key]=field(stock,aliases)
+            continue
+        except PlannerFailure:
+            pass
         found=[]
         for source in sources.values():
             if source['dataset_id']==stock['dataset_id']:continue
@@ -96,12 +102,12 @@ def inventory_query(catalog, ids):
             links=[e for e in catalog.get('relationships',[]) if {e['source_dataset_id'],e['target_dataset_id']} == {stock['dataset_id'],source['dataset_id']} and e.get('status') in ('declared','accepted')]
             if len(links)==1:found.append((source,identifier,links[0]))
         if len(found)!=1:
-            raise PlannerFailure('INVENTORY_LINK_REQUIRED', 'Category and supplier require unambiguous declared or accepted inventory links.', retryable=True)
+            continue
         source,identifier,link=found[0];mapping[key]=identifier
         joins.append({'relationship_id':link['relationship_id'],'target_dataset_id':source['dataset_id']})
     return ({'base_dataset_id':stock['dataset_id'],'joins':joins,'fields':list(mapping.values()),'filters':[],
              'group_by':[],'metrics':[],'order_by':[],'limit':500,
-             'explanation':'Read actual inventory with linked category and supplier; rank after accounting for stock on order.','clarification':''}, mapping)
+             'explanation':'Read actual inventory and only confirmed optional lookup details; rank after accounting for stock on order.','clarification':''}, mapping)
 
 
 def compile_inventory_report(workflow, objective, context):
@@ -119,6 +125,9 @@ def compile_inventory_report(workflow, objective, context):
     start, end = meeting_window(objective)
     ids = inventory_sources(context['database_catalog'], workflow.get('metadata', {}).get('database_source_ids'))
     query, field_map = inventory_query(context['database_catalog'], ids)
+    ids = [query['base_dataset_id'], *[join['target_dataset_id'] for join in query['joins']]]
+    limitations = [key.title()+' details unavailable: relationship missing, ambiguous or awaiting review.'
+                   for key in ('category','supplier') if key not in field_map]
     base = next((a for a in workflow['agents'] if a.get('hierarchy_role') == 'master'), None)
     if base is None:
         base = next(iter(workflow['agents']), None)
@@ -201,7 +210,7 @@ def compile_inventory_report(workflow, objective, context):
                                           max_retries=0, timeout_seconds=14400, max_estimated_cost_usd=3)
     w['metadata'] = {'generation_mode': 'hierarchy', 'dynamic_delegation': {'analyse_inventory': {'max_rounds': 8, 'max_tasks': 12}},
         'database_source_ids': list(ids), 'agent_database_source_ids': {a['agent_id']: list(ids) for a in w['agents'] if a.get('hierarchy_role') == 'master' or 'database.read_query' in a['capabilities']},
-        'unresolved_requirements': [], 'inventory_report_compiler': 1,
+        'unresolved_requirements': [], 'report_limitations': limitations, 'inventory_report_compiler': 1,
         'delivery_preferences': {'email_recipient': 'explicit' if addresses else 'selected_account_inbox',
                                  'calendar_id': 'primary', 'start': start, 'end': end},
         'requested_action_approvals': ['extension_sheets_create_report','extension_mail_send','extension_calendar_create']}

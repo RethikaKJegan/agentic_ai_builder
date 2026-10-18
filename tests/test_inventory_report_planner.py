@@ -1,5 +1,6 @@
 """Offline compilation and real arithmetic; no deployed workflows or provider calls."""
 from copy import deepcopy
+import ast
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -131,6 +132,7 @@ def test_compiled_graph_validates_with_typed_handoffs_and_exact_schedule():
 def test_compiler_never_accepts_invented_source_or_missing_tool():
     w=proposal();w['metadata']['database_source_ids'][0]='invented'
     broken=context();broken['database_catalog']['relationships']=[]
+    broken['database_catalog']['sources']=[s for s in broken['database_catalog']['sources'] if s['dataset_id']!='products']
     with pytest.raises(PlannerFailure):compile_inventory_report(w,PROMPT,broken)
     c=context();c['workflow_google_tools']=[t for t in c['workflow_google_tools'] if t['tool_id']!='extension_inventory_rank']
     with pytest.raises(PlannerFailure,match='REPORT_CAPABILITY_REQUIRED'):compile_inventory_report(proposal(),PROMPT,c)
@@ -206,7 +208,53 @@ def test_source_resolution_uses_field_coverage_and_real_relationships():
         'relationships':[{'source_dataset_id':'actual_stock','target_dataset_id':target,'status':'accepted'} for target in ['actual_category','actual_supplier']]}
     assert inventory_sources(catalog,['invented'])==['actual_stock','actual_category','actual_supplier']
     catalog['relationships']=[]
-    with pytest.raises(PlannerFailure):inventory_sources(catalog,['invented'])
+    assert inventory_sources(catalog,['invented'])==['actual_stock']
+
+
+def test_missing_category_link_omits_optional_enrichment():
+    from workflow_api.inventory_report_planner import inventory_sources,inventory_query
+    catalog=source_catalog()
+    category=next(edge for edge in catalog['relationships'] if edge['target_dataset_id']=='categories')
+    category['status']='proposed'
+    for proposed in (None,['products','categories','suppliers'],['invented']):
+        ids=inventory_sources(catalog,proposed)
+        assert ids==['products','suppliers']
+        query,mapping=inventory_query(catalog,ids)
+        assert 'category' not in mapping and 'supplier' in mapping
+        assert all(j['target_dataset_id']!='categories' for j in query['joins'])
+    category['status']='accepted'
+    assert inventory_sources(catalog,None)==['products','categories','suppliers']
+
+
+def test_seed_without_optional_links_continues_without_llm_planning():
+    from workflow_api.live_providers import LivePlannerProvider
+    from unittest.mock import patch
+    c=context();c['database_catalog']['relationships']=[]
+    provider=LivePlannerProvider('gpt-5.6-luna',['owner@example.com'],SimpleNamespace())
+    with patch.object(provider.provider,'generate',side_effect=AssertionError('No LLM join guessing')):
+        workflow=provider.generate(PROMPT,c)
+    assert workflow['metadata']['database_source_ids']==['products']
+    assert len(workflow['metadata']['report_limitations'])==2
+    assert workflow['metadata']['unresolved_requirements']==[]
+    assert len(workflow['approval_gates'])==3
+    WorkflowService.validate_document(workflow)
+
+
+def test_partial_enrichment_normalizes_and_discloses_without_fabrication():
+    from workflow_api.inventory_ranking import InventoryNormalize,UNVERIFIED_LOOKUP
+    c=context();c['database_catalog']['relationships']=[]
+    w=compile_inventory_report(proposal(),PROMPT,c)
+    mapping=json.loads(ast.literal_eval(next(n for n in w['nodes'] if n['node_id']=='normalize_inventory')['configuration']['input_mapping']['field_map_json']))
+    inputs={'rows':[record('a')],'limited':False,'field_map_json':json.dumps(mapping)}
+    normalizer=InventoryNormalize(NORMALIZE,None)
+    normalized=normalizer.execute({},inputs,'test',None)
+    assert normalized['records'][0]['category']==UNVERIFIED_LOOKUP
+    result=rank_inventory(normalized['records'])
+    assert 'Enrichment incomplete' in result['summary']
+    assert UNVERIFIED_LOOKUP in result['tabs'][0]['rows'][0]
+    assert result['ranked_products'][0]['shortage']==10
+    inputs['rows']=[{k:v for k,v in record('a').items() if k!='units_in_stock'}]
+    with pytest.raises(RuntimeFailure):normalizer.execute({},inputs,'test',None)
 
 
 def test_same_normal_prompt_uses_trusted_compiler_without_model_workflow_json():
@@ -223,3 +271,34 @@ def test_same_normal_prompt_uses_trusted_compiler_without_model_workflow_json():
     WorkflowService.validate_document(workflow)
     bind_generated(workflow,c)
     assert len(workflow['metadata']['database_scope']['sources'])==3
+
+
+def test_ambiguous_lookup_is_omitted_without_affecting_stock_or_supplier():
+    from workflow_api.inventory_report_planner import inventory_sources, inventory_query
+    c=source_catalog()
+    extra=deepcopy(next(s for s in c['sources'] if s['dataset_id']=='categories'))
+    extra['dataset_id']='other_categories'
+    c['sources'].append(extra)
+    c['relationships'].append({'relationship_id':'other_category_link','source_dataset_id':'products','target_dataset_id':'other_categories','status':'accepted'})
+    ids=inventory_sources(c,None)
+    assert ids==['products','suppliers']
+    query,mapping=inventory_query(c,ids)
+    assert 'category' not in mapping and 'supplier' in mapping
+    assert [j['target_dataset_id'] for j in query['joins']]==['suppliers']
+
+
+def test_briefings_are_sectioned_and_keep_exact_report_and_schedule():
+    from workflow_api.inventory_ranking import ReportDelivery,UNVERIFIED_LOOKUP
+    urgent=record('urgent',stock=5);urgent['category']=UNVERIFIED_LOOKUP
+    summary=rank_inventory([urgent,record('covered',on_order=20)])['summary']
+    assert '\n\nRestock priorities\n\n1. urgent' in summary
+    assert '\n\nWatchlist — no confirmed shortage\n\n2. covered' in summary
+    assert UNVERIFIED_LOOKUP not in summary
+    assert summary.count('Enrichment incomplete')==1
+    assert 'In stock: 5 | On order: 0 | Reorder level: 10' in summary
+    result=ReportDelivery(DELIVERY,None).execute({}, {'summary':summary,'spreadsheet_url':'https://docs.google.com/spreadsheets/d/test/edit',
+        'start':'2026-10-23T15:00:00+05:30','end':'2026-10-23T15:30:00+05:30'},'test',None)
+    assert 'Open the full report\nhttps://docs.google.com/spreadsheets/d/test/edit' in result['body']
+    assert '23 October 2026, 03:00 PM – 03:30 PM IST' in result['body']
+    assert 'Agenda\n• Confirm restocking priorities' in result['event']['description']
+    assert result['event']['start']['dateTime']=='2026-10-23T15:00:00+05:30'

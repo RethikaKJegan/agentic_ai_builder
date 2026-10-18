@@ -123,6 +123,9 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     from .data_source_routes import install as install_data_sources
     install_data_sources(app, workflow_service, auth, google_oauth_config or dict(os.environ), lambda: request_reference.get() or f'req_{uuid4().hex}')
 
+    from .workflow_titles import install as install_workflow_titles
+    install_workflow_titles(app,workflow_service,auth)
+
     @app.middleware('http')
     async def protect(request, call_next):
         candidate = request.headers.get('x-request-id', '')

@@ -5,6 +5,7 @@ from connector_extension.common import Connector, denied
 
 RISK = obj({'finding': {'type': 'string', 'maxLength': 2000}, 'source_url': {'type': 'string', 'pattern': '^https?://', 'maxLength': 2000}}, ['finding','source_url'])
 NUMBER = {'type': 'number', 'minimum': 0, 'maximum': 1e12}
+UNVERIFIED_LOOKUP = 'Unavailable: relationship missing, ambiguous or awaiting review'
 RECORD = obj({
     'product_id': {'type': 'string', 'minLength': 1, 'maxLength': 200},
     'product_name': {'type': 'string', 'minLength': 1, 'maxLength': 500},
@@ -60,10 +61,27 @@ def rank_inventory(records, limited=False, external_risks=()):
     if not rows: rows = [['No active products returned','','','',None,None,None,None,None,'No shortages found in the retrieved evidence']]
     notes = f'Reviewed {len(records)} records; {shortage_count} active products have confirmed shortages; showing {len(top)} review candidates. Zero-shortage candidates are watchlist only.'
     if limited: notes += ' Coverage is incomplete: ranking covers retrieved records only.'
-    summary = notes + '\nStock position = stock + already on order. Shortage = max(reorder level - stock position, 0).'
-    for r in top:
-        summary += f"\n{r['product_name']}: stock {r['units_in_stock']}, on order {r['units_on_order']}, reorder {r['reorder_level']}, shortage {r['shortage']}; {r['category']}; {r['supplier']}."
-    summary += f'\nExternal findings: {len(external_risks)}. See the separate External risks tab and its source links; these are separate from inventory facts.'
+    missing = [key for key in ('category','supplier') if any(r[key]==UNVERIFIED_LOOKUP for r in records)]
+    if missing:
+        notes += ' Enrichment incomplete: ' + ', '.join(missing) + ' details unavailable because the relationship is missing, ambiguous or awaiting review. Stock ranking uses verified quantities only.'
+    summary = f'Purchasing priority briefing\n\nAt a glance\n{len(records)} products reviewed · {shortage_count} active products with shortages · {len(top)} priorities listed'
+    for heading, urgent in [('Restock priorities',True),('Watchlist — no confirmed shortage',False)]:
+        group=[r for r in top if (r['shortage']>0)==urgent]
+        if not group:continue
+        summary += '\n\n'+heading
+        for r in group:
+            summary += f"\n\n{top.index(r)+1}. {r['product_name']} (ID: {r['product_id']})"
+            details=[f"{key.title()}: {r[key]}" for key in ('category','supplier') if r[key]!=UNVERIFIED_LOOKUP]
+            if details:summary+='\n'+' · '.join(details)
+            summary += f"\nIn stock: {r['units_in_stock']} | On order: {r['units_on_order']} | Reorder level: {r['reorder_level']}"
+            summary += f"\nStock position: {r['stock_position']} | Shortage: {r['shortage']}"
+    summary += '\n\nMarket context'
+    summary += f'\n{len(external_risks)} sourced findings are available in the spreadsheet’s External risks tab.' if external_risks else '\nNo supported external findings were returned.'
+    summary += '\nExternal market context is separate from confirmed inventory evidence.'
+    summary += '\n\nMethod and coverage\nPriorities account for stock already on order; discontinued products are excluded. Shortages rank first, followed by watchlist items.'
+    summary += '\nStock position = stock + on order. Shortage = max(reorder level − stock position, 0).'
+    if limited:summary+='\nCoverage is incomplete: ranking covers retrieved records only.'
+    if missing:summary+='\nEnrichment incomplete: '+', '.join(missing).capitalize()+' details are pending relationship review or unavailable; stock quantities and ranking remain verified.'
     risk_rows = [[r['finding'],r['source_url'],'External evidence; not an inventory fact'] for r in external_risks]
     if not risk_rows: risk_rows = [['No supported external findings returned','','No external claims made']]
     tabs = [{'title':'Inventory','headers':headers,'rows':rows},
@@ -101,9 +119,13 @@ class ReportDelivery(Connector):
             if not start.utcoffset() or not end.utcoffset() or not 0 < (end-start).total_seconds() <= 8*3600: raise ValueError()
         except ValueError:
             denied('REPORT_MEETING_TIME_REQUIRED','Use a bounded meeting with explicit time zones.',422)
-        body = inputs['summary'] + '\n\nReport: ' + inputs['spreadsheet_url']
-        return {'subject':'Inventory restocking review','body':body,'event':{'summary':'Inventory restocking review',
-            'description':body,'start':{'dateTime':inputs['start'],'timeZone':'Asia/Kolkata'},
+        from zoneinfo import ZoneInfo
+        local_start,local_end=start.astimezone(ZoneInfo('Asia/Kolkata')),end.astimezone(ZoneInfo('Asia/Kolkata'))
+        schedule=local_start.strftime('%d %B %Y, %I:%M %p')+' – '+local_end.strftime('%I:%M %p')+' IST'
+        body = inputs['summary'] + '\n\nOpen the full report\n' + inputs['spreadsheet_url']+'\n\nReview meeting\n'+schedule
+        description='Purchasing review\n'+schedule+'\n\nAgenda\n• Confirm restocking priorities\n• Review watchlist products and supply risks\n• Agree purchasing next steps\n\n'+inputs['summary']+'\n\nOpen the full report\n'+inputs['spreadsheet_url']
+        return {'subject':'Purchasing priorities | Inventory review','body':body,'event':{'summary':'Inventory restocking review',
+            'description':description,'start':{'dateTime':inputs['start'],'timeZone':'Asia/Kolkata'},
             'end':{'dateTime':inputs['end'],'timeZone':'Asia/Kolkata'}}}
 
 
@@ -121,10 +143,13 @@ class InventoryNormalize(Connector):
         import json
         try:
             mapping=json.loads(inputs['field_map_json'])
-            if set(mapping)!=set(RECORD['required']) or any(not isinstance(v,str) for v in mapping.values()):raise ValueError()
+            required=set(RECORD['required'])-{'category','supplier'}
+            if not required <= set(mapping) <= set(RECORD['required']) or any(not isinstance(v,str) for v in mapping.values()):raise ValueError()
             records=[]
             for row in inputs['rows']:
                 record={key:row[field] for key,field in mapping.items()}
+                for key in ('category','supplier'):
+                    if key not in mapping:record[key]=UNVERIFIED_LOOKUP
                 if type(record['product_id']) not in (str,int) or isinstance(record['product_id'],bool):raise ValueError()
                 record['product_id']=str(record['product_id'])
                 flag=record['discontinued']

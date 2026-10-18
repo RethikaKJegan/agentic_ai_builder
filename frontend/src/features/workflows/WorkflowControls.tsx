@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { InputError } from "@/api/feedback";
@@ -79,7 +80,7 @@ export function WorkflowControls({ workflow, onStarted, compact = false }: { wor
   const review = candidateReview?.workflow_version === version ? candidateReview : undefined;
   const activePublished=!dirty&&document?.status==='published'&&backend.overview[workflow.id]?.activation_state==='active';
   const primary:Action=dirty?'save':document?.status==='draft'?'validate':document?.status==='validated'?(document.metadata['approval_submission']?'approve':'submit'):document?.status==='approved'?'publish':'activate';
-  const renderAction=(action:Action)=>{const reason=blocker(action);return <div key={action}><button type="button" disabled={!!busy||!!reason} title={reason||labels[action]} aria-describedby={`${workflow.id}-${action}-reason`} onClick={()=>void act(action)} className={`rounded-lg border px-3 py-2 text-xs disabled:opacity-40 ${action===primary?'border-primary bg-primary text-primary-foreground':'border-border hover:bg-muted'}`}>{busy===action?`${labels[action]}…`:labels[action]}</button><span id={`${workflow.id}-${action}-reason`} className="sr-only">{reason}</span></div>;};
+  const renderAction=(action:Action)=>{const reason=blocker(action);return <div key={action}><button type="button" disabled={!!busy||!!reason} title={displayText(reason||labels[action])} aria-describedby={`${workflow.id}-${action}-reason`} onClick={()=>void act(action)} className={`rounded-lg border px-3 py-2 text-xs disabled:opacity-40 ${action===primary?'border-primary bg-primary text-primary-foreground':'border-border hover:bg-muted'}`}>{displayText(busy===action?`${labels[action]}…`:labels[action])}</button><span id={`${workflow.id}-${action}-reason`} className="sr-only">{displayText(reason)}</span></div>;};
   return <section aria-label="Workflow actions" className={`flex flex-wrap items-center gap-2 ${compact?"":"w-full"}`}>
     {!compact && <div className="text-[11px] leading-5 text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>}
     <ProcurementReview workflow={workflow} onStarted={onStarted} />
@@ -88,8 +89,8 @@ export function WorkflowControls({ workflow, onStarted, compact = false }: { wor
     {activePublished ? onStarted?<button onClick={onStarted} className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground">Open execution</button>:<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-800">Release active</span> : renderAction(primary)}
     <details className="relative"><summary className="cursor-pointer rounded-lg border px-3 py-2 text-xs">Revision actions</summary><div className="absolute right-0 top-11 z-40 w-72 space-y-3 rounded-xl border bg-background p-4 shadow-xl">    <div className="text-[11px] leading-5 text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>
 <p className="text-xs text-muted-foreground">Each action remains a separate server-confirmed transition.</p><div className="flex flex-wrap gap-2">{(['save','validate','submit','approve','publish','activate','reload'] as const).filter(a=>activePublished||a!==primary).map(renderAction)}</div>{dirty&&document&&<p className="text-[11px] text-muted-foreground">Saving creates a new editable revision. The active release keeps its reviewed revision.</p>}</div></details>
-    {review && !review.ready && <p role="status" className="w-full text-sm text-destructive">Registry blockers: {review.reason_codes.join(", ") || "Review the tool assignments."}</p>}
+    {review && !review.ready && <p role="status" className="w-full text-sm text-destructive">Registry blockers: {displayText(review.reason_codes.join(", ") || "Review the tool assignments.")}</p>}
     {conflict && <p role="alert" className="w-full text-sm">The server changed. Your edits are retained. Copy any changes you want to keep before choosing Reload server revision, then reapply them to the latest draft.</p>}
-    <div className={error||(!compact&&message)?"w-full":"hidden"}><ApiFeedback error={error} />{message && !compact && <p role="status" className="text-sm text-emerald-700">{message}</p>}</div>
+    <div className={error||(!compact&&message)?"w-full":"hidden"}><ApiFeedback error={error} />{message && !compact && <p role="status" className="text-sm text-emerald-700">{displayText(message)}</p>}</div>
   </section>;
 }

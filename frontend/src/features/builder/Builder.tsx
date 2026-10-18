@@ -1,3 +1,4 @@
+import { displayText } from "@/lib/display-text";
 import "@xyflow/react/dist/style.css";
 import {
   Background,
@@ -505,7 +506,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
               return (
                 <DropdownMenuItem key={k} onSelect={() => addNode(k)}>
                   <M.icon className="mr-2 h-4 w-4" />
-                  {k === "agent" ? "New AI agent" : M.label}
+                  {displayText(k === "agent" ? "New AI agent" : M.label)}
                 </DropdownMenuItem>
               );
             })}
@@ -515,9 +516,9 @@ function Builder({ workflow }: { workflow: Workflow }) {
             </DropdownMenuLabel>
             {PATTERNS.map((p) => (
               <DropdownMenuItem key={p.id} onSelect={() => insertPatternAt(p.id)}>
-                {p.name}{" "}
+                {displayText(p.name)}{" "}
                 <span className="ml-auto pl-2 text-[10px] text-muted-foreground">
-                  {p.description}
+                  {displayText(p.description)}
                 </span>
               </DropdownMenuItem>
             ))}
@@ -529,7 +530,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
             )}
             {agents.slice(0, 8).map((a) => (
               <DropdownMenuItem key={a.id} onSelect={() => addNode("agent", a.id)}>
-                {a.name}
+                {displayText(a.name)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -599,9 +600,9 @@ function Builder({ workflow }: { workflow: Workflow }) {
                         <M.icon className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{n.data.label}</span>
+                        <span className="block truncate text-sm font-medium">{displayText(n.data.label)}</span>
                         <span className="block truncate text-xs text-muted-foreground">
-                          {M.label}
+                          {displayText(M.label)}
                         </span>
                       </span>
                       {st && <StatusPill status={st} />}
@@ -764,7 +765,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  {diagnostics.filter(x=>x.nodeId===selected.id).map((x,i)=><p role="alert" key={i} className="mb-2 rounded border border-destructive/30 p-2 text-xs text-destructive">{x.message}</p>)}
+                  {diagnostics.filter(x=>x.nodeId===selected.id).map((x,i)=><p role="alert" key={i} className="mb-2 rounded border border-destructive/30 p-2 text-xs text-destructive">{displayText(x.message)}</p>)}
                   {selectedAgent ? (
                     <>
                       <HierarchyBox
@@ -782,7 +783,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                           search={{ agent: selectedAgent.id }}
                           className="text-primary"
                         >
-                          {selectedAgent.name}
+                          {displayText(selectedAgent.name)}
                         </Link>{" "}
                         is used.
                       </p>
@@ -809,7 +810,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                         <div className="space-y-2 text-xs">
                           <label className="block">Condition expression<input aria-label="Condition expression" className="mt-1 w-full rounded-lg border border-border p-2" value={String((selected.data["condition"] as { expression?: string } | undefined)?.expression ?? "")} onChange={(e) => updateNodeData({ condition: { condition_id: String(selected.data["conditionId"] ?? `condition_${selected.id}`), outcomes: (selected.data["condition"] as { outcomes?: string[] } | undefined)?.outcomes ?? ["critical", "standard"], expression: e.target.value } })} /></label>
                           <label className="block">Outcomes (comma separated)<input aria-label="Condition outcomes" className="mt-1 w-full rounded-lg border border-border p-2" value={((selected.data["condition"] as { outcomes?: string[] } | undefined)?.outcomes ?? ["critical", "standard"]).join(", ")} onChange={(e) => updateNodeData({ condition: { condition_id: String(selected.data["conditionId"] ?? `condition_${selected.id}`), expression: String((selected.data["condition"] as { expression?: string } | undefined)?.expression ?? ""), outcomes: e.target.value.split(",").map((value) => value.trim()).filter(Boolean) } })} /></label>
-                          <p>Declared outcomes: {((selected.data["condition"] as { outcomes?: string[] } | undefined)?.outcomes ?? []).join(", ") || "Configure outgoing branch labels"}</p>
+                          <p>Declared outcomes: {displayText(((selected.data["condition"] as { outcomes?: string[] } | undefined)?.outcomes ?? []).join(", ") || "Configure outgoing branch labels")}</p>
                           <p>Outgoing branches: {edges.filter((e) => e.source === selected.id).map((e) => e.label || "unmatched").join(", ") || "None"}</p>
                         </div>
                       )}
@@ -819,7 +820,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        {NODE_META[selected.data.kind].label}
+                        {displayText(NODE_META[selected.data.kind].label)}
                         {selected.data.tool ? ` · ${selected.data.tool} (not configured)` : ""}
                       </p>
                     </div>
@@ -878,7 +879,7 @@ function HierarchyBox({
         <p className="mt-1 text-xs text-muted-foreground">
           Reports to{" "}
           <button onClick={() => onSelect(parent.id)} className="text-primary hover:underline">
-            {parent.data.label}
+            {displayText(parent.data.label)}
           </button>
         </p>
       )}
@@ -890,7 +891,7 @@ function HierarchyBox({
                 onClick={() => onSelect(k.id)}
                 className="w-full truncate rounded-md bg-background px-2 py-1 text-left text-xs hover:text-primary"
               >
-                ↳ {k.data.label}
+                ↳ {displayText(k.data.label)}
               </button>
             </li>
           ))}

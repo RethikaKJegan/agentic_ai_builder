@@ -1,4 +1,5 @@
 "use client";
+import { displayText } from "@/lib/display-text";
 
 import { useId, useMemo, useRef, useState } from "react";
 import dagre from "@dagrejs/dagre";
@@ -71,7 +72,7 @@ export default function RelationshipMap({graph, selected, onSelect}: {graph: Gra
             const a = {x: source.x + (forward ? WIDTH / 2 : -WIDTH / 2), y: fieldY(edge.source_dataset_id, pair.source_field_id, source.y, source.height)};
             const b = {x: target.x + (forward ? -WIDTH / 2 : WIDTH / 2), y: fieldY(edge.target_dataset_id, pair.target_field_id, target.y, target.height)};
             const points = [a, ...route.points.slice(1, -1), b];
-            return <path key={`${edge.relationship_id}-${index}`} d={points.map((point, i) => `${i ? "L" : "M"} ${point.x} ${point.y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="1.5" strokeDasharray={edge.status === "proposed" ? "7 5" : undefined} markerEnd={`url(#${marker})`} markerStart={edge.kind === "suggested" ? `url(#${marker})` : undefined}><title>{layout.nodes.get(pair.source_field_id)?.label} {edge.kind === "declared" ? "references" : "has a suggested link to"} {layout.nodes.get(pair.target_field_id)?.label} · {edge.status}</title></path>;
+            return <path key={`${edge.relationship_id}-${index}`} d={points.map((point, i) => `${i ? "L" : "M"} ${point.x} ${point.y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="1.5" strokeDasharray={edge.status === "proposed" ? "7 5" : undefined} markerEnd={`url(#${marker})`} markerStart={edge.kind === "suggested" ? `url(#${marker})` : undefined}><title>{displayText(layout.nodes.get(pair.source_field_id)?.label)} {edge.kind === "declared" ? "references" : "has a suggested link to"} {displayText(layout.nodes.get(pair.target_field_id)?.label)} · {edge.status}</title></path>;
           });
         })}
         {layout.datasets.map(node => {
@@ -80,16 +81,16 @@ export default function RelationshipMap({graph, selected, onSelect}: {graph: Gra
           const activate = (id: string) => ({role: "button", tabIndex: 0, onPointerDown: (event: React.PointerEvent) => event.stopPropagation(), onClick: () => onSelect(id), onKeyDown: (event: React.KeyboardEvent) => {if(event.key === "Enter" || event.key === " ") {event.preventDefault(); onSelect(id);}}});
           return <g key={node.node_id} transform={`translate(${position.x - WIDTH / 2},${position.y - position.height / 2})`}>
             <rect width={WIDTH} height={position.height} rx="10" className="fill-background stroke-primary" strokeWidth={selected === node.node_id || fields.some(field => field.node_id === selected) ? 2.5 : 1}/>
-            <g {...activate(node.node_id)} aria-label={`Explore ${layout.nodes.get(node.connection_id)?.label} / ${node.label}`} className="cursor-pointer">
-              <title>{node.label}</title><rect width={WIDTH} height={HEADER} rx="10" className="fill-primary/5"/>
-              <text x="14" y="25" fontSize="15" fontWeight="600" className="fill-foreground">{clip(node.label, 37)}</text>
-              <text x="14" y="46" fontSize="12" className="fill-muted-foreground">{clip(layout.nodes.get(node.connection_id)?.label ?? "", 43)}</text>
+            <g {...activate(node.node_id)} aria-label={displayText(`Explore ${layout.nodes.get(node.connection_id)?.label} / ${node.label}`)} className="cursor-pointer">
+              <title>{displayText(node.label)}</title><rect width={WIDTH} height={HEADER} rx="10" className="fill-primary/5"/>
+              <text x="14" y="25" fontSize="15" fontWeight="600" className="fill-foreground">{displayText(clip(node.label, 37))}</text>
+              <text x="14" y="46" fontSize="12" className="fill-muted-foreground">{displayText(clip(layout.nodes.get(node.connection_id)?.label ?? "", 43))}</text>
             </g>
             <line x1="0" x2={WIDTH} y1={HEADER - 4} y2={HEADER - 4} className="stroke-primary/30"/>
-            {fields.map((field, index) => <g key={field.node_id} {...activate(field.node_id)} aria-label={`Inspect ${node.label}.${field.label}`} className="cursor-pointer">
-              <title>{field.label} · {field.types.join(", ")}</title>
+            {fields.map((field, index) => <g key={field.node_id} {...activate(field.node_id)} aria-label={displayText(`Inspect ${node.label}.${field.label}`)} className="cursor-pointer">
+              <title>{displayText(field.label)} · {field.types.join(", ")}</title>
               <rect x="1" y={HEADER + index * ROW} width={WIDTH - 2} height={ROW} className={selected === field.node_id ? "fill-primary/15" : "fill-transparent hover:fill-primary/5"}/>
-              <text x="14" y={HEADER + index * ROW + 18} fontSize="12" className="fill-foreground">{clip(field.label, 29)}</text>
+              <text x="14" y={HEADER + index * ROW + 18} fontSize="12" className="fill-foreground">{displayText(clip(field.label, 29))}</text>
               <text x={WIDTH - 14} y={HEADER + index * ROW + 18} textAnchor="end" fontSize="10" className="fill-muted-foreground">{clip(field.types.join(", "), 17)}</text>
               <circle cx="0" cy={HEADER + index * ROW + ROW / 2} r="2.5" className="fill-primary"/><circle cx={WIDTH} cy={HEADER + index * ROW + ROW / 2} r="2.5" className="fill-primary"/>
             </g>)}
@@ -102,7 +103,7 @@ export default function RelationshipMap({graph, selected, onSelect}: {graph: Gra
             <rect x="-140" y={-route.height / 2} width="280" height={route.height} rx="6" className="fill-background stroke-primary/30"/>
             <text textAnchor="middle" fontSize="11" className="fill-foreground">
               <tspan x="0" y={-route.height / 2 + 16}>{edge.kind === "declared" ? "references" : "metadata link (unverified)"} · {edge.status}</tspan>
-              {edge.field_pairs.map((pair, index) => <tspan key={index} x="0" dy="19">{clip(layout.nodes.get(pair.source_field_id)?.label ?? "", 19)} {edge.kind === "declared" ? "→" : "↔"} {clip(layout.nodes.get(pair.target_field_id)?.label ?? "", 19)}</tspan>)}
+              {edge.field_pairs.map((pair, index) => <tspan key={index} x="0" dy="19">{displayText(clip(layout.nodes.get(pair.source_field_id)?.label ?? "", 19))} {edge.kind === "declared" ? "→" : "↔"} {displayText(clip(layout.nodes.get(pair.target_field_id)?.label ?? "", 19))}</tspan>)}
             </text>
           </g>;
         })}

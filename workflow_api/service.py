@@ -223,6 +223,7 @@ class WorkflowService:
                             'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
                     safe['PROCUREMENT_SOURCE_REQUIRED'] = 'No accessible requirements spreadsheet was identified. Include its link or save it as a workspace source. To start from an idea, ask to generate a new BOQ first.'
+                    safe['INVENTORY_LINK_REQUIRED'] = error.get('message', 'Confirm the inventory category and supplier relationships in Data Intelligence before generating this report.')
                     safe.update(PLANNER_PROVIDER_TIMEOUT='Workflow generation timed out. Retry generation.',
                                 PLANNER_PROVIDER_UNAVAILABLE='The model connection is unavailable. Retry generation.',
                                 PLANNER_RATE_LIMITED='The model provider rate limit was reached. Retry later.',
@@ -287,6 +288,10 @@ class WorkflowService:
             return self.failure(request_id, ApiFailure('INVALID_API_DATA', 'The API could not process valid, safe data.', 400))
 
     def document_data(self, workflow, auth=None):
+        if auth is not None:
+            from .workflow_titles import project
+            with self.store.transaction(write=False) as db:
+                workflow=project(db,auth['subject']['workspace_id'],workflow)
         data = {'workflow': workflow, 'workflow_id': workflow['workflow_id'],
                 'workflow_version': workflow['version'], 'status': workflow['status'],
                 'validation_state': workflow.get('metadata', {}).get('validation_state', 'not_validated')}

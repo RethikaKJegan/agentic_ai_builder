@@ -24,5 +24,5 @@ it("shows explicit unavailable and empty states without fabricated metrics",asyn
  expect(await screen.findByText("Your data story starts here")).toBeVisible();
  expect(screen.getByText("Metadata unavailable for Supabase.")).toBeVisible();
  expect(screen.getByLabelText("Discovered fields")).toHaveTextContent("0");
- expect(screen.getByLabelText("KG relationships")).toHaveTextContent("—");
+ expect(screen.getByLabelText("Semantic Intelligence relationships")).toHaveTextContent("—");
 });
