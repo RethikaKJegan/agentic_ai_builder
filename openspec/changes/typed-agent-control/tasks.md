@@ -1,0 +1,3 @@
+- [x] Add typed input/output variants for strictly representable control payloads with compatible generic fallback.
+- [x] Verify the model factory and real Crew executor offline with research schemas and malformed payload rejection.
+- [x] Validate contracts/specification, deploy and report exact retry requirements without executing actions.

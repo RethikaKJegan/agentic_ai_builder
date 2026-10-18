@@ -49,6 +49,60 @@ def test_submission_rejects_unvalidated_stale_and_unauthorized_requests(context)
     finally:approver.close()
 
 
+def test_submission_allows_real_pending_tool_review_without_granting_approval(context):
+    config=context.registry_configuration(approval_required=True)
+    client=context.configured_session(config)
+    assert context.save(client=client).status_code==200
+    path='/workflows/'+context.workflow['workflow_id']
+    assert context.mutate(path+'/validate','validate_workflow',context.ref(),'validate_pending_123',client=client).status_code==200
+    result=client.post(path+'/submit-for-approval',json=submission(context))
+    assert result.status_code==200,result.text
+    data=result.json()['data']
+    assert data['workflow']['status']=='validated'
+    assert data['workflow']['metadata']['approval_submission']
+    assert not data['registry_review']['ready']
+    assert data['registry_review']['items'][0]['authorization_state']=='pending_approval'
+    assert not data['workflow']['agents'][0]['allowed_tool_ids']
+
+
+@pytest.mark.parametrize('changes,reason',[
+    ({'availability':'disabled'},'TOOL_UNAVAILABLE'),
+    ({'risk_level':'high'},'RISK_NOT_AUTHORIZED'),
+])
+def test_submission_still_rejects_denied_tools(context,changes,reason):
+    client=context.configured_session(context.registry_configuration(**changes))
+    assert context.save(client=client).status_code==200
+    path='/workflows/'+context.workflow['workflow_id']
+    assert context.mutate(path+'/validate','validate_workflow',context.ref(),'validate_denied_123',client=client).status_code==200
+    result=client.post(path+'/submit-for-approval',json=submission(context))
+    assert result.status_code==403,result.text
+    assert reason in result.json()['data']['error']['details']['reason_codes']
+
+
+def test_submission_shows_unresolved_destination_requirement(context):
+    context.workflow['metadata']['unresolved_requirements']=[
+        'Confirm the report spreadsheet destination and product columns.',
+        {'requirement':'Choose report destination'}]
+    validated(context)
+    path='/workflows/'+context.workflow['workflow_id']+'/submit-for-approval'
+    result=context.client.post(path,json=submission(context))
+    assert result.status_code==403,result.text
+    error=result.json()['data']['error']
+    assert error['details']['requirements']==[
+        'Confirm the report spreadsheet destination and product columns.',
+        'Resolve requirement: Choose report destination']
+    assert 'UNRESOLVED_REQUIREMENTS' in error['details']['reason_codes']
+
+
+def test_submission_rejects_uncovered_tool_even_with_pending_approval_summary(context):
+    validated(context)
+    review={'ready':False,'reason_codes':['APPROVAL_REQUIRED','TOOL_ASSIGNMENT_REQUIRED'],
+            'items':[{'tool_id':'missing','authorization_state':'denied','reason_codes':[]}]}
+    with patch.object(context.service.registry_adapter,'review',return_value=review):
+        result=context.client.post('/workflows/'+context.workflow['workflow_id']+'/submit-for-approval',json=submission(context))
+    assert result.status_code==403
+
+
 def test_save_timestamp_is_server_confirmed_and_submission_does_not_leak_to_new_draft(context):
     context.workflow['metadata']['updated_at']='1900-01-01T00:00:00Z'
     validated(context)

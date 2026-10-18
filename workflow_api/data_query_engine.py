@@ -6,6 +6,7 @@ import datetime
 import math
 from decimal import Decimal, InvalidOperation, localcontext
 from .service import ApiFailure
+from .data_query_control import checkpoint
 
 MAX_ROWS = 5000
 MAX_BYTES = 2_000_000
@@ -24,8 +25,10 @@ def scalar(value):
         return Decimal(str(value))
     if isinstance(value, Decimal) and value.is_finite():
         return value
-    if isinstance(value, (datetime.date, datetime.datetime)):
+    if isinstance(value, datetime.datetime):
+        if value.tzinfo is not None: value = value.astimezone(datetime.timezone.utc)
         return value.isoformat()
+    if isinstance(value, datetime.date): return value.isoformat()
     # Mongo Decimal128 is converted explicitly; arrays, objects and ObjectIds are not guessed.
     if type(value).__module__ == 'bson.decimal128':
         return scalar(value.to_decimal())
@@ -57,7 +60,7 @@ def expression(text, field_ids):
         if isinstance(node, ast.Name):
             if node.id not in field_ids: fail('Metric references an unavailable field.')
             fields.add(node.id)
-        if isinstance(node, ast.Constant) and (type(node.value) not in (int, float) or not math.isfinite(node.value)):
+        if isinstance(node, ast.Constant) and (type(node.value) not in (int, float) or not Decimal(str(node.value)).is_finite() or abs(Decimal(str(node.value))) > Decimal('1e30')):
             fail('Metric constants must be finite numbers.')
     return tree.body, fields
 
@@ -96,12 +99,14 @@ def key(row, fields):
 def join_rows(left, right, pairs):
     index = {}
     for row in right:
+        checkpoint()
         k = key(row, [b for _, b in pairs])
         if k is None: fail('Join target contains null keys; a complete unique target is required.', 'DATA_QUERY_JOIN_INVALID', 422)
         if k in index: fail('Join target keys are duplicated. Joining could inflate totals.', 'DATA_QUERY_JOIN_INVALID', 422)
         index[k] = row
     result = []
     for row in left:
+        checkpoint()
         k = key(row, [a for a, _ in pairs])
         if k is None or k not in index:
             fail('Join source contains null or unmatched keys. No incomplete total was returned.', 'DATA_QUERY_JOIN_INVALID', 422)
@@ -110,6 +115,7 @@ def join_rows(left, right, pairs):
 
 
 def filtered(row, filters):
+    checkpoint()
     for item in filters:
         a, b, op = row.get(item['field_id']), item['value'], item['op']
         if op == 'is_null': good = a is None
@@ -137,11 +143,12 @@ def compute(rows, plan, expressions):
     if plan['metrics']:
         groups = {}
         for row in rows:
-            k = key(row, plan['group_by'])
+            k = tuple((type(row.get(f)).__name__, row.get(f)) for f in plan['group_by'])
             groups.setdefault(k, []).append(row)
         if not plan['group_by'] and not rows: groups[()] = []
         output = []
         for group in groups.values():
+            checkpoint()
             record = {f: group[0].get(f) for f in plan['group_by']}
             for metric in plan['metrics']:
                 expr = expressions.get(metric['label'])

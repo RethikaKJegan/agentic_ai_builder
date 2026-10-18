@@ -1,0 +1,3 @@
+# Typed agent control payloads
+
+The inventory run passed database reads and failed MODEL_OUTPUT_SCHEMA_INVALID at its research subagent's first model turn. Existing control transport requires JSON serialized inside a JSON string; its pattern checks braces but cannot enforce valid JSON or the tool's input shape. Use direct structured inputs for closed, fully required tool schemas and direct structured final output for closed business schemas. Preserve encoded fallback for generic/open object schemas, exact Registry grants and runtime validation. Do not execute or resume user workflows during deployment. Live diagnostic was blocked by automatic approval review; verification remains offline.

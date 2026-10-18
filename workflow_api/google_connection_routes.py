@@ -25,6 +25,16 @@ def install(app, service, auth, env, reference):
         except ApiFailure as exc:return failure(exc)
         except Exception:return failure(ApiFailure('GOOGLE_CONNECTIONS_UNAVAILABLE','Google connections could not be loaded.',503))
 
+    @app.put('/integrations/google/workflow-default')
+    async def workflow_default(request: Request):
+        try:
+            body = await request.json()
+            if not isinstance(body, dict) or set(body) != {'connection_id'} or not isinstance(body['connection_id'], str):
+                raise ApiFailure('INVALID_REQUEST', 'Select one owned Google account.', 400)
+            return response(await run_in_threadpool(manager.set_workflow_default, auth, body['connection_id']))
+        except ApiFailure as exc:
+            return failure(exc)
+
     async def authorize(request, connection_id=None):
         try:
             body=await request.json()

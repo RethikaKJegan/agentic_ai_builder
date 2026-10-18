@@ -1,0 +1,3 @@
+# Consume one validated model control decision per turn
+
+Authorized live read-only diagnostics reproduced multiple complete control envelopes concatenated in one SDK output_text. json.loads rejects Extra data, causing MODEL_OUTPUT_SCHEMA_INVALID before tool execution. Parse the entire response as a bounded sequence of complete schema-valid control envelopes, and consume only its first decision. Reject malformed/truncated/unknown envelopes and all trailing prose. Do not execute subsequent speculative decisions, change tool permissions, or retry provider calls. Non-control business JSON remains single-document only.

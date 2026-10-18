@@ -1,0 +1,404 @@
+{
+  "version": 1,
+  "revision": "e118e9c2e766b9f03b579b89bbc17589420f5368cdd3d9e467acad9f24ea78ae",
+  "stale": false,
+  "build_status": "ready",
+  "last_error": null,
+  "graph_revision": 1,
+  "built_at": "2026-10-18T08:38:20.843678+00:00",
+  "entities": [
+    {
+      "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "label": "Customer",
+      "sources": [
+        {
+          "node_id": "mongo_customers",
+          "connection_id": "mongo",
+          "label": "Atlas / demo / customers",
+          "kind": "dataset",
+          "role": "represents",
+          "status": "suggested",
+          "types": [],
+          "metadata": {
+            "name": "customers",
+            "database": "demo",
+            "schema": null,
+            "kind": "collection",
+            "indexes": [],
+            "constraints": [],
+            "discovery_method": "sampled",
+            "sample_count": 0,
+            "has_validation_rules": null,
+            "validation_schema_json": null
+          }
+        },
+        {
+          "node_id": "pg_customers",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / customers",
+          "kind": "dataset",
+          "role": "represents",
+          "status": "suggested",
+          "types": [],
+          "metadata": {
+            "name": "customers",
+            "database": "demo",
+            "schema": "northwind",
+            "kind": "table",
+            "indexes": [],
+            "constraints": [],
+            "discovery_method": "declared",
+            "sample_count": 0,
+            "has_validation_rules": null,
+            "validation_schema_json": null
+          }
+        },
+        {
+          "node_id": "mongo_customers_customerID",
+          "connection_id": "mongo",
+          "label": "Atlas / demo / customers / customerID",
+          "kind": "field",
+          "role": "identifier",
+          "status": "suggested",
+          "types": [
+            "string"
+          ],
+          "metadata": {
+            "field_id": "mongo_customers_customerID",
+            "name": "customerID",
+            "types": [
+              "string"
+            ],
+            "discovery_method": "sampled"
+          }
+        },
+        {
+          "node_id": "pg_orders_customerID",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / orders / customerID",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "text"
+          ],
+          "metadata": {
+            "field_id": "pg_orders_customerID",
+            "name": "customerID",
+            "types": [
+              "text"
+            ],
+            "discovery_method": "declared"
+          }
+        },
+        {
+          "node_id": "pg_customers_customerID",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / customers / customerID",
+          "kind": "field",
+          "role": "identifier",
+          "status": "suggested",
+          "types": [
+            "text"
+          ],
+          "metadata": {
+            "field_id": "pg_customers_customerID",
+            "name": "customerID",
+            "types": [
+              "text"
+            ],
+            "discovery_method": "declared"
+          }
+        }
+      ]
+    },
+    {
+      "entity_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+      "label": "Order",
+      "sources": [
+        {
+          "node_id": "pg_orders",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / orders",
+          "kind": "dataset",
+          "role": "represents",
+          "status": "suggested",
+          "types": [],
+          "metadata": {
+            "name": "orders",
+            "database": "demo",
+            "schema": "northwind",
+            "kind": "table",
+            "indexes": [],
+            "constraints": [
+              {
+                "name": "orders_customer",
+                "kind": "foreign_key",
+                "columns": [
+                  "tenantID",
+                  "customerID"
+                ],
+                "referenced_schema": "northwind",
+                "referenced_table": "customers",
+                "referenced_columns": [
+                  "tenantID",
+                  "customerID"
+                ]
+              }
+            ],
+            "discovery_method": "declared",
+            "sample_count": 0,
+            "has_validation_rules": null,
+            "validation_schema_json": null
+          }
+        }
+      ]
+    },
+    {
+      "entity_id": "entity_820a692e43bb9ae6aa56dc0e57bb06cf",
+      "label": "Employee",
+      "sources": [
+        {
+          "node_id": "mongo_customers_employee_id",
+          "connection_id": "mongo",
+          "label": "Atlas / demo / customers / employee_id",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "mongo_customers_employee_id",
+            "name": "employee_id",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "sampled"
+          }
+        },
+        {
+          "node_id": "pg_orders_employeeID",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / orders / employeeID",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "pg_orders_employeeID",
+            "name": "employeeID",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "declared"
+          }
+        }
+      ]
+    },
+    {
+      "entity_id": "entity_da048eda4e78177117649659a8517977",
+      "label": "Tenant",
+      "sources": [
+        {
+          "node_id": "pg_orders_tenantID",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / orders / tenantID",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "pg_orders_tenantID",
+            "name": "tenantID",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "declared"
+          }
+        },
+        {
+          "node_id": "pg_customers_tenantID",
+          "connection_id": "pg",
+          "label": "Postgres / demo / northwind / customers / tenantID",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "pg_customers_tenantID",
+            "name": "tenantID",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "declared"
+          }
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "ontology_12909495d59c451c6223a097a9334718",
+      "source_entity_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+      "target_entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "predicate": "references",
+      "reversed": false,
+      "status": "suggested",
+      "reviewed_at": null,
+      "evidence_hash": "01dfc2477579618df36798e35535977153aded322bd67231ba64c25cb359fbab",
+      "technical_relationship_id": "rel_b52a132a1691bdb2902a8095a740c6fc",
+      "technical_status": "declared",
+      "source_dataset_id": "pg_orders",
+      "target_dataset_id": "pg_customers",
+      "field_pairs": [
+        {
+          "source_field_id": "pg_orders_tenantID",
+          "target_field_id": "pg_customers_tenantID",
+          "source_label": "Postgres / demo / northwind / orders / tenantID",
+          "target_label": "Postgres / demo / northwind / customers / tenantID"
+        },
+        {
+          "source_field_id": "pg_orders_customerID",
+          "target_field_id": "pg_customers_customerID",
+          "source_label": "Postgres / demo / northwind / orders / customerID",
+          "target_label": "Postgres / demo / northwind / customers / customerID"
+        }
+      ],
+      "evidence": [
+        "Database foreign key: orders_customer",
+        "{\"columns\": [\"tenantID\", \"customerID\"], \"kind\": \"foreign_key\", \"name\": \"orders_customer\", \"referenced_columns\": [\"tenantID\", \"customerID\"], \"referenced_schema\": \"northwind\", \"referenced_table\": \"customers\"}"
+      ],
+      "qualification": {
+        "confidence": "database_declaration",
+        "direction": "source_references_target",
+        "cardinality": "At most one target per source key by declared foreign key; source multiplicity and optionality are not asserted.",
+        "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+        "value_overlap": "not_checked",
+        "review_basis": "No user acceptance asserted."
+      }
+    },
+    {
+      "relationship_id": "ontology_35e5fb805ac83e90e6381191fcff935e",
+      "source_entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "target_entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "predicate": "is related to",
+      "reversed": false,
+      "status": "suggested",
+      "reviewed_at": null,
+      "evidence_hash": "6593c44642f579528db1e12ef2ed85f1fd86b18667929baab6944c3a09ceae8f",
+      "technical_relationship_id": "rel_d0cfb5da9ddcf48a2ce85c4a50538973",
+      "technical_status": "proposed",
+      "source_dataset_id": "mongo_customers",
+      "target_dataset_id": "pg_customers",
+      "field_pairs": [
+        {
+          "source_field_id": "mongo_customers_customerID",
+          "target_field_id": "pg_customers_customerID",
+          "source_label": "Atlas / demo / customers / customerID",
+          "target_label": "Postgres / demo / northwind / customers / customerID"
+        }
+      ],
+      "evidence": [
+        "Normalized identifier name matches: customerid",
+        "Compatible normalized scalar type: string",
+        "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_customerID\", \"name\": \"customerID\", \"types\": [\"string\"]}",
+        "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_customers_customerID\", \"name\": \"customerID\", \"types\": [\"text\"]}",
+        "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+      ],
+      "qualification": {
+        "confidence": "metadata_candidate",
+        "direction": "unknown",
+        "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+        "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+        "value_overlap": "not_checked",
+        "review_basis": "No user acceptance asserted."
+      }
+    },
+    {
+      "relationship_id": "ontology_c584f8f1a466b9871265c16a5fed0915",
+      "source_entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "target_entity_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+      "predicate": "is related to",
+      "reversed": false,
+      "status": "suggested",
+      "reviewed_at": null,
+      "evidence_hash": "9e1c99245891d7cd3d09b8dc1a5e634b67c5267ef7c06543e240d2af02a7f98b",
+      "technical_relationship_id": "rel_9b35cc3e7b13240e9699d4fa5663115c",
+      "technical_status": "proposed",
+      "source_dataset_id": "mongo_customers",
+      "target_dataset_id": "pg_orders",
+      "field_pairs": [
+        {
+          "source_field_id": "mongo_customers_customerID",
+          "target_field_id": "pg_orders_customerID",
+          "source_label": "Atlas / demo / customers / customerID",
+          "target_label": "Postgres / demo / northwind / orders / customerID"
+        }
+      ],
+      "evidence": [
+        "Normalized identifier name matches: customerid",
+        "Compatible normalized scalar type: string",
+        "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_customerID\", \"name\": \"customerID\", \"types\": [\"string\"]}",
+        "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_orders_customerID\", \"name\": \"customerID\", \"types\": [\"text\"]}",
+        "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+      ],
+      "qualification": {
+        "confidence": "metadata_candidate",
+        "direction": "unknown",
+        "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+        "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+        "value_overlap": "not_checked",
+        "review_basis": "No user acceptance asserted."
+      }
+    },
+    {
+      "relationship_id": "ontology_683465cccd9551acdd18c18152b798d9",
+      "source_entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+      "target_entity_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+      "predicate": "is related to",
+      "reversed": false,
+      "status": "suggested",
+      "reviewed_at": null,
+      "evidence_hash": "0fea91afad94d93975b96e9897bac5e68fc3e9a1db8ed8faf8211f5fc657c4ed",
+      "technical_relationship_id": "rel_4869226c255ea084e4c07b74bc371877",
+      "technical_status": "proposed",
+      "source_dataset_id": "mongo_customers",
+      "target_dataset_id": "pg_orders",
+      "field_pairs": [
+        {
+          "source_field_id": "mongo_customers_employee_id",
+          "target_field_id": "pg_orders_employeeID",
+          "source_label": "Atlas / demo / customers / employee_id",
+          "target_label": "Postgres / demo / northwind / orders / employeeID"
+        }
+      ],
+      "evidence": [
+        "Normalized identifier name matches: employeeid",
+        "Compatible normalized scalar type: integer",
+        "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_employee_id\", \"name\": \"employee_id\", \"types\": [\"integer\"]}",
+        "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_orders_employeeID\", \"name\": \"employeeID\", \"types\": [\"integer\"]}",
+        "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+      ],
+      "qualification": {
+        "confidence": "metadata_candidate",
+        "direction": "unknown",
+        "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+        "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+        "value_overlap": "not_checked",
+        "review_basis": "No user acceptance asserted."
+      }
+    }
+  ],
+  "warnings": [
+    "Atlas: metadata is sampled or limited; absence is not proof of deletion.",
+    "Business entities are naming suggestions until reviewed. Entity mappings never authorize execution.",
+    "Business labels and arrow direction are reviewable meaning, not executable joins. No business records were read for this view."
+  ]
+}

@@ -19,6 +19,7 @@ from .catalog import CATALOG
 from .common import ArtifactStore, EffectJournal, JSONTransport
 from .google import GoogleAPI, GoogleToken
 from .sheet_creation import SheetsSetup, SheetResourceStore, setup_inputs
+from .sheet_report import ReportSheetsSetup
 from .calendar import CalendarConnector
 from .mail import MailConnector, address
 from .search import SearchConnector
@@ -126,6 +127,8 @@ class CatalogPlanner:
                 'Nonempty calendars or mail_recipients lists are optional additional restrictions. '
                 'Provisioning is separately enabled; use a stable project_id/creation_key and literal reviewed tab/header inputs. '
                 'Returned proposed_write_targets require a separately saved and reviewed row-write workflow. '
+                'For a NEW populated report use extension_sheets_create_report instead: it creates the file with '
+                'bounded scalar report rows in the same approved request, with no existing write target. '
                 'Use workflow-selected search queries, country, language, freshness and page values; no topic is hardcoded.'}
         return self.provider.generate(objective, supplied)
 
@@ -150,7 +153,7 @@ def create_extension_app(config, state_dir=None, transport=None, token_supplier=
     for original in catalog.values():
         tool = deepcopy(original); provider = tool['provider_id']
         enabled = provider=='procurement' or provider in config.get('enabled_providers', [])
-        if tool['tool_id'] in {'extension_sheets_create', 'extension_sheets_add_tabs'}:
+        if tool['tool_id'] in {'extension_sheets_create', 'extension_sheets_add_tabs', 'extension_sheets_create_report'}:
             enabled = enabled and config.get('sheet_creation_enabled', False)
         connected = True if provider=='procurement' else bool(token_supplier or token_file.is_file()) if provider != 'brave_search' else bool(secret)
         tool['availability'] = 'enabled' if enabled and connected else 'needs_configuration' if enabled else 'disabled'
@@ -190,8 +193,9 @@ def create_extension_app(config, state_dir=None, transport=None, token_supplier=
         if provider=='procurement':
             from .procurement.runtime_tools import ProcurementConnector
             connector=ProcurementConnector(tool,procurement)
-        elif tool['tool_id'] in {'extension_sheets_create', 'extension_sheets_add_tabs'}:
-            connector = SheetsSetup(tool, api, journal, sheet_resources, config.get('sheet_reads', []), config.get('sheet_writes', []))
+        elif tool['tool_id'] in {'extension_sheets_create', 'extension_sheets_add_tabs', 'extension_sheets_create_report'}:
+            connector_type = ReportSheetsSetup if tool['tool_id'] == 'extension_sheets_create_report' else SheetsSetup
+            connector = connector_type(tool, api, journal, sheet_resources, config.get('sheet_reads', []), config.get('sheet_writes', []))
         elif tool['tool_id'] == 'extension_sheets_discover':
             connector = SheetsDiscover(tool, api, config.get('sheet_reads', []))
         elif tool['tool_id'] == 'google_sheets_read_rows':

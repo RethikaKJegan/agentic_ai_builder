@@ -1,0 +1,3 @@
+- [x] Add bounded whole-response control envelope validation and first-decision consumption.
+- [x] Test the actual multi-decision failure through the factory/Crew bridge and negative cases.
+- [x] Repeat the authorized public-only model diagnostic, validate regressions and deploy without running Google actions.

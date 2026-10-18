@@ -386,15 +386,21 @@ class RegistryAdapter:
             # published release carries server-verified workflow approval, so
             # a restarted process may reconstruct its pending assignment
             # evidence through the same Registry approval path before running
-            # an automation.  Ordinary browser/manual execution never has the
-            # lifecycle-only marker and cannot take this branch.
+            # an automation. Manual execution in a separate worker may restore
+            # the same evidence only for its original, currently authorized
+            # approver. No authority is reconstructed from stored roles/scopes.
             approved_by = workflow.get('metadata', {}).get('approved_by')
-            if (not review['ready'] and auth.get('_registry_assignment_subject') and
+            manual_approver = (
+                not auth.get('_registry_assignment_subject') and
+                workflow.get('metadata', {}).get('workspace_id') == auth.get('subject', {}).get('workspace_id') and
+                'workflow.approve' in auth.get('permissions', []) and
+                bool(set(auth.get('roles', [])) & self.service._policy.approval_roles))
+            if (not review['ready'] and (auth.get('_registry_assignment_subject') or manual_approver) and
                     workflow.get('status') == 'published' and
                     workflow.get('metadata', {}).get('validation_state') == 'validated' and
                     isinstance(approved_by, str) and
                     approved_by == assignment_auth.get('subject', {}).get('subject_id')):
-                approval_auth = auth.get('_registry_approval_auth')
+                approval_auth = deepcopy(auth) if manual_approver else auth.get('_registry_approval_auth')
                 if not isinstance(approval_auth, dict) or approval_auth.get('subject') != assignment_auth.get('subject'):
                     # Older releases were created before the full approving
                     # authority was persisted.  Recover it only when this is

@@ -1,0 +1,6 @@
+- [x] Add indexed metadata retrieval and scope-safe graph expansion.
+- [x] Add authenticated preview and freshness validation during planning.
+- [x] Narrow planner and agent source context; preserve execution authority.
+- [x] Rename visible ontology labels and add source/tool preview UI.
+- [x] Verify large catalogs, ambiguity, ownership, stale selections and UI.
+- [x] Build, deploy with retained assets, and verify read-only live behavior.

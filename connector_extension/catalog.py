@@ -76,6 +76,25 @@ def tools():
         'Create an approved spreadsheet with workflow-selected tabs and literal headers; stable project creation key prevents duplicate retries.',
         obj({**deepcopy(setup_properties), 'title': string(200)}, ['project_id', 'creation_key', 'title', 'tabs']),
         deepcopy(setup_output), ['spreadsheets'], 'data.write', True, 'extension_sheet_setup'))
+    report_properties = deepcopy(setup_properties)
+    report_properties.pop('row_count')  # Report dimensions are derived from the approved content.
+    report_properties['tabs'] = {'type': 'array', 'minItems': 1, 'maxItems': 4, 'items': obj({
+        'title': string(100), 'headers': {'type': 'array', 'minItems': 1, 'maxItems': 30,
+            'items': string(200), 'uniqueItems': True},
+        'rows': {'type': 'array', 'minItems': 1, 'maxItems': 250, 'items': {'type': 'array',
+            'minItems': 1, 'maxItems': 30, 'items': {'anyOf': [{'type': 'string', 'maxLength': 2000}, {'type': 'number'},
+                {'type': 'boolean'}, {'type': 'null'}]}}}}, ['title', 'headers', 'rows'])}
+    report_output = deepcopy(setup_output)
+    report_output['properties'].update(written_rows={'type': 'integer', 'minimum': 1, 'maximum': 1000},
+        report_sha256={'type': 'string', 'pattern': '^[a-f0-9]{64}$'})
+    report_output['required'] += ['written_rows', 'report_sha256']
+    result.append(definition('extension_sheets_create_report', 'google_sheets', 'create_spreadsheet_report',
+        'Create a NEW approved spreadsheet containing bounded report tabs, headers and literal scalar rows in one creation request. '
+        'Never writes an existing spreadsheet. Include inventory facts and external source links in separate tabs. '
+        'Requires immediate approval of the complete report; returns verified spreadsheet_url and written_rows. '
+        'Use a stable unique project_id and creation_key for this report; no existing sheet_write_targets are needed.',
+        obj({**report_properties, 'title': string(200)}, ['project_id', 'creation_key', 'title', 'tabs']),
+        report_output, ['spreadsheets'], 'data.write', True, 'extension_sheet_setup'))
     add_input = obj({**deepcopy(setup_properties), 'spreadsheet_id': string(2000), 'spreadsheet_url': string(2000)},
         ['project_id', 'creation_key', 'tabs'])
     add_input['oneOf'] = [{'required': ['spreadsheet_id']}, {'required': ['spreadsheet_url']}]

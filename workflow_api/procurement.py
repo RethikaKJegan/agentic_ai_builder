@@ -45,13 +45,15 @@ def configuration(env):
 def definitions(config):
     if config is None: return []
     result = []
-    for original in [*CATALOG.values(), *TOOLS.values(), START, CONTACTS, SEARCH, PAGE]:
+    from .inventory_ranking import TOOL as INVENTORY_RANK, DELIVERY as REPORT_DELIVERY, NORMALIZE as INVENTORY_NORMALIZE
+    for original in [*CATALOG.values(), *TOOLS.values(), START, CONTACTS, SEARCH, PAGE, INVENTORY_RANK, REPORT_DELIVERY, INVENTORY_NORMALIZE]:
         if original['tool_id'] in {'google_sheets_read_rows', 'google_sheets_upsert_record'}: continue
-        if original['provider_id'] not in ('procurement','ddgs') and original['provider_id'] not in config['enabled_providers']: continue
+        if original['provider_id'] not in ('procurement','ddgs','builder_analysis') and original['provider_id'] not in config['enabled_providers']: continue
         # Search is separately configured and remains outside Phase 1.
         if original['provider_id'] == 'brave_search': continue
+        if original['tool_id'] == 'extension_sheets_create_report' and not config.get('sheet_creation_enabled'): continue
         tool = deepcopy(original); tool['availability'] = 'enabled'
-        if config.get('_automatic_actions'):tool['approval_required']=False
+        if config.get('_automatic_actions') and tool['tool_id'] != 'extension_sheets_create_report':tool['approval_required']=False
         result.append(tool)
     return result
 
@@ -538,17 +540,35 @@ class StartConnector(Connector):
 
 class ScopedConnector:
     """Recheck the parent release immediately before a procurement side effect."""
-    def __init__(self, connector, procurement, workflow=None):
+    def __init__(self, connector, procurement, workflow=None, action_approval=None):
         self.connector,self.procurement,self.workflow=connector,procurement,workflow
+        self.action_approval=action_approval
+    def bind_context(self,workflow,run,auth,node):
+        gates={n['node_id']:n.get('approval_gate_id') for n in workflow['nodes'] if n['kind']=='approval'}
+        immediate={gates[e['source']] for e in workflow['edges'] if e['target']==node['node_id'] and e.get('outcome')=='approved' and e['source'] in gates}
+        proof=next((e['approval_id'] for e in run.get('approval_evidence',[]) if e['gate_id'] in immediate),None)
+        return ScopedConnector(self.connector,self.procurement,workflow,proof)
     def __getattr__(self,name):return getattr(self.connector,name)
     def bind_workflow(self,workflow):
-        return ScopedConnector(self.connector.bind_workflow(workflow),self.procurement,workflow)
+        bound=self.connector.bind_workflow(workflow)
+        if not workflow.get('metadata',{}).get('procurement_project_id') and self.definition['tool_id'] in {
+            'extension_sheets_create_report','extension_sheets_create','extension_sheets_add_tabs',
+            'extension_mail_send','extension_mail_draft','extension_mail_reply',
+            'extension_calendar_create','extension_calendar_update','extension_calendar_cancel'}:
+            bound.definition=deepcopy(bound.definition)
+            bound.definition['approval_required']=True
+            bound.external_write=True
+        return ScopedConnector(bound,self.procurement,workflow,self.action_approval)
     def invoke(self,grant,inputs,effect_id):
         project=self.workflow.get('metadata',{}).get('procurement_project_id')
         if project:
             workspace=self.workflow['metadata']['workspace_id']
             job=self.procurement.job(workspace,project)
             require(self.procurement.active(workspace,job),'PROCUREMENT_WORKFLOW_INACTIVE')
+        if not project and self.connector.external_write:
+            if not self.action_approval:
+                raise RuntimeFailure('APPROVAL_REQUIRED','This exact action requires its immediate run approval.',403)
+            grant={**grant,'approval_reference':self.action_approval}
         return self.connector.invoke(grant,inputs,effect_id)
 
 
@@ -556,6 +576,7 @@ def install(app, settings, env, client, model, auth):
     from connector_extension.google import GoogleAPI, GoogleToken
     from connector_extension.common import EffectJournal, ArtifactStore
     from connector_extension.sheet_creation import SheetsSetup, SheetResourceStore
+    from connector_extension.sheet_report import ReportSheetsSetup
     from connector_extension.calendar import CalendarConnector
     from connector_extension.mail import MailConnector
     from connector_extension.procurement.routes import register_routes, ProcurementWorker
@@ -590,10 +611,14 @@ def install(app, settings, env, client, model, auth):
         provider=tool['provider_id']
         if tool['tool_id']==START_ID:connector=StartConnector(procurement,supplier)
         elif tool['tool_id']==CONTACTS['tool_id']:connector=SelectedContacts(procurement)
+        elif provider=='builder_analysis':
+            from .inventory_ranking import InventoryRank, ReportDelivery, InventoryNormalize
+            connector={'extension_inventory_rank':InventoryRank,'extension_report_delivery':ReportDelivery,'extension_inventory_normalize':InventoryNormalize}[tool['tool_id']](tool,None)
         elif provider=='ddgs':connector=SupplierSearchConnector(tool)
         elif provider=='procurement':connector=ProcurementConnector(tool,procurement)
-        elif tool['tool_id'] in ('extension_sheets_create','extension_sheets_add_tabs'):
-            connector=SheetsSetup(tool,api,journal,resources,settings.get('sheet_reads',[]),settings.get('sheet_writes',[]))
+        elif tool['tool_id'] in ('extension_sheets_create','extension_sheets_add_tabs','extension_sheets_create_report'):
+            connector_type=ReportSheetsSetup if tool['tool_id']=='extension_sheets_create_report' else SheetsSetup
+            connector=connector_type(tool,api,journal,resources,settings.get('sheet_reads',[]),settings.get('sheet_writes',[]))
         elif provider=='google_calendar':connector=CalendarConnector(tool,api,journal,settings.get('calendars',[]))
         elif provider=='gmail':connector=MailConnector(tool,api,journal,artifacts,settings.get('mail_account'),settings.get('mail_recipients',[]))
         elif tool['tool_id']=='extension_sheets_discover':
@@ -628,6 +653,10 @@ def install(app, settings, env, client, model, auth):
         nodes={n['node_id']:n for n in workflow['nodes']}
         writes={t['tool_id'] for t in definitions(settings) if t['approval_required']}
         project=metadata.get('procurement_project_id')
+        if not project:
+            writes |= {'extension_sheets_create_report','extension_sheets_create','extension_sheets_add_tabs',
+                       'extension_mail_send','extension_mail_draft','extension_mail_reply',
+                       'extension_calendar_create','extension_calendar_update','extension_calendar_cancel'}
         if project:writes.add('google_sheets_upsert_record')
         automatic=False
         if metadata.get('procurement_automatic_actions'):
@@ -639,7 +668,7 @@ def install(app, settings, env, client, model, auth):
             if ref['tool_id'] not in writes:continue
             actions=[n for n in workflow['nodes'] if n.get('tool_id')==ref['tool_id'] and n['kind']=='tool']
             require(bool(actions),'APPROVAL_REQUIRED')
-            if automatic:continue
+            if automatic and ref['tool_id'] != 'extension_sheets_create_report':continue
             for node in actions:
                 edges=[e for e in workflow['edges'] if e['target']==node['node_id']]
                 require(len(edges)==1 and edges[0].get('outcome')=='approved' and nodes[edges[0]['source']]['kind']=='approval','APPROVAL_REQUIRED')

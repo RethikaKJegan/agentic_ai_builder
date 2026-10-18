@@ -172,7 +172,7 @@ def test_http_build_and_review_envelopes(manager):
         def envelope(self,ref,status,data):return {'data':data}
         def failure(self,ref,exc):return {'error':{'error_code':exc.code,'message':str(exc)}}
     app=FastAPI()
-    with patch('workflow_api.data_source_routes.DataSources',return_value=SimpleNamespace(relationships=manager)):
+    with patch('workflow_api.data_source_routes.DataSources',return_value=SimpleNamespace(relationships=manager,store=manager.store,env={},semantic=manager.ontology.semantic)):
         install(app,Service(),auth(),{},lambda:'test')
     client=TestClient(app)
     response=client.get('/data-relationships')

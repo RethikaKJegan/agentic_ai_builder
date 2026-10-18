@@ -71,8 +71,30 @@ class GoogleConnections:
             db.execute("CREATE TABLE IF NOT EXISTS google_connection_migrations (version INTEGER PRIMARY KEY)")
             db.execute("INSERT INTO google_connection_migrations(version) VALUES (1) ON CONFLICT DO NOTHING")
             db.execute("CREATE TABLE IF NOT EXISTS google_connections (connection_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner TEXT NOT NULL, account_id TEXT NOT NULL, email TEXT NOT NULL, scopes TEXT NOT NULL, status TEXT NOT NULL, credentials TEXT, revision INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, verified_at TEXT, error_code TEXT, UNIQUE(workspace,owner,account_id))")
+            db.execute("CREATE TABLE IF NOT EXISTS google_workflow_defaults (workspace TEXT NOT NULL, owner TEXT NOT NULL, connection_id TEXT NOT NULL, PRIMARY KEY(workspace,owner))")
             db.execute("CREATE TABLE IF NOT EXISTS google_oauth_sessions (state_hash TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner TEXT NOT NULL, browser_hash TEXT NOT NULL, expires_at REAL NOT NULL, used INTEGER NOT NULL, connection_id TEXT, secret TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS google_connection_audit (event_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner TEXT NOT NULL, connection_id TEXT, event_type TEXT NOT NULL, created_at TEXT NOT NULL)")
+
+    def set_workflow_default(self, auth, identifier):
+        workspace, owner = self.identity(auth, True)
+        with self.store.transaction() as db:
+            row = self.owned(db, auth, identifier)
+            if row[6] not in {'connected', 'verification_failed'} or not row[7]:
+                raise ApiFailure('GOOGLE_RECONNECT_REQUIRED', 'Reconnect the selected default Google account.', 409)
+            db.execute('INSERT INTO google_workflow_defaults VALUES (?,?,?) ON CONFLICT(workspace,owner) DO UPDATE SET connection_id=excluded.connection_id',
+                       (workspace, owner, identifier))
+        return {'connection_id': identifier}
+
+    def workflow_default(self, auth):
+        workspace, owner = self.identity(auth)
+        with self.store.transaction(write=False) as db:
+            row = db.execute('SELECT connection_id FROM google_workflow_defaults WHERE workspace=? AND owner=?', (workspace, owner)).fetchone()
+            if row:
+                current = self.owned(db, auth, row[0])
+                if current[6] not in {'connected', 'verification_failed'} or not current[7]:
+                    raise ApiFailure('GOOGLE_RECONNECT_REQUIRED', 'Reconnect the default Google account; no other account was substituted.', 409)
+                return row[0]
+        return None
 
     def require_config(self):
         if self.config_error:

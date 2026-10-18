@@ -1,0 +1,3 @@
+- [x] Restore accessible selection and read-only evidence inspector.
+- [x] Verify desktop interaction, source scoping and existing essential controls.
+- [x] Build and deploy only the frontend with unchanged backend/configuration.

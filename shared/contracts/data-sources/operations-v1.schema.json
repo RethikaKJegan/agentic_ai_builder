@@ -1,0 +1,518 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://builder.local/contracts/data-sources/operations-v1",
+  "$defs": {
+    "values": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "maxLength": 4096
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_id",
+        "subject_id",
+        "connection_id",
+        "dataset_id",
+        "identity_fields",
+        "writable_fields",
+        "operations"
+      ],
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "writable_fields": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete"
+            ]
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targets"
+      ],
+      "properties": {
+        "targets": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connection_id",
+        "dataset_id",
+        "action",
+        "identity",
+        "values",
+        "unset_fields"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string"
+        },
+        "dataset_id": {
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "create",
+            "update",
+            "delete"
+          ]
+        },
+        "identity": {
+          "$ref": "#/$defs/values"
+        },
+        "values": {
+          "$ref": "#/$defs/values"
+        },
+        "unset_fields": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "prepare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "steps"
+      ],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    },
+    "read": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connection_id",
+        "dataset_id",
+        "identity"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string"
+        },
+        "dataset_id": {
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/values"
+        }
+      }
+    },
+    "execute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confirm"
+      ],
+      "properties": {
+        "confirm": {
+          "const": true
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "state",
+        "created_at",
+        "expires_at",
+        "recovery_until",
+        "recovery_of",
+        "recovery_operation_id",
+        "steps",
+        "preview_available"
+      ],
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "pattern": "^dbop_[a-f0-9]{32}$"
+        },
+        "state": {
+          "enum": [
+            "prepared",
+            "running",
+            "succeeded",
+            "failed",
+            "partial",
+            "uncertain",
+            "expired"
+          ]
+        },
+        "created_at": {
+          "type": "number"
+        },
+        "expires_at": {
+          "type": "number"
+        },
+        "recovery_until": {
+          "type": "number"
+        },
+        "recovery_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recovery_operation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preview_available": {
+          "type": "boolean"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "connection_id",
+              "dataset_id",
+              "label",
+              "tool_id",
+              "state",
+              "matched_records",
+              "affected_records",
+              "error_code"
+            ],
+            "properties": {
+              "action": {
+                "enum": [
+                  "create",
+                  "update",
+                  "delete"
+                ]
+              },
+              "connection_id": {
+                "type": "string"
+              },
+              "dataset_id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "tool_id": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "pending",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "uncertain"
+                ]
+              },
+              "matched_records": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "affected_records": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "identity": {
+                "type": "object"
+              },
+              "values": {
+                "type": "object"
+              },
+              "unset_fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "before": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "after": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configured",
+        "targets",
+        "items",
+        "tools"
+      ],
+      "properties": {
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "connection_id",
+              "dataset_id",
+              "label",
+              "engine",
+              "identity_fields",
+              "writable_fields",
+              "operations"
+            ],
+            "properties": {
+              "connection_id": {
+                "type": "string"
+              },
+              "dataset_id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "engine": {
+                "enum": [
+                  "postgresql",
+                  "mongodb"
+                ]
+              },
+              "identity_fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "writable_fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "create",
+                    "read",
+                    "update",
+                    "delete"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_id",
+              "provider_id",
+              "capability",
+              "approval_required"
+            ],
+            "properties": {
+              "tool_id": {
+                "type": "string"
+              },
+              "provider_id": {
+                "type": "string"
+              },
+              "capability": {
+                "type": "string"
+              },
+              "approval_required": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "read_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "matched_records",
+        "label"
+      ],
+      "properties": {
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "record": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/values"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matched_records": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/policy"
+    },
+    {
+      "$ref": "#/$defs/operation"
+    },
+    {
+      "$ref": "#/$defs/status"
+    },
+    {
+      "$ref": "#/$defs/read_result"
+    }
+  ]
+}

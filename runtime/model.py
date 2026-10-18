@@ -130,7 +130,7 @@ class OpenAIModelFactory:
             text = response.output_text
             if bridge.control_format is not None:
                 from .model_protocol import decode_response
-                text = decode_response(text, bridge.control_context)
+                text = decode_response(text, bridge.control_context, bridge.control_format['schema'])
             return text, response.usage.input_tokens, response.usage.output_tokens
         rates = self.rates[model['model_id']]
         bridge = BoundedLLM(definition, invoke, count, rates['input_per_token'], rates['output_per_token'])

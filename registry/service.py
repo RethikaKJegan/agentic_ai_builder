@@ -256,6 +256,12 @@ class RegistryService:
             return {'policy_version': policy.version}
         return self._respond(auth, 'tools.manage', operation, request_id)
 
+    def trusted_policy_snapshot(self, auth):
+        """Server-side configuration composition; never exposed by discovery APIs."""
+        with self._lock:
+            authorize_subject(auth, self._policy, 'tools.manage')
+            return deepcopy(self._policy)
+
     def decision_records(self, auth, request_id=None):
         return self._respond(auth, 'tools.manage', lambda: {'items': deepcopy(self._decisions)}, request_id)
 

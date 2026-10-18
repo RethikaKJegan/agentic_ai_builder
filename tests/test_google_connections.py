@@ -173,3 +173,18 @@ def test_missing_scope_response_does_not_claim_requested_grants(setup):
     with patch.object(m,'token_request',return_value={'access_token':'access','refresh_token':'refresh','expires_in':3600}),patch.object(m,'validate_identity',return_value={'sub':'google-a','email':'a@example.com','email_verified':True}):
         m.complete(state,'browser','code')
     assert not any(m.list(auth())['items'][0]['capabilities'].values())
+
+
+def test_workflow_default_is_owned_persistent_and_fails_closed_on_disconnect(setup):
+    manager,env=setup;record=connect(manager)
+    assert manager.workflow_default(auth()) is None
+    manager.set_workflow_default(auth(),record['connection_id'])
+    assert manager.workflow_default(auth())==record['connection_id']
+    restarted=GoogleConnections(WorkflowStore(manager.store.path),env)
+    assert restarted.workflow_default(auth())==record['connection_id']
+    for actor in [auth('bob'),auth(workspace='two')]:
+        assert manager.workflow_default(actor) is None
+        with pytest.raises(ApiFailure):manager.set_workflow_default(actor,record['connection_id'])
+    manager.disconnect(auth(),record['connection_id'])
+    with pytest.raises(ApiFailure) as failure:manager.workflow_default(auth())
+    assert failure.value.code=='GOOGLE_RECONNECT_REQUIRED'

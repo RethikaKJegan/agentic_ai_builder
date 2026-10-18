@@ -110,6 +110,22 @@ class IntegratedTests(unittest.TestCase):
             self.assertNotEqual(state['phase'],'STOPPED',state['issues'])
             self.approve(state);state=self.advance()
         self.fail('Preparation did not finish')
+    def test_new_report_registered_with_immediate_approval(self):
+        from connector_extension.examples import connector_workflow
+        from connector_extension.sheet_report import ReportSheetsSetup
+        tool_id='extension_sheets_create_report'
+        connector=self.service.runtime_runner.connectors[tool_id]
+        self.assertIsInstance(connector.connector,ReportSheetsSetup)
+        workflow=connector_workflow(tool_id,{'project_id':'restock_demo','creation_key':'report_v1',
+            'title':'Restock review','tabs':[{'title':'Inventory','headers':['Product','Stock'],
+            'rows':[['Offline fixture',2]]}]},'native_report_gate')
+        self.service.configuration_validator(workflow)
+        workflow['edges']=[edge for edge in workflow['edges'] if edge['target']!='action']
+        workflow['edges'].append({'edge_id':'bypass','source':'start','target':'action'})
+        with self.assertRaises(ProcurementError) as failure:self.service.configuration_validator(workflow)
+        self.assertEqual(failure.exception.code,'APPROVAL_REQUIRED')
+        self.assertEqual(len(self.http.sent),0)
+
     def test_native_prompt_to_approved_sends_and_tracking(self):
         before=deepcopy(self.http.books);state=self.to_sending()
         self.assertEqual(len(self.http.drafts),4);self.assertEqual(len(self.http.sent),0)

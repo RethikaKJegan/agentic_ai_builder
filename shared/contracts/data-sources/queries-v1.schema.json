@@ -1,0 +1,672 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://builder.local/contracts/data-sources/queries-v1",
+  "$defs": {
+    "selection_preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_dataset_count", "sources", "relationships", "business_mappings", "warnings"],
+      "properties": {
+        "catalog_dataset_count": {"type": "integer", "minimum": 0},
+        "sources": {
+          "type": "array", "maxItems": 4,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["dataset_id", "connection_id", "engine", "label", "reasons", "fields"],
+            "properties": {
+              "dataset_id": {"type": "string"},
+              "connection_id": {"type": "string"},
+              "engine": {"enum": ["postgresql", "mongodb"]},
+              "label": {"type": "string"},
+              "reasons": {"type": "array", "items": {"type": "string"}},
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["field_id", "label", "types", "purposes"],
+                  "properties": {
+                    "field_id": {"type": "string"},
+                    "label": {"type": "string"},
+                    "types": {"type": "array", "items": {"type": "string"}},
+                    "purposes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["output", "filter", "group", "metric", "join", "row_count"]}}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array", "maxItems": 3,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["relationship_id", "source_dataset_id", "target_dataset_id", "status", "field_pairs"],
+            "properties": {
+              "relationship_id": {"type": "string"},
+              "source_dataset_id": {"type": "string"},
+              "target_dataset_id": {"type": "string"},
+              "status": {"enum": ["declared", "accepted"]},
+              "field_pairs": {"type": "array", "minItems": 1, "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["source_field_id", "target_field_id"],
+                "properties": {"source_field_id": {"type": "string"}, "target_field_id": {"type": "string"}}
+              }}
+            }
+          }
+        },
+        "business_mappings": {"type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["node_id", "entity_name", "role"],
+          "properties": {"node_id": {"type": "string"}, "entity_name": {"type": "string"}, "role": {"enum": ["represents", "identifier", "reference", "attribute"]}}
+        }},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "properties": {
+        "base_dataset_id": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "joins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "relationship_id": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "target_dataset_id": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "relationship_id",
+              "target_dataset_id"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 3
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 30
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field_id": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "op": {
+                "enum": [
+                  "eq",
+                  "ne",
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "is_null",
+                  "not_null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ],
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "field_id",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 20
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 10
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "op": {
+                "enum": [
+                  "count",
+                  "sum",
+                  "avg",
+                  "min",
+                  "max"
+                ]
+              },
+              "expression": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "label",
+              "op",
+              "expression"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10
+        },
+        "order_by": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "column": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "direction": {
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "column",
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 5
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "clarification": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "base_dataset_id",
+        "joins",
+        "fields",
+        "filters",
+        "group_by",
+        "metrics",
+        "order_by",
+        "limit",
+        "explanation",
+        "clarification"
+      ],
+      "additionalProperties": false
+    },
+    "planned": {
+      "type": "object",
+      "properties": {
+        "plan_id": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "plan": {
+          "$ref": "#/$defs/plan"
+        },
+        "graph_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "number"
+        },
+        "field_labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "dataset_labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "physical_plan": {
+          "$ref": "#/$defs/physical_plan"
+        },
+        "selection_preview": {
+          "$ref": "#/$defs/selection_preview"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "plan_id",
+        "question",
+        "plan",
+        "graph_revision",
+        "created_at",
+        "expires_at",
+        "field_labels",
+        "dataset_labels"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "executed_plan": {"$ref": "#/$defs/plan"},
+        "plan_id": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "total_result_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limited": {
+          "type": "boolean"
+        },
+        "executed_at": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dataset_id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "metadata_revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "finished_at": {
+                "type": "string"
+              },
+              "rows_read": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "dataset_id",
+              "label",
+              "metadata_revision",
+              "started_at",
+              "finished_at",
+              "rows_read"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "join_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "relationship_id": {
+                "type": "string"
+              },
+              "source_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "matched_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_unique": {
+                "type": "boolean"
+              },
+              "checked_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "relationship_id",
+              "source_rows",
+              "target_rows",
+              "matched_rows",
+              "target_unique",
+              "checked_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "plan_id",
+        "columns",
+        "rows",
+        "total_result_rows",
+        "matched_rows",
+        "limited",
+        "executed_at",
+        "sources",
+        "join_checks",
+        "explanation",
+        "warnings"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "configured": {
+          "type": "boolean"
+        },
+        "max_rows_per_dataset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_datasets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_result_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "plan_ttl_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "jobs_available": {
+          "type": "boolean"
+        },
+        "job_timeout_seconds": {
+          "type": "integer",
+          "minimum": 45,
+          "maximum": 300
+        },
+        "result_ttl_seconds": {
+          "type": "integer",
+          "const": 900
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "configured",
+        "max_rows_per_dataset",
+        "max_bytes",
+        "max_datasets",
+        "max_result_rows",
+        "plan_ttl_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "physical_plan": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "enum": [
+            "application",
+            "postgresql",
+            "mongodb",
+            "federated"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_source_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "snapshot": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "reason",
+        "operations",
+        "max_source_rows",
+        "snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "enum": [
+            "application",
+            "postgresql",
+            "mongodb",
+            "federated"
+          ]
+        },
+        "snapshot": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transferred_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transferred_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fragments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dataset_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "engine": {
+                "enum": [
+                  "postgresql",
+                  "mongodb"
+                ]
+              },
+              "purpose": {
+                "enum": [
+                  "complete dimension",
+                  "complete join key domain",
+                  "partial aggregates"
+                ]
+              },
+              "snapshot": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "finished_at": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "transferred_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "transferred_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dataset_ids",
+              "engine",
+              "purpose",
+              "snapshot",
+              "started_at",
+              "finished_at",
+              "duration_ms",
+              "source_rows",
+              "transferred_rows",
+              "transferred_bytes"
+            ]
+          },
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "strategy",
+        "snapshot",
+        "duration_ms",
+        "transferred_rows",
+        "transferred_bytes"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/planned"
+    },
+    {
+      "$ref": "#/$defs/result"
+    },
+    {
+      "$ref": "#/$defs/status"
+    }
+  ]
+}

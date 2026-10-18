@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://builder.local/contracts/data-sources/query-jobs-v1",
+  "$defs": {
+    "progress": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "completed_fragments": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transferred_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transferred_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "stage",
+        "completed_fragments",
+        "transferred_rows",
+        "transferred_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "job": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "pattern": "^dqj_[a-f0-9]{32}$"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "validating",
+            "running",
+            "finalizing",
+            "succeeded",
+            "failed",
+            "cancel_requested",
+            "cancelled"
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "created_at": {
+          "type": "number",
+          "minimum": 0
+        },
+        "updated_at": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deadline_at": {
+          "type": "number",
+          "minimum": 0
+        },
+        "progress": {
+          "$ref": "#/$defs/progress"
+        },
+        "result_expires_at": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result_available": {
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "planned_query": {
+          "$ref": "https://builder.local/contracts/data-sources/queries-v1#/$defs/planned"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "plan_id",
+        "state",
+        "attempt",
+        "created_at",
+        "updated_at",
+        "deadline_at",
+        "progress",
+        "result_expires_at",
+        "result_available",
+        "error",
+        "planned_query"
+      ]
+    },
+    "list": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/job"
+          },
+          "maxItems": 20
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "contract_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "$ref": "https://builder.local/contracts/data-sources/queries-v1#/$defs/result"
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/job"
+    },
+    {
+      "$ref": "#/$defs/list"
+    },
+    {
+      "$ref": "#/$defs/result"
+    }
+  ]
+}

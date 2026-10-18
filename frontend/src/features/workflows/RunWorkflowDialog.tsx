@@ -12,6 +12,7 @@ import { parseRunInputs, eventOnly } from "./run-inputs";
 export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWorkflow; onClose: () => void }) {
   const backend = useBackend(); const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false); const [error, setError] = useState<Error>(); const [run, setRun] = useState<RunRecord>();
+  const executionKey = useRef<string | undefined>(undefined);
   const submitting = useRef(false); const submittedPayload = useRef<string | undefined>(undefined);
   const automatic = eventOnly(workflow);
   const blocker = !backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : workflow.status !== "published" ? "A published revision is required." : automatic ? "This workflow waits for its configured event. Activate it, create an event in its source, then check Runs." : "";
@@ -22,7 +23,10 @@ export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWo
       if (submittedPayload.current && submittedPayload.current !== serialized) throw new InputError("The earlier run request has an uncertain outcome. Keep these inputs and retry, or check Runs before starting different inputs.");
       submitting.current = true; setBusy(true); setError(undefined);
       submittedPayload.current = serialized;
-      setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs })).run);
+      // One explicit dialog is one execution intent. Retries keep this key;
+      // reopening Run must not return an older terminal run for identical inputs.
+      executionKey.current ??= crypto.randomUUID();
+      setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs }, executionKey.current)).run);
       void backend.refreshOverview();
     } catch (caught) {
       if (caught instanceof ApiError && ["INVALID_INPUT", "OPERATION_NOT_AUTHORIZED", "REVISION_CONFLICT", "WORKFLOW_NOT_FOUND", "REVISION_NOT_PUBLISHED"].includes(caught.error.error_code)) submittedPayload.current = undefined;

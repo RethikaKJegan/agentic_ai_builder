@@ -1,0 +1,3 @@
+- [x] Fix detailed refresh and shared build status without changing backend contracts.
+- [x] Verify regressions, type/lint/build/contracts and desktop/mobile browser build flows.
+- [x] Deploy retained-assets frontend artifact and verify live build feedback.

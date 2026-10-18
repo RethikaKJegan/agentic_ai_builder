@@ -1,0 +1,3 @@
+# Business ontology and automatic metadata refresh — Phase 1
+
+Extend the existing graph with a versioned, metadata-only business ontology projection, evidence-bound predicate/direction reviews and an interactive entity canvas. Preserve technical graph contracts, source IDs and executable relationship permissions. Reuse existing owned snapshots, entity mappings, leased profiling and graph workers. Add per-connection automatic refresh settings and freshness status, with bounded periodic discovery, retries/backoff and no duplicate jobs. Unchanged automatic checks preserve metadata/graph revisions. Automatic scheduling does not grant database writes. Preserve existing uncommitted work and Praxi. Phase 2 retrieval and instance-level business records are excluded.

@@ -1,0 +1,21 @@
+import {act,cleanup,fireEvent,render,screen} from "@testing-library/react";
+import {afterEach,expect,it,vi} from "vitest";
+import {api} from "@/api/client";
+import {semanticViewSchema} from "@/api/semantic-kg";
+import fixture from "../../../e2e/fixtures/semantic-kg.json";
+import Relationships from "./Relationships";
+afterEach(()=>{cleanup();vi.useRealTimers();vi.restoreAllMocks();});
+it.each(["ready","failed"] as const)("updates semantic inference feedback to %s without changing graph mode",async state=>{
+ vi.useFakeTimers();let view=semanticViewSchema.parse(structuredClone(fixture));
+ vi.spyOn(api,"knowledgeGraph").mockImplementation(async()=>view);
+ vi.spyOn(api,"dataRefresh").mockResolvedValue({version:1,items:[]});
+ vi.spyOn(api,"inferKnowledgeGraph").mockImplementation(async()=>{view={...view,semantic_status:{...view.semantic_status,state:"queued"}};return view;});
+ render(<Relationships canManage/>);await act(async()=>{});
+ fireEvent.click(screen.getByRole("button",{name:"Generate semantic relationships"}));await act(async()=>{});
+ expect(screen.getByRole("button",{name:"Inferring semantic relationships…"})).toBeDisabled();
+ view={...view,semantic_status:{...view.semantic_status,state,last_error:state==="failed"?"Inference failed; retry.":null}};
+ await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});
+ expect(screen.getByRole("button",{name:"Generate semantic relationships"})).toBeEnabled();
+ expect(screen.getByRole("button",{name:"Entity types"})).toHaveAttribute("aria-pressed","true");
+ if(state==="failed")expect(screen.getByRole("alert")).toHaveTextContent("Inference failed");
+});

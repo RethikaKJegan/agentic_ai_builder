@@ -1,0 +1,249 @@
+{
+  "version": 2,
+  "revision": "cc523bbe87ce1b67da591d375bca4c5470a0cd81af7f3a46a50fdaf02fedd4bb",
+  "stale": false,
+  "build_status": "ready",
+  "last_error": null,
+  "graph_revision": 2,
+  "built_at": "2026-10-18T09:46:38.330789+00:00",
+  "entities": [
+    {
+      "entity_id": "entity_de46a45ced4697015845d3f118403fe7",
+      "label": "Category",
+      "sources": [
+        {
+          "node_id": "mongo_categories",
+          "connection_id": "mongo",
+          "label": "mongo / demo / categories",
+          "kind": "dataset",
+          "role": "represents",
+          "status": "suggested",
+          "types": [],
+          "metadata": {
+            "name": "categories",
+            "database": "demo",
+            "schema": null,
+            "kind": "collection",
+            "indexes": [],
+            "constraints": [],
+            "discovery_method": "sampled",
+            "sample_count": 0,
+            "has_validation_rules": null,
+            "validation_schema_json": null
+          },
+          "description": ""
+        },
+        {
+          "node_id": "mongo_categories_categoryID",
+          "connection_id": "mongo",
+          "label": "mongo / demo / categories / categoryID",
+          "kind": "field",
+          "role": "identifier",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "mongo_categories_categoryID",
+            "name": "categoryID",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "sampled"
+          },
+          "description": ""
+        },
+        {
+          "node_id": "pg_lines_categoryID",
+          "connection_id": "pg",
+          "label": "pg / demo / northwind / lines / categoryID",
+          "kind": "field",
+          "role": "reference",
+          "status": "suggested",
+          "types": [
+            "integer"
+          ],
+          "metadata": {
+            "field_id": "pg_lines_categoryID",
+            "name": "categoryID",
+            "types": [
+              "integer"
+            ],
+            "discovery_method": "declared"
+          },
+          "description": ""
+        }
+      ]
+    },
+    {
+      "entity_id": "entity_42d2b70866ba77b84620696f6c6cb281",
+      "label": "Line",
+      "sources": [
+        {
+          "node_id": "pg_lines",
+          "connection_id": "pg",
+          "label": "pg / demo / northwind / lines",
+          "kind": "dataset",
+          "role": "represents",
+          "status": "suggested",
+          "types": [],
+          "metadata": {
+            "name": "lines",
+            "database": "demo",
+            "schema": "northwind",
+            "kind": "table",
+            "indexes": [],
+            "constraints": [],
+            "discovery_method": "declared",
+            "sample_count": 0,
+            "has_validation_rules": null,
+            "validation_schema_json": null
+          },
+          "description": ""
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "ontology_e507134031869f62ff3604d4c7fb66a8",
+      "source_entity_id": "entity_de46a45ced4697015845d3f118403fe7",
+      "target_entity_id": "entity_42d2b70866ba77b84620696f6c6cb281",
+      "predicate": "categorizes",
+      "reversed": false,
+      "status": "confirmed",
+      "reviewed_at": "2026-10-18T09:46:38.391820+00:00",
+      "evidence_hash": "20769232f493b9e336679f0bb0db094bcf56935648a60e3f52b72845b567168f",
+      "technical_relationship_id": "rel_4e9dce2b9d9ed8e46c9d98386d2ee86c",
+      "technical_status": "accepted",
+      "source_dataset_id": "mongo_categories",
+      "target_dataset_id": "pg_lines",
+      "field_pairs": [
+        {
+          "source_field_id": "mongo_categories_categoryID",
+          "target_field_id": "pg_lines_categoryID",
+          "source_label": "mongo / demo / categories / categoryID",
+          "target_label": "pg / demo / northwind / lines / categoryID"
+        }
+      ],
+      "evidence": [
+        "Normalized identifier name matches: categoryid",
+        "Compatible normalized scalar type: integer",
+        "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_categories_categoryID\", \"name\": \"categoryID\", \"types\": [\"integer\"]}",
+        "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_lines_categoryID\", \"name\": \"categoryID\", \"types\": [\"integer\"]}",
+        "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+      ],
+      "qualification": {
+        "confidence": "metadata_candidate",
+        "direction": "unknown",
+        "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+        "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+        "value_overlap": "not_checked",
+        "review_basis": "User review permits the existing query validator to consider this relationship; runtime join checks still apply."
+      },
+      "confidence": null,
+      "inference_method": "user_review",
+      "rationale": "Owner-reviewed business interpretation; this review does not grant a technical join.",
+      "evidence_refs": [],
+      "alternatives": [],
+      "inferred_at": null,
+      "semantic_evidence_hash": "8a195bf2c4aa04e3551bc651e3a08a8c04f77adc936098ceb7244154446d6583",
+      "provenance": {
+        "structural_relationship_id": "rel_4e9dce2b9d9ed8e46c9d98386d2ee86c",
+        "source_dataset_id": "mongo_categories",
+        "target_dataset_id": "pg_lines",
+        "field_pairs": [
+          {
+            "source_field_id": "mongo_categories_categoryID",
+            "target_field_id": "pg_lines_categoryID",
+            "source_label": "mongo / demo / categories / categoryID",
+            "target_label": "pg / demo / northwind / lines / categoryID"
+          }
+        ],
+        "source_revisions": [
+          {
+            "connection_id": "mongo",
+            "revision": 1,
+            "generation": 1
+          },
+          {
+            "connection_id": "pg",
+            "revision": 1,
+            "generation": 1
+          }
+        ],
+        "record_evidence": "not_sampled"
+      }
+    }
+  ],
+  "warnings": [
+    "Business entities are naming suggestions until reviewed. Entity mappings never authorize execution.",
+    "Business labels and arrow direction are reviewable meaning, not executable joins. No business records were read for this view.",
+    "Semantic proposals are inferences, not verified business facts. Review meaning separately from technical join access."
+  ],
+  "datasets": [
+    {
+      "dataset_id": "mongo_categories",
+      "label": "categories",
+      "connection_id": "mongo",
+      "fields": [
+        {
+          "field_id": "mongo_categories_categoryID",
+          "name": "categoryID",
+          "types": [
+            "integer"
+          ]
+        },
+        {
+          "field_id": "mongo_categories_name",
+          "name": "name",
+          "types": [
+            "string"
+          ]
+        }
+      ]
+    },
+    {
+      "dataset_id": "pg_lines",
+      "label": "northwind.lines",
+      "connection_id": "pg",
+      "fields": [
+        {
+          "field_id": "pg_lines_categoryID",
+          "name": "categoryID",
+          "types": [
+            "integer"
+          ]
+        },
+        {
+          "field_id": "pg_lines_price",
+          "name": "price",
+          "types": [
+            "numeric"
+          ]
+        },
+        {
+          "field_id": "pg_lines_qty",
+          "name": "qty",
+          "types": [
+            "integer"
+          ]
+        },
+        {
+          "field_id": "pg_lines_discount",
+          "name": "discount",
+          "types": [
+            "numeric"
+          ]
+        }
+      ]
+    }
+  ],
+  "semantic_status": {
+    "configured": false,
+    "enabled": false,
+    "state": "idle",
+    "last_error": null,
+    "input_hash": "8577b26589fd4f80c6a3758915eee78dd3fd30b566cf993c752331567268d87e"
+  }
+}

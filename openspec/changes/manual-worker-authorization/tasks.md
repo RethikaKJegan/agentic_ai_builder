@@ -1,0 +1,3 @@
+- [x] Add narrowly scoped manual assignment recovery using current authenticated approver authority.
+- [x] Test separate service instances, restart recovery and negative authorization cases.
+- [x] Validate contracts/specification and deploy without running user actions.

@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge-retrieval-v1",
+  "title": "Knowledge graph source retrieval v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "revision",
+    "indexed_at",
+    "coverage",
+    "query_terms",
+    "requires_selection",
+    "graph_stale",
+    "candidates",
+    "source_ids",
+    "relationships",
+    "warnings",
+    "tools"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "revision": {
+      "type": "string"
+    },
+    "indexed_at": {
+      "type": "string"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connections",
+        "datasets",
+        "matched_datasets",
+        "candidate_limit",
+        "source_limit",
+        "metadata_only"
+      ],
+      "properties": {
+        "connections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "datasets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched_datasets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_limit": {
+          "const": 12
+        },
+        "source_limit": {
+          "const": 4
+        },
+        "metadata_only": {
+          "const": true
+        }
+      }
+    },
+    "query_terms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 48
+    },
+    "requires_selection": {
+      "type": "boolean"
+    },
+    "graph_stale": {
+      "type": "boolean"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_id",
+          "connection_id",
+          "label",
+          "engine",
+          "score",
+          "selected",
+          "reasons",
+          "fields",
+          "operations"
+        ],
+        "properties": {
+          "dataset_id": {
+            "type": "string"
+          },
+          "connection_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "maxItems": 16
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relationship_id",
+          "source_dataset_id",
+          "target_dataset_id",
+          "status",
+          "field_pairs"
+        ],
+        "properties": {
+          "relationship_id": {
+            "type": "string"
+          },
+          "source_dataset_id": {
+            "type": "string"
+          },
+          "target_dataset_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "field_pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_field_id",
+                "target_field_id"
+              ],
+              "properties": {
+                "source_field_id": {
+                  "type": "string"
+                },
+                "target_field_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tool_id",
+          "capability",
+          "approval_required",
+          "description"
+        ],
+        "properties": {
+          "tool_id": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "approval_required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "source_ids"
+      ],
+      "properties": {
+        "revision": {
+          "type": "string"
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective"
+      ],
+      "properties": {
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "revision",
+            "source_ids"
+          ],
+          "properties": {
+            "revision": {
+              "type": "string"
+            },
+            "source_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -152,3 +152,25 @@ it('supports an explicitly configured public Google return through the loopback 
   expect(result.status).toBe(303);
   expect(result.headers.get('location')).toBe('https://praxi.bellcorpstudio.com/app/integrations?google=expired');
 });
+
+it('preserves a query job idempotency header and exact body through the production proxy', async () => {
+  vi.stubEnv('BUILDER_ENVIRONMENT','production');
+  const fetch=vi.fn().mockResolvedValue(response(202));vi.stubGlobal('fetch',fetch);
+  const body=JSON.stringify({plan_id:'dq_owned'});const key='query_job_retry_123456';
+  const result=await POST(new NextRequest('https://praxi.bellcorpstudio.com/api/backend/data-queries/jobs',{method:'POST',headers:{origin:'https://praxi.bellcorpstudio.com','content-type':'application/json','idempotency-key':key,cookie:'builder_dev_session=bound; unrelated=drop'},body}),context('data-queries/jobs'));
+  expect(result.status).toBe(202);expect(fetch).toHaveBeenCalledTimes(1);
+  const options=fetch.mock.calls[0]![1] as RequestInit;
+  expect(new Headers(options.headers).get('idempotency-key')).toBe(key);
+  expect(new Headers(options.headers).get('cookie')).toBe('builder_dev_session=bound');
+  expect(new TextDecoder().decode(options.body as Uint8Array)).toBe(body);
+});
+
+it.each(['data-operations/prepare','data-operations/dbop_0123456789abcdef0123456789abcdef/recover'])('preserves CRUD intent keys and exact bytes for %s',async(path)=>{
+  const fetch=vi.fn().mockResolvedValue(response(200));vi.stubGlobal('fetch',fetch);
+  const body=path.endsWith('/prepare')?'{"steps":[]}':'{}';const key='database_intent_retry_1234';
+  const result=await POST(new NextRequest(base+path,{method:'POST',headers:{host:new URL(base).host,origin:new URL(base).origin,'content-type':'application/json','idempotency-key':key},body}),context(path));
+  expect(result.status).toBe(200);
+  const options=fetch.mock.calls[0]![1] as RequestInit;
+  expect(new Headers(options.headers).get('idempotency-key')).toBe(key);
+  expect(new TextDecoder().decode(options.body as Uint8Array)).toBe(body);
+});

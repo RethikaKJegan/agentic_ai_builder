@@ -1,0 +1,5 @@
+- [x] Register bounded create-report capability and implement atomic creation plus read verification.
+- [x] Integrate native and extension registration and planner guidance; preserve approvals and ceilings.
+- [x] Verify offline creation, literal cells, bounds, retries, reconciliation and planner contracts.
+- [ ] Activate backend and verify a generation-only Northwind proposal; execute no external actions.
+- [x] Save and validate an explicitly corrected Northwind draft with the existing Google binding; keep it unpublished and unexecuted.

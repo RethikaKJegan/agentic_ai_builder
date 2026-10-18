@@ -203,8 +203,14 @@ class WorkflowService:
                 from contextlib import nullcontext
                 google_tools = getattr(self, 'google_tools', None)
                 scope = google_tools.planning(auth, trusted['payload'].get('context', {})) if google_tools else nullcontext(None)
+                def resolve_context(context):
+                    result = planning_context(self.store, auth, context)
+                    if selected_google:
+                        result['google_connection_id'] = selected_google
+                    databases = getattr(self, 'database_workflows', None)
+                    return databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', ''))) if databases else result
                 with scope as selected_google:
-                    result = self.planner.plan(trusted, context_resolver=lambda context: planning_context(self.store, auth, context))
+                    result = self.planner.plan(trusted, context_resolver=resolve_context)
                 if selected_google and result.get('status', 500) < 400:
                     result['data']['workflow'].setdefault('metadata', {})['google_connection_id'] = selected_google
                 elif result.get('status', 500) < 400:
@@ -380,6 +386,8 @@ class WorkflowService:
                 self.validate_document(workflow)
                 if getattr(self, 'configuration_validator', None):
                     self.configuration_validator(workflow)
+                if databases := getattr(self, 'database_workflows', None):
+                    databases.validate_workflow(workflow, auth)
                 # A structurally valid draft may still lack executable tool assignments.
                 workflow['status'] = 'validated'
                 workflow['metadata']['validation_state'] = 'validated'
@@ -401,6 +409,8 @@ class WorkflowService:
             self.validate_document(workflow)
             if getattr(self, 'configuration_validator', None):
                 self.configuration_validator(workflow)
+            if databases := getattr(self, 'database_workflows', None):
+                databases.validate_workflow(workflow, auth)
             if action == 'approve':
                 # Reconcile older validated drafts with the current trusted
                 # registry before reviewing them. This lets an existing draft

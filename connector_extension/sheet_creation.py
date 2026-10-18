@@ -192,9 +192,12 @@ class SheetsSetup(Connector):
         return {'metadataKey': MARKER_KEY, 'metadataValue': marker, 'visibility': 'DOCUMENT',
                 'location': {'spreadsheet': True} if sheet_id is None else {'sheetId': sheet_id}}
 
+    def creation_rows(self, spec):
+        return [{'values': [{'userEnteredValue': {'stringValue': h}} for h in spec['headers']]}]
+
     def execute(self, grant, inputs, effect_id, deadline):
         value = self.manifest(inputs); key, old = self.journal_row(value)
-        create = self.definition['tool_id'] == 'extension_sheets_create'
+        create = self.definition['tool_id'] in {'extension_sheets_create', 'extension_sheets_create_report'}
         if old:
             if old[1] != 'completed':
                 denied('UNKNOWN_INVOCATION_RESULT', 'Setup result is uncertain; reconcile it before another create.')
@@ -222,8 +225,7 @@ class SheetsSetup(Connector):
                     sheets.append({'properties': {'sheetId': index, 'title': spec['title'],
                         'gridProperties': {'rowCount': value['row_count'], 'columnCount': len(spec['headers'])}},
                         'developerMetadata': [self.marker_value(marker,index)],
-                        'data': [{'startRow': 0, 'startColumn': 0, 'rowData': [{'values': [
-                            {'userEnteredValue': {'stringValue': h}} for h in spec['headers']]}]}]})
+                        'data': [{'startRow': 0, 'startColumn': 0, 'rowData': self.creation_rows(spec)}]})
                 metadata_tags = [self.marker_value(marker)]
                 body = {'properties': {'title': value['title']}, 'sheets': sheets, 'developerMetadata': metadata_tags}
                 response = self.api.request('sheets', 'POST', 'spreadsheets', ['spreadsheets'], body, deadline)
@@ -259,7 +261,7 @@ class SheetsSetup(Connector):
         """Operator-only read verification; no provider mutation or blind retry."""
         value = self.manifest(inputs); key, old = self.journal_row(value)
         if not old: denied('SHEETS_SETUP_RECONCILIATION_REQUIRED', 'No existing intent matches this setup key.')
-        create = self.definition['tool_id'] == 'extension_sheets_create'
+        create = self.definition['tool_id'] in {'extension_sheets_create', 'extension_sheets_create_report'}
         identifier = google_spreadsheet_id(identifier)
         if not create and identifier != value['spreadsheet_id']:
             denied('SHEETS_SETUP_RECONCILIATION_REQUIRED', 'Reconcile only the reviewed destination.')

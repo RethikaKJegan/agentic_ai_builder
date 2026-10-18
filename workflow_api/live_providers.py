@@ -142,6 +142,12 @@ class LivePlannerProvider:
         from registry.contracts import RegistryError
         import ast
         supplied = {**context, **self.context}
+        database_tools = [*context.get('database_workflow_tools', []), *context.get('workflow_google_tools', [])]
+        if database_tools:
+            supplied['available_tools'] = [*supplied['available_tools'], *(t['tool_id'] for t in database_tools)]
+            supplied['available_capabilities'] = [*supplied['available_capabilities'], *(t['capability'] for t in database_tools)]
+            supplied['tool_output_schemas'] = {**supplied['tool_output_schemas'], **{t['tool_id']: t['output_schema'] for t in database_tools}}
+            supplied['allowed_agent_permissions'] = sorted(set(supplied['allowed_agent_permissions']) | {p for t in database_tools for p in t['permission_scopes']})
         from .sheet_discovery import spreadsheet_references, planning_spreadsheet_references, validate_discovered_setup, catalog_snapshot
         catalogs = []
         references = planning_spreadsheet_references(objective, supplied)
@@ -172,8 +178,10 @@ class LivePlannerProvider:
             supplied.pop('customer_automation_defaults', None)
         # At most two bounded planning calls. A correction edits the draft;
         # neither call registers grants, publishes, executes or approves it.
+        from .inventory_report_planner import seed_inventory_report
+        seed = seed_inventory_report(objective, supplied)
         for attempt in range(2):
-            workflow = self.provider.generate(objective, supplied)
+            workflow = deepcopy(seed) if seed is not None else self.provider.generate(objective, supplied)
             if catalogs:
                 workflow.setdefault('metadata', {})['sheet_catalog'] = catalog_snapshot(catalogs)
             automation = workflow.get('metadata', {}).get('customer_automation')
@@ -196,6 +204,15 @@ class LivePlannerProvider:
                     retryable=True) from None
             from planner.validation import normalize_generated_inputs, normalize_tool_agent_capabilities, validate_output_mappings
             from runtime.sheet_records import normalize_generated_record_schemas
+            from .inventory_report_planner import compile_inventory_report
+            try:
+                if seed is None:
+                    workflow = compile_inventory_report(workflow, objective, supplied)
+            except PlannerFailure as exc:
+                if attempt == 0:
+                    supplied['validation_feedback'] = [{'code': exc.code, 'hint': str(exc)}]
+                    continue
+                raise
             normalize_generated_inputs(workflow)
             normalize_tool_agent_capabilities(workflow)
             normalize_generated_record_schemas(workflow)
@@ -203,20 +220,28 @@ class LivePlannerProvider:
             normalize_generated_email_approvals(workflow)
             try:
                 WorkflowService.validate_document(workflow)
-                validate_output_mappings(workflow, self.context['tool_output_schemas'])
+                validate_output_mappings(workflow, supplied['tool_output_schemas'])
                 from runtime.sheet_records import validate_record_workflow
                 validate_record_workflow(workflow, self.sheet_targets)
                 from runtime.email_recipients import validate_email_workflow
                 validate_email_workflow(workflow, allow_automatic=supplied['customer_automation_requested'],
                                         managers=self.context['allowed_email_recipients'])
                 validate_discovered_setup(workflow, catalogs)
+                if supplied.get('database_catalog'):
+                    from .database_workflows import bind_generated
+                    try:
+                        bind_generated(deepcopy(workflow), supplied)
+                    except (ValueError, TypeError, KeyError):
+                        raise PlannerFailure('KG_SOURCE_BINDING_INVALID',
+                            'Use exact catalog dataset IDs and explicit specialist source assignments within the selected scope.',
+                            field='metadata.database_source_ids') from None
             except PlannerFailure as exc:
                 if exc.code == 'SHEETS_SOURCE_AMBIGUOUS':
                     raise
                 hints = {
                     'EMAIL_SOURCE_MAPPING_REQUIRED': 'The initial graph sends only to the source-row customer. Remove manager email nodes and reply-loop branches; the inbox worker handles those using customer_automation metadata.',
                     'WORKFLOW_VALIDATION_FAILED': 'Include a kind=trigger node and a kind=output node, and connect every graph node to a path from the trigger. Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
-                    'OUTPUT_FIELD_NOT_DECLARED': 'SMTP returns message_id, not sent. Map message_id from the sender output; if email_sent is required, use True only in the output step reached after successful SMTP submission.',
+                    'OUTPUT_FIELD_NOT_DECLARED': 'Map only fields declared in each source output schema using the graph node ID, with no result/output wrapper. Profile returns email_address, report creation spreadsheet_url, mail message_id and calendar event_id.',
                 }
                 errors.append({'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})})
             agents_by_id = {agent['agent_id']: agent for agent in workflow.get('agents', [])}
@@ -234,9 +259,9 @@ class LivePlannerProvider:
             for agent in workflow.get('agents', []):
                 if any(agent.get('model', {}).get(key) != value for key, value in self.context['runtime_model'].items()):
                     errors.append({'code': 'USE_CONFIGURED_RUNTIME_MODEL', 'field': agent['agent_id']})
-                if set(agent.get('permissions', [])) - set(self.context['allowed_agent_permissions']):
+                if set(agent.get('permissions', [])) - set(supplied['allowed_agent_permissions']):
                     errors.append({'code': 'USE_ALLOWED_PERMISSIONS', 'field': agent['agent_id']})
-                if set(agent.get('capabilities', [])) - set(self.context['available_capabilities']):
+                if set(agent.get('capabilities', [])) - set(supplied['available_capabilities']):
                     errors.append({'code': 'USE_AVAILABLE_CAPABILITIES', 'field': agent['agent_id']})
             for tool in workflow.get('tools', []):
                 if 'configuration_reference' in tool:
@@ -330,6 +355,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     runner.direct_write_tools = frozenset({'smtp_send_email'} if direct_send else ())
     runner.connectors['google_sheets_upsert_record'] = GoogleSheetsRecordConnector(
         resolve, ROOT / env['GOOGLE_TOKEN_FILE'], targets, timeout=15, require_approval=not direct_write)
+    runner.connectors.update(app.state.database_workflows.connectors())
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
     from .source_context import knowledge_documents
@@ -431,7 +457,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             reply_stop.set()
             if reply_thread:reply_thread.join(timeout=5)
     from .worker_control import WorkerSupervisor
-    components=[*workers,app.state.planning_jobs,app.state.data_source_worker]
+    components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs]
     if hasattr(service,'reply_cases'):components.append(ReplyWorker())
     supervisor=WorkerSupervisor(service.store,components,role=process_role)
     app.state.worker_supervisor=supervisor

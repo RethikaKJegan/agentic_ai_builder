@@ -1,0 +1,22 @@
+{
+  "targets": [
+    {
+      "workspace_id": "local-workspace",
+      "subject_id": "local-builder",
+      "connection_id": "REPLACE_WITH_TEST_POSTGRES_CONNECTION_ID",
+      "dataset_id": "REPLACE_WITH_TEST_POSTGRES_DATASET_ID",
+      "identity_fields": ["id"],
+      "writable_fields": ["name", "amount", "enabled", "version"],
+      "operations": ["create", "read", "update", "delete"]
+    },
+    {
+      "workspace_id": "local-workspace",
+      "subject_id": "local-builder",
+      "connection_id": "REPLACE_WITH_TEST_ATLAS_CONNECTION_ID",
+      "dataset_id": "REPLACE_WITH_TEST_ATLAS_DATASET_ID",
+      "identity_fields": ["_id"],
+      "writable_fields": ["name", "amount", "enabled", "version"],
+      "operations": ["create", "read", "update", "delete"]
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "kg_revision": "cc523bbe87ce1b67da591d375bca4c5470a0cd81af7f3a46a50fdaf02fedd4bb",
+  "retrieved_at": "2026-10-18T09:46:38.524102+00:00",
+  "nodes": [
+    {
+      "node_id": "record_c442430280c91ab83a4e61c75da9a18a",
+      "dataset_id": "mongo_categories",
+      "dataset_label": "mongo / demo / categories",
+      "identity_field_id": "mongo_categories_categoryID",
+      "identity_value": 1,
+      "label_field_id": "mongo_categories_name",
+      "label": "Food",
+      "fields": [
+        {
+          "field_id": "mongo_categories_categoryID",
+          "name": "categoryID",
+          "value": 1
+        },
+        {
+          "field_id": "mongo_categories_name",
+          "name": "name",
+          "value": "Food"
+        }
+      ]
+    },
+    {
+      "node_id": "record_02712359f0eaf8bcb8d9dcd5226b1428",
+      "dataset_id": "pg_lines",
+      "dataset_label": "pg / demo / northwind / lines",
+      "identity_field_id": "pg_lines_qty",
+      "identity_value": 2,
+      "label_field_id": "pg_lines_qty",
+      "label": "2",
+      "fields": [
+        {
+          "field_id": "pg_lines_categoryID",
+          "name": "categoryID",
+          "value": 1
+        },
+        {
+          "field_id": "pg_lines_qty",
+          "name": "qty",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "node_id": "record_d6fefbf19e172a9039715daeb1abf21a",
+      "dataset_id": "pg_lines",
+      "dataset_label": "pg / demo / northwind / lines",
+      "identity_field_id": "pg_lines_qty",
+      "identity_value": 4,
+      "label_field_id": "pg_lines_qty",
+      "label": "4",
+      "fields": [
+        {
+          "field_id": "pg_lines_categoryID",
+          "name": "categoryID",
+          "value": 1
+        },
+        {
+          "field_id": "pg_lines_qty",
+          "name": "qty",
+          "value": 4
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "observed_fe5ea4098e9d11a7d499ac76f0ea0500",
+      "relationship_id": "ontology_e507134031869f62ff3604d4c7fb66a8",
+      "source_node_id": "record_c442430280c91ab83a4e61c75da9a18a",
+      "target_node_id": "record_02712359f0eaf8bcb8d9dcd5226b1428",
+      "predicate": "categorizes",
+      "semantic_status": "confirmed",
+      "structural_relationship_id": "rel_4e9dce2b9d9ed8e46c9d98386d2ee86c",
+      "observed_fields": [
+        {
+          "source_field_id": "mongo_categories_categoryID",
+          "target_field_id": "pg_lines_categoryID",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "edge_id": "observed_9f28343bb8219779f98ce8b07ca8204f",
+      "relationship_id": "ontology_e507134031869f62ff3604d4c7fb66a8",
+      "source_node_id": "record_c442430280c91ab83a4e61c75da9a18a",
+      "target_node_id": "record_d6fefbf19e172a9039715daeb1abf21a",
+      "predicate": "categorizes",
+      "semantic_status": "confirmed",
+      "structural_relationship_id": "rel_4e9dce2b9d9ed8e46c9d98386d2ee86c",
+      "observed_fields": [
+        {
+          "source_field_id": "mongo_categories_categoryID",
+          "target_field_id": "pg_lines_categoryID",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "limited": false,
+  "sources": [
+    {
+      "dataset_id": "mongo_categories",
+      "label": "mongo / demo / categories",
+      "metadata_revision": 1,
+      "started_at": "2026-10-18T09:46:38.417125+00:00",
+      "finished_at": "2026-10-18T09:46:38.417971+00:00",
+      "rows_read": 2
+    },
+    {
+      "dataset_id": "pg_lines",
+      "label": "pg / demo / northwind / lines",
+      "metadata_revision": 1,
+      "started_at": "2026-10-18T09:46:38.444903+00:00",
+      "finished_at": "2026-10-18T09:46:38.445731+00:00",
+      "rows_read": 3
+    },
+    {
+      "dataset_id": "pg_lines",
+      "label": "pg / demo / northwind / lines",
+      "metadata_revision": 1,
+      "started_at": "2026-10-18T09:46:38.476479+00:00",
+      "finished_at": "2026-10-18T09:46:38.477326+00:00",
+      "rows_read": 3
+    },
+    {
+      "dataset_id": "pg_lines",
+      "label": "pg / demo / northwind / lines",
+      "metadata_revision": 1,
+      "started_at": "2026-10-18T09:46:38.502514+00:00",
+      "finished_at": "2026-10-18T09:46:38.503340+00:00",
+      "rows_read": 3
+    }
+  ],
+  "query_traces": [
+    {
+      "plan_id": "dq_8e61b7715876e8f4cdab96a23cf10fa0",
+      "plan": {
+        "base_dataset_id": "mongo_categories",
+        "joins": [],
+        "fields": [
+          "mongo_categories_categoryID",
+          "mongo_categories_name"
+        ],
+        "filters": [
+          {
+            "field_id": "mongo_categories_categoryID",
+            "op": "eq",
+            "value": 1
+          }
+        ],
+        "group_by": [],
+        "metrics": [],
+        "order_by": [],
+        "limit": 2,
+        "explanation": "Explicit bounded KG record exploration using current field IDs.",
+        "clarification": ""
+      },
+      "total_result_rows": 1,
+      "executed_at": "2026-10-18T09:46:38.439884+00:00"
+    },
+    {
+      "plan_id": "dq_f35f705f7669177e2fb4408ab8f9064c",
+      "plan": {
+        "base_dataset_id": "pg_lines",
+        "joins": [],
+        "fields": [
+          "pg_lines_categoryID",
+          "pg_lines_qty"
+        ],
+        "filters": [
+          {
+            "field_id": "pg_lines_categoryID",
+            "op": "eq",
+            "value": 1
+          }
+        ],
+        "group_by": [],
+        "metrics": [],
+        "order_by": [],
+        "limit": 5,
+        "explanation": "Explicit bounded KG record exploration using current field IDs.",
+        "clarification": ""
+      },
+      "total_result_rows": 2,
+      "executed_at": "2026-10-18T09:46:38.471506+00:00"
+    },
+    {
+      "plan_id": "dq_54dcad46e2545fe7d153caa5ac6ebb81",
+      "plan": {
+        "base_dataset_id": "pg_lines",
+        "joins": [],
+        "fields": [
+          "pg_lines_qty"
+        ],
+        "filters": [
+          {
+            "field_id": "pg_lines_qty",
+            "op": "eq",
+            "value": 2
+          }
+        ],
+        "group_by": [],
+        "metrics": [],
+        "order_by": [],
+        "limit": 2,
+        "explanation": "Explicit bounded KG record exploration using current field IDs.",
+        "clarification": ""
+      },
+      "total_result_rows": 1,
+      "executed_at": "2026-10-18T09:46:38.497310+00:00"
+    },
+    {
+      "plan_id": "dq_6f8e4ee2f74d1a8e7ad1759db2365f50",
+      "plan": {
+        "base_dataset_id": "pg_lines",
+        "joins": [],
+        "fields": [
+          "pg_lines_qty"
+        ],
+        "filters": [
+          {
+            "field_id": "pg_lines_qty",
+            "op": "eq",
+            "value": 4
+          }
+        ],
+        "group_by": [],
+        "metrics": [],
+        "order_by": [],
+        "limit": 2,
+        "explanation": "Explicit bounded KG record exploration using current field IDs.",
+        "clarification": ""
+      },
+      "total_result_rows": 1,
+      "executed_at": "2026-10-18T09:46:38.521900+00:00"
+    }
+  ],
+  "warnings": [
+    "Decimals and integers outside the exact JavaScript integer range are returned as strings.",
+    "Observed matching keys establish record links, not independent proof of an inferred business interpretation. Sources use independent reads."
+  ]
+}

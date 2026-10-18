@@ -1,0 +1,38 @@
+{
+  "configured": true,
+  "targets": [
+    {
+      "connection_id": "pg",
+      "dataset_id": "pg_records",
+      "label": "Supabase / demo / public / records",
+      "engine": "postgresql",
+      "identity_fields": ["id"],
+      "writable_fields": ["name", "amount", "enabled", "version"],
+      "operations": ["create", "read", "update", "delete"]
+    },
+    {
+      "connection_id": "mongo",
+      "dataset_id": "mongo_records",
+      "label": "Atlas / demo / records",
+      "engine": "mongodb",
+      "identity_fields": ["_id"],
+      "writable_fields": ["name", "amount", "enabled", "version"],
+      "operations": ["create", "read", "update", "delete"]
+    }
+  ],
+  "items": [],
+  "tools": [
+    {
+      "tool_id": "postgresql_create_record",
+      "provider_id": "postgresql",
+      "capability": "database.create",
+      "approval_required": true
+    },
+    {
+      "tool_id": "mongodb_create_record",
+      "provider_id": "mongodb",
+      "capability": "database.create",
+      "approval_required": true
+    }
+  ]
+}

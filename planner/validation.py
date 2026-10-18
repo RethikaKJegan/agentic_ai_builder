@@ -25,6 +25,18 @@ def normalize_generated_inputs(workflow: dict[str, Any]) -> None:
     """
     for node in workflow.get('nodes', []):
         configuration = node.get('configuration', {})
+        # A fresh all-literal mapping is exactly a literal input object, including
+        # nested JSON. Never reinterpret mixed dynamic mappings or executable code.
+        if 'input' not in configuration and isinstance(configuration.get('input_mapping'), dict) and configuration['input_mapping']:
+            try:
+                values = {key: ast.literal_eval(expression) for key, expression in configuration['input_mapping'].items()}
+                import json
+                json.dumps(values, allow_nan=False)
+            except (ValueError, SyntaxError, TypeError, RecursionError):
+                pass
+            else:
+                configuration['input'] = values
+                del configuration['input_mapping']
         literals, mappings = configuration.get('input'), configuration.get('input_mapping')
         if not isinstance(literals, dict) or not isinstance(mappings, dict) or set(literals) & set(mappings):
             continue

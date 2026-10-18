@@ -93,11 +93,13 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         if planning_worker_enabled:
             planning_jobs.start()
             app.state.data_source_worker.start()
+            app.state.data_query_jobs.start()
 
     @app.on_event('shutdown')
     async def stop_workers():
         planning_jobs.stop()
         app.state.data_source_worker.stop()
+        app.state.data_query_jobs.stop()
         for worker in app.state.workers:
             worker.stop()
 
@@ -506,7 +508,9 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
                 return error('REFERENCE_MISMATCH','Route and workflow reference must match.',400)
             result=await run_in_threadpool(submit,workflow_service,body,auth)
             return JSONResponse(result,status_code=result['status'])
-        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
+        except ApiFailure as exc:
+            result=workflow_service.failure(request_reference.get() or f'req_{uuid4().hex}',exc)
+            return JSONResponse(result,status_code=exc.status,headers={'Cache-Control':'no-store'})
         except Exception:return error('APPROVAL_SUBMISSION_FAILED','The approval submission could not be confirmed.',503)
 
     @app.post('/integrations/{provider}/test')

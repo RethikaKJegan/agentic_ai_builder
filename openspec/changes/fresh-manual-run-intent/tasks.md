@@ -1,0 +1,3 @@
+- [x] Scope explicit manual run keys to the dialog and test retry/new-dialog behavior.
+- [x] Run UI tests, type/lint/build and specification validation.
+- [x] Deploy frontend with retained assets; leave existing runs and external actions untouched.

@@ -1,0 +1,452 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "semantic-kg-v1",
+  "title": "Evidence-backed semantic Knowledge graph",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "revision": {
+      "type": "string"
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "build_status": {
+      "enum": [
+        "idle",
+        "queued",
+        "running",
+        "ready",
+        "failed"
+      ]
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "graph_revision": {
+      "type": "integer"
+    },
+    "built_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "connection_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "suggested",
+                    "confirmed",
+                    "rejected",
+                    "needs_review"
+                  ]
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node_id",
+                "connection_id",
+                "label",
+                "kind",
+                "role",
+                "status",
+                "types",
+                "metadata",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entity_id",
+          "label",
+          "sources"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "relationship_id": {
+            "type": "string"
+          },
+          "source_entity_id": {
+            "type": "string"
+          },
+          "target_entity_id": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reversed": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "inferred",
+              "ambiguous",
+              "confirmed",
+              "rejected",
+              "needs_review"
+            ]
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_hash": {
+            "type": "string"
+          },
+          "technical_relationship_id": {
+            "type": "string"
+          },
+          "technical_status": {
+            "type": "string"
+          },
+          "source_dataset_id": {
+            "type": "string"
+          },
+          "target_dataset_id": {
+            "type": "string"
+          },
+          "field_pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_field_id": {
+                  "type": "string"
+                },
+                "target_field_id": {
+                  "type": "string"
+                },
+                "source_label": {
+                  "type": "string"
+                },
+                "target_label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source_field_id",
+                "target_field_id",
+                "source_label",
+                "target_label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "qualification": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "type": "null"
+          },
+          "semantic_evidence_hash": {
+            "type": "string"
+          },
+          "inference_method": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "inferred_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "structural_relationship_id",
+              "source_dataset_id",
+              "target_dataset_id",
+              "field_pairs",
+              "source_revisions",
+              "record_evidence"
+            ],
+            "properties": {
+              "structural_relationship_id": {
+                "type": "string"
+              },
+              "source_dataset_id": {
+                "type": "string"
+              },
+              "target_dataset_id": {
+                "type": "string"
+              },
+              "field_pairs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source_field_id": {
+                      "type": "string"
+                    },
+                    "target_field_id": {
+                      "type": "string"
+                    },
+                    "source_label": {
+                      "type": "string"
+                    },
+                    "target_label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source_field_id",
+                    "target_field_id",
+                    "source_label",
+                    "target_label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "source_revisions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "connection_id",
+                    "revision",
+                    "generation"
+                  ],
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "record_evidence": {
+                "const": "not_sampled"
+              }
+            }
+          }
+        },
+        "required": [
+          "relationship_id",
+          "source_entity_id",
+          "target_entity_id",
+          "predicate",
+          "reversed",
+          "status",
+          "reviewed_at",
+          "evidence_hash",
+          "technical_relationship_id",
+          "technical_status",
+          "source_dataset_id",
+          "target_dataset_id",
+          "field_pairs",
+          "evidence",
+          "qualification",
+          "confidence",
+          "semantic_evidence_hash",
+          "inference_method",
+          "rationale",
+          "evidence_refs",
+          "alternatives",
+          "inferred_at",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_id",
+          "label",
+          "connection_id",
+          "fields"
+        ],
+        "properties": {
+          "dataset_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "connection_id": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field_id",
+                "name",
+                "types"
+              ],
+              "properties": {
+                "field_id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "semantic_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configured",
+        "state",
+        "last_error",
+        "input_hash",
+        "enabled"
+      ],
+      "properties": {
+        "configured": {
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "idle",
+            "queued",
+            "running",
+            "ready",
+            "failed"
+          ]
+        },
+        "last_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "input_hash": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "required": [
+    "version",
+    "revision",
+    "stale",
+    "build_status",
+    "last_error",
+    "graph_revision",
+    "built_at",
+    "entities",
+    "relationships",
+    "warnings",
+    "datasets",
+    "semantic_status"
+  ],
+  "additionalProperties": false
+}

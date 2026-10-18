@@ -49,12 +49,17 @@ class PlannerService:
                 context = context_resolver(context)
             reject_sensitive(context)
             workflow = self.provider.generate(objective.strip(), context)
+            from workflow_api.database_workflows import bind_generated
+            bind_generated(workflow, context)
             reject_sensitive(workflow)
             mark_automatic_inputs(workflow, context)
             self._clear_proposed_assignments(workflow)
             identity_objective = objective + '\n[dynamic-delegation-v1]' if workflow.get('metadata', {}).get('dynamic_delegation') else objective
             if workflow.get('metadata', {}).get('execution_input_mode') == 'automatic':
                 identity_objective += '\n[automatic-inputs-v1]'
+            retrieval = context.get('knowledge_graph_retrieval') if isinstance(context, dict) else None
+            if retrieval:
+                identity_objective += '\n[knowledge-graph-retrieval-v1:' + retrieval['revision'] + ':' + ','.join(retrieval['source_ids']) + ']'
             selected_google = context.get('google_connection_id') if isinstance(context, dict) else None
             if selected_google:
                 identity_objective += '\n[google-connection:' + str(selected_google) + ']'
@@ -72,6 +77,9 @@ class PlannerService:
         except (ValueError, TypeError, RuntimeError) as exc:
             return {"request_id": request_id, "status": 502, "data": None, "error": PlannerFailure("PLANNER_PROVIDER_FAILED", "The planning provider did not return a usable draft.", retryable=True).envelope(request_id)}
         except Exception as exc:
+            from workflow_api.service import ApiFailure
+            if isinstance(exc, ApiFailure):
+                return {"request_id": request_id, "status": exc.status, "data": None, "error": PlannerFailure(exc.code, str(exc), retryable=exc.retryable).envelope(request_id)}
             # SDK exceptions do not inherit RuntimeError. Never reflect their
             # request headers, response bodies or messages into the API.
             code, message, status = 'PLANNER_PROVIDER_FAILED', 'The planning provider failed. Retry generation.', 502
@@ -120,6 +128,9 @@ class PlannerService:
             parent = agent.get("parent_agent_id")
             if parent in mapping:
                 agent["parent_agent_id"] = mapping[parent]
+        assignments = workflow.get('metadata', {}).get('agent_database_sources')
+        if isinstance(assignments, dict):
+            workflow['metadata']['agent_database_sources'] = {mapping.get(aid, aid): ids for aid, ids in assignments.items()}
         for node in workflow.get("nodes", []):
             if node.get("agent_id") in mapping:
                 node["agent_id"] = mapping[node["agent_id"]]

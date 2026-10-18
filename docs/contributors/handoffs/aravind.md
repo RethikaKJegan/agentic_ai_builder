@@ -96,3 +96,38 @@ Rethika explicitly accepted Aravind's delivered registry boundary and Harihar's 
 Rethika accepted the delivered upstream registry/UI/API boundaries and has delivered the core runtime through existing canonical operations. Fresh verification: 94 Python tests (50 upstream, 44 runtime), 61 frontend tests, TypeScript, contract/drift checks, runtime dependencies and strict OpenSpec PASS. Runtime routes remain disabled by default and can be explicitly connected; no live model/email/trigger demonstration or final segment acceptance is claimed. See `runtime/README.md` and `docs/contributors/handoffs/rethika.md` for server adapters, approval/worker/grant boundaries and remaining publication/production limits.
 
 Joint review requested for `openspec/changes/rethika-runtime-observability/contract-review.md` and its companion draft schema before release/trigger/automation/overview implementation. Suprajha reviews executable input/expression mappings; Aravind reviews trigger scopes and restart authorization; Harihar reviews lifecycle transport, DTOs and overview streams. All extension signoffs remain pending; existing shared contracts are unchanged. This is a repository handoff notification, not an external message or fabricated owner acceptance.
+
+
+## Original-plan Phase 5 database workflows — 18 October 2026 (IST)
+
+Implemented trusted graph/source planning context, pinned workflow source scope,
+actual Registry database tools, bounded query/record reads and run-linked prepared
+CRUD with immediate owner approval before commit. Preparation and provenance are
+atomic; console execution refuses workflow-owned operations. Stable delegation can
+read/prepare; fixed graph nodes commit. Workflow details, Execution and Approvals
+show planned sources, current previews and actual source/count/handoff evidence.
+Configured existing Google tools compose through their existing boundaries.
+
+Evidence: 440 backend regressions; final provenance hardening rerun 54 overlapping
+native/HTTP tests; 41 focused UI tests; 34 desktop/mobile browser fixtures; build,
+types, lint, contracts/drift and strict OpenSpec passed. Full frontend suite has
+279 passes and seven confirmed pre-existing failures, reproduced against the saved
+Phase 4 snapshot. See openspec/changes/database-workflow-integration-phase5/verification.md
+and docs/database-workflow-integration-phase5.md for evidence, scope and limits.
+
+Local implementation only: Phase 4 remains running; no deploy/restart, cloud CRUD,
+Google action, credential/policy change or live model call. Owner manual workflows
+are supported; automation and independent credential delegation remain denied. No
+external notification or contributor acceptance is inferred.
+
+
+## Reliable inventory report — 18 October 2026
+
+Delivered a bounded fresh-prompt compiler using owned KG candidates and exact accepted/declared source links, deterministic stock/on-order ranking with honest watchlist labels, verified new-Sheet URL delivery and separate spreadsheet/email/calendar action gates. Registry validation and scoped connector execution enforce immediate approval evidence independently of legacy procurement automatic settings. An owner-scoped Google default reuses the user's previously selected account; explicit choices still override it. Existing frontend, credentials and database write policy are unchanged.
+
+Verification: 183 backend/connector tests and 10 subtests passed; contracts, syntax and strict OpenSpec passed. Changes activated; Atlas/Supabase, public research and selected Google identity/capabilities verified. No live workflow was created or executed and no Google artifact was created. User performs the UI acceptance test. See docs/reliable-inventory-report.md and openspec/changes/reliable-inventory-report/verification.md for boundaries/evidence. This is a repository handoff, not an external notification or inferred contributor acceptance.
+
+
+## Manual worker assignment recovery — 18 October 2026
+
+Fixed fresh manual workers losing process-local tool approval evidence after API publication. Recovery requires the same currently authorized approver, exact workspace and validated published revision; current Registry scopes/policy and action approvals remain enforced. Fresh-service safety regression passed; 90 overlapping tests and 29 subtests passed. One unrelated empty-tool-list expectation fails unchanged against the original implementation. Real published revision preflight authorized all ten tools without running any workflow or external action. See openspec/changes/manual-worker-authorization/verification.md and its activation evidence. Existing terminal blocked runs require a new manual run; no draft rewrite or republish is needed.

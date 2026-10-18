@@ -1,0 +1,3 @@
+# Restore manual execution assignments in fresh workers
+
+Manual runs are queued in the API process but execute in another process. Registry tool approval evidence is process-local; published workflows with approved tools therefore fail TOOL_ASSIGNMENT_REQUIRED in fresh workers. Reconstruct exact pending tool approval evidence for a persisted, validated published revision only when the current authenticated caller is the recorded approving subject, still has workflow.approve and an approved Registry role. Preserve current scope, policy, tool availability and runtime action approval checks. Do not execute user workflows during deployment.

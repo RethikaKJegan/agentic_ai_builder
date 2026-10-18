@@ -147,6 +147,9 @@ class GraphRunner:
         connector = self.connectors.get(grant['tool_id'])
         if connector is None:
             raise RuntimeFailure('CONNECTOR_NOT_CONFIGURED', 'No authorized connector adapter is configured.', 503)
+        bind_context = getattr(connector, 'bind_context', None)
+        if callable(bind_context):
+            connector = bind_context(workflow, run, auth, node)
         bind_workflow = getattr(connector, 'bind_workflow', None)
         if callable(bind_workflow):
             connector = bind_workflow(workflow)
@@ -275,6 +278,7 @@ class GraphRunner:
                         run['node_states'][node['node_id']] = 'paused'
                         run['lease_until'] = 0
                         runtime.event(db, run, 'approval.pending', {'approval_id': approval['approval_id'], 'node_id': node['node_id'],
+                                      **({'database_operation_id': self.params(approved_node, run).get('operation_id')} if approved_node and approved_node.get('tool_id') == 'database_execute_operation' else {}),
                                       **({'email_preview': email_preview} if email_preview is not None else {})})
                         runtime.transition(db, run, 'paused_for_approval')
                         return runtime.public(run)

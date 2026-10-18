@@ -1,0 +1,685 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "node_id": "mongo",
+        "kind": "connection",
+        "label": "Atlas",
+        "connection_id": "mongo",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {}
+      },
+      {
+        "node_id": "mongo_customers",
+        "kind": "dataset",
+        "label": "customers",
+        "connection_id": "mongo",
+        "parent_id": "database_f56db7d7a300dd8c4e4b96a007296244",
+        "types": [],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "name": "customers",
+          "database": "demo",
+          "schema": null,
+          "kind": "collection",
+          "indexes": [],
+          "constraints": [],
+          "discovery_method": "sampled",
+          "sample_count": 0,
+          "has_validation_rules": null,
+          "validation_schema_json": null
+        }
+      },
+      {
+        "node_id": "mongo_customers_customerID",
+        "kind": "field",
+        "label": "customerID",
+        "connection_id": "mongo",
+        "parent_id": "mongo_customers",
+        "types": [
+          "string"
+        ],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "field_id": "mongo_customers_customerID",
+          "name": "customerID",
+          "types": [
+            "string"
+          ],
+          "discovery_method": "sampled"
+        }
+      },
+      {
+        "node_id": "mongo_customers_employee_id",
+        "kind": "field",
+        "label": "employee_id",
+        "connection_id": "mongo",
+        "parent_id": "mongo_customers",
+        "types": [
+          "integer"
+        ],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "field_id": "mongo_customers_employee_id",
+          "name": "employee_id",
+          "types": [
+            "integer"
+          ],
+          "discovery_method": "sampled"
+        }
+      },
+      {
+        "node_id": "mongo_customers_id",
+        "kind": "field",
+        "label": "id",
+        "connection_id": "mongo",
+        "parent_id": "mongo_customers",
+        "types": [
+          "string"
+        ],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "field_id": "mongo_customers_id",
+          "name": "id",
+          "types": [
+            "string"
+          ],
+          "discovery_method": "sampled"
+        }
+      },
+      {
+        "node_id": "mongo_customers_nested.customerID",
+        "kind": "field",
+        "label": "nested.customerID",
+        "connection_id": "mongo",
+        "parent_id": "mongo_customers",
+        "types": [
+          "string"
+        ],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "field_id": "mongo_customers_nested.customerID",
+          "name": "nested.customerID",
+          "types": [
+            "string"
+          ],
+          "discovery_method": "sampled"
+        }
+      },
+      {
+        "node_id": "mongo_customers_items[].customerID",
+        "kind": "field",
+        "label": "items[].customerID",
+        "connection_id": "mongo",
+        "parent_id": "mongo_customers",
+        "types": [
+          "string"
+        ],
+        "discovery_method": "sampled",
+        "description": "",
+        "metadata": {
+          "field_id": "mongo_customers_items[].customerID",
+          "name": "items[].customerID",
+          "types": [
+            "string"
+          ],
+          "discovery_method": "sampled"
+        }
+      },
+      {
+        "node_id": "pg",
+        "kind": "connection",
+        "label": "Postgres",
+        "connection_id": "pg",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {}
+      },
+      {
+        "node_id": "pg_orders",
+        "kind": "dataset",
+        "label": "northwind.orders",
+        "connection_id": "pg",
+        "parent_id": "schema_2abc244fd413a26ecdd20eae652a17be",
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "name": "orders",
+          "database": "demo",
+          "schema": "northwind",
+          "kind": "table",
+          "indexes": [],
+          "constraints": [
+            {
+              "name": "orders_customer",
+              "kind": "foreign_key",
+              "columns": [
+                "tenantID",
+                "customerID"
+              ],
+              "referenced_schema": "northwind",
+              "referenced_table": "customers",
+              "referenced_columns": [
+                "tenantID",
+                "customerID"
+              ]
+            }
+          ],
+          "discovery_method": "declared",
+          "sample_count": 0,
+          "has_validation_rules": null,
+          "validation_schema_json": null
+        }
+      },
+      {
+        "node_id": "pg_orders_tenantID",
+        "kind": "field",
+        "label": "tenantID",
+        "connection_id": "pg",
+        "parent_id": "pg_orders",
+        "types": [
+          "integer"
+        ],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "field_id": "pg_orders_tenantID",
+          "name": "tenantID",
+          "types": [
+            "integer"
+          ],
+          "discovery_method": "declared"
+        }
+      },
+      {
+        "node_id": "pg_orders_customerID",
+        "kind": "field",
+        "label": "customerID",
+        "connection_id": "pg",
+        "parent_id": "pg_orders",
+        "types": [
+          "text"
+        ],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "field_id": "pg_orders_customerID",
+          "name": "customerID",
+          "types": [
+            "text"
+          ],
+          "discovery_method": "declared"
+        }
+      },
+      {
+        "node_id": "pg_orders_employeeID",
+        "kind": "field",
+        "label": "employeeID",
+        "connection_id": "pg",
+        "parent_id": "pg_orders",
+        "types": [
+          "integer"
+        ],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "field_id": "pg_orders_employeeID",
+          "name": "employeeID",
+          "types": [
+            "integer"
+          ],
+          "discovery_method": "declared"
+        }
+      },
+      {
+        "node_id": "pg_customers",
+        "kind": "dataset",
+        "label": "northwind.customers",
+        "connection_id": "pg",
+        "parent_id": "schema_2abc244fd413a26ecdd20eae652a17be",
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "name": "customers",
+          "database": "demo",
+          "schema": "northwind",
+          "kind": "table",
+          "indexes": [],
+          "constraints": [],
+          "discovery_method": "declared",
+          "sample_count": 0,
+          "has_validation_rules": null,
+          "validation_schema_json": null
+        }
+      },
+      {
+        "node_id": "pg_customers_tenantID",
+        "kind": "field",
+        "label": "tenantID",
+        "connection_id": "pg",
+        "parent_id": "pg_customers",
+        "types": [
+          "integer"
+        ],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "field_id": "pg_customers_tenantID",
+          "name": "tenantID",
+          "types": [
+            "integer"
+          ],
+          "discovery_method": "declared"
+        }
+      },
+      {
+        "node_id": "pg_customers_customerID",
+        "kind": "field",
+        "label": "customerID",
+        "connection_id": "pg",
+        "parent_id": "pg_customers",
+        "types": [
+          "text"
+        ],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {
+          "field_id": "pg_customers_customerID",
+          "name": "customerID",
+          "types": [
+            "text"
+          ],
+          "discovery_method": "declared"
+        }
+      },
+      {
+        "node_id": "database_f56db7d7a300dd8c4e4b96a007296244",
+        "kind": "database",
+        "label": "demo",
+        "connection_id": "mongo",
+        "parent_id": "mongo",
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {}
+      },
+      {
+        "node_id": "database_8c09a0c949624f956f76f62401ea3290",
+        "kind": "database",
+        "label": "demo",
+        "connection_id": "pg",
+        "parent_id": "pg",
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {}
+      },
+      {
+        "node_id": "schema_2abc244fd413a26ecdd20eae652a17be",
+        "kind": "schema",
+        "label": "northwind",
+        "connection_id": "pg",
+        "parent_id": "database_8c09a0c949624f956f76f62401ea3290",
+        "types": [],
+        "discovery_method": "declared",
+        "description": "",
+        "metadata": {}
+      },
+      {
+        "node_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "kind": "entity",
+        "label": "Customer",
+        "connection_id": "",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "reviewable_concept",
+        "description": "",
+        "metadata": {
+          "execution_authority": false
+        }
+      },
+      {
+        "node_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+        "kind": "entity",
+        "label": "Order",
+        "connection_id": "",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "reviewable_concept",
+        "description": "",
+        "metadata": {
+          "execution_authority": false
+        }
+      },
+      {
+        "node_id": "entity_820a692e43bb9ae6aa56dc0e57bb06cf",
+        "kind": "entity",
+        "label": "Employee",
+        "connection_id": "",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "reviewable_concept",
+        "description": "",
+        "metadata": {
+          "execution_authority": false
+        }
+      },
+      {
+        "node_id": "entity_da048eda4e78177117649659a8517977",
+        "kind": "entity",
+        "label": "Tenant",
+        "connection_id": "",
+        "parent_id": null,
+        "types": [],
+        "discovery_method": "reviewable_concept",
+        "description": "",
+        "metadata": {
+          "execution_authority": false
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "relationship_id": "rel_b52a132a1691bdb2902a8095a740c6fc",
+        "kind": "declared",
+        "source_dataset_id": "pg_orders",
+        "target_dataset_id": "pg_customers",
+        "field_pairs": [
+          {
+            "source_field_id": "pg_orders_tenantID",
+            "target_field_id": "pg_customers_tenantID"
+          },
+          {
+            "source_field_id": "pg_orders_customerID",
+            "target_field_id": "pg_customers_customerID"
+          }
+        ],
+        "evidence": [
+          "Database foreign key: orders_customer",
+          "{\"columns\": [\"tenantID\", \"customerID\"], \"kind\": \"foreign_key\", \"name\": \"orders_customer\", \"referenced_columns\": [\"tenantID\", \"customerID\"], \"referenced_schema\": \"northwind\", \"referenced_table\": \"customers\"}"
+        ],
+        "evidence_hash": "0ae27c20474576d11669bf2f02c267d95809c32000007716c4541d43f5b52aa3",
+        "status": "declared",
+        "reviewed_at": null,
+        "qualification": {
+          "confidence": "database_declaration",
+          "direction": "source_references_target",
+          "cardinality": "At most one target per source key by declared foreign key; source multiplicity and optionality are not asserted.",
+          "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+          "value_overlap": "not_checked",
+          "review_basis": "No user acceptance asserted."
+        },
+        "review_stale": false
+      },
+      {
+        "relationship_id": "rel_d0cfb5da9ddcf48a2ce85c4a50538973",
+        "kind": "suggested",
+        "source_dataset_id": "mongo_customers",
+        "target_dataset_id": "pg_customers",
+        "field_pairs": [
+          {
+            "source_field_id": "mongo_customers_customerID",
+            "target_field_id": "pg_customers_customerID"
+          }
+        ],
+        "evidence": [
+          "Normalized identifier name matches: customerid",
+          "Compatible normalized scalar type: string",
+          "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_customerID\", \"name\": \"customerID\", \"types\": [\"string\"]}",
+          "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_customers_customerID\", \"name\": \"customerID\", \"types\": [\"text\"]}",
+          "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+        ],
+        "evidence_hash": "113d05bfc2528812db2cf5301ef32af97a2681b295e7fe0c084acce5a64cb999",
+        "status": "proposed",
+        "reviewed_at": null,
+        "qualification": {
+          "confidence": "metadata_candidate",
+          "direction": "unknown",
+          "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+          "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+          "value_overlap": "not_checked",
+          "review_basis": "No user acceptance asserted."
+        },
+        "review_stale": false
+      },
+      {
+        "relationship_id": "rel_9b35cc3e7b13240e9699d4fa5663115c",
+        "kind": "suggested",
+        "source_dataset_id": "mongo_customers",
+        "target_dataset_id": "pg_orders",
+        "field_pairs": [
+          {
+            "source_field_id": "mongo_customers_customerID",
+            "target_field_id": "pg_orders_customerID"
+          }
+        ],
+        "evidence": [
+          "Normalized identifier name matches: customerid",
+          "Compatible normalized scalar type: string",
+          "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_customerID\", \"name\": \"customerID\", \"types\": [\"string\"]}",
+          "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_orders_customerID\", \"name\": \"customerID\", \"types\": [\"text\"]}",
+          "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+        ],
+        "evidence_hash": "f95221532c08f6a86079b60f2ca26cccc2409ded69851e7571b2bf1d6d6be6ad",
+        "status": "proposed",
+        "reviewed_at": null,
+        "qualification": {
+          "confidence": "metadata_candidate",
+          "direction": "unknown",
+          "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+          "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+          "value_overlap": "not_checked",
+          "review_basis": "No user acceptance asserted."
+        },
+        "review_stale": false
+      },
+      {
+        "relationship_id": "rel_4869226c255ea084e4c07b74bc371877",
+        "kind": "suggested",
+        "source_dataset_id": "mongo_customers",
+        "target_dataset_id": "pg_orders",
+        "field_pairs": [
+          {
+            "source_field_id": "mongo_customers_employee_id",
+            "target_field_id": "pg_orders_employeeID"
+          }
+        ],
+        "evidence": [
+          "Normalized identifier name matches: employeeid",
+          "Compatible normalized scalar type: integer",
+          "Source field: {\"discovery_method\": \"sampled\", \"field_id\": \"mongo_customers_employee_id\", \"name\": \"employee_id\", \"types\": [\"integer\"]}",
+          "Target field: {\"discovery_method\": \"declared\", \"field_id\": \"pg_orders_employeeID\", \"name\": \"employeeID\", \"types\": [\"integer\"]}",
+          "Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified."
+        ],
+        "evidence_hash": "79e4981e0491646e0241c4e69a3da3822ba1b98024a206960d90e80b84889fc3",
+        "status": "proposed",
+        "reviewed_at": null,
+        "qualification": {
+          "confidence": "metadata_candidate",
+          "direction": "unknown",
+          "cardinality": "Unknown; metadata matching is not proof of cardinality.",
+          "target_key_evidence": "No applicable declared uniqueness evidence in the discovered snapshot.",
+          "value_overlap": "not_checked",
+          "review_basis": "No user acceptance asserted."
+        },
+        "review_stale": false
+      }
+    ],
+    "warnings": [
+      "Atlas: metadata is sampled or limited; absence is not proof of deletion.",
+      "Business entities are naming suggestions until reviewed. Entity mappings never authorize execution."
+    ],
+    "sources": [
+      {
+        "connection_id": "mongo",
+        "revision": 1,
+        "generation": 1
+      },
+      {
+        "connection_id": "pg",
+        "revision": 1,
+        "generation": 1
+      }
+    ],
+    "built_at": "2026-10-18T01:09:50.681133+00:00",
+    "revision": 1,
+    "mappings": [
+      {
+        "node_id": "mongo_customers",
+        "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "entity_name": "Customer",
+        "proposed_name": "Customer",
+        "role": "represents",
+        "status": "suggested",
+        "evidence_hash": "fff0ed24f93ec9344853be198b8d76df429c9ebf22b2dbdcfa6c33536285eccc",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_orders",
+        "entity_id": "entity_78000f9390ebddc1e3b0f86185c1d8cd",
+        "entity_name": "Order",
+        "proposed_name": "Order",
+        "role": "represents",
+        "status": "suggested",
+        "evidence_hash": "38e6ec347b5af211c4d546ca8c9864bbfa220a8f3652069ce51c3a0105783b39",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_customers",
+        "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "entity_name": "Customer",
+        "proposed_name": "Customer",
+        "role": "represents",
+        "status": "suggested",
+        "evidence_hash": "e341fbb6d0218231bff1edcff68b97b06d419ac6b0a9f859e185a13520fdcddd",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "mongo_customers_customerID",
+        "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "entity_name": "Customer",
+        "proposed_name": "Customer",
+        "role": "identifier",
+        "status": "suggested",
+        "evidence_hash": "d902bea2de51b0221ef49733801189203f05ffd6ba41d44cb6ffb95929c67181",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "mongo_customers_employee_id",
+        "entity_id": "entity_820a692e43bb9ae6aa56dc0e57bb06cf",
+        "entity_name": "Employee",
+        "proposed_name": "Employee",
+        "role": "reference",
+        "status": "suggested",
+        "evidence_hash": "2858fa70c70a26eec2d874f3ee4905cfbd76d4120e3f78746a2f31103839f812",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_orders_tenantID",
+        "entity_id": "entity_da048eda4e78177117649659a8517977",
+        "entity_name": "Tenant",
+        "proposed_name": "Tenant",
+        "role": "reference",
+        "status": "suggested",
+        "evidence_hash": "f3fca3c2409ae7cd1ff56bf62fc3b0d60539514da813f1c62607ed9f1c07d623",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_orders_customerID",
+        "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "entity_name": "Customer",
+        "proposed_name": "Customer",
+        "role": "reference",
+        "status": "suggested",
+        "evidence_hash": "60f52543aa1fc1c5f7418c50c41303d2a3fb643002bcc79d6b8fc64f4e23bf45",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_orders_employeeID",
+        "entity_id": "entity_820a692e43bb9ae6aa56dc0e57bb06cf",
+        "entity_name": "Employee",
+        "proposed_name": "Employee",
+        "role": "reference",
+        "status": "suggested",
+        "evidence_hash": "19cd9ea696390ddf322363adbd33f33ed6baa193e1a7a80679cf885616d93161",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_customers_tenantID",
+        "entity_id": "entity_da048eda4e78177117649659a8517977",
+        "entity_name": "Tenant",
+        "proposed_name": "Tenant",
+        "role": "reference",
+        "status": "suggested",
+        "evidence_hash": "1125b57593cbd279ffd97ad65c868c77aec0d9363bba225f46c5ffc02ffc6e0d",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      },
+      {
+        "node_id": "pg_customers_customerID",
+        "entity_id": "entity_2e11f7f6e11df49ae8edf97db7606b01",
+        "entity_name": "Customer",
+        "proposed_name": "Customer",
+        "role": "identifier",
+        "status": "suggested",
+        "evidence_hash": "71b259edcd5a95538a294d0c145d57e71f70dd0ddea59fc66372ed0cc035f853",
+        "reviewed_at": null,
+        "evidence": [
+          "Dataset/identifier naming suggests a business concept; this is not a proven business fact.",
+          "Confirmation supplies meaning only, never a join or tool permission."
+        ]
+      }
+    ]
+  },
+  "stale": false,
+  "build_status": "ready",
+  "last_error": null,
+  "version": 2
+}

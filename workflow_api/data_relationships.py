@@ -36,6 +36,13 @@ def compatible(left, right):
     return len(a) == len(b) == 1 and a == b
 
 
+def mongo_reference_compatible(left, right):
+    # ObjectId evidence can describe a Mongo reference, but does not extend the
+    # executable query engine's scalar-key support or introduce string coercion.
+    a, b = set(left['types'])-{'null'}, set(right['types'])-{'null'}
+    return compatible(left,right) or a == b == {'ObjectId'}
+
+
 def build_graph(sources):
     nodes, relationships, warnings, candidates = [], [], [], {}
     datasets = {}
@@ -60,7 +67,12 @@ def build_graph(sources):
                 key = identifier(field['name'])
                 if re.search(r'(?:ID|Id|_id|-id| id)$', field['name']) and len(key) > 2 and '.' not in field['name'] and '[' not in field['name'] and scalar_types(field) in ({'string'}, {'integer'}):
                     candidates.setdefault(key, []).append((cid, did, field))
+    seen_links = set()
     def relationship(kind, left, right, pairs, evidence):
+        link = tuple(sorted(tuple(sorted((p['source_field_id'],p['target_field_id']))) for p in pairs))
+        if kind=='suggested' and link in seen_links:
+            return
+        seen_links.add(link)
         rid = 'rel_' + fingerprint([kind, left, right, pairs])[:32]
         relationships.append(dict(relationship_id=rid, kind=kind, source_dataset_id=left,
                                   target_dataset_id=right, field_pairs=pairs, evidence=evidence,
@@ -90,6 +102,7 @@ def build_graph(sources):
                 relationship('declared', dataset['dataset_id'], target['dataset_id'], pairs,
                              ['Database foreign key: '+constraint.get('name',''), json.dumps(constraint, sort_keys=True)])
     checked = 0
+    by_id = {d['dataset_id']: d for d in datasets.values()}
     for key in sorted(candidates):
         group = sorted(candidates[key], key=lambda x: (x[0],x[1],x[2]['field_id']))
         for (ac,ad,af),(bc,bd,bf) in itertools.combinations(group,2):
@@ -97,13 +110,43 @@ def build_graph(sources):
             if checked > MAX_CANDIDATE_PAIRS or len(relationships) >= MAX_RELATIONSHIPS:
                 warnings.append('Candidate comparison limit reached; suggestions are incomplete.')
                 break
-            if ac == bc or not compatible(af,bf):
+            mongo_same = ac == bc and ad != bd and by_id[ad].get('schema') is None and by_id[bd].get('schema') is None
+            if (ac == bc and not mongo_same) or ad == bd or not compatible(af,bf):
                 continue
             relationship('suggested',ad,bd,[dict(source_field_id=af['field_id'],target_field_id=bf['field_id'])],
                          [f'Normalized identifier name matches: {key}', 'Compatible normalized scalar type: '+','.join(sorted(scalar_types(af))),
                           'Source field: '+json.dumps({k:v for k,v in af.items() if k!='present_in_samples'},sort_keys=True), 'Target field: '+json.dumps({k:v for k,v in bf.items() if k!='present_in_samples'},sort_keys=True),
                           'Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified.'])
         if checked > MAX_CANDIDATE_PAIRS or len(relationships) >= MAX_RELATIONSHIPS:
+            break
+    # Collection-qualified Mongo references may point to a target _id. These are
+    # additional proposals only; generic id-to-id matching is never inferred.
+    from .data_graph_v2 import singular, field_stem
+    mongo = [d for d in datasets.values() if d.get('schema') is None]
+    for target in mongo:
+        target_id = next((f for f in target['fields'] if f['name']=='_id'), None)
+        if not target_id:
+            continue
+        for source in mongo:
+            if source is target:
+                continue
+            for field in source['fields']:
+                checked += 1
+                if checked > MAX_CANDIDATE_PAIRS or len(relationships)>=MAX_RELATIONSHIPS:
+                    warnings.append('Candidate comparison limit reached; suggestions are incomplete.')
+                    break
+                if identifier(field_stem(field['name'])) != identifier(singular(target['name'])) or not mongo_reference_compatible(field,target_id):
+                    continue
+                if set(field['types'])-{'null'} == {'ObjectId'}:
+                    warnings.append('ObjectId reference suggestions describe metadata only; current query key types remain restricted.')
+                relationship('suggested', source['dataset_id'], target['dataset_id'], [dict(source_field_id=field['field_id'],target_field_id=target_id['field_id'])],
+                             ['Collection-qualified identifier suggests a reference to the target _id.',
+                              'Source field: '+json.dumps({k:v for k,v in field.items() if k!='present_in_samples'},sort_keys=True),
+                              'Target field: '+json.dumps({k:v for k,v in target_id.items() if k!='present_in_samples'},sort_keys=True),
+                              'Metadata only. Value overlap, uniqueness, join direction and cardinality are unverified.'])
+            if checked > MAX_CANDIDATE_PAIRS or len(relationships)>=MAX_RELATIONSHIPS:
+                break
+        if checked > MAX_CANDIDATE_PAIRS or len(relationships)>=MAX_RELATIONSHIPS:
             break
     return dict(nodes=nodes, relationships=relationships, warnings=sorted(set(warnings)))
 
@@ -116,6 +159,10 @@ class DataRelationships:
             db.execute('CREATE TABLE IF NOT EXISTS data_relationship_jobs (workspace TEXT NOT NULL, owner TEXT NOT NULL, state TEXT NOT NULL, token TEXT, lease_until REAL NOT NULL, attempts INTEGER NOT NULL, error TEXT, PRIMARY KEY(workspace,owner))')
             db.execute('CREATE TABLE IF NOT EXISTS data_relationship_reviews (workspace TEXT NOT NULL, owner TEXT NOT NULL, relationship_id TEXT NOT NULL, evidence_hash TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace,owner,relationship_id))')
             db.execute('CREATE TABLE IF NOT EXISTS data_relationship_annotations (workspace TEXT NOT NULL, owner TEXT NOT NULL, node_id TEXT NOT NULL, description TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(workspace,owner,node_id))')
+        from .data_graph_v2 import DataGraphV2
+        self.detailed = DataGraphV2(self)
+        from .data_ontology import BusinessOntology
+        self.ontology = BusinessOntology(self)
 
     @staticmethod
     def inputs(db, workspace, owner):

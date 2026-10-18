@@ -16,6 +16,7 @@ import { autoLayout } from "@/domain/layout";
 import { dependencyOrder } from "@/domain/graph-review";
 import { ProcurementProjectCommunication } from "./ProcurementProjectCommunication";
 import { AgentCommunication } from "./AgentCommunication";
+import { ApprovalControl } from "@/features/runs/ServerRunView";
 const nodeTypes = { mesh: MeshNode };
 export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void }) {
   const [scope,setScope]=useState<"project"|"run">("project");
@@ -97,6 +98,12 @@ export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTr
         {(workflow || graph) && <AgentCommunication workflow={workflow ?? graph!} trace={trace} />}
       </div>
       <ApiFeedback error={trace.error} />
+      {trace.run?.approvals.some(approval => approval.status === "pending" && trace.events.some(event => event.event_type === "approval.pending" && event.details?.["approval_id"] === approval.approval_id && typeof event.details?.["database_operation_id"] === "string")) && <div className="max-h-96 shrink-0 overflow-y-auto p-3">
+        {trace.run.approvals.filter(approval => approval.status === "pending").map(approval => {
+          const operationId = trace.events.find(event => event.event_type === "approval.pending" && event.details?.["approval_id"] === approval.approval_id)?.details?.["database_operation_id"];
+          return typeof operationId === "string" ? <ApprovalControl key={approval.approval_id} approval={approval} databaseOperationId={operationId} onUpdated={trace.retry} /> : null;
+        })}
+      </div>}
       {!trace.available ? (
         <p className="p-4">Execution requires a connected runtime and runs.view permission.</p>
       ) : !trace.runId ? (

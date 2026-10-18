@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/refresh-v1",
+  "title": "refresh-v1",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 86400
+          },
+          "next_check_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "last_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_success_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_change_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "consecutive_failures": {
+            "type": "integer"
+          },
+          "profiling_status": {
+            "type": "string"
+          },
+          "connection_status": {
+            "type": "string"
+          },
+          "metadata_revision": {
+            "type": "integer"
+          },
+          "last_error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "connection_id",
+          "name",
+          "enabled",
+          "interval_seconds",
+          "next_check_at",
+          "last_attempt_at",
+          "last_success_at",
+          "last_change_at",
+          "consecutive_failures",
+          "profiling_status",
+          "connection_status",
+          "metadata_revision",
+          "last_error_message"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "items"
+  ],
+  "additionalProperties": false
+}

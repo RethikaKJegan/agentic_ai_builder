@@ -1,0 +1,12 @@
+# Verification — 18 October 2026
+
+Implemented and activated the bounded inventory report compiler, deterministic evidence normalization/ranking/delivery, owner-scoped Google default and immediate write approval enforcement. Shared contract shapes and existing frontend are unchanged.
+
+- Final backend/connector regression: **183 passed, 10 subtests passed** (292.62 seconds). Includes the user's exact prompt, the no-model-planning fast path, source binding, canonical mappings, Google ownership, all three write approval/rejection paths, actual runtime delegation and offline verified Sheet/email/calendar handoffs.
+- Contract validation, Python syntax compilation and strict OpenSpec validation passed.
+- Actual cached Northwind metadata resolves products, categories and suppliers, eight selected fields and valid accepted/declared links. Query validation passed without reading business rows. Atlas and Supabase connection checks passed.
+- Public web search returned real links and page read succeeded. Current exact-prompt KG metadata preview includes the three required sources in the bounded candidate pool. The interactive preview may offer review for its larger pool; planning uses automatic mode and compiles the exact three-source execution scope.
+- Backend and worker restarted; all three application services are active. Four report tools are registered/enabled. Selected Google account verified connected with Gmail-send, Sheets-write and Calendar-write capabilities; it is saved as the owner-scoped default.
+- No live workflow mutation or Google-artifact creation was requested by these deployment checks. Offline runtime tests use temporary test stores and mocked providers. The initial activation script's global workflow-count equality check failed across restart; that equality is not a valid concurrency assertion. The independent service/account readiness check passed; the activation script contains no workflow mutation request. No user drafts were rewritten.
+
+Evidence is under `.local/reliable-inventory-report/`: final-tests.log, contracts.log, openspec.log, metadata-readiness.json, web-readiness.log, preview-response.json and activation.json. Earlier failed test logs are diagnostic history and are superseded by final-tests.log. Live Google writes and the user's own end-to-end workflow execution remain unperformed; these are the UI acceptance test described in docs/reliable-inventory-report.md.

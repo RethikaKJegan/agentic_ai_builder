@@ -167,7 +167,7 @@ class CloudAdapters:
             with timeout(PROFILE_SECONDS):
                 with MongoClient(config['uri'], tls=True, tlsAllowInvalidCertificates=False, tlsAllowInvalidHostnames=False,
                                  connectTimeoutMS=8000, serverSelectionTimeoutMS=8000, socketTimeoutMS=10000,
-                                 maxPoolSize=2, retryReads=False) as client:
+                                 maxPoolSize=2, retryReads=False, retryWrites=False) as client:
                     client[config['database']].command('ping')
                     yield client
         else:

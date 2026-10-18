@@ -1,0 +1,4 @@
+- [x] Add bounded automatic candidate retrieval and pin actual planner source choices.
+- [x] Simplify Overview to prompt and generation, opening saved workflow directly.
+- [x] Verify source/authority boundaries and single-submit desktop flow.
+- [x] Build and deploy with graceful backend worker drain and unchanged configuration.

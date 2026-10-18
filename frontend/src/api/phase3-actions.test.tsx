@@ -208,3 +208,22 @@ it("run detail loading rejects overlapping selections until the first response f
   finish({ run: { run_id: "run_a", workflow_id: "workflow_a", workflow_version: 1, status: "completed", approvals: [] } } as never);
   await waitFor(() => expect(second).toBeEnabled());
 });
+
+it("keeps a retry key after an uncertain run request but uses a fresh key for a new dialog", async () => {
+  const original = workflow(); original.status = "published"; original.inputs = [];
+  const request = vi.spyOn(api, "request").mockRejectedValueOnce(new Error("Uncertain transport outcome"))
+    .mockResolvedValue({ run: { run_id: "run_new_intent", workflow_id: original.workflow_id, workflow_version: original.version, status: "queued", approvals: [] } } as never);
+  const first = render(<RunWorkflowDialog workflow={original} onClose={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start run" })).toBeEnabled());
+  expect(request).toHaveBeenCalledTimes(1);
+  const key = request.mock.calls[0]?.[2]; expect(typeof key).toBe("string"); expect(key).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+  await screen.findByRole("link", { name: "View run details" });
+  expect(request.mock.calls[1]?.[2]).toBe(key);
+  first.unmount();
+  render(<RunWorkflowDialog workflow={original} onClose={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+  await screen.findByRole("link", { name: "View run details" });
+  expect(request.mock.calls[2]?.[2]).not.toBe(key);
+});

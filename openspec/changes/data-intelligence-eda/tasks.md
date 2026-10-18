@@ -1,0 +1,3 @@
+- [x] Add metadata-backed desktop EDA dashboard and connection/revision refresh.
+- [x] Verify real counts, empty/error states and desktop presentation.
+- [x] Build and activate frontend only without backend/configuration changes.

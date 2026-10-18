@@ -274,3 +274,112 @@ Generation availability follow-up: the backend and frontend proxy both reported 
 The user's inventory workflow had been deleted but its published revision remained as history. The same prompt produced the same planner ID; initial-save conflict recovery reopened that retained published revision, and the UI's approved-status guard reported a misleading review requirement despite empty unresolved requirements. The authenticated planning boundary now follows workspace-local deletion records to allocate a stable replacement ID, copies cached planner responses and rebinds agent, parent and node references before returning a fresh proposal. Further deletion yields a new replacement; existing replacements remain stable. Historical revisions, tombstones and approvals are preserved.
 
 Verification: all 199 backend tests, shared contracts, strict scoped OpenSpec and diff checks pass. New HTTP/API tests verify same-key retries, fresh draft saving, agent isolation, successive deletions and unchanged historical data; another test verifies workspace isolation. A read-only check of the actual deleted inventory revision resolved its replacement identity while confirming history was unchanged. The idle backend on 8002 was reloaded with its existing configuration. No new live workflow was saved, published, executed or restored by verification. Evidence: `.local/recreate-workflow-tests.log`, `.local/recreate-workflow-all-tests.log`, `.local/recreate-workflow-backend.log`.
+
+
+## Data Intelligence Phase 5 — 2026-10-17
+
+Delivered bounded federated PostgreSQL fact aggregation with PostgreSQL/MongoDB dimensions, complete pre-filter join checks, exact weighted aggregate merging, native average finalization and per-fragment UI evidence. Data-query contracts add the federated strategy and optional execution fragments; workflow/agent/tool contracts are unchanged. Existing ownership, management/read permissions, expiry, freshness, no-result-history and source review rules remain. Unsupported shapes retain bounded fallback; separate databases have no atomic shared snapshot. See `docs/cloud-federation-phase5.md` for exact support and limits.
+
+Verification: 137 backend tests, 68 focused frontend/domain tests, four desktop/mobile browser fixture scenarios, types/lint/production build/contracts/strict OpenSpec passed. Deployed public real-model acceptance matched all eight cross-source category sales totals and weighted averages against independent SQL/category reads, with 2,155 fact rows and two strict joins. Live native average over 77 products also matched. Backend/frontend/worker active; no cloud data, credentials or review decisions changed. This records delivery evidence, not contributor acceptance or external notification.
+
+
+## Data Intelligence Phase 6 — 2026-10-18
+
+Delivered owned durable query jobs, shared-store claims, attempt/lease fencing, current-authority checks, progress, cancellation, one fresh recovery attempt and encrypted results retained for 15 minutes. Job/plan metadata lasts up to 24 hours. The Questions UI restores jobs after refresh, clears expired rows and preserves submission keys across uncertain responses. The production proxy forwards the exact query-job idempotency header. Worker supervision includes DataQueryJobs; API-only mode does not consume jobs. Existing synchronous execution remains compatible with its prior bound.
+
+Data-query contracts add query-jobs-v1 and optional status/canonical envelope metadata; workflow/agent/tool contracts are unchanged. Default absolute job budget is 180 s from submission (configurable 45–300), also bounded by plan expiry; existing source/statement/precision/transfer budgets remain. This deployment retains its server-configured development identity, not newly implemented production IAM. See `docs/cloud-query-jobs-phase6.md` for exact behavior and limitations.
+
+Verification: 178 backend tests, 103 focused frontend/domain/proxy tests, ten desktop/mobile browser fixture checks, types/lint/build/contracts/strict OpenSpec pass. Isolated tests cover real PostgreSQL cancellation, killed-worker recovery, PostgreSQL-store competing claims, cancellation/publication races and encrypted expiry. Live public federation matched eight independent category sales sums/weighted averages across 2,155 order details; the same job/result survived API restart/browser refresh. A second live active job cancelled without result rows. Services active. No connected cloud rows, credentials or relationship review decisions changed; job/plan/audit writes were normal authorized query metadata. This records evidence, not contributor acceptance or external notification.
+
+
+## Original-plan Phase 4 controlled CRUD — 18 October 2026 (IST)
+
+Added policy-scoped PostgreSQL/MongoDB point CRUD, actual Registry controller/tool
+bindings and approval fingerprints, encrypted prepared evidence, current-authority
+guards, durable no-replay claims and reviewed compensation. The Operations UI
+supplies explicit review, counts, history and guarded recovery. Workflow/agent/tool
+contracts remain unchanged; the additive operations-v1 schema governs console
+requests and policy. Generated workflow wiring remains original-plan Phase 5.
+
+Evidence: 215 backend regressions without skips, final 30 native CRUD tests
+(overlapping the broader run), 134 frontend tests and 30 desktop/mobile browser
+fixture scenarios; types/lint/build/contracts/drift/strict OpenSpec passed.
+See `openspec/changes/controlled-database-crud-phase4/verification.md` and
+`docs/controlled-database-crud-phase4.md`. Workspace implementation only: no deploy,
+restart, live cloud writes, credential changes or policy activation. Cross-source
+groups can partially commit; uncertain outcomes cannot be replayed. No contributor
+acceptance or external notification is claimed.
+
+
+Phase 4 activation follow-up — 18 October 2026: user authorized the running-app
+release. Verified build zQFwuMLj3YJulWO9QmS8i and the Atlas-only phase4_records
+policy are active; Builder API/frontend/worker restarted successfully. All 319
+previous static assets remain unchanged. Four real local/public desktop/mobile
+Chromium Operations/reload checks passed without errors or mutations. Existing
+authentication/origin settings remain; individual production IAM is not added.
+No cloud CRUD, model request or workflow execution was initiated by acceptance.
+Rollback/evidence: .local/phase4-crud/activation/. See Phase 4 verification notes.
+
+
+## Original-plan Phase 5 database workflows — 18 October 2026 (IST)
+
+Implemented trusted graph/source planning context, pinned workflow source scope,
+actual Registry database tools, bounded query/record reads and run-linked prepared
+CRUD with immediate owner approval before commit. Preparation and provenance are
+atomic; console execution refuses workflow-owned operations. Stable delegation can
+read/prepare; fixed graph nodes commit. Workflow details, Execution and Approvals
+show planned sources, current previews and actual source/count/handoff evidence.
+Configured existing Google tools compose through their existing boundaries.
+
+Evidence: 440 backend regressions; final provenance hardening rerun 54 overlapping
+native/HTTP tests; 41 focused UI tests; 34 desktop/mobile browser fixtures; build,
+types, lint, contracts/drift and strict OpenSpec passed. Full frontend suite has
+279 passes and seven confirmed pre-existing failures, reproduced against the saved
+Phase 4 snapshot. See openspec/changes/database-workflow-integration-phase5/verification.md
+and docs/database-workflow-integration-phase5.md for evidence, scope and limits.
+
+Local implementation only: Phase 4 remains running; no deploy/restart, cloud CRUD,
+Google action, credential/policy change or live model call. Owner manual workflows
+are supported; automation and independent credential delegation remain denied. No
+external notification or contributor acceptance is inferred.
+
+## Semantic Knowledge graph — 18 October 2026
+
+Status: ready-for-handoff for deployed UI, metadata retrieval, semantic review and bounded actual-record execution. Live model activation remains blocked pending explicit schema/destination authorization; no downstream acceptance is implied.
+
+One Knowledge graph replaces the separate map/detailed navigation. Structured semantic proposals retain original technical provenance; ambiguity/review and technical join permission stay separate. Actual-record mode uses validated read plans and observed key matches. Workflow source selection consumes semantic context and pins its evidence basis. Metadata changes invalidate affected meanings/workflows.
+
+Verified build s3UuI6ax0MMm4xtwwg4RX is live, all three services healthy, previous static assets retained and credential/write-policy hashes unchanged. Offline/native/HTTP/UI tests and desktop/mobile browser checks passed; exact overlapping test counts and limits are in openspec/changes/semantic-knowledge-graph/verification.md. No cloud writes, Google actions or live model extraction were executed. Extraction is default-off at both job and provider boundaries after automatic approval review rejected schema transfer without destination-specific authorization. Next: owner UI acceptance and explicit schema-only authorization before enabling extraction to the configured OpenAI destination. See docs/semantic-knowledge-graph.md.
+
+### Semantic extraction activation update — 18 October 2026
+
+The owner explicitly authorized automatic schema-only extraction to api.openai.com
+using gpt-5.6-luna. Enabled the existing flag and gracefully restarted API/worker;
+all services healthy. Initial live inference is ready: 10 relationships, 6
+inferred with validated evidence and 4 ambiguous. Previous authorization block
+is resolved for this exact payload/destination. Labels remain inferred pending
+business review. No record payload, external email/Calendar action, database write
+or credential/write-policy change was introduced. Evidence:
+.local/semantic-kg/inference-result.json and enable-inference.log.
+
+
+## Reliable inventory report — 18 October 2026
+
+Delivered a bounded fresh-prompt compiler using owned KG candidates and exact accepted/declared source links, deterministic stock/on-order ranking with honest watchlist labels, verified new-Sheet URL delivery and separate spreadsheet/email/calendar action gates. Registry validation and scoped connector execution enforce immediate approval evidence independently of legacy procurement automatic settings. An owner-scoped Google default reuses the user's previously selected account; explicit choices still override it. Existing frontend, credentials and database write policy are unchanged.
+
+Verification: 183 backend/connector tests and 10 subtests passed; contracts, syntax and strict OpenSpec passed. Changes activated; Atlas/Supabase, public research and selected Google identity/capabilities verified. No live workflow was created or executed and no Google artifact was created. User performs the UI acceptance test. See docs/reliable-inventory-report.md and openspec/changes/reliable-inventory-report/verification.md for boundaries/evidence. This is a repository handoff, not an external notification or inferred contributor acceptance.
+
+
+## Manual worker assignment recovery — 18 October 2026
+
+Fixed fresh manual workers losing process-local tool approval evidence after API publication. Recovery requires the same currently authorized approver, exact workspace and validated published revision; current Registry scopes/policy and action approvals remain enforced. Fresh-service safety regression passed; 90 overlapping tests and 29 subtests passed. One unrelated empty-tool-list expectation fails unchanged against the original implementation. Real published revision preflight authorized all ten tools without running any workflow or external action. See openspec/changes/manual-worker-authorization/verification.md and its activation evidence. Existing terminal blocked runs require a new manual run; no draft rewrite or republish is needed.
+
+
+## Typed research control messages — 18 October 2026
+
+Published v1 inventory run read/normalized real inventory, then its research child failed MODEL_OUTPUT_SCHEMA_INVALID before tool execution. Raw response is unavailable; no specific invalid field is asserted. Closed registered tool inputs and closed business outputs now use direct typed response-schema fields instead of fragile JSON-in-string transport; generic/open schemas retain fallback. Registry and per-action gates remain unchanged. 55 protocol/delegation/report regressions and 3 subtests passed, including offline real CrewAI/provider bridge. Contracts/strict OpenSpec passed. Local published-v1 schema preflight passed without a model or connector call. Backend/worker activation evidence is under .local/research-control-fix. No user run or cloud write was executed. See openspec/changes/typed-agent-control/verification.md for the blocked live diagnostic, verification limits and separate draft-v2 registry banner.
+
+
+## Single-decision provider response — 18 October 2026
+
+User-authorized live read-only diagnostics reproduced the missing cause of the research failure: SDK output_text sometimes concatenates several complete control envelopes, which single-document parsing rejects. The control decoder now validates the entire bounded stream and consumes only its first decision; no later speculative tool action/finish is executed. Non-control JSON, Registry gates, action approvals and usage limits remain intact. 48 regressions and 7 subtests passed; live tool and finish diagnostics passed with synthetic public inputs, and contracts/strict OpenSpec passed. Backend/worker deployment leaves frontend/config and workflow definitions unchanged. No user run or Google action was executed. See openspec/changes/single-decision-response/verification.md and .local/research-control-diagnostic/activation.json.

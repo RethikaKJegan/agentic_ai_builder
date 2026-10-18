@@ -1,7 +1,10 @@
+import { knowledgePreviewSchema } from "@/api/knowledge-graph";
+import { KnowledgeSourcePreview } from "./KnowledgeSourcePreview";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
 import type { Workflow } from "@/domain/types";
 import { dependencyOrder, graphIssues } from "@/domain/graph-review";
 import { fromCanonical } from "@/api/mapping";
+import { DatabaseWorkflowReview } from "./DatabaseWorkflowReview";
 export function PlanReview({
   document,
   workflow,
@@ -14,6 +17,7 @@ export function PlanReview({
   const graph = workflow ?? (document ? fromCanonical(document).workflow : undefined);
   if (!graph) return null;
   const canonical = document ?? graph.canonical;
+  const retrieved = knowledgePreviewSchema.safeParse(canonical?.metadata['knowledge_graph_retrieval']);
   const issues = graphIssues(graph.nodes, graph.edges);
   const trigger =
     canonical?.metadata["trigger_templates"] ??
@@ -72,6 +76,8 @@ export function PlanReview({
           </dd>
         </div>
       </dl>
+      {retrieved.success&&<KnowledgeSourcePreview view={retrieved.data}/>}
+      <DatabaseWorkflowReview document={canonical} />
       <details open={generated}>
         <summary className="cursor-pointer font-medium">Major steps and branches</summary>
         <ol className="mt-2 space-y-1">

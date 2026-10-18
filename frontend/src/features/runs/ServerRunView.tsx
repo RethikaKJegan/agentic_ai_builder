@@ -6,15 +6,18 @@ import { useRunFeed } from "./useRunFeed";
 import { unsafeText } from "@/api/feedback";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { StatusPill } from "@/features/shell/StatusPill";
+import { DatabaseApprovalPreview } from "@/features/workflows/DatabaseWorkflowReview";
 
-export function ApprovalControl({ approval, emailPreview, onUpdated }: { approval: ApprovalRecord; emailPreview?: unknown; onUpdated?: (() => void) | undefined }) {
+export function ApprovalControl({ approval, emailPreview, databaseOperationId, onUpdated }: { approval: ApprovalRecord; emailPreview?: unknown; databaseOperationId?: string | undefined; onUpdated?: (() => void) | undefined }) {
   const backend = useBackend();
   const [record, setRecord] = useState(approval);
   const decisionPending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [databaseReviewed, setDatabaseReviewed] = useState(false);
   const decide = async (decision: "approved" | "rejected") => {
     if (decisionPending.current || !backend.can("workflow.approve") || !record.allowed_decisions.includes(decision)) return;
+    if (decision === "approved" && databaseOperationId && !databaseReviewed) return;
     decisionPending.current = true; setBusy(true); setError(null);
     try {
       const result = await api.request("decide_approval", { approval_id: record.approval_id, workflow_id: record.workflow_id,
@@ -28,7 +31,8 @@ export function ApprovalControl({ approval, emailPreview, onUpdated }: { approva
     <p className="text-xs text-muted-foreground">Required roles: {record.required_roles?.join(", ") || "Determined by the server gate"}</p>
     <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
     {emailPreview != null && <pre aria-label="Email awaiting approval" className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{JSON.stringify(emailPreview, null, 2)}</pre>}
-    {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
+    {databaseOperationId && record.status === "pending" && <DatabaseApprovalPreview key={databaseOperationId} operationId={databaseOperationId} onReviewed={setDatabaseReviewed} />}
+    {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy || (decision === "approved" && !!databaseOperationId && !databaseReviewed)} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
     {record.status === "pending" && (!backend.can("workflow.approve") || !record.allowed_decisions.length) && <p className="text-xs text-muted-foreground">The exact gate role, workflow.approve permission and workspace membership are required to decide this approval.</p>}
     {record.status === "unmatched" && <p className="text-xs text-muted-foreground">This approval does not match the current workflow revision.</p>}
     <ApiFeedback error={error} />
@@ -96,11 +100,12 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
         const matched = approval.workflow_id === run.workflow_id && approval.workflow_version === run.workflow_version;
         const record = matched ? approval : { ...approval, status: "unmatched" as const, allowed_decisions: [] };
         const preview = events.find((event) => event.event_type === "approval.pending" && event.details?.["approval_id"] === record.approval_id)?.details?.["email_preview"];
-        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} emailPreview={preview} onUpdated={() => void loadRun(run.run_id)} />;
+        const operationId = events.find(event => event.event_type === "approval.pending" && event.details?.["approval_id"] === record.approval_id)?.details?.["database_operation_id"];
+        return <ApprovalControl key={`${record.approval_id}:${record.status}`} approval={record} emailPreview={preview} databaseOperationId={typeof operationId === "string" ? operationId : undefined} onUpdated={() => void loadRun(run.run_id)} />;
       })}
       {events.filter(event=>event.event_type==="node.failed").map(event=><p key={event.event_id} className="text-sm text-destructive">Failed node: {String(event.details?.["node_id"]??"unknown")} · {typeof event.details?.["error_code"]==="string" && !unsafeText(event.details["error_code"])?event.details["error_code"]:"Inspect the recorded failure reference"}</p>)}
       {feed.hasMore && <p role="status" className="text-xs">Loading the next recorded event page…</p>}
-      {!approvalsOnly && <ol className="divide-y divide-border rounded-xl border border-border" aria-label="Run events">{events.map((event) => <li key={event.event_id} className="p-3"><p className="text-sm">{event.event_type}</p><p className="text-xs text-muted-foreground">{event.timestamp} · {event.source} · {event.event_id} · v{event.workflow_version}</p></li>)}</ol>}
+      {!approvalsOnly && <ol className="divide-y divide-border rounded-xl border border-border" aria-label="Run events">{events.map((event) => <li key={event.event_id} className="p-3"><p className="text-sm">{event.event_type}</p><p className="text-xs text-muted-foreground">{event.timestamp} · {event.source} · {event.event_id} · v{event.workflow_version}</p>{event.details && <details className="mt-2 text-xs"><summary>Recorded inputs, source usage and results</summary><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(event.details, null, 2)}</pre></details>}</li>)}</ol>}
     </>}
   </div>;
 }

@@ -77,3 +77,106 @@ Verification: 154 Python tests PASS, shared contracts valid, strict live-workflo
 The published complaint workflow received matching rows but failed before its first model call: BUDGET_EXHAUSTED. Its two model agents each reserve $0.05; its workflow omitted max_estimated_cost_usd, which runtime correctly treats as zero. Live planner correction now checks total model-node cost ceilings and guidance requires an explicit workflow ceiling. 45 focused planner/live-provider tests and shared contracts PASS.
 
 Using the local authenticated API, prepared complaint workflow planned_d1477ce2f38deb07 version 2 as a draft with a $0.10 overall ceiling and 300-second timeout; cleared executable references through the canonical editable-revision flow. It remains unpublished for user review. Version-1 releases and blocked runs were preserved. No model or email calls occurred during repair. The running backend needs an operator restart to load preventive planner code; saved version 2 itself can be reviewed/published without restart.
+
+
+## Original-plan Phase 5 database workflows — 18 October 2026 (IST)
+
+Implemented trusted graph/source planning context, pinned workflow source scope,
+actual Registry database tools, bounded query/record reads and run-linked prepared
+CRUD with immediate owner approval before commit. Preparation and provenance are
+atomic; console execution refuses workflow-owned operations. Stable delegation can
+read/prepare; fixed graph nodes commit. Workflow details, Execution and Approvals
+show planned sources, current previews and actual source/count/handoff evidence.
+Configured existing Google tools compose through their existing boundaries.
+
+Evidence: 440 backend regressions; final provenance hardening rerun 54 overlapping
+native/HTTP tests; 41 focused UI tests; 34 desktop/mobile browser fixtures; build,
+types, lint, contracts/drift and strict OpenSpec passed. Full frontend suite has
+279 passes and seven confirmed pre-existing failures, reproduced against the saved
+Phase 4 snapshot. See openspec/changes/database-workflow-integration-phase5/verification.md
+and docs/database-workflow-integration-phase5.md for evidence, scope and limits.
+
+Local implementation only: Phase 4 remains running; no deploy/restart, cloud CRUD,
+Google action, credential/policy change or live model call. Owner manual workflows
+are supported; automation and independent credential delegation remain denied. No
+external notification or contributor acceptance is inferred.
+
+## Automatic KG selection on prompt submission — 18 October 2026
+
+Status: ready-for-handoff, owner acceptance pending. Removed mandatory Overview
+source preview, KG checkboxes, account picker and extra review/open click. Existing
+model receives a bounded owned KG candidate pool and chooses one-to-four source IDs;
+server validates/pins actual choices. Explicit preview API remains compatible.
+Owned-source, join, stale evidence, write approval and scope guards preserved.
+Existing unsaved browser edits are kept while opening the saved workflow directly.
+No automatic external execution or arbitrary Google account substitution.
+
+Evidence: backend 21/34 and planner 27 overlapping tests, 27 frontend tests,
+3 desktop browser cases, typecheck/lint/build and strict OpenSpec. Build
+0kxH3ezt3GIh5mNoVJwht live, config hashes unchanged. Real Northwind generation
+without manual selection succeeded: 12 candidates → products/suppliers/categories
+(3 sources, PostgreSQL + MongoDB), no unresolved requirements. Proposal only;
+no workflow actions executed. Full evidence and limits:
+openspec/changes/automatic-kg-planning/verification.md.
+
+## Northwind research/Sheets planning blockers — 18 October 2026
+
+Fixed registered-tool visibility in DB-backed planning: web search/page read and
+Sheets creation/setup definitions are included; obsolete Google-only composition
+instruction corrected. Verified 35 source/procurement tests and 27 planner/provider
+tests plus 4 subtests. Backend-only change live, configuration/frontend unchanged.
+Existing Northwind draft still describes email/30 minutes; latest user intent is
+no email, primary calendar, 19 October 2026 15:00–16:00 IST (60 minutes).
+
+Full replacement is NOT ready: two generation-only attempts rejected by normal
+validation, first restricted mappings then SHEETS_TARGET_REQUIRED. No replacement
+saved or external actions executed. New Sheets setup returns proposed targets, but
+same-run report population lacks an approved handoff to the concrete-target writer.
+Do not remove that guard or old unresolved requirements to make submission pass.
+Next required work is scoped new-spreadsheet report export with explicit approval
+and ownership. Evidence: openspec/changes/planner-research-sheet-tools/verification.md.
+
+## New spreadsheet report capability — 18 October 2026
+
+Implemented and activated `extension_sheets_create_report` for DB-backed workflows.
+One approved create request includes bounded literal report tabs/rows and returns a
+read-verified URL/count/digest. Existing fixed spreadsheet destination ceilings,
+ownership markers, uncertain-result journal and immediate approval checks remain.
+Native + extension registration use existing creation opt-in; no credential/config,
+frontend or Praxi changes. Planner receives exact schema and NEW-report guidance.
+
+Evidence: 48 connector tests (+6 subtests), 59 planner/provider/source tests
+(+4 subtests), one targeted native registration/approval test, contracts and strict
+OpenSpec pass. Initial 5 failures were corrected and affected suite rerun green.
+Backend/worker live; configuration hashes and frontend process unchanged. No real
+Sheets, email, Calendar or DB mutation executed. Live-provider execution still
+requires normal owner approval; do not claim it already ran.
+
+Latest explicit user answers supersede earlier no-email/one-hour assumptions:
+recipient is the selected Google account's own inbox, obtained through the bound
+Gmail profile; meeting is primary calendar, 19 Oct 2026 15:30–16:00 Asia/Kolkata.
+First generation-only check failed OUTPUT_FIELD_NOT_DECLARED (no draft saved).
+A correction with exact output schema feedback and the old draft's selected Google
+binding is being verified. Final evidence: openspec/changes/new-spreadsheet-report/verification.md.
+
+Final follow-up: new-report grid size now derives from approved rows; connector48,
+native1, contracts and final planner27 (+4 subtests) rerun green. Saved a corrected
+authored Northwind draft `planned_cde21033218f6110` v1 through normal PlannerService,
+KG binder and API save/validation: three real scoped datasets, existing Google
+binding preserved, zero unresolved requirements, no non-approval tool failures.
+It remains unapproved/unpublished/unexecuted. This is an authored correction of a
+captured proposal, NOT proof that earlier automatic generations succeeded. Final
+report guidance addresses observed mapping/capability/handoff/rejection defects;
+final automatic check outcome is in final-live-plan.log. See updated verification.
+
+Final automatic job `plan_9ec9f0b2c4374a338badce3dc96a2e51` failed
+PLANNER_PROVIDER_FAILED. Automatic regeneration remains an unresolved planner
+issue; the explicitly authored saved draft is separately validated and reviewable.
+Do not report full automatic prompt-to-workflow success or real Google execution.
+
+
+## Reliable inventory report — 18 October 2026
+
+Delivered a bounded fresh-prompt compiler using owned KG candidates and exact accepted/declared source links, deterministic stock/on-order ranking with honest watchlist labels, verified new-Sheet URL delivery and separate spreadsheet/email/calendar action gates. Registry validation and scoped connector execution enforce immediate approval evidence independently of legacy procurement automatic settings. An owner-scoped Google default reuses the user's previously selected account; explicit choices still override it. Existing frontend, credentials and database write policy are unchanged.
+
+Verification: 183 backend/connector tests and 10 subtests passed; contracts, syntax and strict OpenSpec passed. Changes activated; Atlas/Supabase, public research and selected Google identity/capabilities verified. No live workflow was created or executed and no Google artifact was created. User performs the UI acceptance test. See docs/reliable-inventory-report.md and openspec/changes/reliable-inventory-report/verification.md for boundaries/evidence. This is a repository handoff, not an external notification or inferred contributor acceptance.

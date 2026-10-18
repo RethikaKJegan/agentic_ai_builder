@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "revision": "0eabdc334fb0520ad740141850d55df03a1cbeb4ea0df3fa272cdd3af1a499fd",
+  "indexed_at": "2026-10-18T09:07:27.948161+00:00",
+  "coverage": {
+    "connections": 2,
+    "datasets": 3,
+    "matched_datasets": 3,
+    "candidate_limit": 12,
+    "source_limit": 4,
+    "metadata_only": true
+  },
+  "query_terms": [
+    "customer",
+    "order"
+  ],
+  "requires_selection": true,
+  "graph_stale": false,
+  "candidates": [
+    {
+      "dataset_id": "pg_orders",
+      "connection_id": "pg",
+      "label": "Postgres / demo / northwind / orders",
+      "engine": "postgresql",
+      "score": 15,
+      "selected": true,
+      "reasons": [
+        "dataset name matches \u201corder\u201d.",
+        "field customerID matches \u201ccustomer\u201d.",
+        "source path matches \u201corder\u201d."
+      ],
+      "fields": [
+        "tenantID",
+        "customerID",
+        "employeeID"
+      ],
+      "operations": [
+        "query"
+      ]
+    },
+    {
+      "dataset_id": "mongo_customers",
+      "connection_id": "mongo",
+      "label": "Atlas / demo / customers",
+      "engine": "mongodb",
+      "score": 10,
+      "selected": true,
+      "reasons": [
+        "dataset name matches \u201ccustomer\u201d.",
+        "field customerID matches \u201ccustomer\u201d.",
+        "field items[].customerID matches \u201ccustomer\u201d.",
+        "field nested.customerID matches \u201ccustomer\u201d.",
+        "source path matches \u201ccustomer\u201d."
+      ],
+      "fields": [
+        "customerID",
+        "employee_id",
+        "id",
+        "nested.customerID",
+        "items[].customerID"
+      ],
+      "operations": [
+        "query"
+      ]
+    },
+    {
+      "dataset_id": "pg_customers",
+      "connection_id": "pg",
+      "label": "Postgres / demo / northwind / customers",
+      "engine": "postgresql",
+      "score": 10,
+      "selected": true,
+      "reasons": [
+        "dataset name matches \u201ccustomer\u201d.",
+        "field customerID matches \u201ccustomer\u201d.",
+        "source path matches \u201ccustomer\u201d."
+      ],
+      "fields": [
+        "tenantID",
+        "customerID"
+      ],
+      "operations": [
+        "query"
+      ]
+    }
+  ],
+  "source_ids": [
+    "pg_orders",
+    "mongo_customers",
+    "pg_customers"
+  ],
+  "relationships": [
+    {
+      "relationship_id": "rel_b52a132a1691bdb2902a8095a740c6fc",
+      "source_dataset_id": "pg_orders",
+      "target_dataset_id": "pg_customers",
+      "status": "declared",
+      "field_pairs": [
+        {
+          "source_field_id": "pg_orders_tenantID",
+          "target_field_id": "pg_customers_tenantID"
+        },
+        {
+          "source_field_id": "pg_orders_customerID",
+          "target_field_id": "pg_customers_customerID"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "Atlas: metadata is sampled or limited; absence is not proof of deletion.",
+    "Business entities are naming suggestions until reviewed. Entity mappings never authorize execution.",
+    "Selected sources have no declared/accepted path within three hops. Cross-source joins must remain unresolved.",
+    "Several sources match equally. Choose the intended sources and refresh the preview."
+  ],
+  "tools": [
+    {
+      "tool_id": "database_read_record",
+      "capability": "database.read_record",
+      "approval_required": false,
+      "description": "Use only the published database_scope. Queries use a validated logical plan; prepare captures an exact immutable change without writing."
+    },
+    {
+      "tool_id": "database_read_query",
+      "capability": "database.read_query",
+      "approval_required": false,
+      "description": "Use only the published database_scope. Queries use a validated logical plan; prepare captures an exact immutable change without writing."
+    },
+    {
+      "tool_id": "database_prepare_operation",
+      "capability": "database.prepare",
+      "approval_required": false,
+      "description": "Use only the published database_scope. Queries use a validated logical plan; prepare captures an exact immutable change without writing."
+    },
+    {
+      "tool_id": "database_execute_operation",
+      "capability": "database.execute",
+      "approval_required": true,
+      "description": "Commit the same run's prepared database operation after its immediate human approval gate."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Design
+
+Capability selection requires validated join pairs. The fact prefix is PostgreSQL and remains on the base connection until the first remote join; all subsequent datasets are bounded dimensions. Metrics may reference only prefix fields and contain no division. Dimension types must support native scalar validation. Projection-only, interleaved fact/dimension chains, cross-source metric expressions and unsupported types fall back.
+
+Read each complete dimension in one native snapshot, bounded to 5,000 rows. In one PostgreSQL read-only repeatable-read transaction, execute complete source/local-join checks and an unfiltered grouped frontier-key domain with row weights, then partial aggregation grouped by prefix output keys and all frontier join keys. Each intermediate has at most 5,000 records and all transferred intermediate payloads cumulatively fit 2 MB. Preserve all needed prefix fields for pre-filter scalar validation.
+
+Join complete domain records to dimensions using typed existing strict joins, reporting weighted original source counts. Validate even keys outside filters and unused duplicate/null target keys. Join filtered partial states to the same dimension data, apply dimension filters, merge count/sum/min/max/average states under 38-digit decimal context, and only then sort/limit. Empty ungrouped output retains count=0 and other aggregates=null. No reaggregation of averages, coercion of textual keys, premature limits or partial totals.
+
+Native average also uses sum/count states and complete bounded groups before global sorting. Existing exact operand/intermediate envelope keeps partial sums exact. Separate source snapshots and per-fragment read windows are exposed. Execution totals measure serialized intermediate payloads, not protocol bytes. Existing 45-second deadline, database statement timeouts, 1M fact rows/source and 64MB PG projected source bounds remain. Large dimensions/high-cardinality groups fail safely.

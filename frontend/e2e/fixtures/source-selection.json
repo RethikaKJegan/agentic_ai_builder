@@ -1,0 +1,68 @@
+{
+  "catalog_dataset_count": 3,
+  "sources": [
+    {
+      "dataset_id": "orders",
+      "connection_id": "pg",
+      "engine": "postgresql",
+      "label": "Supabase / demo / public / orders",
+      "reasons": [
+        "Base dataset in the validated plan.",
+        "Provides calculation fields.",
+        "Provides keys required to link selected datasets."
+      ],
+      "fields": [
+        {
+          "field_id": "order_customer",
+          "label": "Supabase / demo / public / orders / customer_id",
+          "types": ["text"],
+          "purposes": ["join"]
+        },
+        {
+          "field_id": "order_amount",
+          "label": "Supabase / demo / public / orders / amount",
+          "types": ["numeric"],
+          "purposes": ["metric"]
+        }
+      ]
+    },
+    {
+      "dataset_id": "customers",
+      "connection_id": "mongo",
+      "engine": "mongodb",
+      "label": "Atlas / demo / customers",
+      "reasons": [
+        "Join target in the validated plan.",
+        "Provides grouping fields.",
+        "Provides keys required to link selected datasets."
+      ],
+      "fields": [
+        {
+          "field_id": "customer_id",
+          "label": "Atlas / demo / customers / customer_id",
+          "types": ["string"],
+          "purposes": ["join"]
+        },
+        {
+          "field_id": "customer_name",
+          "label": "Atlas / demo / customers / name",
+          "types": ["string"],
+          "purposes": ["group"]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "orders_customers",
+      "source_dataset_id": "orders",
+      "target_dataset_id": "customers",
+      "status": "accepted",
+      "field_pairs": [{ "source_field_id": "order_customer", "target_field_id": "customer_id" }]
+    }
+  ],
+  "business_mappings": [
+    { "node_id": "customers", "entity_name": "Customer", "role": "represents" }
+  ],
+  "warnings": ["Atlas fields were discovered by sampling."]
+}

@@ -64,50 +64,26 @@ it("retains the original prompt on planner failure and supports an explicit retr
   expect(prompt).toHaveValue("My original automation prompt");
   expect(navigate).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Retry generation" }));
-  await waitFor(() =>
-    expect(screen.getByRole("region", { name: "Generation result" })).toBeVisible(),
-  );
+  await waitFor(() => expect(navigate).toHaveBeenCalledOnce());
   expect(request).toHaveBeenCalledTimes(2);
-  expect(navigate).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Review and edit workflow" }));
-  expect(navigate).toHaveBeenCalledOnce();
+  expect(navigate).toHaveBeenCalledWith({to:"/app/workflows/$id",params:{id:document().workflow_id}});
 });
-it("does not overwrite unsaved edits when reopening an existing planner identity", async () => {
-  const d = document();
-  useMesh.getState().acceptWorkflow(d);
-  useMesh.getState().renameWorkflow(d.workflow_id, "Keep my dirty draft");
-  vi.spyOn(creation, "createWorkflow").mockResolvedValue({ workflow: d, existing: true });
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-  render(<Overview />);
-  fireEvent.change(screen.getByLabelText("Process description"), {
-    target: { value: "Repeated prompt" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Generate workflow" }));
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Review and edit workflow" })).toBeVisible(),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Review and edit workflow" }));
-  expect(confirm).toHaveBeenCalled();
-  expect(navigate).not.toHaveBeenCalled();
-  expect(useMesh.getState().workflows[0]?.name).toBe("Keep my dirty draft");
-  confirm.mockReturnValue(true);
-  fireEvent.click(screen.getByRole("button", { name: "Review and edit workflow" }));
-  expect(navigate).toHaveBeenCalledOnce();
+it("opens an existing workflow while preserving unsaved browser edits", async () => {
+  const d=document();useMesh.getState().acceptWorkflow(d);
+  useMesh.getState().renameWorkflow(d.workflow_id,"Keep my dirty draft");
+  vi.spyOn(creation,"createWorkflow").mockResolvedValue({workflow:d,existing:true});
+  const confirm=vi.spyOn(window,"confirm");render(<Overview/>);
+  fireEvent.change(screen.getByLabelText("Process description"),{target:{value:"Repeated prompt"}});
+  fireEvent.click(screen.getByRole("button",{name:"Generate workflow"}));
+  await waitFor(()=>expect(navigate).toHaveBeenCalledOnce());
+  expect(confirm).not.toHaveBeenCalled();
   expect(useMesh.getState().workflows[0]?.name).toBe("Keep my dirty draft");
 });
-it("blocks regeneration of the displayed review unless explicitly chosen", async () => {
-  const create = vi
-    .spyOn(creation, "createWorkflow")
-    .mockResolvedValue({ workflow: document(), existing: false });
-  vi.spyOn(window, "confirm").mockReturnValue(false);
-  render(<Overview />);
-  fireEvent.change(screen.getByLabelText("Process description"), {
-    target: { value: "Create this process" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Generate workflow" }));
-  await waitFor(() =>
-    expect(screen.getByRole("region", { name: "Generation result" })).toBeVisible(),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Generate workflow" }));
-  expect(create).toHaveBeenCalledTimes(1);
+it("blocks duplicate in-flight generation from repeated clicks",async()=>{
+  let finish!:(value:{workflow:ReturnType<typeof document>;existing:boolean})=>void;
+  const create=vi.spyOn(creation,"createWorkflow").mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+  render(<Overview/>);fireEvent.change(screen.getByLabelText("Process description"),{target:{value:"Create this process"}});
+  const button=screen.getByRole("button",{name:"Generate workflow"});fireEvent.click(button);fireEvent.click(button);
+  await waitFor(()=>expect(create).toHaveBeenCalledTimes(1));
+  finish({workflow:document(),existing:false});await waitFor(()=>expect(navigate).toHaveBeenCalledOnce());
 });

@@ -65,3 +65,23 @@ python3 scripts/generate_ui_contracts.py --check
 ```
 
 See `../docs/contributors/harihar-api.md` for routes, DTO mappings, service ownership and remaining dependencies. `incoming/mesh-nextjs-final.zip` records the earlier UI migration baseline; active API integration source is in this repository.
+
+## Replacing the production build
+
+Build and verify in an isolated directory. Before activating it, retain the active
+build's static assets (including assets it retained from earlier deployments):
+
+```sh
+# From the repository root; replace the target with the verified build directory.
+python3 scripts/retain_frontend_assets.py \
+  --target .local/verified-build/frontend/.next \
+  --source frontend/.next
+```
+
+The utility compares all overlapping paths before writing and fails on different
+bytes. It adds missing static files only; it does not copy server code or HTML.
+Back up the active build, replace it with the verified build including these
+retained files, then restart the frontend. Next indexes static files at startup.
+Do not discard retained chunks on each deployment: cached HTML and already open
+tabs can still reference them. Any later pruning needs a deliberate retention
+policy. See [mobile startup evidence](../docs/mobile-startup-assets.md).

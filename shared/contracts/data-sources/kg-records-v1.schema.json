@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kg-records-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "kg_revision",
+    "retrieved_at",
+    "limited",
+    "nodes",
+    "edges",
+    "sources",
+    "query_traces",
+    "warnings"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "kg_revision": {
+      "type": "string"
+    },
+    "retrieved_at": {
+      "type": "string"
+    },
+    "limited": {
+      "type": "boolean"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "dataset_id",
+          "dataset_label",
+          "identity_field_id",
+          "identity_value",
+          "label_field_id",
+          "label",
+          "fields"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "dataset_id": {
+            "type": "string"
+          },
+          "dataset_label": {
+            "type": "string"
+          },
+          "identity_field_id": {
+            "type": "string"
+          },
+          "identity_value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "label_field_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field_id",
+                "name",
+                "value"
+              ],
+              "properties": {
+                "field_id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "maxItems": 11
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_id",
+          "relationship_id",
+          "source_node_id",
+          "target_node_id",
+          "predicate",
+          "semantic_status",
+          "structural_relationship_id",
+          "observed_fields"
+        ],
+        "properties": {
+          "edge_id": {
+            "type": "string"
+          },
+          "relationship_id": {
+            "type": "string"
+          },
+          "source_node_id": {
+            "type": "string"
+          },
+          "target_node_id": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "semantic_status": {
+            "enum": [
+              "inferred",
+              "confirmed"
+            ]
+          },
+          "structural_relationship_id": {
+            "type": "string"
+          },
+          "observed_fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_field_id",
+                "target_field_id",
+                "value"
+              ],
+              "properties": {
+                "source_field_id": {
+                  "type": "string"
+                },
+                "target_field_id": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "maxItems": 10
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_id",
+          "label",
+          "metadata_revision",
+          "started_at",
+          "finished_at",
+          "rows_read"
+        ],
+        "properties": {
+          "dataset_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "metadata_revision": {
+            "type": "integer"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "rows_read": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "query_traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "plan_id",
+          "plan",
+          "total_result_rows",
+          "executed_at"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "object"
+          },
+          "total_result_rows": {
+            "type": "integer"
+          },
+          "executed_at": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

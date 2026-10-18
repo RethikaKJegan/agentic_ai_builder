@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/ontology-v1",
+  "title": "ontology-v1",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "revision": {
+      "type": "string"
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "build_status": {
+      "enum": [
+        "idle",
+        "queued",
+        "running",
+        "ready",
+        "failed"
+      ]
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "graph_revision": {
+      "type": "integer"
+    },
+    "built_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "connection_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "suggested",
+                    "confirmed",
+                    "rejected",
+                    "needs_review"
+                  ]
+                },
+                "types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "metadata": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "node_id",
+                "connection_id",
+                "label",
+                "kind",
+                "role",
+                "status",
+                "types",
+                "metadata"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entity_id",
+          "label",
+          "sources"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "relationship_id": {
+            "type": "string"
+          },
+          "source_entity_id": {
+            "type": "string"
+          },
+          "target_entity_id": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "reversed": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "suggested",
+              "confirmed",
+              "rejected",
+              "needs_review"
+            ]
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_hash": {
+            "type": "string"
+          },
+          "technical_relationship_id": {
+            "type": "string"
+          },
+          "technical_status": {
+            "type": "string"
+          },
+          "source_dataset_id": {
+            "type": "string"
+          },
+          "target_dataset_id": {
+            "type": "string"
+          },
+          "field_pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_field_id": {
+                  "type": "string"
+                },
+                "target_field_id": {
+                  "type": "string"
+                },
+                "source_label": {
+                  "type": "string"
+                },
+                "target_label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source_field_id",
+                "target_field_id",
+                "source_label",
+                "target_label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "qualification": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "relationship_id",
+          "source_entity_id",
+          "target_entity_id",
+          "predicate",
+          "reversed",
+          "status",
+          "reviewed_at",
+          "evidence_hash",
+          "technical_relationship_id",
+          "technical_status",
+          "source_dataset_id",
+          "target_dataset_id",
+          "field_pairs",
+          "evidence",
+          "qualification"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "revision",
+    "stale",
+    "build_status",
+    "last_error",
+    "graph_revision",
+    "built_at",
+    "entities",
+    "relationships",
+    "warnings"
+  ],
+  "additionalProperties": false
+}

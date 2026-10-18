@@ -1,0 +1,4 @@
+- [x] Correct submission eligibility without approving tool grants.
+- [x] Return actionable unresolved requirements using the existing UI error contract.
+- [x] Verify pending approvals, denied/missing assignments, unresolved requirements and lifecycle regressions.
+- [x] Activate backend fix and verify the affected revision through a live UI rejection check without creating a review request.

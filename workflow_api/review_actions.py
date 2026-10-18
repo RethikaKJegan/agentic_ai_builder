@@ -26,7 +26,31 @@ def submit(service,request,auth):
         if not workflow or workflow['version']!=payload['workflow_version']:raise ApiFailure('REVISION_CONFLICT','Reload the current revision before submitting.',409)
         if workflow['status']!='validated':raise ApiFailure('INVALID_TRANSITION','Validate this revision before submitting for approval.',409)
         review=service.registry_adapter.review(workflow,auth)
-        if not review['ready']:raise ApiFailure('ASSIGNMENT_REVALIDATION_FAILED','Resolve Registry review blockers before submitting.',403)
+        # Submission requests review; it does not grant approval. Pending tool
+        # approvals must be reviewable without accepting denied/missing grants.
+        items=review.get('items',[])
+        covered={item.get('tool_id') for item in items
+                 if item.get('authorization_state') in {'authorized','pending_approval'}}
+        pending_only=(bool(items)
+            and set(review['reason_codes']) <= {'APPROVAL_REQUIRED','TOOL_ASSIGNMENT_REQUIRED'}
+            and all(item.get('authorization_state') in {'authorized','pending_approval'}
+                    and set(item.get('reason_codes',[])) <= {'APPROVAL_REQUIRED'} for item in items)
+            and {tool['tool_id'] for tool in workflow['tools']} <= covered)
+        if not review['ready'] and not pending_only:
+            requirements=[]
+            for item in workflow['metadata'].get('unresolved_requirements',[])[:30]:
+                if isinstance(item,str):
+                    requirements.append(item[:1000])
+                elif isinstance(item,dict):
+                    if item.get('reason')=='condition_mapping_required':
+                        requirements.append('Configure a reviewed condition/event mapping before submission.')
+                    elif isinstance(item.get('requirement'),str):
+                        requirements.append('Resolve requirement: '+item['requirement'][:900])
+            raise ApiFailure('ASSIGNMENT_REVALIDATION_FAILED',
+                'Complete the setup requirements below before submitting.' if requirements
+                else 'Resolve denied or missing Registry assignments before submitting.',403,
+                details={'requirements':list(dict.fromkeys(requirements)),
+                         'reason_codes':review['reason_codes']})
         workflow=deepcopy(workflow)
         workflow['metadata']['approval_submission']={'workflow_version':workflow['version'],'submitted_by':subject,
             'submitted_at':datetime.fromtimestamp(service.lifecycle.clock(),timezone.utc).isoformat()}

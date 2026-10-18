@@ -57,6 +57,11 @@ class DataSources:
             db.execute('CREATE TABLE IF NOT EXISTS data_source_audit (event_id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, workspace TEXT NOT NULL, owner TEXT NOT NULL, kind TEXT NOT NULL, created_at TEXT NOT NULL)')
 
         self.relationships = DataRelationships(store)
+        from .data_refresh import DataRefresh
+        self.refresh = DataRefresh(self)
+        from .semantic_kg import SemanticKnowledgeGraph
+        self.semantic = SemanticKnowledgeGraph(self)
+        self.relationships.ontology.semantic = self.semantic
 
     def configured(self):
         if not self.cipher:
@@ -91,14 +96,17 @@ class DataSources:
         return {'success':True,'message':'Connection and discovery access verified. Metadata profiling has not run.'}
 
     @staticmethod
-    def queue(db, doc):
-        doc['generation'] += 1
+    def queue(db, doc, invalidate=True):
+        if invalidate:
+            doc['generation'] += 1
         doc['profiling_status']='queued'
         doc['last_error_code']=None
         doc['last_error_message']=None
         doc['updated_at']=now()
         db.execute("UPDATE data_source_profile_jobs SET state='cancelled',token=NULL WHERE connection_id=? AND state IN ('queued','running')",(doc['connection_id'],))
-        db.execute('INSERT INTO data_source_profile_jobs VALUES (?,?,?,?,?,?,?)',('dbjob_'+secrets.token_hex(16),doc['connection_id'],doc['generation'],'queued',None,0,0))
+        job='dbjob_'+secrets.token_hex(16)
+        db.execute('INSERT INTO data_source_profile_jobs VALUES (?,?,?,?,?,?,?)',(job,doc['connection_id'],doc['generation'],'queued',None,0,0))
+        return job
 
     def connect(self, auth, body):
         self.configured()
@@ -114,6 +122,7 @@ class DataSources:
             if count >= 20:raise ApiFailure('DATA_SOURCE_LIMIT', 'Disconnect an existing database before adding more than 20 connections.',409)
             self.queue(db,doc)
             db.execute('INSERT INTO data_source_connections VALUES (?,?,?,?,?)',(cid,workspace,owner,self.cipher.encrypt(json.dumps(config).encode()).decode(),json.dumps(doc)))
+            self.refresh.ensure(db,cid)
             self.audit(db,auth,cid,'connected')
         return doc
 
@@ -176,6 +185,7 @@ class DataSources:
         return {'connection':doc,'snapshot':json.loads(row[0]) if row else None}
 
     def tick(self):
+        self.refresh.schedule()
         # Claim transaction is short. No network I/O holds a database transaction.
         with self.store.transaction() as db:
             row=db.execute("SELECT job_id,connection_id,generation,attempts FROM data_source_profile_jobs WHERE state='queued' OR (state='running' AND lease_until<?) ORDER BY job_id LIMIT 1",(time.time(),)).fetchone()
@@ -190,6 +200,7 @@ class DataSources:
             token=secrets.token_hex(16)
             db.execute("UPDATE data_source_profile_jobs SET state='running',token=?,lease_until=?,attempts=? WHERE job_id=?",(token,time.time()+180,attempts+1,job))
             doc['profiling_status']='running';self.save(db,doc)
+            self.refresh.started(db,cid)
         try:
             self.configured()
             if attempts>=3:raise ApiFailure('DATA_SOURCE_PROFILING_INTERRUPTED','Profiling was repeatedly interrupted. Refresh metadata to retry.',503)
@@ -204,6 +215,7 @@ class DataSources:
             if not claim or claim!=('running',token) or not current or not current[0]:return True
             doc=json.loads(current[1])
             if doc['generation']!=generation:return True
+            changed=False
             if failure:
                 doc.update(profiling_status='failed',last_error_code=failure.code,last_error_message=str(failure))
                 if failure.code=='DATA_SOURCE_ACCESS_DENIED':doc['connection_status']='authentication_failed'
@@ -211,15 +223,23 @@ class DataSources:
                 state='failed'
             else:
                 previous=db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',(cid,doc['metadata_revision'])).fetchone()
-                result.update(connection_id=cid,engine=doc['engine'],revision=doc['metadata_revision']+1,discovered_at=now(),changes=changes(json.loads(previous[0]) if previous else None,result))
-                db.execute('INSERT INTO data_source_snapshots VALUES (?,?,?)',(cid,result['revision'],json.dumps(result)))
-                doc.update(connection_status='connected',profiling_status='ready',metadata_revision=result['revision'],last_profiled_at=result['discovered_at'],last_error_code=None,last_error_message=None)
+                previous=json.loads(previous[0]) if previous else None
+                automatic=db.execute('SELECT 1 FROM data_source_auto_jobs WHERE job_id=?',(job,)).fetchone()
+                from .data_graph_v2 import structural
+                shape=lambda value:structural({k:value.get(k) for k in ('datasets','coverage','warnings','limits')})
+                changed=not automatic or not previous or shape(previous)!=shape(result)
+                if changed:
+                    result.update(connection_id=cid,engine=doc['engine'],revision=doc['metadata_revision']+1,discovered_at=now(),changes=changes(previous,result))
+                    db.execute('INSERT INTO data_source_snapshots VALUES (?,?,?)',(cid,result['revision'],json.dumps(result)))
+                    doc['metadata_revision']=result['revision']
+                doc.update(connection_status='connected',profiling_status='ready',last_profiled_at=now(),last_error_code=None,last_error_message=None)
                 state='succeeded'
+            self.refresh.finished(db,cid,bool(failure),changed)
             doc['updated_at']=now();self.save(db,doc)
             db.execute('UPDATE data_source_profile_jobs SET state=?,token=NULL WHERE job_id=?',(state,job))
             row=db.execute('SELECT workspace,owner FROM data_source_connections WHERE connection_id=?',(cid,)).fetchone()
             db.execute('INSERT INTO data_source_audit VALUES (?,?,?,?,?,?)',('dba_'+secrets.token_hex(16),cid,*row,'profile_'+state,now()))
-            if not failure:self.relationships.enqueue(db,*row)
+            if changed:self.relationships.enqueue(db,*row)
         return True
 
 
@@ -236,6 +256,7 @@ class DataSourceWorker:
                 try:
                     worked=self.manager.tick()
                     worked=self.manager.relationships.tick() or worked
+                    worked=self.manager.semantic.tick() or worked
                     self.health.update(state='active',last_success=now(),last_error=None)
                 except Exception:
                     worked=False;self.health.update(state='failed',last_error='DATA_SOURCE_WORKER_FAILED')

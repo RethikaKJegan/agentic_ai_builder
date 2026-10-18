@@ -56,7 +56,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const controller = new AbortController();
   const abort = () => controller.abort();
   request.signal.addEventListener('abort', abort, { once: true });
-  const timeout = setTimeout(abort, route === 'workflows/plan' ? config.plannerTimeout : config.normalTimeout);
+  const timeout = setTimeout(abort, route === 'workflows/plan' ? config.plannerTimeout : route.startsWith('data-operations/') ? 125_000 : (route.startsWith('data-queries/') || route === 'knowledge-graph/records') ? 65_000 : config.normalTimeout);
   let streaming = false;
   const cleanup = () => { clearTimeout(timeout); request.signal.removeEventListener('abort', abort); };
   try {
@@ -66,6 +66,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       'x-hub-signature-256', 'x-slack-signature', 'x-slack-request-timestamp']) {
       const value = request.headers.get(key);
       if (value) headers.set(key, value);
+    }
+    if ((route === 'data-queries/jobs' || route === 'data-operations/prepare' || (route.startsWith('data-operations/') && route.endsWith('/recover'))) && request.method === 'POST') {
+      const key = request.headers.get('idempotency-key');
+      if (key) headers.set('idempotency-key', key);
     }
     const cookies = request.cookies.getAll().filter((cookie) => cookieNames.has(cookie.name));
     if (cookies.length) headers.set('cookie', cookies.map((c) => `${c.name}=${c.value}`).join('; '));

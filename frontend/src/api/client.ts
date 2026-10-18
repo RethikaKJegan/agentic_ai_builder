@@ -1,5 +1,10 @@
-import { relationshipViewSchema } from "./data-relationships";
+import { semanticViewSchema, recordGraphSchema } from "./semantic-kg";
+import { knowledgePreviewSchema, type KnowledgeSelection } from "./knowledge-graph";
+import { plannedQuerySchema, queryResultSchema, queryStatusSchema, queryJobSchema, queryJobListSchema } from "./data-queries";
+import { relationshipViewSchema, detailedViewSchema } from "./data-relationships";
+import { databaseOperationSchema, databaseOperationsSchema, databaseRecordSchema, type DatabaseStep } from "./data-operations";
 import { databaseConnectionSchema, databaseConnectionsSchema, databaseMetadataSchema, type DatabaseConfig } from "./data-sources";
+import { ontologySchema, refreshSchema } from "./data-ontology";
 import { safeError } from "./feedback";
 import { z } from "zod";
 import { assertWorkflowReferences } from "./control";
@@ -133,6 +138,107 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async knowledgeGraph(relationshipId?:string,body?:object) {
+    const value=await this.read(relationshipId?`knowledge-graph/review/${encodeURIComponent(relationshipId)}`:"knowledge-graph",relationshipId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
+    const parsed=semanticViewSchema.safeParse(value);
+    if(!parsed.success)return fail("INVALID_API_DATA","The semantic Knowledge graph response is invalid.");
+    return parsed.data;
+  }
+  async inferKnowledgeGraph() {
+    return semanticViewSchema.parse(await this.read("knowledge-graph/infer",{method:"POST"}));
+  }
+  async knowledgeRecords(body:object) {
+    const parsed=recordGraphSchema.safeParse(await this.read("knowledge-graph/records",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The actual-record graph response is invalid.");
+    return parsed.data;
+  }
+  async knowledgePreview(objective:string,selection?:KnowledgeSelection) {
+    const value=await this.read("knowledge-graph/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({objective,...(selection?{selection}:{})})});
+    const parsed=knowledgePreviewSchema.safeParse(value);
+    if(!parsed.success)return fail("INVALID_API_DATA","The Knowledge graph preview is invalid.");
+    return parsed.data;
+  }
+  async databaseOperations() {
+    return databaseOperationsSchema.parse(await this.read("data-operations"));
+  }
+  async databaseOperation(operationId:string) {
+    return databaseOperationSchema.parse(await this.read(`data-operations/${encodeURIComponent(operationId)}`));
+  }
+  async readDatabaseRecord(body: {connection_id:string;dataset_id:string;identity:Record<string,unknown>}) {
+    return databaseRecordSchema.parse(await this.read("data-operations/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}));
+  }
+  async prepareDatabaseOperation(steps:DatabaseStep[],key:string) {
+    return databaseOperationSchema.parse(await this.read("data-operations/prepare",{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":key},body:JSON.stringify({steps})}));
+  }
+  async executeDatabaseOperation(operationId:string) {
+    return databaseOperationSchema.parse(await this.read(`data-operations/${encodeURIComponent(operationId)}/execute`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true})}));
+  }
+  async recoverDatabaseOperation(operationId:string,key:string) {
+    return databaseOperationSchema.parse(await this.read(`data-operations/${encodeURIComponent(operationId)}/recover`,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":key},body:"{}"}));
+  }
+  async dataQueryStatus() {
+    const parsed=queryStatusSchema.safeParse(await this.read("data-queries"));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query configuration response is invalid.");
+    return parsed.data;
+  }
+  async planDataQuestion(question:string) {
+    const parsed=plannedQuerySchema.safeParse(await this.read("data-queries/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question})}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query plan response is invalid.");
+    return parsed.data;
+  }
+  async executeDataQuestion(planId:string) {
+    const parsed=queryResultSchema.safeParse(await this.read("data-queries/execute",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan_id:planId})}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query result response is invalid.");
+    return parsed.data;
+  }
+
+  async submitDataQueryJob(planId:string,key:string) {
+    const parsed=queryJobSchema.safeParse(await this.read("data-queries/jobs",{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":key},body:JSON.stringify({plan_id:planId})}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query job response is invalid.");
+    return parsed.data;
+  }
+  async dataQueryJobs() {
+    const parsed=queryJobListSchema.safeParse(await this.read("data-queries/jobs"));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query jobs response is invalid.");
+    return parsed.data;
+  }
+  async dataQueryJob(jobId:string) {
+    const parsed=queryJobSchema.safeParse(await this.read(`data-queries/jobs/${encodeURIComponent(jobId)}`));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query job response is invalid.");
+    return parsed.data;
+  }
+  async cancelDataQueryJob(jobId:string) {
+    const parsed=queryJobSchema.safeParse(await this.read(`data-queries/jobs/${encodeURIComponent(jobId)}/cancel`,{method:"POST"}));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query cancellation response is invalid.");
+    return parsed.data;
+  }
+  async dataQueryJobResult(jobId:string) {
+    const parsed=queryResultSchema.safeParse(await this.read(`data-queries/jobs/${encodeURIComponent(jobId)}/result`));
+    if(!parsed.success)return fail("INVALID_API_DATA","The query result response is invalid.");
+    return parsed.data;
+  }
+
+  async detailedGraph(nodeId?:string,body?:object) {
+    const value=await this.read(nodeId ? `data-relationships/v2/mapping/${encodeURIComponent(nodeId)}` : "data-relationships/v2",nodeId ? {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : undefined);
+    const parsed=detailedViewSchema.safeParse(value);
+    if(!parsed.success)return fail("INVALID_API_DATA","The detailed graph response is invalid.");
+    return parsed.data;
+  }
+
+  async ontology(relationshipId?:string,body?:object) {
+    const value=await this.read(relationshipId?`data-ontology/${encodeURIComponent(relationshipId)}`:"data-ontology",relationshipId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
+    const parsed=ontologySchema.safeParse(value);
+    if(!parsed.success)return fail("INVALID_API_DATA","The knowledge graph response is invalid.");
+    return parsed.data;
+  }
+
+  async dataRefresh(connectionId?:string,body?:object) {
+    const value=await this.read(connectionId?`data-refresh/${encodeURIComponent(connectionId)}`:"data-refresh",connectionId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
+    const parsed=refreshSchema.safeParse(value);
+    if(!parsed.success)return fail("INVALID_API_DATA","The automatic refresh response is invalid.");
+    return parsed.data;
+  }
+
   async relationships(action?: "build" | "review" | "annotation", itemId?: string, body?: object) {
     const path = action === "build" ? "data-relationships/build" : action ? `data-relationships/${action}/${encodeURIComponent(itemId ?? "")}` : "data-relationships";
     const parsed = relationshipViewSchema.safeParse(await this.read(path, action ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body ?? {})} : undefined));

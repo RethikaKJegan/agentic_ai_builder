@@ -71,7 +71,7 @@ export default function RelationshipMap({graph, selected, onSelect}: {graph: Gra
             const a = {x: source.x + (forward ? WIDTH / 2 : -WIDTH / 2), y: fieldY(edge.source_dataset_id, pair.source_field_id, source.y, source.height)};
             const b = {x: target.x + (forward ? -WIDTH / 2 : WIDTH / 2), y: fieldY(edge.target_dataset_id, pair.target_field_id, target.y, target.height)};
             const points = [a, ...route.points.slice(1, -1), b];
-            return <path key={`${edge.relationship_id}-${index}`} d={points.map((point, i) => `${i ? "L" : "M"} ${point.x} ${point.y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="1.5" strokeDasharray={edge.status === "proposed" ? "7 5" : undefined} markerEnd={`url(#${marker})`} markerStart={edge.kind === "suggested" ? `url(#${marker})` : undefined}><title>{layout.nodes.get(pair.source_field_id)?.label} {edge.kind === "declared" ? "references" : "matches name/type of"} {layout.nodes.get(pair.target_field_id)?.label} · {edge.status}</title></path>;
+            return <path key={`${edge.relationship_id}-${index}`} d={points.map((point, i) => `${i ? "L" : "M"} ${point.x} ${point.y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="1.5" strokeDasharray={edge.status === "proposed" ? "7 5" : undefined} markerEnd={`url(#${marker})`} markerStart={edge.kind === "suggested" ? `url(#${marker})` : undefined}><title>{layout.nodes.get(pair.source_field_id)?.label} {edge.kind === "declared" ? "references" : "has a suggested link to"} {layout.nodes.get(pair.target_field_id)?.label} · {edge.status}</title></path>;
           });
         })}
         {layout.datasets.map(node => {
@@ -101,7 +101,7 @@ export default function RelationshipMap({graph, selected, onSelect}: {graph: Gra
           return <g key={edge.relationship_id} transform={`translate(${route.x},${route.y})`} className="pointer-events-none">
             <rect x="-140" y={-route.height / 2} width="280" height={route.height} rx="6" className="fill-background stroke-primary/30"/>
             <text textAnchor="middle" fontSize="11" className="fill-foreground">
-              <tspan x="0" y={-route.height / 2 + 16}>{edge.kind === "declared" ? "references" : "matches name/type (unverified)"} · {edge.status}</tspan>
+              <tspan x="0" y={-route.height / 2 + 16}>{edge.kind === "declared" ? "references" : "metadata link (unverified)"} · {edge.status}</tspan>
               {edge.field_pairs.map((pair, index) => <tspan key={index} x="0" dy="19">{clip(layout.nodes.get(pair.source_field_id)?.label ?? "", 19)} {edge.kind === "declared" ? "→" : "↔"} {clip(layout.nodes.get(pair.target_field_id)?.label ?? "", 19)}</tspan>)}
             </text>
           </g>;

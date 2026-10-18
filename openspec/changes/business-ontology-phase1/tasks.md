@@ -1,0 +1,5 @@
+- [x] Add versioned ontology projection, review persistence and protected APIs.
+- [x] Add owned refresh settings, bounded scheduling and unchanged-check handling.
+- [x] Add business ontology canvas, evidence inspector and refresh controls.
+- [x] Verify contracts, focused backend/frontend regressions and desktop/mobile browser flows.
+- [x] Deploy verified build retaining older assets; record live checks and UI acceptance steps.

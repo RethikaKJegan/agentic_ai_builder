@@ -67,7 +67,7 @@ class ConnectorTests(unittest.TestCase):
                       {'mimeType': 'application/pdf', 'filename': 'quote.pdf', 'body': {'attachmentId': 'att_1', 'size': 4}}]}}
 
     def test_catalog_uses_unchanged_contract(self):
-        self.assertEqual(len(CATALOG), 19)
+        self.assertEqual(len(CATALOG), 20)
         for definition in CATALOG.values():
             validate(definition, 'tool')
             self.assertEqual(definition['retry_policy']['max_retries'], 0)

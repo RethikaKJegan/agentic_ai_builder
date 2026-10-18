@@ -69,6 +69,8 @@ class GoogleTools:
     @contextmanager
     def planning(self, auth, context):
         identifier=context.get(KEY) if isinstance(context,dict) else None
+        if not identifier and hasattr(self.manager,'workflow_default'):
+            identifier=self.manager.workflow_default(auth)
         if identifier:
             with self.service.store.transaction(write=False) as db:
                 self.validate({'metadata':{KEY:identifier}},auth,db)
@@ -123,7 +125,7 @@ class GoogleTools:
         # ScopedConnector delegates __getattr__; construct it explicitly instead of copy's reconstruction hooks.
         from .procurement import ScopedConnector
         if isinstance(connector,ScopedConnector):
-            return ScopedConnector(self.adapt(connector.connector,token,tool_id),connector.procurement,connector.workflow)
+            return ScopedConnector(self.adapt(connector.connector,token,tool_id),connector.procurement,connector.workflow,connector.action_approval)
         bound=copy(connector)
         if hasattr(connector,'connector'):
             bound.connector=self.adapt(connector.connector,token,tool_id)

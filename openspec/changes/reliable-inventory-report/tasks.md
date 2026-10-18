@@ -1,0 +1,4 @@
+- [x] Implement deterministic report assembly, bounded ranking and source-binding feedback.
+- [x] Enforce Google action approvals at validation and connector boundaries.
+- [x] Verify planner/source/ranking/runtime/Google handoffs with offline providers.
+- [x] Activate tested changes; check readiness without creating a workflow or executing external actions.

@@ -1,0 +1,3 @@
+- [x] Restore manual relationship review in Inspect with current revision and permission guards.
+- [x] Verify ambiguous/needs-review correction and desktop interaction.
+- [x] Build and deploy the frontend only, preserving backend and configuration.

@@ -1,0 +1,3 @@
+- [x] Simplify graph UI and enforce connection-local edge/source rendering.
+- [x] Verify filters, regeneration, automatic refresh and absence of removed controls on desktop/mobile.
+- [x] Build and activate the frontend without changing backend behavior or workflow KG retrieval.

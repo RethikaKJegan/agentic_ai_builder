@@ -1,5 +1,21 @@
 # Handoff — Harihar
 
+## Original-plan Phase 3 source selection — 18 October 2026 (IST)
+
+Questions now consumes current confirmed business mappings and shows a
+server-derived selected-source preview with full paths, required field purposes,
+eligible linking pairs and an inspectable highlighted graph. Successful results
+carry the executed logical plan separately from the review preview. Queries-v1
+gains optional selection_preview/executed_plan metadata; model query-intent and
+workflow/agent/tool contracts are unchanged. Old plans/jobs remain compatible.
+
+Implementation and acceptance steps: `docs/prompt-source-selection-phase3.md`.
+Fresh evidence and limitations:
+`openspec/changes/prompt-source-selection-phase3/verification.md`. Workspace-only
+delivery; no deployment, live model/cloud validation, external notification or
+contributor contract acceptance is inferred. Existing Google/procurement behavior
+and Praxi files were not modified.
+
 ## Slack-to-Gmail publication diagnosis — 2026-10-10
 
 Publication failures now include safe, structured setup requirements, rendered in the existing editor error panel. Unresolved requirements still prevent approval and publication; this change creates no registry grants or active automation. Regression coverage verifies the rejected revision remains validated without authorization references. Verification: 116 Python tests, 62 frontend tests, production Next.js build, TypeScript and ESLint PASS.
@@ -83,3 +99,235 @@ The broader legacy browser suite was also attempted on isolated ports: 1/8 passe
 Use `scripts/run_live_backend.py` on 8000 and launch Next with BUILDER_API_URL=http://127.0.0.1:8000. The existing Overview Sheet URL field and objective drive live planning; Publish validates, approves the revision and activates its trigger metadata. The launcher creates no workflow. Runtime email approval remains a separate human action in Runs/Approvals. Supported descriptive node configuration now survives editor saving without an unsupported-runtime error.
 
 63 frontend tests, typecheck, lint and production build passed; both focused approval browser scenarios passed with a mocked API. 135 Python tests and a synthetic live-model DAG run separately verify actual orchestration. Earlier broad browser failures remain recorded. Complete prompt/startup instructions: `docs/sheets-gmail.md`. No contributor acceptance is inferred.
+
+
+## Data Intelligence Phase 5 — 2026-10-17
+
+Delivered bounded federated PostgreSQL fact aggregation with PostgreSQL/MongoDB dimensions, complete pre-filter join checks, exact weighted aggregate merging, native average finalization and per-fragment UI evidence. Data-query contracts add the federated strategy and optional execution fragments; workflow/agent/tool contracts are unchanged. Existing ownership, management/read permissions, expiry, freshness, no-result-history and source review rules remain. Unsupported shapes retain bounded fallback; separate databases have no atomic shared snapshot. See `docs/cloud-federation-phase5.md` for exact support and limits.
+
+Verification: 137 backend tests, 68 focused frontend/domain tests, four desktop/mobile browser fixture scenarios, types/lint/production build/contracts/strict OpenSpec passed. Deployed public real-model acceptance matched all eight cross-source category sales totals and weighted averages against independent SQL/category reads, with 2,155 fact rows and two strict joins. Live native average over 77 products also matched. Backend/frontend/worker active; no cloud data, credentials or review decisions changed. This records delivery evidence, not contributor acceptance or external notification.
+
+
+## Data Intelligence Phase 6 — 2026-10-18
+
+Delivered owned durable query jobs, shared-store claims, attempt/lease fencing, current-authority checks, progress, cancellation, one fresh recovery attempt and encrypted results retained for 15 minutes. Job/plan metadata lasts up to 24 hours. The Questions UI restores jobs after refresh, clears expired rows and preserves submission keys across uncertain responses. The production proxy forwards the exact query-job idempotency header. Worker supervision includes DataQueryJobs; API-only mode does not consume jobs. Existing synchronous execution remains compatible with its prior bound.
+
+Data-query contracts add query-jobs-v1 and optional status/canonical envelope metadata; workflow/agent/tool contracts are unchanged. Default absolute job budget is 180 s from submission (configurable 45–300), also bounded by plan expiry; existing source/statement/precision/transfer budgets remain. This deployment retains its server-configured development identity, not newly implemented production IAM. See `docs/cloud-query-jobs-phase6.md` for exact behavior and limitations.
+
+Verification: 178 backend tests, 103 focused frontend/domain/proxy tests, ten desktop/mobile browser fixture checks, types/lint/build/contracts/strict OpenSpec pass. Isolated tests cover real PostgreSQL cancellation, killed-worker recovery, PostgreSQL-store competing claims, cancellation/publication races and encrypted expiry. Live public federation matched eight independent category sales sums/weighted averages across 2,155 order details; the same job/result survived API restart/browser refresh. A second live active job cancelled without result rows. Services active. No connected cloud rows, credentials or relationship review decisions changed; job/plan/audit writes were normal authorized query metadata. This records evidence, not contributor acceptance or external notification.
+
+## Mobile startup deployment correction — 2026-10-18
+
+Reproduced the reported skeleton in mobile WebKit using the actual prior build's HTML: five JavaScript chunks returned 404 after build replacement. Restored 213 missing assets from available rollback builds without changing any current asset bytes, and restarted only the frontend. The identical old page then hydrated with no errors. Fresh desktop Chromium/mobile Chromium/mobile WebKit passed content, refresh, navigation and Questions with no final errors or overflow. Four asset-retention tests, contracts and strict OpenSpec passed. Future builds must retain the active build's static files before activation using `scripts/retain_frontend_assets.py`; see `docs/mobile-startup-assets.md` and frontend README. The physical phone's cache was not inspected. No app source, server bundle, contracts, credentials or business data changed; no contributor acceptance or external notification is inferred.
+
+## Remaining-scope Phase 1: detailed knowledge graph — 2026-10-18
+
+Delivered a versioned v2 metadata projection with database/schema containment,
+reviewable shared business concepts/roles, evidence qualifications and conservative
+Mongo reference suggestions. Existing v1 IDs/API/query consumers remain compatible.
+Entity reviews are owned, audited, revision-checked, fingerprinted and marked
+needs-review when structural evidence changes. Confirmation grants no join/tool
+authority. The UI retains the original map and adds technical/business exploration,
+details, focused filters and reviews. See `docs/knowledge-graph-completion-phase1.md`.
+
+194 backend, 41 Google/procurement, 121 frontend/domain/proxy tests and 16 browser
+fixture scenarios passed; types/scoped lint/build/contracts/OpenSpec passed.
+Live desktop/mobile Chromium and mobile WebKit navigated/refreshed the real graph
+without errors or overflow. Existing reviews/IDs were preserved; all 33 business
+mappings remain suggested. Only a derived metadata rebuild was requested live;
+no cloud reads/writes, model calls or user review decisions were submitted.
+Deployment retains previous static assets; services active. Source-selection,
+workflow CRUD integration, EDA/reset and physical iPhone acceptance remain later
+work. This records delivery evidence, not contributor acceptance.
+
+## Detailed graph build feedback correction — 2026-10-18
+
+Fixed frozen parent build status and delayed detailed refresh. The detailed view
+publishes accepted status, refreshes immediately after build requests, polls active
+builds at one second and idle views at six seconds, and preserves navigation.
+Backend inference, source data, permissions and canonical contracts unchanged.
+Verification: 124 frontend/domain/proxy tests, 16 production browser scenarios,
+types/lint/build/contracts/drift checks passed. Live desktop Chromium/mobile
+Chromium/mobile WebKit builds became visible in 3.462/2.466/2.519 seconds without
+reload, page errors or missing chunks. Frontend-only deployment retained old assets;
+backend/worker not restarted. Physical iPhone testing remains separate. No external
+notification or downstream contributor acceptance is claimed.
+
+## Original-plan Phase 2 source navigation — 18 October 2026 (IST)
+
+Completed the detailed graph's entity source paging and source-qualified clickable
+relationship fields. All entity mappings are now inspectable from the entity in
+100-item pages; same-entity refresh preserves expansion. Read-only/historical
+navigation works while edits remain disabled. Existing graph backend, contracts,
+IDs, reviews and query behavior are unchanged.
+
+Fresh checks: 85 backend, 124 frontend/domain/proxy tests, 16 production Chromium
+desktop/mobile browser fixture scenarios, TypeScript, scoped lint, isolated build,
+contracts/drift, strict OpenSpec and whitespace passed. Workspace implementation
+only; no deployment/restart or cloud/provider operations. Evidence and limits:
+`openspec/changes/knowledge-graph-phase2-navigation/verification.md`. No external
+notification or contributor acceptance is inferred.
+
+
+## Original-plan Phase 4 controlled CRUD — 18 October 2026 (IST)
+
+Added policy-scoped PostgreSQL/MongoDB point CRUD, actual Registry controller/tool
+bindings and approval fingerprints, encrypted prepared evidence, current-authority
+guards, durable no-replay claims and reviewed compensation. The Operations UI
+supplies explicit review, counts, history and guarded recovery. Workflow/agent/tool
+contracts remain unchanged; the additive operations-v1 schema governs console
+requests and policy. Generated workflow wiring remains original-plan Phase 5.
+
+Evidence: 215 backend regressions without skips, final 30 native CRUD tests
+(overlapping the broader run), 134 frontend tests and 30 desktop/mobile browser
+fixture scenarios; types/lint/build/contracts/drift/strict OpenSpec passed.
+See `openspec/changes/controlled-database-crud-phase4/verification.md` and
+`docs/controlled-database-crud-phase4.md`. Workspace implementation only: no deploy,
+restart, live cloud writes, credential changes or policy activation. Cross-source
+groups can partially commit; uncertain outcomes cannot be replayed. No contributor
+acceptance or external notification is claimed.
+
+
+Phase 4 activation follow-up — 18 October 2026: user authorized the running-app
+release. Verified build zQFwuMLj3YJulWO9QmS8i and the Atlas-only phase4_records
+policy are active; Builder API/frontend/worker restarted successfully. All 319
+previous static assets remain unchanged. Four real local/public desktop/mobile
+Chromium Operations/reload checks passed without errors or mutations. Existing
+authentication/origin settings remain; individual production IAM is not added.
+No cloud CRUD, model request or workflow execution was initiated by acceptance.
+Rollback/evidence: .local/phase4-crud/activation/. See Phase 4 verification notes.
+
+
+## Original-plan Phase 5 database workflows — 18 October 2026 (IST)
+
+Implemented trusted graph/source planning context, pinned workflow source scope,
+actual Registry database tools, bounded query/record reads and run-linked prepared
+CRUD with immediate owner approval before commit. Preparation and provenance are
+atomic; console execution refuses workflow-owned operations. Stable delegation can
+read/prepare; fixed graph nodes commit. Workflow details, Execution and Approvals
+show planned sources, current previews and actual source/count/handoff evidence.
+Configured existing Google tools compose through their existing boundaries.
+
+Evidence: 440 backend regressions; final provenance hardening rerun 54 overlapping
+native/HTTP tests; 41 focused UI tests; 34 desktop/mobile browser fixtures; build,
+types, lint, contracts/drift and strict OpenSpec passed. Full frontend suite has
+279 passes and seven confirmed pre-existing failures, reproduced against the saved
+Phase 4 snapshot. See openspec/changes/database-workflow-integration-phase5/verification.md
+and docs/database-workflow-integration-phase5.md for evidence, scope and limits.
+
+Local implementation only: Phase 4 remains running; no deploy/restart, cloud CRUD,
+Google action, credential/policy change or live model call. Owner manual workflows
+are supported; automation and independent credential delegation remain denied. No
+external notification or contributor acceptance is inferred.
+
+## Two-phase KG improvement: Phase 1 — 18 October 2026 (IST)
+
+Added Business ontology entity canvas, source/evidence inspector, independent
+predicate/direction review and per-connection automatic metadata refresh UI.
+Backend reuses owned metadata, entity mappings and leased profiling/graph workers;
+unchanged automatic checks preserve source/graph versions. New ontology-v1 and
+refresh-v1 contracts are additive and do not change executable join authority.
+
+Deployed build 7XQosrkQgXqVcqcxKZPSD retaining 332 older assets. Verification:
+180 backend passes with three additional skips, 140 frontend passes, 36 production
+browser fixtures and four real local/public desktop/mobile Chromium checks.
+Both cloud sources completed automatic profiles without changing their revision 8
+or graph revision 41. No cloud writes, messages or live model calls. Phase 2
+retrieval remains separate. Scope/tests: docs/business-ontology-phase1.md and
+openspec/changes/business-ontology-phase1/verification.md. No contributor acceptance
+or external notification is inferred. Rollback: .local/ontology-phase1/activation/.
+
+## Two-phase KG improvement: Phase 2 — 18 October 2026 (IST)
+
+Renamed the visible Business ontology view to Knowledge graph. Added an owned
+metadata inverted index, authenticated source preview, ranked reasons/coverage,
+explicit ambiguity handling, bounded technical path expansion, reviewed-revision
+checks before planning, task source assignments and persisted retrieval evidence.
+The selected subgraph and actual configured Registry tools are visible before a
+model call. Execution scope, query validators, database write policy and Google
+approval boundaries remain authoritative; legacy API/review IDs are compatible.
+
+Verified 154 saved datasets narrow to one model source and scoped execution
+freshness remains valid. Native workflow/query/approval regressions and existing
+data UI flows pass; exact evidence and limits are recorded in
+openspec/changes/knowledge-graph-retrieval-phase2/verification.md and
+docs/knowledge-graph-phase2.md. Retrieval is lexical over saved metadata, not an
+embedding service or unrestricted semantic reasoning; current ingestion limits
+and a four-source execution scope remain explicit.
+
+Deployed build QCWDXZvX-tP8HfUkJBzCP with 356 retained prior assets. Existing
+scheduled procurement work was gracefully drained before restart and scheduling
+resumed afterward. Credentials and write-policy configuration hashes are
+unchanged. No cloud writes, Google actions or model calls were initiated by
+release acceptance. Rollback backup/assets: .local/kg-phase2/activation/.
+Praxi untouched; no external notification or contributor acceptance is inferred.
+
+## Essential Knowledge graph controls — 18 October 2026
+
+Status: ready-for-handoff; owner acceptance pending. Knowledge graph tab now has
+regeneration, automatic refresh, connection/search/status filters and graph
+navigation only. Record exploration, review/edit panels and duplicate graph/mode
+controls removed from the tab; services remain compatible. Single-connection
+edges require both physical datasets in that connection. All-connections view
+retains cross-database links. Agent retrieval remains unchanged and independent
+of the display filter. Verification: 11 focused UI tests, 8 desktop/mobile browser
+checks, typecheck/lint/build and read-only live browser checks. Frontend build
+iqRTeb3DiyEQ8QX3iG2it deployed; backend/worker PIDs and configuration unchanged.
+See openspec/changes/simplify-knowledge-graph/verification.md for evidence and the
+corrected deployment health-check rollback. No external actions were executed.
+
+### Read-only desktop KG inspector restored — 18 October 2026
+
+Per owner correction, restored only the Inspect sidebar with node/edge mouse and
+keyboard selection. Shows source metadata and actual semantic/structural evidence
+traces; filters scope details and hide excluded selections. Editing/record modes
+remain hidden; no backend or planner change. Verified 7 focused UI tests, 4 desktop
+browser checks, typecheck/lint/build and live read-only desktop inspection. Build
+RqUpt8VvfotOSokER1pp5 deployed, backend/worker PIDs/config unchanged. Evidence:
+openspec/changes/restore-kg-inspector/verification.md. Owner acceptance pending.
+
+### Manual relationship correction in Inspect — 18 October 2026
+
+Restored only business relationship review (label/direction, confirm/reject/reset)
+in Inspect, including ambiguous/needs-review edges. Uses existing guarded semantic
+review API/current revision; stale/read-only sessions disabled and polling guarded
+during save. No backend, planner or technical permission change. Verified 11 unit
+tests, 4 desktop browser checks, typecheck/lint/build and live form enablement
+without saving a real label. Frontend EleW6dZe9YkaYwp8yE9N- live; backend/worker
+PIDs/config unchanged. Evidence: openspec/changes/restore-kg-manual-review/verification.md.
+Owner acceptance pending. Record/technical-edit modes remain hidden.
+
+### Presentation-focused EDA tab — 18 October 2026
+
+Added desktop metadata overview with metric cards, field-type donut, dataset field
+comparison, KG statuses and discovery coverage. Per-connection/combined scope,
+manual refresh and automatic reload on metadata-revision/connection changes.
+Uses saved metadata/KG GET APIs only; no record scans, fake statistics, backend
+job or planner change. Empty and partial/unavailable states included. Verified
+6 focused tests, 5 desktop browser checks, typecheck/lint/build and read-only live
+metadata dashboard. Frontend cj3GVmZYbrPPxcDPi-qwG deployed; backend/worker
+PIDs/config unchanged. Evidence: openspec/changes/data-intelligence-eda/verification.md.
+Owner acceptance pending. Usage/scope: docs/data-intelligence-eda.md.
+
+## Automatic KG selection on prompt submission — 18 October 2026
+
+Status: ready-for-handoff, owner acceptance pending. Removed mandatory Overview
+source preview, KG checkboxes, account picker and extra review/open click. Existing
+model receives a bounded owned KG candidate pool and chooses one-to-four source IDs;
+server validates/pins actual choices. Explicit preview API remains compatible.
+Owned-source, join, stale evidence, write approval and scope guards preserved.
+Existing unsaved browser edits are kept while opening the saved workflow directly.
+No automatic external execution or arbitrary Google account substitution.
+
+Evidence: backend 21/34 and planner 27 overlapping tests, 27 frontend tests,
+3 desktop browser cases, typecheck/lint/build and strict OpenSpec. Build
+0kxH3ezt3GIh5mNoVJwht live, config hashes unchanged. Real Northwind generation
+without manual selection succeeded: 12 candidates → products/suppliers/categories
+(3 sources, PostgreSQL + MongoDB), no unresolved requirements. Proposal only;
+no workflow actions executed. Full evidence and limits:
+openspec/changes/automatic-kg-planning/verification.md.
+
+
+## Fresh manual Run intent — 18 October 2026
+
+Fixed RunWorkflowDialog reusing the global payload-based execution key and permanently returning an older terminal run. Each new dialog now supplies its own key while retries/double-clicks inside that dialog preserve idempotency. Focused UI tests 3 passed; typecheck, scoped lint, contracts, strict OpenSpec and isolated production build passed. A broader UI file retains one pre-existing missing-useNavigate mock failure, with 24 passing tests. Frontend activation retains prior assets and leaves backend/worker/configuration unchanged. No workflow or external action was executed by verification. See openspec/changes/fresh-manual-run-intent/verification.md.
