@@ -19,11 +19,12 @@ export async function createWorkflow(payload: Payloads["plan_workflow"], client:
   }
 
   try {
+    const initial = { ...planned.workflow, version: 1, status: "draft" as const };
     const saved = await client.request("save_workflow_version", {
       workflow_id: planned.workflow.workflow_id,
-      workflow_version: planned.workflow.version,
+      workflow_version: 1,
       base_version: 0,
-      workflow: planned.workflow,
+      workflow: initial,
     });
     return { ...saved, existing: false };
   } catch (error) {

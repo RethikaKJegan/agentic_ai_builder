@@ -2,13 +2,13 @@
 1 info using npm@10.9.9
 2 info using node@v22.23.3
 3 silly config load:file:/home/raf/.nvm/versions/node/v22.23.3/lib/node_modules/npm/npmrc
-4 silly config load:file:/home/raf/agentic-ai-builder/.local/kg-essential/frontend/.npmrc
+4 silly config load:file:/home/raf/agentic-ai-builder/.local/google-marketplace-ui/.npmrc
 5 silly config load:file:/home/raf/.npmrc
-6 silly config load:file:/home/raf/agentic-ai-builder/.local/kg-essential/frontend/etc/npmrc
-7 verbose title npm run build
-8 verbose argv "--prefix" ".local/kg-essential/frontend" "run" "build"
-9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T10_19_18_149Z-
-10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T10_19_18_149Z-debug-0.log
+6 silly config load:file:/home/raf/agentic-ai-builder/.local/google-marketplace-ui/etc/npmrc
+7 verbose title npm run typecheck
+8 verbose argv "--prefix" ".local/google-marketplace-ui" "run" "typecheck"
+9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T17_04_43_734Z-
+10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T17_04_43_734Z-debug-0.log
 11 silly logfile start cleaning logs, removing 1 files
 12 silly logfile done cleaning log files
 13 verbose cwd /home/raf/agentic-ai-builder

@@ -23,6 +23,38 @@ class RetryableInvocation(RuntimeFailure):
 
 
 class GraphRunner:
+    def invoke_agent_with_feedback(self, adapter, binding, params, run_id, auth, worker, workflow, node, reference):
+        from shared.llm_feedback import correct_once
+        def invoke(item):
+            agent = deepcopy(binding)
+            if item:
+                agent['_validation_feedback'] = item
+            output = adapter.invoke(agent, params, reference)
+            if list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
+                raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
+            return output
+        def prepare(item):
+            if getattr(adapter, 'external_write', False):
+                return False
+            with self.runtime.store.transaction() as db:
+                run = self.runtime.load(db, run_id, auth, 'workflow.execute')
+                if run['status'] != 'running' or run.get('worker') != worker:
+                    raise RuntimeFailure('DELEGATION_INTERRUPTED', 'The run no longer owns model execution.')
+                self.runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
+                if self.runtime.clock()-run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
+                    raise RuntimeFailure('RUN_TIMEOUT', 'The run duration is exhausted.')
+                if any(run['usage'].get(group, {}).get('llm_calls', 0) >= limits['max_llm_calls']
+                       for group, limits in ((binding['agent_id'], binding['limits']),
+                                             ('workflow', workflow['execution_policy']['limits']))):
+                    return False
+                amount = adapter.reservation(binding)
+                amount['llm_calls'] = 1
+                self.reserve(db, run, workflow, binding, amount)
+                self.runtime.event(db, run, 'agent.correction', {'node_id': node['node_id'],
+                    'agent_id': binding['agent_id'], 'attempt': 1, 'validation_feedback': [item]})
+                self.runtime.save(db, run)
+        return correct_once(invoke, prepare)
+
     def __init__(self, runtime, agents=None, connectors=None, direct_write_tools=()):
         self.runtime = runtime
         self.agents, self.connectors = agents, connectors or {}
@@ -119,6 +151,8 @@ class GraphRunner:
                     raise RuntimeFailure('AGENT_TIMEOUT', 'The agent execution duration budget is exhausted.')
             usage = run['usage'].get(name, {})
             for key, value in amount.items():
+                if key in {'tokens', 'estimated_cost_usd'} and not self.runtime.enforce_usage_budgets:
+                    continue
                 if usage.get(key, 0) + value > limits.get(counters[key], 0):
                     raise RuntimeFailure('BUDGET_EXHAUSTED', 'The next invocation exceeds an execution budget.')
         for name, _ in groups:
@@ -326,6 +360,9 @@ class GraphRunner:
                 try:
                     if kind == 'agent' and node['node_id'] in workflow['metadata'].get('dynamic_delegation', {}):
                         output = DelegationSession(self, run_id, auth, worker, workflow, node, agent, params).execute()
+                    elif kind == 'agent':
+                        output = self.invoke_agent_with_feedback(adapter, binding, params, run_id, auth, worker,
+                                                                 workflow, node, run['run_id'] + ':' + node['node_id'])
                     else:
                         output = adapter.invoke(binding, params, run['run_id'] + ':' + node['node_id'])
                     if kind == 'agent' and list(Draft202012Validator(agent['output_schema']).iter_errors(output)):

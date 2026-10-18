@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import tempfile
 import unittest
+import time
 from urllib.parse import urlparse, parse_qs, unquote
 from connector_extension.catalog import CATALOG
 from connector_extension.common import EffectJournal
@@ -66,19 +67,42 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(rows[2]['values'][0], {'userEnteredValue': {'stringValue': '=literal'}})
         self.assertEqual(rows[1]['values'][2], {'userEnteredValue': {'boolValue': True}})
         self.assertEqual(rows[1]['values'][3], {})
-    def test_repeated_run_does_not_duplicate_and_changed_data_is_denied(self):
-        first = self.invoke(); second = self.invoke(effect='run_two')
+    def test_repeated_action_does_not_duplicate_and_changed_data_is_denied(self):
+        first = self.invoke(); second = self.invoke()
         self.assertEqual(first['spreadsheet_id'], second['spreadsheet_id']); self.assertTrue(second['reused'])
         changed = deepcopy(self.inputs); changed['tabs'][0]['rows'][0][1] = 7
         with self.assertRaises(RuntimeFailure) as error: self.invoke(changed)
         self.assertEqual(error.exception.code, 'EFFECT_REFERENCE_MISMATCH'); self.assertEqual(self.http.write_count, 1)
+    def test_new_run_with_changed_findings_creates_a_separate_report(self):
+        first = self.invoke()
+        changed = deepcopy(self.inputs); changed['tabs'][1]['rows'][0][0] = 'New public finding'
+        second = self.invoke(changed, effect='run_two')
+        self.assertNotEqual(first['spreadsheet_id'], second['spreadsheet_id'])
+        self.assertEqual(self.http.write_count, 2)
+        self.assertEqual(self.invoke(changed, effect='run_two')['spreadsheet_id'], second['spreadsheet_id'])
+        self.assertEqual(self.http.write_count, 2)
+    def test_new_revision_cannot_collide_even_with_the_same_action_reference(self):
+        first = self.invoke()
+        self.workflow['version'] = 2
+        self.assertNotEqual(first['spreadsheet_id'], self.invoke()['spreadsheet_id'])
+    def test_legacy_completed_report_is_preserved_and_does_not_block_new_runs(self):
+        connector = self.connector()
+        legacy = super(ReportSheetsSetup, connector).execute(grant(TOOL), self.inputs, 'legacy', time.monotonic()+30)
+        changed = deepcopy(self.inputs); changed['tabs'][0]['rows'][0][1] = 9
+        fresh = self.invoke(changed)
+        self.assertNotEqual(legacy['spreadsheet_id'], fresh['spreadsheet_id'])
+        self.assertEqual(self.http.books[legacy['spreadsheet_id']]['sheets'][0]['business_rows'][0][1], 2)
+        self.assertEqual(connector.reconcile(self.inputs, legacy['spreadsheet_id'])['spreadsheet_id'], legacy['spreadsheet_id'])
+    def test_empty_action_reference_is_rejected_before_io(self):
+        with self.assertRaises(RuntimeFailure):self.invoke(effect='')
+        self.assertEqual(self.http.write_count, 0)
     def test_readback_failure_requires_reconciliation_and_never_recreates(self):
         self.http.fail_verification = True
         with self.assertRaises(Exception): self.invoke()
         self.http.fail_verification = False
         with self.assertRaises(RuntimeFailure) as error: self.invoke()
         self.assertEqual(error.exception.code, 'UNKNOWN_INVOCATION_RESULT')
-        result = self.connector().reconcile(self.inputs, 'created_1')
+        result = self.connector().reconcile(self.inputs, 'created_1', effect_id='run_one')
         self.assertEqual(result['written_rows'], 3); self.assertEqual(self.http.write_count, 1)
         self.assertTrue(self.invoke()['reused'])
     def test_external_edits_are_not_overwritten(self):

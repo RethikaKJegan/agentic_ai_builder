@@ -49,6 +49,8 @@ class PlannerService:
                 context = context_resolver(context)
             reject_sensitive(context)
             workflow = self.provider.generate(objective.strip(), context)
+            # Planning proposes content, never server revision history.
+            workflow['version'], workflow['status'] = 1, 'draft'
             from workflow_api.database_workflows import bind_generated
             bind_generated(workflow, context)
             reject_sensitive(workflow)

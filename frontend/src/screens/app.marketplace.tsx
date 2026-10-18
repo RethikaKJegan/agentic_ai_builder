@@ -1,5 +1,5 @@
 "use client";
-import { useRouteSearch } from "@/lib/navigation";
+import { Link, useRouteSearch } from "@/lib/navigation";
 import { useNavigate } from "@/lib/navigation";
 import { useMemo, useState } from "react";
 import { Bot, Building2, Check, Plug, Search, ShieldCheck, Workflow as WfIcon } from "lucide-react";
@@ -59,7 +59,7 @@ export default function Marketplace() {
     <div className="flex h-full flex-col lg:flex-row">
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-10">
         <h1 className="text-3xl font-semibold">Marketplace</h1>
-        <p className="mt-2 text-sm text-muted-foreground">A curated library. Templates and agents become editable local drafts. Connector setup is awaiting backend integration.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Discover tools here and connect your accounts in Integrations. Templates and agents become editable local drafts.</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">
@@ -76,6 +76,7 @@ export default function Marketplace() {
           ))}
         </div>
 
+        {kind === "tool" && <Link to="/app/integrations" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"><Plug className="h-4 w-4" />Connect Google</Link>}
         {list.length === 0 ? (
           <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">No assets match. Try a different search or category.</p>
         ) : (
@@ -83,7 +84,7 @@ export default function Marketplace() {
             {list.map((a) => {
               const Icon = KIND_ICON[a.kind];
               return (
-                <button key={a.id} onClick={() => navigate({ search: { asset: a.id } })} className={`flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors ${sel?.id === a.id ? "bg-highlight" : "hover:bg-canvas"}`}>
+                <button key={a.id} onClick={() => a.kind === "tool" ? goTo({ to: "/app/integrations" }) : navigate({ search: { asset: a.id } })} className={`flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors ${sel?.id === a.id ? "bg-highlight" : "hover:bg-canvas"}`}>
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-accent bg-background text-primary"><Icon className="h-4 w-4" /></span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{a.name}</p>
@@ -104,6 +105,7 @@ export default function Marketplace() {
           <h2 className="mt-2 text-2xl font-semibold">{sel.name}</h2>
           <p className="mt-1 text-xs text-muted-foreground">by {sel.publisher} · {sel.domain}</p>
           <p className="mt-4 text-sm leading-relaxed">{sel.description}</p>
+          {sel.kind === "tool" && <Link to="/app/integrations" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"><Plug className="h-4 w-4" />Connect Google</Link>}
 
           {sel.kind === "workflow" && <TemplatePreview templateId={sel.ref} />}
           {sel.kind === "agent" && sel.agent && (

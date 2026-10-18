@@ -103,6 +103,15 @@ def draft():
 
 
 class LiveProviderTests(unittest.TestCase):
+    def test_usage_budget_policy_is_server_owned_and_defaults_to_enforcement(self):
+        self.assertTrue(self.service.runtime_runner.runtime.enforce_usage_budgets)
+        self.env['BUILDER_ENFORCE_USAGE_BUDGETS'] = '0'
+        app = self.make_app(database=self.path / 'uncapped.sqlite3')
+        self.assertFalse(app.state.workflow_service.runtime_runner.runtime.enforce_usage_budgets)
+        self.env['BUILDER_ENFORCE_USAGE_BUDGETS'] = 'invalid'
+        with self.assertRaises(ValueError):
+            self.make_app(database=self.path / 'invalid.sqlite3')
+
     def test_google_sheet_url_reference_and_invalid_hosts(self):
         resource = 'https://docs.google.com/spreadsheets/d/spreadsheet_test_1234567890/edit?gid=0#gid=0'
         self.assertEqual(google_spreadsheet_id(resource), 'spreadsheet_test_1234567890')

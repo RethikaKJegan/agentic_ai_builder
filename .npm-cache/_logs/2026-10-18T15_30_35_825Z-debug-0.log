@@ -5,10 +5,10 @@
 4 silly config load:file:/home/raf/agentic-ai-builder/frontend/.npmrc
 5 silly config load:file:/home/raf/.npmrc
 6 silly config load:file:/home/raf/agentic-ai-builder/frontend/etc/npmrc
-7 verbose title npm run test:e2e --config playwright.graph.config.ts e2e/knowledge-preview.spec.ts e2e/semantic-kg.spec.ts e2e/data-insights.spec.ts --grep desktop
-8 verbose argv "--prefix" "frontend" "run" "test:e2e" "--" "--config" "playwright.graph.config.ts" "e2e/knowledge-preview.spec.ts" "e2e/semantic-kg.spec.ts" "e2e/data-insights.spec.ts" "--grep" "desktop"
-9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T11_09_31_542Z-
-10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T11_09_31_542Z-debug-0.log
+7 verbose title npm run typecheck
+8 verbose argv "--prefix" "frontend" "run" "typecheck"
+9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T15_30_35_825Z-
+10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-10-18T15_30_35_825Z-debug-0.log
 11 silly logfile start cleaning logs, removing 1 files
 12 silly logfile done cleaning log files
 13 verbose cwd /home/raf/agentic-ai-builder

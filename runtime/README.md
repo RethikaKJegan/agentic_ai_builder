@@ -1,5 +1,24 @@
 # Rethika runtime
 
+## One validation correction for model output
+
+Workflow generation keeps its existing two-attempt limit. The second attempt gets
+rule codes, field/hints and the secret-checked previous draft. Runtime coordinator,
+specialist and ordinary agent model calls can correct invalid JSON/output once.
+Model-proposed handoff/tool inputs are checked before dispatch. Corrections receive
+safe validation metadata and preserve original inputs; ordinary strict input
+schemas receive feedback through temporary model instructions instead.
+
+Each runtime correction rechecks authority/deadlines, reserves another call and
+records `agent.correction` with code/hint in the run events. A remaining reviewed
+allowance is required: exhausted call ceilings keep the original validation
+failure, and other exhausted budgets stop before the correction. Failed calls keep
+conservative usage reservations. The loop does not replay tools, Google writes,
+approval or authorization denials, provider failures or uncertain external effects.
+If the second output is invalid, execution stops; feedback is not a guarantee of
+model compliance. No private reasoning, rejected runtime response text or secrets
+are included in feedback.
+
 ## Prompt-selected sheet writes
 
 Phase 1 record saves now use `metadata.sheet_write_targets` from the generated, reviewed workflow revision. A user enters spreadsheet IDs/URLs, tab ranges, stable ID columns and desired output columns in the setup prompt; the editor's Sheet write access panel shows the generated scope before publication. No per-spreadsheet environment configuration is required. Each target contains spreadsheet_id, range, identity_column, writable_columns and allow_create. See `docs/sheet-drafts-phase1.md`.
@@ -180,3 +199,23 @@ For a real non-Sheets example, run `.venv-integrations/bin/python scripts/test_l
 Live evidence from 2026-10-11: run `run_4b3102485f88475fa26c7472e42b8c1c` completed with seven actual model calls and one GitHub tool call. The final checked update matched source metadata and corrected the claim that `octocat/Hello-World` was archived with default branch `main`: actual values were `archived=false` and `default_branch=master` at test time. This is live model/connector evidence for this specific scenario.
 
 Every actual decision/task reserves cumulative workflow and agent budgets, with per-call token/cost allocations bounded by reviewed limits. Intents and observations persist before model calls; exact revision/grants are revalidated around execution. Invalid batches, schema errors, unmet approvals and excessive tasks/rounds fail closed. Partially completed batches never automatically replay; interrupted executing parents block recovery. The communication diagram uses exact-run `agent.spawned` and task/result handoff events for ephemeral nodes, invocation UUIDs and bidirectional evidence. New generation gets a distinct identity from older static workflows for the same objective; existing saved workflows require regeneration or a reviewed conversion to use delegation.
+
+## Operator override for cumulative usage budgets
+
+Compiled inventory reports (`inventory_report_compiler=1`) with one research-only
+child and identical coordinator/child external-risk schemas wait for that child's
+validated result and forward it directly. This avoids an unnecessary coordinator
+control turn while public research is pending. Generic multi-agent workflows keep
+their existing synthesis loop. Research failure, invalid output, cancellation and
+current-revision authorization still stop execution before delivery actions.
+
+Set `BUILDER_ENFORCE_USAGE_BUDGETS=0` in the backend/worker environment and restart
+both processes to stop enforcing cumulative workflow/agent token and estimated
+cost caps. The default is `1` (enforced). Workflow inputs cannot change this policy.
+Existing reviewed revisions remain unchanged and need no republishing.
+
+Each model turn still has a finite token capacity from its registered agent.
+Model/tool call counts, delegation rounds/tasks, retry limits, timeouts, tool
+authorization, schema validation and Google-action approvals remain enforced.
+Reservations and confirmed usage remain in traces even with cumulative caps off.
+This setting does not remove provider context limits, quotas or billing limits.

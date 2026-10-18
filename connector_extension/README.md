@@ -139,6 +139,15 @@ All provider writes, including draft creation, require Registry publication revi
 
 After an uncertain result, inspect the provider using read tools and reconcile the action before deliberately starting another one. Do not erase journal entries to trigger a resend. Local Sheet locks coordinate only this extension's state directory; they do not coordinate other applications or separate extension installations. External Sheet edits can race a read/write; no distributed transaction or provider compare-and-swap is claimed.
 
+Report exports (`extension_sheets_create_report`) use the bound workflow namespace
+and runtime action reference (`run_id:node_id`) as well as project/creation key.
+Each fresh run creates a separate approved report. Retrying the same action with
+identical content reuses its verified receipt; changed content under that action
+still fails before mutation. Permanent spreadsheet setup retains its original
+project-level identity. To reconcile a new report, pass the original action
+reference as `effect_id` to `ReportSheetsSetup.reconcile`; omitting it addresses
+legacy report receipts. Existing journal entries and spreadsheets are preserved.
+
 Default state is separate: workflow history, effect intents, artifacts, credential refresh and Sheet locks remain under `.local/connector-extension`. `--state-dir` may choose only a subdirectory there. Permissions/grants are reconstructed by the existing Registry on restart. The launcher starts a runtime worker for manual runs and approval expiry; it does not start existing customer reply/source polling. When procurement is explicitly enabled, a separate bounded coordinator advances only registered first-slice projects after actual runtime results and human gates. It does not add quotation polling or scheduled order reminders.
 
 ## Verification

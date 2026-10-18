@@ -34,6 +34,8 @@ class RuntimeService:
     """Inject trusted current auth into every worker invocation, never from storage."""
     def __init__(self, workflows, clock=time.time, observer=None):
         self.observer = observer
+        # Trusted launcher policy, never accepted from workflow metadata/inputs.
+        self.enforce_usage_budgets = True
         self.workflows, self.store, self.clock = workflows, workflows.store, clock
         with self.store.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS runtime_runs (workspace TEXT, run_id TEXT PRIMARY KEY, workflow_id TEXT, version INTEGER, subject TEXT, retry_key TEXT, fingerprint TEXT, document TEXT NOT NULL, UNIQUE(workspace, subject, retry_key))')

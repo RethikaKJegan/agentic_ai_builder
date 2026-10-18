@@ -476,6 +476,15 @@ class ObservabilityTests(RuntimeFixture):
 
 
 class ModelBudgetTests(unittest.TestCase):
+    def test_cost_opt_out_preserves_finite_request_capacity_and_other_checks(self):
+        model = self.model_class(self.definition, self.provider, lambda messages: 10, 1, 1,
+                                 enforce_usage_budgets=False)
+        self.assertIn('support', model.call('example'))
+        self.assertGreater(model.actual_usage['estimated_cost_usd'], 0)
+        with self.assertRaises(RuntimeFailure):
+            model.call('second invocation')
+        self.assertEqual(len(self.calls), 1)
+
     def setUp(self):
         from runtime.model import BoundedLLM
         self.calls = []

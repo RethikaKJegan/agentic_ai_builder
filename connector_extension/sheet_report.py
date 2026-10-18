@@ -1,6 +1,7 @@
 """Bounded report export into a newly created spreadsheet, never an existing file."""
 import json
 import math
+from copy import copy
 from urllib.parse import quote, urlencode
 from runtime.service import digest
 from runtime.sheet_records import column_label
@@ -9,6 +10,28 @@ from .sheet_creation import SheetsSetup
 
 
 class ReportSheetsSetup(SheetsSetup):
+    def for_action(self, effect_id):
+        if not isinstance(effect_id, str) or not effect_id.strip():
+            denied('EFFECT_REFERENCE_REQUIRED', 'Report export requires its runtime action reference.')
+        bound = copy(self)
+        bound.report_action_reference = effect_id
+        return bound
+
+    def stable_effect(self, value):
+        action = getattr(self, 'report_action_reference', None)
+        if action is None:
+            # Read-only reconciliation of legacy reports retains their old key.
+            return super().stable_effect(value)
+        return 'sheet_report_' + digest([self.namespace, action, value['project_id'], value['creation_key']])
+
+    def execute(self, grant, inputs, effect_id, deadline):
+        bound = self.for_action(effect_id)
+        return super(ReportSheetsSetup, bound).execute(grant, inputs, effect_id, deadline)
+
+    def reconcile(self, inputs, identifier, effect_id=None):
+        bound = self.for_action(effect_id) if effect_id is not None else self
+        return super(ReportSheetsSetup, bound).reconcile(inputs, identifier)
+
     def manifest(self, inputs):
         value = super().manifest(inputs)
         value['row_count'] = max(2, max(len(tab['rows']) + 1 for tab in value['tabs']))

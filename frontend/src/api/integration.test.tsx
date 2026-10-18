@@ -66,6 +66,20 @@ describe("authoritative contract mapping", () => {
     const firstView = useMesh.getState().workflows.find((w) => w.id === first.workflow_id)!;
     expect(toCanonical(firstView, useMesh.getState().agents).agents).toEqual(first.agents);
   });
+  it("preserves omitted model settings on an unchanged save and serializes explicit edits", () => {
+    const workflow = document();
+    const agent = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
+    const { name: _name, retry_policy: _retry, guardrails: _guardrails, ...embedded } = agent;
+    delete embedded.model.temperature;
+    workflow.agents = [embedded];
+    const mapped = fromCanonical(workflow);
+    expect(toCanonical(mapped.workflow, mapped.agents).agents[0]?.model).toEqual(embedded.model);
+    mapped.agents[0]!.temperature = 0.7;
+    expect(toCanonical(mapped.workflow, mapped.agents).agents[0]?.model.temperature).toBe(0.7);
+    embedded.model.temperature = 0;
+    const explicit = fromCanonical(workflow);
+    expect(toCanonical(explicit.workflow, explicit.agents).agents[0]?.model.temperature).toBe(0);
+  });
   it("keeps a changed model paired with its provider", () => {
     const original = document();
     const agent = CanonicalAgentSchema.parse(fixture("agents/valid-classifier.json"));
@@ -294,6 +308,18 @@ describe("Slack-triggered approval collection", () => {
 
 
 describe("Overview creation recovery", () => {
+  it("saves cached higher-version planning results as the first draft revision", async () => {
+    const planned = { ...document(), status: "draft" as const, version: 2 };
+    const transport = vi.fn()
+      .mockResolvedValueOnce(envelope({ workflow: planned }))
+      .mockResolvedValueOnce(envelope({ error: { error_code: "WORKFLOW_NOT_FOUND", message: "Missing.", request_id: "req_test", retryable: false } }, 404))
+      .mockResolvedValueOnce(envelope({ workflow: { ...planned, version: 1 } }));
+    const result = await createWorkflow({ objective: "Supplier audit" }, new WorkflowClient(transport));
+    expect(result.workflow.version).toBe(1);
+    expect(JSON.parse(transport.mock.calls[2]![1].body)).toMatchObject({ payload: {
+      workflow_version: 1, base_version: 0, workflow: { version: 1, status: "draft" },
+    } });
+  });
   const conflict = () => envelope({ error: { error_code: "REVISION_CONFLICT", message: "A newer revision exists.",
     request_id: "req_test", retryable: false, field: "workflow.version" } }, 409);
 

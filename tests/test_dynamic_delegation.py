@@ -13,6 +13,114 @@ from runtime.model import BoundedLLM
 
 
 class DynamicDelegationTests(RuntimeFixture):
+    def test_ordinary_graph_agent_receives_feedback_without_altering_strict_inputs(self):
+        from runtime.service import RuntimeFailure
+        self.workflow['metadata'].pop('dynamic_delegation')
+        self.put()
+        owner=self
+        seen=[]
+        class Adapter:
+            retry_safe=False;external_write=False
+            def reservation(self,agent):return {'llm_calls':1,'tokens':10}
+            def invoke(self,agent,inputs,reference):
+                seen.append(deepcopy((agent,inputs)))
+                if len(seen)==1:raise RuntimeFailure('MODEL_OUTPUT_INVALID_JSON','Invalid.')
+                owner.assertEqual(agent['_validation_feedback']['code'],'MODEL_OUTPUT_INVALID_JSON')
+                owner.assertEqual(inputs,seen[0][1])
+                return {'summary':'Verified.'}
+        result,events=self.run_case(executor=Adapter())
+        self.assertEqual(result['status'],'completed',json.dumps(events))
+        self.assertEqual(len(seen),2)
+        self.assertEqual(len([e for e in events if e['event_type']=='agent.correction']),1)
+
+    def test_real_model_bridge_repairs_invalid_json_without_repeating_actions(self):
+        calls=[]
+        self.runtime.enforce_usage_budgets=False
+        def factory(definition):
+            def provider(messages,cap,timeout):
+                calls.append(deepcopy(messages))
+                if len(calls)==1:return '{invalid',10,10
+                self.assertIn('validation_feedback',json.dumps(messages))
+                return json.dumps({'action':'finish','reason':'Corrected.','output':{'summary':'Verified.'}}),10,10
+            return BoundedLLM(definition,provider,lambda messages:100,0,0)
+        result,events=self.run_case(executor=CrewExecutor(self.workflows.registry_adapter,factory))
+        self.assertEqual(result['status'],'completed',json.dumps(events))
+        self.assertEqual(len(calls),2)
+        self.assertFalse(any(e['event_type']=='agent.spawned' for e in events))
+
+    def test_invalid_model_output_receives_feedback_and_one_reserved_correction(self):
+        from runtime.service import RuntimeFailure
+        contexts = []
+        def choose(context):
+            contexts.append(deepcopy(context))
+            if len(contexts) == 1:
+                raise RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID', 'Rejected model text must not be echoed.')
+            self.assertEqual(context['validation_feedback'][0]['code'], 'MODEL_OUTPUT_SCHEMA_INVALID')
+            self.assertEqual(context['request']['request_text'], 'research the issue')
+            return {'action':'finish','reason':'Corrected output.','output':{'summary':'Verified.'}}
+        result, events = self.run_case(executor=self.executor(choose))
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(len(contexts), 2)
+        self.assertEqual(len([e for e in events if e['event_type']=='agent.correction']), 1)
+        self.assertNotIn('Rejected model text', json.dumps(events))
+        self.assertFalse(self.called)
+        with self.store.transaction(write=False) as db:
+            stored=self.runtime.load(db,result['run_id'],self.auth)
+        self.assertEqual(stored['usage']['master_agent']['llm_calls'],2)
+
+    def test_invalid_correction_stops_after_two_calls_and_no_tools(self):
+        from runtime.service import RuntimeFailure
+        calls=[]
+        def choose(context):
+            calls.append(context)
+            raise RuntimeFailure('MODEL_OUTPUT_INVALID_JSON','Invalid.')
+        result,events=self.run_case(executor=self.executor(choose))
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(len(calls),2)
+        self.assertFalse(self.called)
+        self.assertIn('MODEL_OUTPUT_INVALID_JSON',json.dumps(events))
+
+    def test_denied_model_call_is_never_retried(self):
+        from runtime.service import RuntimeFailure
+        calls=[]
+        def choose(context):
+            calls.append(context)
+            raise RuntimeFailure('APPROVAL_REQUIRED','Approval is required.')
+        result,events=self.run_case(executor=self.executor(choose))
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(len(calls),1)
+        self.assertFalse(any(e['event_type']=='agent.correction' for e in events))
+
+    def test_usage_budget_opt_out_keeps_per_turn_capacity_and_records_usage(self):
+        self.runtime.enforce_usage_budgets = False
+        self.workflow['execution_policy']['limits'].update(max_tokens=1, max_estimated_cost_usd=0)
+        self.put()
+        turns, caps = [], []
+        def factory(definition):
+            def provider(messages, cap, timeout):
+                caps.append(cap)
+                if definition['agent_id'] == 'master_agent':
+                    turns.append(1)
+                    output = ({'action': 'continue', 'reason': 'Process next item.', 'continuation': {}}
+                              if len(turns) < 3 else
+                              {'action': 'finish', 'reason': 'Complete.', 'output': {'verified': True}})
+                else:
+                    output = {'verified': True}
+                return json.dumps(output), 9000, 500
+            return BoundedLLM(definition, provider, lambda messages: 10000, 1, 1,
+                              enforce_usage_budgets=False)
+        result, events = self.run_case(executor=CrewExecutor(self.workflows.registry_adapter, factory))
+        self.assertEqual(result['status'], 'completed', json.dumps(events))
+        self.assertEqual(caps, [6000, 6000, 6000])
+        with self.store.transaction(write=False) as db:
+            stored = self.runtime.load(db, result['run_id'], self.auth)
+        self.assertEqual(stored['usage']['master_agent']['tokens'], 28500)
+        self.assertEqual(stored['usage']['workflow']['estimated_cost_usd'], 28500)
+
+    def test_usage_budget_opt_out_preserves_model_call_ceiling(self):
+        self.runtime.enforce_usage_budgets = False
+        self.test_workflow_budget_exhaustion_prevents_child_call()
+
     def test_exhausted_required_reviews_join_before_next_master_turn(self):
         from time import sleep
         self.workflow['metadata']['dynamic_delegation']['master']['max_tasks']=2

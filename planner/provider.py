@@ -228,7 +228,8 @@ class OpenAIStructuredOutputProvider:
                     "Use at least 120 seconds per database execution tool agent and a larger workflow duration budget. "
                     "Database query/prepare/execute each reserve four tool calls conservatively; point reads reserve one. Set sufficient agent/workflow limits; no automatic retries. "
                     "All outputs references use graph NODE IDs, never agent IDs unless identical. Cross-check every mapping against node_id. "
-                    "If context.validation_feedback is present, return a complete corrected draft addressing those errors. "
+                    "If context.validation_feedback is present, fix every listed rule and use its field/hint. "
+                    "Edit context.previous_draft when supplied, preserving valid steps and approvals. Return the complete corrected draft, never a patch. "
                     "Do not place model calls, Python code, or side effects inside condition or transform nodes. "
                     "For an incoming Google Sheets row use metadata.trigger_templates containing provider_id=google_sheets, delivery=poll, "
                     "event_type=row.created, resource_id=the ID extracted from the Sheet URL/ID in the objective or context.google_sheets_resource, "
@@ -291,9 +292,18 @@ class OpenAIStructuredOutputProvider:
             store=False,
         )
         raw = getattr(response, "output_text", "")
-        workflow = json.loads(raw)
+        try:
+            workflow = json.loads(raw)
+        except (ValueError, TypeError):
+            from .errors import PlannerFailure
+            raise PlannerFailure('PLANNER_OUTPUT_INVALID_JSON', 'Return one complete workflow JSON object.', retryable=True) from None
+        if not isinstance(workflow, dict):
+            from .errors import PlannerFailure
+            raise PlannerFailure('PLANNER_OUTPUT_INVALID', 'The workflow must be a JSON object.', retryable=True)
         if context.get('generation_mode') == 'hierarchy' and not workflow.get('metadata', {}).get('dynamic_delegation'):
-            raise ValueError('Hierarchy generation must include dynamic delegation, not fixed specialist execution steps.')
+            from .errors import PlannerFailure
+            raise PlannerFailure('PLANNER_OUTPUT_INVALID', 'Hierarchy generation requires dynamic delegation.',
+                                 field='metadata.dynamic_delegation', retryable=True)
         return workflow
 
 

@@ -69,7 +69,8 @@ export function toCanonical(workflow: Workflow, agents: Agent[], nextVersion = (
       role: agent.role, goal: agent.purpose, instructions: agent.instructions,
       capabilities: agent.capabilities ?? original?.capabilities ?? [], permissions: agent.declaredPermissions ?? original?.permissions ?? ["workflow.read_input"],
       ...(agent.parentAgentId ? {parent_agent_id: agents.find(parent=>parent.id===agent.parentAgentId)?.canonicalId ?? agent.parentAgentId} : {}),
-      model: { ...(original?.model ?? { provider: "openai" }), provider: original && agent.modelId === original.model.model_id ? original.model.provider : MODELS.find((model) => model.id === agent.modelId)?.provider.toLowerCase() ?? original?.model.provider ?? "openai", model_id: agent.modelId, temperature: agent.temperature },
+      model: { ...(original?.model ?? { provider: "openai" }), provider: original && agent.modelId === original.model.model_id ? original.model.provider : MODELS.find((model) => model.id === agent.modelId)?.provider.toLowerCase() ?? original?.model.provider ?? "openai", model_id: agent.modelId,
+        ...(original && original.model.temperature === undefined && agent.temperature === 0 && agent.modelId === original.model.model_id ? {} : { temperature: agent.temperature }) },
       input_schema: original?.input_schema ?? { type: "object" }, output_schema: outputSchema,
       limits: { ...(original?.limits ?? limits), max_tokens: agent.maxTokens } };
   });

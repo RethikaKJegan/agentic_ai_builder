@@ -16,6 +16,70 @@ from connector_extension.tests.test_connectors import grant
 from runtime.service import RuntimeFailure
 from runtime.supplier_search import SEARCH, PAGE
 
+
+@pytest.mark.parametrize('window',[
+    'from 3:00–4:00 PM IST', 'within 3:00–4:00 PM IST',
+    'between 3:00 PM and 4:00 PM IST', 'from 3 PM to 4 PM IST',
+    'within 3:00—4:00 PM IST', 'within 3:00-4:00 PM IST',
+])
+def test_equivalent_explicit_meeting_windows(window):
+    start,end=meeting_window('Prepare a 30-minute review on 20 October 2026 '+window+'.')
+    assert start['dateTime']=='2026-10-20T15:30:00+05:30'
+    assert end['dateTime']=='2026-10-20T16:00:00+05:30'
+
+
+@pytest.mark.parametrize('text',[
+    '30-minute review on 20 October 2026 within 4:00–3:00 PM IST',
+    '90-minute review on 20 October 2026 within 3:00–4:00 PM IST',
+    '30-minute review on 20 October 2026 within 3:70–4:00 PM IST',
+    '30-minute review on 20 October 2026 within 3:00–4:00 PM',
+])
+def test_invalid_or_incomplete_meeting_windows_still_fail(text):
+    with pytest.raises(PlannerFailure) as error:meeting_window(text)
+    assert error.value.code=='REPORT_MEETING_TIME_REQUIRED'
+
+
+def test_supplied_repeat_prompt_wording_compiles_without_provider_call():
+    from workflow_api.live_providers import LivePlannerProvider
+    from unittest.mock import patch
+    c=context();c.update(generation_mode='hierarchy',execution_input_mode='automatic')
+    prompt=PROMPT.replace('19 October','20 October').replace('from 3:00','within 3:00')
+    provider=LivePlannerProvider('gpt-5.6-luna',['owner@example.com'],SimpleNamespace())
+    with patch.object(provider.provider,'generate',side_effect=AssertionError('No model workflow generation')):
+        workflow=provider.generate(prompt,c)
+    assert workflow['metadata']['delivery_preferences']['start']['dateTime']=='2026-10-20T15:30:00+05:30'
+
+
+@pytest.mark.parametrize('window', ['3:00–3:30 PM IST', 'from 3 PM to 3:30 PM IST'])
+def test_exact_interval_specifies_its_own_duration(window):
+    start,end=meeting_window('Review on 23 October 2026, '+window+'.')
+    assert start['dateTime']=='2026-10-23T15:00:00+05:30'
+    assert end['dateTime']=='2026-10-23T15:30:00+05:30'
+
+
+@pytest.mark.parametrize('window', ['within 3–4 PM IST', 'between 3 PM and 4 PM IST', '4–3 PM IST', '3–3 PM IST', '3–4 PM'])
+def test_ambiguous_or_invalid_interval_without_duration_still_fails(window):
+    with pytest.raises(PlannerFailure):
+        meeting_window('Review on 23 October 2026 '+window)
+
+
+def test_short_supplied_prompt_uses_verified_inventory_compiler():
+    from workflow_api.live_providers import LivePlannerProvider
+    from unittest.mock import patch
+    prompt=("Review Northwind’s top five restocking priorities, accounting for incoming stock; include categories, suppliers and ranking reasons. "
+            "Add sourced web supply risks separately in a new Google Sheet. "
+            "Email the briefing and Sheet link to my connected Google inbox and include both in a review on 23 October 2026, 3:00–3:30 PM IST; "
+            "get separate approval before creating the Sheet, sending email and booking the meeting.")
+    provider=LivePlannerProvider('gpt-5.6-luna',['owner@example.com'],SimpleNamespace())
+    with patch.object(provider.provider,'generate',side_effect=AssertionError('Must use supported compiler')):
+        workflow=provider.generate(prompt,context())
+    assert workflow['metadata']['unresolved_requirements']==[]
+    assert len(workflow['approval_gates'])==3
+    assert workflow['metadata']['delivery_preferences']['start']['dateTime']=='2026-10-23T15:00:00+05:30'
+    assert REQUIRED <= {tool['tool_id'] for tool in workflow['tools']}
+    WorkflowService.validate_document(workflow)
+    WorkflowService.validate_document(workflow)
+
 PROMPT = ('Check our inventory and find the five products that most urgently need restocking, taking stock already on order into account. '
           'Include their category and supplier. Search the web for relevant food-wholesale supply risks and source links. '
           'Put findings in a new Google spreadsheet, prepare an email summary, and arrange a 30-minute review on 19 October 2026, '

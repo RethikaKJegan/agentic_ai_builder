@@ -132,5 +132,8 @@ def decode_response(text, context=None, wire_schema=None):
             if any(not isinstance(t['inputs'],dict) for t in decision['tasks']):
                 raise ValueError()
         return json.dumps(decision)
-    except (ValueError,TypeError,KeyError,ValidationError):
-        raise RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID','The model control envelope contained an invalid encoded object.') from None
+    except (ValueError,TypeError,KeyError,ValidationError) as exc:
+        failure = RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID','The model control envelope contained an invalid encoded object.')
+        failure.validation_field = ('/'.join(str(p) for p in exc.absolute_schema_path)
+                                    if isinstance(exc, ValidationError) else 'decision/encoded_object')
+        raise failure from None

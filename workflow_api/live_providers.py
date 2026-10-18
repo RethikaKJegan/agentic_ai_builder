@@ -181,7 +181,14 @@ class LivePlannerProvider:
         from .inventory_report_planner import seed_inventory_report
         seed = seed_inventory_report(objective, supplied)
         for attempt in range(2):
-            workflow = deepcopy(seed) if seed is not None else self.provider.generate(objective, supplied)
+            from shared.llm_feedback import feedback
+            try:
+                workflow = deepcopy(seed) if seed is not None else self.provider.generate(objective, supplied)
+            except PlannerFailure as exc:
+                if attempt == 0 and exc.code in {'PLANNER_OUTPUT_INVALID', 'PLANNER_OUTPUT_INVALID_JSON'}:
+                    supplied['validation_feedback'] = [feedback(exc.code, exc.field)]
+                    continue
+                raise
             if catalogs:
                 workflow.setdefault('metadata', {})['sheet_catalog'] = catalog_snapshot(catalogs)
             automation = workflow.get('metadata', {}).get('customer_automation')
@@ -290,13 +297,18 @@ class LivePlannerProvider:
             if not errors:
                 return workflow
             if attempt == 0:
-                supplied['validation_feedback'] = errors
+                supplied['validation_feedback'] = [{**feedback(e['code'], e.get('field')), **e} for e in errors]
+                supplied['previous_draft'] = deepcopy(workflow)
         raise PlannerFailure('PLANNER_OUTPUT_INVALID', 'The generated workflow failed execution validation.',
                              retryable=True, details={'requirements': sorted({item['code'] for item in errors})})
 
 
 def create_configured_app(env=None, database=None, client=None, model_factory=None):
     env = environment() if env is None else env
+    usage_budgets = env.get('BUILDER_ENFORCE_USAGE_BUDGETS', '1')
+    if usage_budgets not in {'0', '1'}:
+        raise ValueError('BUILDER_ENFORCE_USAGE_BUDGETS must be 0 or 1.')
+    enforce_usage_budgets = usage_budgets == '1'
     mode = deployment_mode(env.get('BUILDER_ENVIRONMENT', 'production'))
     process_role=env.get('BUILDER_PROCESS_ROLE','combined')
     if process_role not in {'api','worker','combined'}:raise ValueError('Use api, worker or combined process role.')
@@ -350,6 +362,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             return dict(host='smtp.gmail.com', port=587, username=env['GMAIL_SMTP_USER'], password=env['GMAIL_SMTP_PASSWORD'], sender=env['GMAIL_SMTP_USER'])
         raise ValueError('Unknown provider credential reference.')
     runner = service.runtime_runner
+    runner.runtime.enforce_usage_budgets = enforce_usage_budgets
     runner.connectors = {'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),
                          'smtp_send_email': SMTPConnector(resolve, recipients(env), ['smtp.gmail.com'], timeout=15, require_approval=not direct_send)}
     runner.direct_write_tools = frozenset({'smtp_send_email'} if direct_send else ())
@@ -359,7 +372,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
     from .source_context import knowledge_documents
-    runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(rates, client, tokenizers),
+    runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(
+                                    rates, client, tokenizers, enforce_usage_budgets=enforce_usage_budgets),
                                 knowledge_loader=lambda workspace: knowledge_documents(service.store, workspace))
     source = ProviderTriggerSource(service, runner.connectors)
     service.trigger_poller = source.poll

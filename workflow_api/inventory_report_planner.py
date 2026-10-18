@@ -20,19 +20,21 @@ REQUIRED = {'database_read_query', 'supplier_web_search', 'supplier_read_page',
 
 def meeting_window(objective):
     date = re.search(r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b', objective, re.I)
-    window = re.search(r'\bfrom\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*[–—-]\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*IST\b', objective, re.I)
+    window = re.search(r'\b(?:(from|within|between)\s+)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*(?:[–—-]|\bto\b|\band\b)\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*IST\b', objective, re.I)
     duration = re.search(r'\b(\d{1,3})[ -]minute\b', objective, re.I)
-    if not date or not window or not duration:
+    if not date or not window or (not duration and window[1] and window[1].lower() in {'within', 'between'}):
         raise PlannerFailure('REPORT_MEETING_TIME_REQUIRED', 'Provide a date, meeting duration and an IST time window.', retryable=True)
     try:
         day = datetime.strptime(' '.join(date.groups()), '%d %B %Y')
-        sh, sm, sa, eh, em, ea = window.groups()
+        _, sh, sm, sa, eh, em, ea = window.groups()
         def clock(hour, minute, period):
             hour, minute = int(hour), int(minute or 0)
             if not 1 <= hour <= 12 or not 0 <= minute <= 59: raise ValueError()
             return day.replace(hour=hour % 12 + (12 if period.upper() == 'PM' else 0), minute=minute)
         start, end = clock(sh, sm, sa or ea), clock(eh, em, ea)
-        length = timedelta(minutes=int(duration[1]))
+        # An exact start/end interval already specifies duration. A flexible
+        # within/between window still requires the requested meeting length.
+        length = timedelta(minutes=int(duration[1])) if duration else end - start
         if not timedelta(0) < length <= end - start: raise ValueError()
         # Workspace's confirmed preference: the final fitting slot in the window.
         start = end - length
@@ -104,7 +106,7 @@ def inventory_query(catalog, ids):
 
 def compile_inventory_report(workflow, objective, context):
     if not (context.get('database_catalog') and re.search(r'\brestock(?:ing)?\b', objective, re.I)
-            and re.search(r'\bnew\s+Google\s+spreadsheet\b', objective, re.I)
+            and re.search(r'\bnew\s+Google\s+(?:spreadsheet|sheet)\b', objective, re.I)
             and re.search(r'\bemail\b', objective, re.I) and re.search(r'\breview\b', objective, re.I)):
         return workflow
     if re.search(r'\b(?:slack|contracts?|delete|insert|update)\b', objective, re.I):

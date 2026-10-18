@@ -1,5 +1,103 @@
 # Handoff — Rethika
 
+## Unchanged model settings and concise inventory planning — 2026-10-18
+
+The UI added temperature:0 while saving generated models that omitted it,
+causing exact Registry configuration mismatch. Mapping now preserves omission
+for unchanged model/default values; explicit edits remain subject to review.
+The short Google Sheet prompt also missed the inventory compiler's spreadsheet
+wording. Compiler accepts both forms and unambiguous exact IST intervals without
+redundant duration; flexible windows still require a duration. No Registry rule
+was bypassed. The affected draft was recovered as validated revision 3 through
+normal APIs without approval/publication/execution. See preserve-agent-settings
+OpenSpec tasks for test evidence and the unrelated empty-catalog test failure.
+
+## Inline Execution approvals — 2026-10-18
+
+ExecutionView now shows all matching pending approvals for the selected paused run,
+including spreadsheet, email and calendar gates. Reuses ApprovalControl, server
+permissions, exact revision bindings and database review requirements. Decisions
+refresh the trace. Terminal runs and mismatched approvals have no inline controls.
+32 focused tests, build, types, lint and desktop/mobile browser checks passed;
+browser decisions were mocked. Frontend deployed; backend contracts unchanged.
+
+## Shared validation feedback — 2026-10-18
+
+Added a small shared feedback helper and one correction around pure runtime model
+calls: coordinator control, specialist tool/task decisions and ordinary agents.
+Safe codes/hints and available schemas guide correction; task/tool inputs are
+validated before dispatch. Exact Registry authorization and action approvals remain
+authoritative. Correction reserves a fresh call, rechecks run/revision/deadlines
+and records agent.correction. Invalid second output stops. Reviewed allowances
+are not expanded, and failed-call reservations remain conservative. Tools,
+permissions, provider errors and uncertain external writes are never replayed.
+
+Planner generation retains two attempts, enriched with actionable recipient/cost
+rule hints and a secret-checked prior draft. JSON and missing hierarchy output
+errors now enter that same bounded correction loop. No shared contracts changed.
+135 regression tests and 25 subtests passed, plus targeted ordinary-agent and
+real CrewAI/model-bridge correction checks. Contracts, scoped strict OpenSpec and
+diff checks passed. No live generation or Google actions were used for verification.
+Deployment evidence: `openspec/changes/simple-llm-feedback/tasks.md`.
+
+## Meeting-window wording — 2026-10-18
+
+REPORT_MEETING_TIME_REQUIRED from the supplied "within 3:00–4:00 PM IST"
+prompt was caused by requiring literal "from" in meeting_window. The parser now
+accepts from/within/between and dash/to/and separators, retaining explicit date,
+duration, IST and window validation and final fitting slot preference.
+21 planner tests pass, including equivalent wordings, invalid windows and compiler
+generation with the supplied wording. Contracts, strict scoped OpenSpec and diff
+checks pass. No workflow or Google action was executed for this fix.
+
+## Per-action report identity — 2026-10-18
+
+Live run `run_5a32f33c84674e3984ea1cbf322951d8` completed research, ranking
+and spreadsheet approval, then failed create_report with EFFECT_REFERENCE_MISMATCH.
+The journal contains a completed report under the compiler's fixed project/key;
+its report hash differs from the fresh findings. Report exports inherited permanent
+setup's cross-run identity, incorrectly treating a new report as a mutated old one.
+
+ReportSheetsSetup now scopes its stable effect to the bound workflow namespace
+and runtime action reference, keeping project/key and fingerprint checks. Same
+action retries reuse verified receipts; fresh runs create distinct reports.
+Permanent setup, old receipts, uncertain-effect checks, approvals and input
+validation are preserved. Reconciliation accepts the original effect_id; omitting
+it retains legacy receipt lookup. Mail and Calendar already use runtime effect IDs.
+See `openspec/changes/report-action-identity/` for verification and deployment.
+
+## Inventory research result handoff — 2026-10-18
+
+Live v2 run `run_175e1144d3b249fe87a85e9828a42b95` failed on the second
+coordinator call while its helper was pending; research subsequently completed
+with valid output. Compiled inventory reports now wait for their sole research
+child and forward its matching validated output without a redundant coordinator
+model call. General workflows retain model synthesis. Cancellation, failure,
+schema validation, authorization and all three Google approvals remain enforced.
+The existing v2 meets the narrow compiler/schema/capability conditions; no saved
+revision was modified. Unseen failed provider text is not claimed diagnosed.
+
+8 inventory runtime tests and 43 planner/protocol/delegation tests plus 7 subtests
+passed. Shared contracts, strict scoped OpenSpec and diff checks passed. Full live
+Google execution remains unverified. See `openspec/changes/inventory-research-handoff/`.
+
+## Operator usage-budget override — 2026-10-18
+
+Added trusted launcher setting `BUILDER_ENFORCE_USAGE_BUDGETS` (default `1`).
+The operator requested backend usage-cap removal; this deployment now sets `0`.
+Cumulative workflow/agent token and estimated-cost caps no longer stop execution.
+Each model turn retains finite token capacity, and call counts, delegation bounds,
+timeouts, retries, Registry/schema checks and Google approvals remain enforced.
+Confirmed cost above a disabled cap remains finite and correctly accounted.
+No shared contracts or reviewed workflow revisions were changed.
+
+115 runtime/delegation/live-provider tests passed; two final targeted tests passed
+after finite-value validation tightening. Contracts, strict scoped OpenSpec and
+diff checks pass. Backend and worker reloaded; session/worker-health returned 200
+and current RuntimeWorker is ready. No inventory workflow or Google action was
+executed for verification. Start a new run of the existing published release;
+full live execution is not yet established. See `openspec/changes/optional-usage-budgets/`.
+
 ## Google consent diagnostics — 2026-10-12
 
 Remote OAuth setup now offers account selection and credential-free actionable errors. Scope-change responses are accepted only if all configured permissions are covered (Sheets write includes Sheets read); denied permissions or absent offline access preserve the old token. Actual grants are persisted privately. Eight focused OAuth tests, shared contracts, strict scoped OpenSpec and diff checks pass. Live consent remains pending; the saved token has no Sheets edit scope. No user credentials, workflows or backend processes were changed. See `openspec/changes/google-oauth-diagnostics/` and the remote command in `docs/sheets-gmail.md`.

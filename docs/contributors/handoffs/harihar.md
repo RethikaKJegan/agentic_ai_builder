@@ -1,5 +1,35 @@
 # Handoff — Harihar
 
+## New draft revision recovery — 2026-10-18
+
+A successful supplier-audit planning job proposed version 2 for an unsaved
+workflow. First save base 0/version 2 conflicted, followed by WORKFLOW_NOT_FOUND
+on the concurrency recovery lookup. PlannerService now owns initial draft/version
+1; frontend initial save also normalizes cached generated results after checking
+that no saved revision exists. Existing revisions/concurrent-save recovery remain
+intact. Recovered planned_b92b9315f54dec2b from its successful job result with a
+normal authorized save as draft v1; no publish, approval or execution.
+
+28 backend tests/4 subtests and 24 frontend integration tests pass, along with
+types, lint, build, contracts and strict scoped OpenSpec. Deployed frontend/backend/
+worker; workflow GET confirms v1, frontend HTTP 200 and RuntimeWorker ready. See
+`openspec/changes/planned-initial-revision/tasks.md`.
+
+## Google Marketplace discovery — 2026-10-18
+
+Replaced Marketplace Slack/HubSpot integration entries with Google and a small
+Connect Google action linking to Integrations. Removed the generic technical
+provider card grid and setup copy; retained existing real Google account OAuth,
+seven service-permission choices, collapsed tool checks and database summary.
+No backend tool removal or authorization/credential/workflow changes.
+
+30 focused tests, types, lint, production build and scoped strict OpenSpec pass.
+Desktop/mobile production browser checks pass before and after deployment,
+including navigation and permission dialog; OAuth was not started. Six unrelated
+workflow/graph unit failures reproduced on unchanged HEAD. Previous production
+build retained for rollback. Frontend active. See
+`openspec/changes/google-marketplace-connection/tasks.md` for exact evidence.
+
 ## Original-plan Phase 3 source selection — 18 October 2026 (IST)
 
 Questions now consumes current confirmed business mappings and shows a

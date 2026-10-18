@@ -12,7 +12,7 @@ const base = (): InstallState => ({
 const asset = (id: string) => MARKETPLACE.find((a) => a.id === id)!;
 
 describe("marketplace install", () => {
-  it("ships 12 curated assets", () => expect(MARKETPLACE).toHaveLength(12));
+  it("ships 11 curated assets", () => expect(MARKETPLACE).toHaveLength(11));
   it("workflow template creates an editable workflow with its agents", () => {
     const r = applyInstall(base(), asset("mk_wf_complaint"));
     expect(r.patch.workflows).toHaveLength(1);
@@ -24,7 +24,7 @@ describe("marketplace install", () => {
     expect(r.patch.agents![0]!.name).toBe("Contract Reviewer");
   });
   it("tool install cannot fabricate a configured connector", () => {
-    const r = applyInstall(base(), asset("mk_tl_slack"));
+    const r = applyInstall(base(), asset("mk_tl_google"));
     expect(r.patch).toEqual({});
     expect(r.target).toBeUndefined();
     expect(r.message).toContain("backend integration");

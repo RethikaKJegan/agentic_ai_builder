@@ -111,6 +111,8 @@ class CrewExecutor:
         if record is None:
             raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'Use an accepted registered agent.', 403)
         definition = deepcopy(record['definition'])
+        if feedback := agent.get('_validation_feedback'):
+            definition['instructions'] += '\nValidation correction: ' + json.dumps(feedback)
         if output_schema is not None:
             definition['input_schema'] = {'type': 'object'}
             definition['output_schema'] = deepcopy(output_schema)
@@ -130,6 +132,8 @@ class CrewExecutor:
         if record is None:
             raise RuntimeFailure('AGENT_REGISTRATION_REQUIRED', 'Use an accepted registered agent.', 403)
         definition = deepcopy(record['definition'])
+        if feedback := agent.get('_validation_feedback'):
+            definition['instructions'] += '\nValidation correction: ' + json.dumps(feedback)
         definition['allowed_tool_ids'] = deepcopy(agent['allowed_tool_ids'])
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         # The persisted DAG, rather than CrewAI's internal delegation, controls

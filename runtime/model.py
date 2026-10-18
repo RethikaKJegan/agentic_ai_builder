@@ -17,12 +17,14 @@ from .service import RuntimeFailure
 
 
 class BoundedLLM(BaseLLM):
-    def __init__(self, definition, provider, count_tokens, input_rate, output_rate, clock=time.monotonic):
+    def __init__(self, definition, provider, count_tokens, input_rate, output_rate, clock=time.monotonic,
+                 *, enforce_usage_budgets=True):
         super().__init__(model=definition['model']['model_id'])
         if any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in (input_rate, output_rate)):
             raise ValueError('Configure finite nonnegative provider rates per token.')
         self.output_schema = definition['output_schema']
         self.limits = definition['limits']
+        self.enforce_usage_budgets = enforce_usage_budgets
         self.provider_call, self.count_tokens = provider, count_tokens
         self.input_rate, self.output_rate, self.clock = input_rate, output_rate, clock
         self.started, self.calls, self.reserved_tokens, self.reserved_cost = clock(), 0, 0, 0.0
@@ -58,7 +60,7 @@ class BoundedLLM(BaseLLM):
         if self.calls >= self.limits['max_llm_calls'] or completion_cap < 1 or duration <= 0:
             raise RuntimeFailure('BUDGET_EXHAUSTED', 'The next model request exceeds an agent budget.')
         cost = input_size * self.input_rate + completion_cap * self.output_rate
-        if self.reserved_cost + cost > self.limits.get('max_estimated_cost_usd', 0):
+        if self.enforce_usage_budgets and self.reserved_cost + cost > self.limits.get('max_estimated_cost_usd', 0):
             raise RuntimeFailure('BUDGET_EXHAUSTED', 'The next model request exceeds the agent cost budget.')
         # Reserve the worst case before provider invocation. Unused capacity is
         # not refunded, including failed requests and hidden CrewAI retries.
@@ -75,8 +77,11 @@ class BoundedLLM(BaseLLM):
                 output = json.loads(text)
             except (ValueError, TypeError):
                 raise RuntimeFailure('MODEL_OUTPUT_INVALID_JSON', 'The provider did not return a complete JSON object.') from None
-            if list(Draft202012Validator(self.output_schema).iter_errors(output)):
-                raise RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID', 'The provider JSON did not satisfy the required schema.')
+            violations = list(Draft202012Validator(self.output_schema).iter_errors(output))
+            if violations:
+                failure = RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID', 'The provider JSON did not satisfy the required schema.')
+                failure.validation_field = '/'.join(str(p) for p in violations[0].absolute_schema_path)
+                raise failure
             self.actual_usage['llm_calls'] += 1
             self.actual_usage['tokens'] += actual_input + actual_output
             self.actual_usage['estimated_cost_usd'] += actual_input * self.input_rate + actual_output * self.output_rate
@@ -94,8 +99,9 @@ class BoundedLLM(BaseLLM):
 
 class OpenAIModelFactory:
     """Server-owned provider pricing and tokenizer; credentials stay in SDK."""
-    def __init__(self, rates, client=None, tokenizers=None):
+    def __init__(self, rates, client=None, tokenizers=None, *, enforce_usage_budgets=True):
         self.rates, self.client, self.tokenizers = rates, client, tokenizers or {}
+        self.enforce_usage_budgets = enforce_usage_budgets
 
     def __call__(self, definition):
         model = definition['model']
@@ -133,5 +139,6 @@ class OpenAIModelFactory:
                 text = decode_response(text, bridge.control_context, bridge.control_format['schema'])
             return text, response.usage.input_tokens, response.usage.output_tokens
         rates = self.rates[model['model_id']]
-        bridge = BoundedLLM(definition, invoke, count, rates['input_per_token'], rates['output_per_token'])
+        bridge = BoundedLLM(definition, invoke, count, rates['input_per_token'], rates['output_per_token'],
+                            enforce_usage_budgets=self.enforce_usage_budgets)
         return bridge

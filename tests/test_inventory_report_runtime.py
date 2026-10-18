@@ -3,6 +3,10 @@ from copy import deepcopy
 import base64
 from email import message_from_bytes
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+from contextlib import nullcontext
 from urllib.parse import urlparse
 import pytest
 from connector_extension.tests.test_sheet_report import ReportProvider
@@ -36,7 +40,11 @@ class OfflineAgents:
     retry_safe=False;external_write=False
     def reservation(self,agent):return {'llm_calls':1,'tokens':10,'estimated_cost_usd':0}
     def invoke_decision(self,agent,context,invocation,schema):
-        if context['pending_tasks']:return {'action':'wait','reason':'Wait for actual evidence.'}
+        # Reproduce the live coordinator failure on any redundant synthesis
+        # turn: compiled reports must hand the validated result through instead.
+        if context['pending_tasks'] or context['results']:
+            from runtime.service import RuntimeFailure
+            raise RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID', 'Unexpected second coordinator call.')
         if not context['results']:
             return {'action':'delegate','reason':'Retrieve both evidence types.','tasks':[
                 {'agent_id':a['agent_id'],'inputs':{},'reason':'Read assigned sources.'} for a in context['available_agents']]}
@@ -109,4 +117,66 @@ def test_native_report_sequence_requires_each_approval_and_uses_actual_url(rejec
         assert event['end']['dateTime']=='2026-10-19T16:00:00+05:30'
         inventory=case.http.books['created_1']['sheets'][0]['business_rows']
         assert len(inventory)==3 and inventory[0][0]=='urgent' and inventory[0][8]==9
+        # A fresh run changes public findings while retaining the same compiled
+        # project/key. It must produce a new report and use its URL downstream.
+        runner.connectors['supplier_web_search'].result['results'][0]['snippet']='Changed external fixture finding'
+        second=case.call('execute_workflow',{**ref,'inputs':{}})['run']
+        assert second['run_id']!=run['run_id']
+        for stage in range(3):
+            assert second['status']=='paused_for_approval'
+            assert len(case.http.books)==(1 if stage==0 else 2)
+            assert len(case.http.sent)==(2 if stage==2 else 1)
+            assert len(case.http.events)==1
+            approval=next(a for a in second['approvals'] if a['status']=='pending')
+            case.call('decide_approval',{**ref,'approval_id':approval['approval_id'],'decision':'approved'})
+            second=runner.runtime.get_run(second['run_id'],case.auth)
+        assert second['status']=='completed'
+        assert len(case.http.books)==len(case.http.sent)==len(case.http.events)==2
+        assert 'https://docs.google.com/spreadsheets/d/created_2/edit' in case.http.sent[1].get_payload(decode=True).decode()
+        assert 'https://docs.google.com/spreadsheets/d/created_2/edit' in case.http.events[1]['description']
+        assert case.http.events[0]['id']!=case.http.events[1]['id']
     finally:case.doCleanups()
+
+
+@pytest.mark.parametrize('outcome',['valid','invalid','failed','cancelled'])
+def test_compiled_research_handoff_waits_and_validates_before_return(outcome):
+    from runtime.delegation import DelegationSession
+    from runtime.service import RuntimeFailure
+    from workflow_api.inventory_ranking import RISK
+    schema={'type':'object','properties':{'external_risks':{'type':'array','items':RISK}},
+            'required':['external_risks'],'additionalProperties':False}
+    child={'agent_id':'research','role':'Research','goal':'Find public risks.',
+           'input_schema':{'type':'object'},'output_schema':schema,
+           'capabilities':['web_search','read_public_page'],'approval_requirements':[]}
+    session=DelegationSession.__new__(DelegationSession)
+    session.master={'agent_id':'master','input_schema':{'type':'object'},'output_schema':schema}
+    session.children={'research':child};session.inputs={'objective':'Find public risks.'}
+    session.config={'max_rounds':4,'max_tasks':12}
+    session.workflow={'metadata':{'inventory_report_compiler':1}}
+    session.node={'node_id':'analyse_inventory'}
+    session.run_id='synthetic';session.auth={}
+    session.runtime=SimpleNamespace(store=SimpleNamespace(transaction=lambda **kw:nullcontext(None)),
+                                   event=lambda *args,**kw:None,save=lambda *args:None)
+    completed=[];model_calls=[]
+    def current(db):
+        if completed and outcome=='cancelled':
+            raise RuntimeFailure('DELEGATION_INTERRUPTED','Cancelled.')
+        return {'delegation_turns':{'analyse_inventory':'invocation'},'approval_evidence':[]}
+    session.current=current
+    def invoke(agent,inputs,node_id,*args,**kw):
+        if agent['agent_id']=='master':
+            model_calls.append(1)
+            assert len(model_calls)==1
+            return {'action':'delegate','reason':'Research.','tasks':[
+                {'agent_id':'research','inputs':{},'reason':'Find evidence.'}]}
+        time.sleep(.02);completed.append(True)
+        if outcome=='failed':raise RuntimeFailure('RESEARCH_FAILED','Failed.')
+        return {'external_risks':[{'finding':'Public fixture','source_url':'invalid'}]} if outcome=='invalid' else {'external_risks':[]}
+    session.invoke=invoke
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        if outcome=='valid':
+            assert session.coordinate(pool,[])=={'external_risks':[]}
+        else:
+            with pytest.raises(RuntimeFailure) as err:session.coordinate(pool,[])
+            assert err.value.code=={'invalid':'AGENT_OUTPUT_INVALID','failed':'RESEARCH_FAILED','cancelled':'DELEGATION_INTERRUPTED'}[outcome]
+    assert completed and len(model_calls)==1

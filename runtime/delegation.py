@@ -143,6 +143,10 @@ class DelegationSession:
 
     def remaining_binding(self, binding, run, agent):
         """Use the remaining reviewed allowance, without splitting it by rounds."""
+        if not self.runtime.enforce_usage_budgets:
+            # Each turn keeps its finite configured capacity; cumulative usage
+            # remains recorded but no longer shrinks the next turn's allowance.
+            return
         for limit, counter in [('max_tokens', 'tokens'), ('max_estimated_cost_usd', 'estimated_cost_usd')]:
             if limit in binding['limits']:
                 binding['limits'][limit] = max(0, min(
@@ -152,6 +156,56 @@ class DelegationSession:
             raise RuntimeFailure('BUDGET_EXHAUSTED', 'The reviewed token allowance is exhausted.')
 
     def model_turn(self, agent, binding, inputs, invocation_id, schema, reservation):
+        from shared.llm_feedback import correct_once, with_feedback
+        def invoke(item):
+            corrected = deepcopy(binding)
+            if item and schema is None:
+                corrected['_validation_feedback'] = item
+            output = self._model_turn(agent, corrected, with_feedback(inputs, item) if item and schema is not None else inputs,
+                                      invocation_id, schema, reservation)
+            expected = schema or agent['output_schema']
+            if list(Draft202012Validator(expected).iter_errors(output)):
+                raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Model output failed the required schema.')
+            if schema is not None:
+                action = output['action']
+                targets = []
+                if action == 'finish':
+                    targets = [(inputs['final_output_schema'], output['output'])]
+                elif action == 'tool':
+                    tool = next((t for t in inputs.get('available_tools', []) if t['tool_id'] == output['tool_id']), None)
+                    if tool is None:
+                        raise RuntimeFailure('TOOL_ISOLATION_DENIED', 'Select only an available tool.')
+                    targets = [(tool['input_schema'], output['inputs'])]
+                elif action == 'delegate':
+                    for task in output['tasks']:
+                        child = self.children.get(task['agent_id'])
+                        if child is None:
+                            raise RuntimeFailure('DELEGATION_AGENT_DENIED', 'Select only an available specialist.')
+                        targets.append((child['input_schema'], task['inputs']))
+                if any(list(Draft202012Validator(s).iter_errors(v)) for s, v in targets):
+                    code = 'CONNECTOR_INPUT_INVALID' if action == 'tool' else 'AGENT_INPUT_INVALID' if action == 'delegate' else 'AGENT_OUTPUT_INVALID'
+                    error = RuntimeFailure(code, 'The proposed handoff or tool inputs failed their schema.')
+                    error.invalid_model_output = True
+                    raise error
+            return output
+        def prepare(item):
+            with self.runtime.store.transaction() as db:
+                run = self.current(db)
+                if any(run['usage'].get(group, {}).get('llm_calls', 0) >= limits['max_llm_calls']
+                       for group, limits in ((agent['agent_id'], agent['limits']),
+                                             ('workflow', self.workflow['execution_policy']['limits']))):
+                    return False
+                if callable(getattr(self.runner.agents, 'invoke_accounted', None)):
+                    self.remaining_binding(binding, run, agent)
+                reservation.clear()
+                reservation.update(self.runner.agents.reservation(binding))
+                self.runner.reserve(db, run, self.workflow, agent, reservation)
+                self.runtime.event(db, run, 'agent.correction', {'agent_id': agent['agent_id'],
+                    'invocation_id': invocation_id, 'attempt': 1, 'validation_feedback': [item]})
+                self.runtime.save(db, run)
+        return correct_once(invoke, prepare)
+
+    def _model_turn(self, agent, binding, inputs, invocation_id, schema, reservation):
         accounted = getattr(self.runner.agents, 'invoke_accounted', None)
         if not callable(accounted):
             if schema is DECISION_SCHEMA:
@@ -163,8 +217,10 @@ class DelegationSession:
         # Only a confirmed successful provider response releases unused capacity.
         # Unknown/failed calls keep their reservations and are never retried here.
         if (set(actual) != set(reservation) or actual.get('llm_calls') != 1 or
-                any(type(value) not in (int, float) or value < 0 or value != value or
-                    value > reservation[key] for key, value in actual.items())):
+                any(type(value) not in (int, float) or value < 0 or value != value or value == float('inf') or
+                    (value > reservation[key] and not (
+                        key == 'estimated_cost_usd' and not self.runtime.enforce_usage_budgets))
+                    for key, value in actual.items())):
             raise RuntimeFailure('INVALID_USAGE', 'Confirmed model usage must fit its reservation.')
         with self.runtime.store.transaction() as db:
             run = self.runtime.load(db, self.run_id, self.auth, 'workflow.execute')
@@ -383,6 +439,18 @@ class DelegationSession:
     def coordinate(self, pool, pending):
         results, count, continuation = [], 0, {}
 
+        # Inventory compiler v1 assigns only external-risk research to this
+        # coordinator. Its sole child already returns the exact business output;
+        # inventory ranking and delivery belong to subsequent deterministic nodes.
+        children = list(self.children.values())
+        passthrough = (
+            self.workflow.get('metadata', {}).get('inventory_report_compiler') == 1
+            and len(children) == 1
+            and children[0]['output_schema'] == self.master['output_schema']
+            and set(self.master['output_schema'].get('properties', {})) == {'external_risks'}
+            and set(children[0].get('capabilities', [])) == {'web_search', 'read_public_page'}
+        )
+
         def collect(wait=False):
             for task, future in list(pending):
                 if wait or future.done():
@@ -395,7 +463,16 @@ class DelegationSession:
             required=set(self.workflow.get('metadata',{}).get('procurement_required_reviews',[]))
             scheduled={r['agent_id'] for r in results}|{t['agent_id'] for t,_ in pending}
             join_required=bool(required) and required<=scheduled and count>=self.config['max_tasks']
-            collect(wait=round_number == self.config['max_rounds'] or join_required)
+            collect(wait=round_number == self.config['max_rounds'] or join_required or (passthrough and count == 1))
+            if passthrough and count == 1 and len(results) == 1 and not pending:
+                output = results[0]['result']
+                if list(Draft202012Validator(self.master['output_schema']).iter_errors(output)):
+                    raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Research output does not match the report schema.')
+                # Recheck cancellation, current revision/grants and run deadline
+                # after the potentially long helper call, before returning data.
+                with self.runtime.store.transaction(write=False) as db:
+                    self.current(db)
+                return deepcopy(output)
             context = {'control_task_input_mode': self.workflow.get('metadata', {}).get('control_task_input_mode'),
                 'request': self.inputs, 'final_output_schema': self.master['output_schema'], 'available_agents': [
                 {k: a[k] for k in ('agent_id', 'role', 'goal', 'input_schema')}

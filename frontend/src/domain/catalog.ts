@@ -22,8 +22,7 @@ export const MARKETPLACE: MarketplaceAsset[] = [
     id: "mk_ag_expense", kind: "agent", name: "Expense policy auditor", domain: "Finance operations", publisher: "MESH", description: "Reviews expense claims for policy breaches, duplicates and missing receipts.", dependencies: ["Document parser"],
     agent: { name: "Expense Auditor", role: "Reviewer", purpose: "Audit expense claims against policy.", instructions: "Flag duplicates, out-of-policy items and missing receipts. Summarise per claim.", modelId: "gpt-5-mini", tools: ["Document parser"], knowledge: ["Finance approval matrix"] },
   },
-  { id: "mk_tl_slack", kind: "tool", ref: "con_slack", name: "Slack", domain: "Communication", publisher: "MESH", description: "Post messages and approval requests to channels.", dependencies: [] },
-  { id: "mk_tl_hubspot", kind: "tool", ref: "con_hubspot", name: "HubSpot", domain: "Sales", publisher: "MESH", description: "Read and update contacts, companies and deals.", dependencies: [] },
+  { id: "mk_tl_google", kind: "tool", ref: "con_google", name: "Google", domain: "Productivity", publisher: "Google", description: "Connect a Google account in Integrations to authorize Gmail, Sheets and Calendar for your workflows.", dependencies: [] },
   { id: "mk_gr_pii", kind: "guardrail", name: "PII protection pack", domain: "Governance", publisher: "MESH", description: "Turns on PII redaction and output validation for every agent in the workspace.", dependencies: [], guardrails: { piiRedaction: true, outputValidation: true } },
   { id: "mk_gr_injection", kind: "guardrail", name: "Prompt-injection shield", domain: "Governance", publisher: "MESH", description: "Enables injection detection on every agent so manipulated inputs are blocked.", dependencies: [], guardrails: { injectionDetection: true } },
 ];

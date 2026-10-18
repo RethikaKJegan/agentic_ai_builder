@@ -20,6 +20,17 @@ def request(objective="Classify support requests and notify the owner", key="ide
 
 
 class PlannerTests(unittest.TestCase):
+    def test_initial_revision_number_and_status_are_owned_by_application(self):
+        class Provider(RuleBasedStructuredOutputProvider):
+            def generate(self, objective, context):
+                workflow = super().generate(objective, context)
+                workflow.update(version=2, status='published')
+                return workflow
+        result=PlannerService(Provider()).plan(request())
+        self.assertEqual(result['status'],200)
+        self.assertEqual(result['data']['workflow']['version'],1)
+        self.assertEqual(result['data']['workflow']['status'],'draft')
+
     def test_secrets_in_proposed_assignments_are_rejected_before_removal(self):
         class SecretProvider(RuleBasedStructuredOutputProvider):
             def generate(self, objective, context):

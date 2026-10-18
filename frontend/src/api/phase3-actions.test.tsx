@@ -18,7 +18,7 @@ import { RevisionHistory } from "@/features/workflows/RevisionHistory";
 import { WorkflowReviewQueue } from "@/features/workflows/WorkflowReviewQueue";
 import Settings from "@/screens/app.settings";
 import Integrations from "@/screens/app.integrations";
-vi.mock("@/lib/navigation", () => ({ Link: ({ children, to, search }: { children: React.ReactNode; to: string; search?: Record<string, string> }) => <a href={to + (search ? "?" + new URLSearchParams(search).toString() : "")}>{children}</a> }));
+vi.mock("@/lib/navigation", () => ({ useNavigate: () => vi.fn(), Link: ({ children, to, search }: { children: React.ReactNode; to: string; search?: Record<string, string> }) => <a href={to + (search ? "?" + new URLSearchParams(search).toString() : "")}>{children}</a> }));
 const fixture = (name: string) => JSON.parse(readFileSync(path.resolve(process.cwd(), "../shared/contracts/examples", name), "utf8"));
 const workflow = () => CanonicalWorkflowSchema.parse(fixture("workflows/support-triage.json"));
 const permissions = ["workflow.view", "workflow.edit", "workflow.validate", "workflow.approve", "workflow.publish", "workflow.execute", "tools.read", "runs.view"];
@@ -140,15 +140,18 @@ it("failed initial settings load never enables saving over an unknown value", as
   vi.spyOn(api, "settings").mockRejectedValue(failure("API_UNAVAILABLE")); render(<Settings />);
   await waitFor(() => expect(screen.getByRole("alert")).toBeVisible()); expect(screen.getByLabelText("Notification preference")).toBeDisabled(); expect(screen.getByRole("button", { name: "Save setting" })).toBeDisabled();
 });
-it("configured integrations stay unverified and failed connectivity never displays success", async () => {
+it("integrations offers Google account setup without technical provider cards", async () => {
   const tool = CanonicalToolSchema.parse(fixture("tools/google-sheets-read.json")); tool.provider_id = "smtp"; tool.availability = "enabled";
   useBackend.setState({ tools: [{ tool_id: tool.tool_id, definition: tool, version: 1, credential_configured: true, authorization_state: "requires_assignment" }] });
-  const check = vi.spyOn(api, "integrationCheck").mockResolvedValueOnce({ provider: "smtp", configured: true, verified: false, tested: false, live_test_supported: true, state: "configured", message: "Configuration only." })
-    .mockResolvedValueOnce({ provider: "smtp", configured: true, verified: false, tested: false, live_test_supported: true, state: "connection_failed", message: "Connection verification failed." });
-  render(<Integrations />); expect(screen.getByText("Configured · not verified")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Check configuration" })); await waitFor(() => expect(screen.getByRole("button", { name: "Verify connection" })).toBeVisible());
-  fireEvent.click(screen.getByRole("button", { name: "Verify connection" })); await waitFor(() => expect(screen.getByText("Connection failed")).toBeVisible());
-  expect(check.mock.calls).toEqual([["smtp", "configuration"], ["smtp", "connection"]]); expect(screen.queryByText("Verified", { exact: true })).toBeNull();
+  const check = vi.spyOn(api, "integrationCheck");
+  vi.spyOn(api, "googleConnections").mockResolvedValue({ configured: true, setup_message: null, callback_uri: null, callback_in_client_file: true, shared_demo_identity: false, capabilities: [], items: [] });
+  render(<Integrations />);
+  await waitFor(() => expect(screen.getByText("No Google accounts connected yet.")).toBeVisible());
+  expect(screen.getByRole("button", { name: /^Connect Google$/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Check configuration" })).toBeNull();
+  expect(screen.queryByText("Configured · not verified")).toBeNull();
+  expect(screen.queryByLabelText("smtp integration")).toBeNull();
+  expect(check).not.toHaveBeenCalled();
 });
 it("client rejects HTTP failures and inconsistent integration success envelopes", async () => {
   const data = { provider: "smtp", configured: true, verified: true, tested: true, state: "configured", live_test_supported: false, message: "Incorrect success" };
