@@ -1,0 +1,13 @@
+family_id,family_name,protocol_id,is_demo,provenance
+1,Beverage containers,1,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Dry goods cartons,2,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Dairy containers,3,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Frozen food packs,4,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,Confectionery packs,5,True,SYNTHETIC graph demonstration only; not operational evidence.
+6,Seafood containers,6,True,SYNTHETIC graph demonstration only; not operational evidence.
+7,Grain sacks,7,True,SYNTHETIC graph demonstration only; not operational evidence.
+8,Produce crates,8,True,SYNTHETIC graph demonstration only; not operational evidence.
+9,Spice containers,1,True,SYNTHETIC graph demonstration only; not operational evidence.
+10,Sauce containers,2,True,SYNTHETIC graph demonstration only; not operational evidence.
+11,Preserve jars,3,True,SYNTHETIC graph demonstration only; not operational evidence.
+12,Gift assortments,4,True,SYNTHETIC graph demonstration only; not operational evidence.

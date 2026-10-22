@@ -1,0 +1,9 @@
+protocol_id,protocol_name,handling_description,is_demo,provenance
+1,Ambient dry handling,Illustrative handling classification: ambient dry handling,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Chilled handling,Illustrative handling classification: chilled handling,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Frozen handling,Illustrative handling classification: frozen handling,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Fragile handling,Illustrative handling classification: fragile handling,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,Moisture barrier handling,Illustrative handling classification: moisture barrier handling,True,SYNTHETIC graph demonstration only; not operational evidence.
+6,Aroma protection,Illustrative handling classification: aroma protection,True,SYNTHETIC graph demonstration only; not operational evidence.
+7,Light protection,Illustrative handling classification: light protection,True,SYNTHETIC graph demonstration only; not operational evidence.
+8,Clean sealed handling,Illustrative handling classification: clean sealed handling,True,SYNTHETIC graph demonstration only; not operational evidence.

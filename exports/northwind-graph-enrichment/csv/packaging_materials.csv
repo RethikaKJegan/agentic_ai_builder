@@ -1,0 +1,9 @@
+material_id,material_name,is_demo,provenance
+1,Corrugated board,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Glass,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Aluminium,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Paper fibre,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,Reusable polymer,True,SYNTHETIC graph demonstration only; not operational evidence.
+6,Barrier film,True,SYNTHETIC graph demonstration only; not operational evidence.
+7,Wood fibre,True,SYNTHETIC graph demonstration only; not operational evidence.
+8,Moulded pulp,True,SYNTHETIC graph demonstration only; not operational evidence.

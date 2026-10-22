@@ -1,0 +1,3 @@
+# Inventory read retry with stable metadata
+
+Owner authorized applying the previously described immediate workaround: disable automatic metadata refresh for the existing Supabase and Atlas connections, wait for ready profiles, and create one new run of the same reviewed inventory workflow. Preserve original refresh intervals and record prior settings for restoration. Do not change workflow definitions, source data, graph reviews or approval decisions. Stop at the independent Sheet creation approval; email and Calendar remain separately gated. Category omission is an existing proposal limitation and remains explicitly reported.

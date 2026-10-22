@@ -1,0 +1,22 @@
+\set ON_ERROR_STOP on
+BEGIN;
+\ir 01_create_schema.sql
+\copy northwind_graph_demo.business_regions (region_id, region_name, is_demo, provenance) FROM 'csv/business_regions.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.facility_types (facility_type_id, facility_type_name, is_demo, provenance) FROM 'csv/facility_types.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.handling_protocols (protocol_id, protocol_name, handling_description, is_demo, provenance) FROM 'csv/handling_protocols.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.packaging_materials (material_id, material_name, is_demo, provenance) FROM 'csv/packaging_materials.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.packaging_profiles (packaging_id, packaging_name, material_id, protocol_id, is_demo, provenance) FROM 'csv/packaging_profiles.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.certification_standards (standard_id, standard_name, protocol_id, is_demo, provenance) FROM 'csv/certification_standards.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.transport_modes (mode_id, mode_name, is_demo, provenance) FROM 'csv/transport_modes.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.material_families (family_id, family_name, protocol_id, is_demo, provenance) FROM 'csv/material_families.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.supplier_sites (site_id, site_name, region_id, facility_type_id, protocol_id, is_demo, provenance) FROM 'csv/supplier_sites.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.warehouses (warehouse_id, warehouse_name, region_id, facility_type_id, protocol_id, is_demo, provenance) FROM 'csv/warehouses.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.inspection_checklists (checklist_id, checklist_name, standard_id, protocol_id, is_demo, provenance) FROM 'csv/inspection_checklists.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.distribution_lanes (lane_id, lane_name, origin_region_id, destination_region_id, mode_id, protocol_id, is_demo, provenance) FROM 'csv/distribution_lanes.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.site_certifications (site_certification_id, site_id, standard_id, checklist_id, claim_status, is_demo, provenance) FROM 'csv/site_certifications.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.warehouse_capabilities (capability_id, warehouse_id, protocol_id, checklist_id, is_demo, provenance) FROM 'csv/warehouse_capabilities.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.material_packaging_rules (rule_id, family_id, packaging_id, protocol_id, is_demo, provenance) FROM 'csv/material_packaging_rules.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.lane_site_assignments (assignment_id, lane_id, site_id, warehouse_id, is_demo, provenance) FROM 'csv/lane_site_assignments.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\copy northwind_graph_demo.site_material_approvals (approval_id, site_id, family_id, standard_id, approval_status, is_demo, provenance) FROM 'csv/site_material_approvals.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+\ir 04_validate.sql
+COMMIT;

@@ -1,5 +1,17 @@
 # Handoff — Harihar
 
+## Fixed workspace website login — 2026-10-22
+
+Owner-authorized source implementation adds Launch Workspace → /login → /app,
+server-side scrypt verification, an expiring signed HttpOnly gate cookie,
+protected workspace/API access and logout. Keeps local-builder/local-workspace,
+connector/database storage and independent action approvals. Signed webhooks
+and Google callbacks retain backend verification. 131 frontend tests, 62 backend
+regressions, three production browser scenarios, types/lint/build/contracts and
+strict scoped OpenSpec pass. Private credentials/config and deployment notes:
+`docs/workspace-login.md`; evidence: `openspec/changes/workspace-login/tasks.md`.
+Deployed after explicit owner authorization on 22 October 2026. Public HTTPS and live desktop/mobile Launch Workspace → login → /app, refresh and logout passed. Only the frontend restarted; backend/worker and saved connection IDs remained unchanged. No provider writes. Rollback artifact retained; see workspace-login tasks for evidence.
+
 ## New draft revision recovery — 2026-10-18
 
 A successful supplier-audit planning job proposed version 2 for an unsaved

@@ -1,0 +1,9 @@
+region_id,region_name,is_demo,provenance
+1,British Isles,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Western Europe,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Northern Europe,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Mediterranean,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,East Asia,True,SYNTHETIC graph demonstration only; not operational evidence.
+6,South Asia,True,SYNTHETIC graph demonstration only; not operational evidence.
+7,North America,True,SYNTHETIC graph demonstration only; not operational evidence.
+8,Oceania,True,SYNTHETIC graph demonstration only; not operational evidence.

@@ -1,5 +1,7 @@
 # Shared website origin routing
 
+Subsequent owner request: the source change `openspec/changes/workspace-login/` adds a fixed website login while retaining this private backend routing and workspace identity. See `docs/workspace-login.md`. That change was deployed on 22 October 2026 after explicit owner authorization; live HTTPS and desktop/mobile checks passed. The ungated preference below records the previous deployment decision.
+
 The owner explicitly selected a shared website without a MESH login or password gate. Google authorization is for connected tools (Drive, Calendar, Sheets, etc.), not website sign-in. Anyone able to reach this website can use its configured shared workspace and existing workspace permissions. This configuration does not provide individual user identities.
 
 The actual origin failure came from passing the external HTTPS origin into services configured only for loopback UI origins. The Builder TLS virtual host now validates the original browser Origin, cross-site fetch context and same-origin proof for unsafe methods before forwarding `/api/backend/` with the application's exact configured loopback Host/Origin/protocol. Secure HttpOnly SameSite cookies remain enabled. The API remains loopback-only, defaults and private origin guards are unchanged, and no wildcard origin is allowed.

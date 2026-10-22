@@ -1,0 +1,13 @@
+{
+  "postgresql_version": "16",
+  "csv_import": "passed",
+  "sql_editor_import": "passed",
+  "validated_tables": 17,
+  "validated_foreign_keys": 31,
+  "application_metadata_discovery": "passed",
+  "application_declared_relationship_discovery": "passed",
+  "source_sentinel_unchanged": true,
+  "repeat_import_fails_closed": true,
+  "cleanup_without_cascade": "passed",
+  "live_databases_contacted": false
+}

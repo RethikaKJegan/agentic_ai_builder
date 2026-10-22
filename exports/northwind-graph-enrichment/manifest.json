@@ -1,0 +1,243 @@
+{
+  "schema": "northwind_graph_demo",
+  "synthetic": true,
+  "table_count": 17,
+  "row_count": 928,
+  "declared_foreign_keys": 31,
+  "original_tables_modified": [],
+  "tables": [
+    {
+      "name": "business_regions",
+      "csv": "csv/business_regions.csv",
+      "rows": 8,
+      "columns": [
+        "region_id",
+        "region_name",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 0
+    },
+    {
+      "name": "facility_types",
+      "csv": "csv/facility_types.csv",
+      "rows": 5,
+      "columns": [
+        "facility_type_id",
+        "facility_type_name",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 0
+    },
+    {
+      "name": "handling_protocols",
+      "csv": "csv/handling_protocols.csv",
+      "rows": 8,
+      "columns": [
+        "protocol_id",
+        "protocol_name",
+        "handling_description",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 0
+    },
+    {
+      "name": "packaging_materials",
+      "csv": "csv/packaging_materials.csv",
+      "rows": 8,
+      "columns": [
+        "material_id",
+        "material_name",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 0
+    },
+    {
+      "name": "packaging_profiles",
+      "csv": "csv/packaging_profiles.csv",
+      "rows": 24,
+      "columns": [
+        "packaging_id",
+        "packaging_name",
+        "material_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 2
+    },
+    {
+      "name": "certification_standards",
+      "csv": "csv/certification_standards.csv",
+      "rows": 10,
+      "columns": [
+        "standard_id",
+        "standard_name",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 1
+    },
+    {
+      "name": "transport_modes",
+      "csv": "csv/transport_modes.csv",
+      "rows": 5,
+      "columns": [
+        "mode_id",
+        "mode_name",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 0
+    },
+    {
+      "name": "material_families",
+      "csv": "csv/material_families.csv",
+      "rows": 12,
+      "columns": [
+        "family_id",
+        "family_name",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 1
+    },
+    {
+      "name": "supplier_sites",
+      "csv": "csv/supplier_sites.csv",
+      "rows": 48,
+      "columns": [
+        "site_id",
+        "site_name",
+        "region_id",
+        "facility_type_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "warehouses",
+      "csv": "csv/warehouses.csv",
+      "rows": 24,
+      "columns": [
+        "warehouse_id",
+        "warehouse_name",
+        "region_id",
+        "facility_type_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "inspection_checklists",
+      "csv": "csv/inspection_checklists.csv",
+      "rows": 32,
+      "columns": [
+        "checklist_id",
+        "checklist_name",
+        "standard_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 2
+    },
+    {
+      "name": "distribution_lanes",
+      "csv": "csv/distribution_lanes.csv",
+      "rows": 72,
+      "columns": [
+        "lane_id",
+        "lane_name",
+        "origin_region_id",
+        "destination_region_id",
+        "mode_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 4
+    },
+    {
+      "name": "site_certifications",
+      "csv": "csv/site_certifications.csv",
+      "rows": 144,
+      "columns": [
+        "site_certification_id",
+        "site_id",
+        "standard_id",
+        "checklist_id",
+        "claim_status",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "warehouse_capabilities",
+      "csv": "csv/warehouse_capabilities.csv",
+      "rows": 96,
+      "columns": [
+        "capability_id",
+        "warehouse_id",
+        "protocol_id",
+        "checklist_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "material_packaging_rules",
+      "csv": "csv/material_packaging_rules.csv",
+      "rows": 96,
+      "columns": [
+        "rule_id",
+        "family_id",
+        "packaging_id",
+        "protocol_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "lane_site_assignments",
+      "csv": "csv/lane_site_assignments.csv",
+      "rows": 144,
+      "columns": [
+        "assignment_id",
+        "lane_id",
+        "site_id",
+        "warehouse_id",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    },
+    {
+      "name": "site_material_approvals",
+      "csv": "csv/site_material_approvals.csv",
+      "rows": 192,
+      "columns": [
+        "approval_id",
+        "site_id",
+        "family_id",
+        "standard_id",
+        "approval_status",
+        "is_demo",
+        "provenance"
+      ],
+      "foreign_keys": 3
+    }
+  ]
+}

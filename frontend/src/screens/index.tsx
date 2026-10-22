@@ -92,7 +92,7 @@ function Nav() {
         </a>
         <div className="flex justify-end">
           <Link
-            to="/app"
+            to="/login"
             aria-label="Launch Workspace"
             className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-primary sm:px-4"
           >
@@ -149,7 +149,7 @@ function Hero() {
           className="mt-10 flex flex-wrap gap-3"
         >
           <Link
-            to="/app"
+            to="/login"
             className="group inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 font-medium text-primary-foreground shadow-lift transition-colors hover:bg-primary-deep"
           >
             Start building{" "}
@@ -232,7 +232,7 @@ function TypingComposer() {
             Plain English. No framework knowledge needed.
           </span>
           <Link
-            to="/app"
+            to="/login"
             
             className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-deep"
           >
@@ -508,7 +508,7 @@ export default function Landing() {
               ))}
             </ul>
             <Link
-              to="/app"
+              to="/login"
               className="mt-10 inline-flex h-12 items-center gap-2 rounded-full bg-primary px-7 font-medium text-primary-foreground shadow-lift transition-colors hover:bg-primary-deep"
             >
               Launch Workspace <ArrowRight className="h-4 w-4" />

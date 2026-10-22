@@ -1,0 +1,15 @@
+# Workspace website login
+
+Launch Workspace → /login → /app. The fixed account is engineering@bellcorpstudio.com. Server verification uses a salted scrypt password hash; an HMAC-signed eight-hour HttpOnly, SameSite=Lax cookie gates workspace pages and browser backend traffic. Secure is enabled for HTTPS/production. Only signed webhook ingress and the independently state-bound Google callback bypass this website gate; backend validation remains in force. Login/logout require exact configured same-origin requests. Login accepts at most twenty attempts per minute per Next server process. This is a shared account, not individual user attribution.
+
+## Local configuration and deployment
+
+The generated eight-digit password is in the private ignored `.local/workspace-login-credentials.txt`. Its salted hash and a random signing secret are in private ignored `frontend/.env.local`. Neither is sent to client bundles. Preserve these files; do not commit them. Deploy both `BUILDER_LOGIN_SECRET` (at least 32 random characters) and `BUILDER_LOGIN_PASSWORD_HASH` (16-byte salt in hex, colon, 64-byte scrypt hash in hex) to the Next server environment or its `.env.local`. Missing configuration fails closed. Keep the signing secret stable across builds/processes; rotating it invalidates website sessions. The local generated configuration is not automatically copied to an isolated release directory.
+
+Login/logout accept the exact configured loopback `BUILDER_UI_ORIGINS` plus `BUILDER_LOGIN_PUBLIC_ORIGIN` (defaults to `https://praxi.bellcorpstudio.com`). The TLS proxy already retains the public Host for /api/workspace-auth/. This separate public login origin avoids changing existing backend origin settings: the /api/backend loopback rewrite stays unchanged. Keep the private backend and Next backend-proxy deployment mode/origins as configured. Verify the public login POST and protected API denial after deployment.
+
+Deployed to https://praxi.bellcorpstudio.com on 22 October 2026 after explicit owner authorization. Public HTTPS and live desktop/mobile login, refresh, logout and direct-app protection passed. The frontend alone restarted; backend/worker processes and saved connection IDs were preserved. Previous frontend artifact is retained at `.local/ui-rollbacks/workspace-login-20261022-final/previous.next`.
+
+## Identity and workflow preservation
+
+After website login, the existing private backend still issues its own session with the same local-builder/local-workspace identity, roles and permissions. No new workspace, user, registry grant or connector authorization is created. Database connections, Google OAuth tokens and workflow data remain in their existing storage. Sheet creation, sending email and booking meetings retain their existing independent approvals. Signing out clears website/backend browser cookies and discards the rendered app through a full navigation, without deleting browser drafts, source databases, connection records or running/scheduled workflows. A signed token already copied out of a browser remains valid until expiry; rotate the signing key to revoke all such sessions.

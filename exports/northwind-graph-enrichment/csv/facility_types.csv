@@ -1,0 +1,6 @@
+facility_type_id,facility_type_name,is_demo,provenance
+1,Consolidation hub,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Packing site,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Distribution centre,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Cold storage site,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,Inspection site,True,SYNTHETIC graph demonstration only; not operational evidence.

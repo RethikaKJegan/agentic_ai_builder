@@ -1,4 +1,5 @@
 "use client";
+import { confirmDraftNavigation } from "@/features/workflows/unsaved";
 import { displayText } from "@/lib/display-text";
 import { usePathname } from "next/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
@@ -47,6 +48,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [cmd, setCmd] = useState(false);
   const [help, setHelp] = useState(false);
   const [more, setMore] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  async function signOut() {
+    if (signingOut || !confirmDraftNavigation()) return;
+    setSigningOut(true);
+    try {
+      const response = await fetch("/api/workspace-auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Sign-out failed. Please try again.");
+      window.location.assign("/login");
+    } catch {
+      toast.error("Unable to sign out. Please try again.");
+      setSigningOut(false);
+    }
+  }
   const openHelp = useCallback(() => setHelp(true), []);
   useGlobalShortcuts(openHelp);
   const pathname = usePathname();
@@ -142,10 +156,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <p>Local workspace</p>
-                <p className="text-xs font-normal text-muted-foreground">Browser drafts</p>
+                <p className="truncate text-xs font-normal text-muted-foreground" title="engineering@bellcorpstudio.com">engineering@bellcorpstudio.com</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild><Link to="/">Back to website</Link></DropdownMenuItem>
+              <DropdownMenuItem disabled={signingOut} onSelect={() => void signOut()}>{signingOut ? "Signing out…" : "Sign out"}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>

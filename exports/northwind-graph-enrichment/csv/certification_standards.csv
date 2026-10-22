@@ -1,0 +1,11 @@
+standard_id,standard_name,protocol_id,is_demo,provenance
+1,DEMO-STD-01,1,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,DEMO-STD-02,2,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,DEMO-STD-03,3,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,DEMO-STD-04,4,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,DEMO-STD-05,5,True,SYNTHETIC graph demonstration only; not operational evidence.
+6,DEMO-STD-06,6,True,SYNTHETIC graph demonstration only; not operational evidence.
+7,DEMO-STD-07,7,True,SYNTHETIC graph demonstration only; not operational evidence.
+8,DEMO-STD-08,8,True,SYNTHETIC graph demonstration only; not operational evidence.
+9,DEMO-STD-09,1,True,SYNTHETIC graph demonstration only; not operational evidence.
+10,DEMO-STD-10,2,True,SYNTHETIC graph demonstration only; not operational evidence.

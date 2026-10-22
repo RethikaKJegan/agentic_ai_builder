@@ -1,0 +1,51 @@
+import { expect, test } from "@playwright/test";
+for (const mobile of [false, true]) {
+  test(`workspace login preserves shared identity on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const blocked = await page.request.get("/api/backend/session");
+    expect(blocked.status()).toBe(401);
+    await page.goto("/app/workflows");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+    await page.getByLabel("Password", { exact: true }).fill("87654321");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("email or password is incorrect");
+    await page.getByLabel("Password", { exact: true }).fill("12345678");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByLabel("Process description")).toBeVisible();
+    const session = await page.evaluate(async () => (await fetch("/api/backend/session")).json());
+    expect(session.data.auth.subject).toEqual({ subject_id: "local-builder", workspace_id: "local-workspace" });
+    const permissions = session.data.auth.permissions;
+    await page.evaluate(() => localStorage.setItem("login-preservation-check", "keep"));
+    await page.reload();
+    await expect(page.getByLabel("Process description")).toBeVisible();
+    await page.goto("/app/integrations");
+    await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
+    await page.getByRole("button", { name: "User menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(await page.evaluate(() => localStorage.getItem("login-preservation-check"))).toBe("keep");
+    expect((await page.request.get("/api/backend/session")).status()).toBe(401);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/login$/);
+    await page.getByLabel("Password", { exact: true }).fill("12345678");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByLabel("Process description")).toBeVisible();
+    const restored = await page.evaluate(async () => (await fetch("/api/backend/session")).json());
+    expect(restored.data.auth.permissions).toEqual(permissions);
+    expect(restored.data.auth.subject).toEqual(session.data.auth.subject);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: `../.local/workspace-login/${mobile ? "mobile" : "desktop"}-workspace.png` });
+    expect(errors).toEqual([]);
+  });
+}
+test("Launch Workspace opens the login page", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Launch Workspace", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("engineering@bellcorpstudio.com");
+  await page.screenshot({ path: "../.local/workspace-login/login.png" });
+});

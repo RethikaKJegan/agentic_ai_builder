@@ -1,0 +1,6 @@
+mode_id,mode_name,is_demo,provenance
+1,Road,True,SYNTHETIC graph demonstration only; not operational evidence.
+2,Rail,True,SYNTHETIC graph demonstration only; not operational evidence.
+3,Sea,True,SYNTHETIC graph demonstration only; not operational evidence.
+4,Air,True,SYNTHETIC graph demonstration only; not operational evidence.
+5,Intermodal,True,SYNTHETIC graph demonstration only; not operational evidence.
