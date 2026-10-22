@@ -80,7 +80,7 @@ function Nav() {
         <a
           href="/"
           onClick={toTop}
-          aria-label="MESH — back to top"
+          aria-label="PraxilonAI — back to top"
           className="group relative flex items-center gap-2 rounded-lg px-2 py-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-0.5 hover:scale-[1.03]"
         >
           <span
@@ -88,7 +88,7 @@ function Nav() {
             className="absolute inset-0 -z-10 rounded-full bg-primary/0 blur-xl transition-colors duration-300 group-hover:bg-primary/20"
           />
           <LogoMark className="h-6 w-6 transition-[filter] duration-300 group-hover:drop-shadow-[0_0_8px_var(--primary)]" />
-          <span className="font-display text-[17px] font-semibold tracking-tight">MESH</span>
+          <span className="font-display text-[17px] font-semibold tracking-tight">PraxilonAI</span>
         </a>
         <div className="flex justify-end">
           <Link
@@ -445,7 +445,7 @@ export default function Landing() {
         id="product"
         n="01 — Describe it"
         title="Start with a sentence."
-        body="Write the process the way you'd explain it to a new colleague. MESH reads intent, steps, exceptions and approvals."
+        body="Write the process the way you'd explain it to a new colleague. PraxilonAI reads intent, steps, exceptions and approvals."
       >
         <TypingComposer />
       </Chapter>

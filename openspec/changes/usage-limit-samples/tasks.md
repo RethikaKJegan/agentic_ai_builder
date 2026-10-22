@@ -1,0 +1,3 @@
+- [x] Confirm direct-child support and implement labelled numeric samples only in Usage & Limits.
+- [x] Validate reported values/zero preservation and sample attribution with tests/build/types/lint/contracts and responsive checks.
+- [x] Deploy frontend only with rollback and verify existing graph/workflow bindings unchanged.

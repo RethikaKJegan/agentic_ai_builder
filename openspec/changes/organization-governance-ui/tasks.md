@@ -1,0 +1,4 @@
+- [x] Implement three read-only governance pages without draft editors or simulated records.
+- [x] Verify actual policy values, session permission attribution, audit search/filter/inspection, missing data and errors.
+- [x] Validate frontend types, lint, build, domain tests and desktop/mobile browser flows.
+- [x] Deploy frontend only with rollback; verify live presentation and unchanged backend/workflow bindings.

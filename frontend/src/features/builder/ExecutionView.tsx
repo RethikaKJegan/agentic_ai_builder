@@ -19,8 +19,8 @@ import { ProcurementProjectCommunication } from "./ProcurementProjectCommunicati
 import { AgentCommunication } from "./AgentCommunication";
 import { ApprovalControl } from "@/features/runs/ServerRunView";
 const nodeTypes = { mesh: MeshNode };
-export function ExecutionView({ trace, workflow, onDesign }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void }) {
-  const [scope,setScope]=useState<"project"|"run">("project");
+export function ExecutionView({ trace, workflow, onDesign, preferRun = false }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void; preferRun?: boolean }) {
+  const [scope,setScope]=useState<"project"|"run">(preferRun?"run":"project");
   const [selected, setSelected] = useState("");
   const graph = trace.revision?.workflow;
   const nodes = useMemo(

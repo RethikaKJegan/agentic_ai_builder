@@ -65,7 +65,7 @@ it("shows disabled policy honestly without simulated targets", async () => {
     targets: [],
   });
   render(<DatabaseOperations canManage />);
-  expect(await screen.findByText(/No database operation targets are enabled/)).toBeVisible();
+  expect(await screen.findByText(/No available database operation targets are enabled/)).toBeVisible();
   expect(screen.queryByRole("button", { name: "Read record" })).toBeNull();
 });
 

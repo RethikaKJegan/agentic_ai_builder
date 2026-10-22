@@ -71,7 +71,7 @@ export function CinematicHero() {
             transition={{ duration: 0.8 }}
             className="font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-primary-deep"
           >
-            MESH / The agentic AI operating system
+            PraxilonAI / The agentic AI operating system
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 24 }}

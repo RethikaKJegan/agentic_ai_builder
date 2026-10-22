@@ -1,0 +1,3 @@
+- [x] Remove requested annotations and simplify mock usage descriptions without changing values.
+- [x] Validate frontend build/types/lint/tests and desktop/mobile UI.
+- [x] Deploy frontend only and verify unchanged backend/workflow bindings.

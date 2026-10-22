@@ -14,9 +14,9 @@ export function LogoMark({ className = "h-6 w-6" }: { className?: string }) {
 
 export function Logo({ to = "/" as "/" | "/app" }) {
   return (
-    <Link to={to} className="flex items-center gap-2" aria-label="MESH home">
+    <Link to={to} className="flex items-center gap-2" aria-label="PraxilonAI home">
       <LogoMark />
-      <span className="font-display text-[17px] font-semibold tracking-tight">MESH</span>
+      <span className="font-display text-[17px] font-semibold tracking-tight">PraxilonAI</span>
     </Link>
   );
 }

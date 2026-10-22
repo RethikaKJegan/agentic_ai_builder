@@ -97,7 +97,7 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
       done: validated,
       reason: !saved
         ? "Save the draft first."
-        : "Use Validate and resolve authoritative field/Registry errors.",
+        : "Use Prepare & Activate and resolve any validation or Registry errors.",
     },
     {
       title: "Simulate safely",
@@ -110,7 +110,7 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
       done: approved,
       reason: !validated
         ? "Validate first, then Submit for approval or ask an authorized approver."
-        : "Use Submit for approval, then an authorized reviewer uses Approve.",
+        : "Prepare & Activate submits this revision and continues when the current reviewer has approval authority.",
     },
     {
       title: "Publish approved revision",
@@ -130,7 +130,7 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
       title: "Execute or receive event",
       done: !!live?.latest_run_id,
       reason:
-        "Use Run published on Workflows for manual workflows, or wait for a configured active trigger event.",
+        "Use Run in this editor for the active manual release, or wait for a configured active trigger event.",
     },
     {
       title: "Monitor run",
@@ -145,16 +145,16 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
     },
   ];
   const next = dirty
-    ? "Review the working draft, then Save draft."
+    ? "Review changes, then choose Prepare & Activate."
     : !validated
-      ? "Review the plan and configuration, then Validate."
+      ? "Review the plan and configuration, then choose Prepare & Activate."
       : !approved
-        ? "Submit this revision for approval."
+        ? "Choose Prepare & Activate to continue approval."
         : !published
-          ? "Publish this approved revision."
+          ? "Choose Prepare & Activate to publish and activate."
           : !currentActive
-            ? "Review trigger setup, then Activate the published revision."
-            : "Select Execution to monitor recorded runs; use Workflows to start an authorized manual run.";
+            ? "Review trigger setup, then choose Prepare & Activate."
+            : "Use Run here to start the active release and open Execution.";
   const currentIndex = dirty
     ? 5
     : !validated

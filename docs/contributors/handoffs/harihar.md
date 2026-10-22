@@ -377,3 +377,53 @@ openspec/changes/automatic-kg-planning/verification.md.
 ## Fresh manual Run intent — 18 October 2026
 
 Fixed RunWorkflowDialog reusing the global payload-based execution key and permanently returning an older terminal run. Each new dialog now supplies its own key while retries/double-clicks inside that dialog preserve idempotency. Focused UI tests 3 passed; typecheck, scoped lint, contracts, strict OpenSpec and isolated production build passed. A broader UI file retains one pre-existing missing-useNavigate mock failure, with 24 passing tests. Frontend activation retains prior assets and leaves backend/worker/configuration unchanged. No workflow or external action was executed by verification. See openspec/changes/fresh-manual-run-intent/verification.md.
+
+
+## MESH branding cleanup — 22 October 2026
+
+Deployed frontend-only: MESH favicon, enlarged sidebar branding with Powered by PraxilonAI, sidebar creation shortcut removed, and only the two highlighted Google notices removed. Existing account controls preserved. Build/typecheck/lint, 77 tests and isolated/live desktop/mobile checks passed. No backend code/configuration or database changes; read-only before/after comparisons confirmed unchanged graph, connection IDs and workflow bindings. Evidence: openspec/changes/mesh-branding-cleanup/verification.md. Owner visual acceptance pending.
+
+
+## Organization governance UI — 22 October 2026
+
+Deployed three read-only Governance tabs: Organization Policies, Roles & Responsibilities, Oversight & Accountability. Document sections, session permissions and searchable runtime evidence replace draft editors/dashboard content on Governance only. Actual scope and missing organization information remain explicit; no fabricated policy, grant or audit data. Build/types/lint, shared contracts, strict OpenSpec, 76 tests and isolated/live desktop/mobile checks passed. Backend/configuration/database untouched; existing graph, connections and workflow bindings unchanged. Evidence: openspec/changes/organization-governance-ui/verification.md. Owner visual acceptance pending.
+
+
+## Governance Usage & Limits separation — 22 October 2026
+
+Deployed frontend-only replacement of Roles & Responsibilities with Usage & Limits. Organization Policies retains approvals/safeguards/access/data references; numerical boundaries now live only in the Execution/Delegation/Spending reference. Revision agent limits and runtime aggregate usage remain separate, with missing values/periods labelled and actual zero preserved. Expandable source details, revision selection, pagination and retrieval time included. No backend/API/configuration/database changes. Build/types/lint/contracts/OpenSpec, 77 tests and isolated/live desktop/mobile checks passed; workflow and graph bindings unchanged. Evidence: openspec/changes/governance-usage-limits/verification.md. Owner visual acceptance pending.
+
+
+## Usage limit sample presentation — 22 October 2026
+
+Verified maxChildren exists in the browser hierarchy editor and Builder.addChild; current monitoring does not report it. Retained the concept as Sub-agents per agent. Missing numeric Usage & Limits values now carry explicit Sample badges and a visible illustrative-data notice; real values and zeros remain unchanged. No samples enter runtime configuration or storage. Build/types/lint/contracts/OpenSpec, 77 tests and isolated/live desktop/mobile checks passed. Frontend-only deployment preserved backend processes, graph, connections and workflow bindings. Pending Monitoring/navigation changes remain unexecuted. Evidence: openspec/changes/usage-limit-samples/verification.md. Owner visual acceptance pending.
+
+
+## Runs monitoring consolidation — 22 October 2026
+
+Deployed frontend-only migration of standalone Monitoring into Runs. Four real API KPI cards precede existing run/reply controls; expandable runtime details retain usage, triggers, guardrails, audit, distribution, traces and pagination. Monitoring navigation/command/shortcut entries removed and old URL redirects to Runs. Approvals preserved throughout. Yellow Governance sample banner/badges replaced by a neutral example legend and starred illustrative numbers. Build/types/lint/contracts/OpenSpec, 90 tests and isolated/live desktop/mobile checks passed. Backend/API/configuration/database untouched; graph/connections/workflow bindings unchanged. Evidence: openspec/changes/runs-monitoring-consolidation/verification.md. Owner visual acceptance pending.
+
+
+## Usage mock annotation cleanup — 22 October 2026
+
+At explicit user request for a mock presentation, removed Usage & Limits asterisks, example legend, sample caveats and shared organization reference notice. Displayed numbers and interactions unchanged. Fallback values remain presentation mocks, not verified production measurements or enforced settings. Build/types/lint/contracts/OpenSpec, 77 tests and isolated/live desktop/mobile checks passed. Frontend-only deployment preserved backend processes, auth/connections, graph and workflow bindings. Evidence: openspec/changes/usage-mock-cleanup/verification.md. Owner visual acceptance pending.
+
+
+## Operations stale-source recovery and Approvals navigation — 22 October 2026
+
+Removed only shell Operate Approvals entry; approval pages/controls/other links preserved. Independently reproduced Operations 404 caused by an old policy connection ID absent from current owned connections. Minimal DataOperations.status patch omits only missing owned sources from discovery; context/action authorization remains strict and no policy grants are remapped. Live status now 200 with existing history and no current targets (explicit policy needed for new connections). Backend service restarted, worker unchanged. Config/policy hashes, connection/graph/workflow/refresh data preserved. 33 backend and 77 frontend tests, build/types/lint/contracts/OpenSpec, isolated/live desktop/mobile checks passed. Evidence: openspec/changes/operations-missing-source/verification.md. Owner acceptance pending.
+
+
+## Editor preparation/run and policy guide — 22 October 2026
+
+Deployed frontend-only Prepare & Activate / Activate changes plus active-version Run inside the editor. Exact saved/release reconciliation, sequential existing APIs, permission/approval pause, stop-on-error/edit, progress and explicit recovery preserved. Run retains input/idempotency handling, checks active release ID/version, then selects accepted run and opens Execution (including run-first procurement view). Governance placeholders replaced with approved imperative policy guidance and absent technical rows hidden; actual requirements/safeguards preserved. Mobile canvas toolbar no longer overlaps progress. Build/types/lint/contracts/OpenSpec and 115 tests passed; intercepted desktop/mobile lifecycle+Execution flows and read-only live checks passed. No real workflow activation/run or external action during verification. Backend/configuration/databases unchanged; source/graph/workflow bindings preserved. Evidence: openspec/changes/editor-launch-and-policy-guide/verification.md. Owner acceptance pending.
+
+
+## PraxilonAI visible branding — 22 October 2026
+
+Deployed frontend-only visible MESH→PraxilonAI branding across landing/login/app/title metadata/catalog publisher labels. Removed Powered by attribution and only the shared Knowledge sidebar/mobile-menu entry. Three-dot mark and Knowledge route/API/other access preserved; internal identifiers/storage unchanged. Build/types/lint/contracts/OpenSpec, 72 domain tests and isolated/live desktop/mobile checks passed. Backend/configuration/connections/workflow bindings unchanged. Evidence: openspec/changes/praxilonai-branding/verification.md. Owner visual acceptance pending.
+
+
+## Data Intelligence notice removal — 22 October 2026
+
+Removed only the requested shared-demo identity paragraph. All tabs/controls/backend behavior preserved. Build/TypeScript/lint, 78 existing tests and live desktop/mobile checks passed. Frontend-only deployment; auth/connections/graph/workflow bindings unchanged. Evidence: openspec/changes/data-intelligence-notice-removal/verification.md.

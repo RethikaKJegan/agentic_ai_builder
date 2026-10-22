@@ -1,0 +1,3 @@
+# Runs monitoring consolidation and neutral example attribution
+Move standalone Monitoring UI into Runs: one compact Total runs/Active/Completed/Failed row followed by existing run/reply content and collapsed runtime monitoring details retaining existing data, pagination and polling. Remove Monitoring navigation, command and keyboard entries; redirect the old frontend route to Runs for bookmarks. Preserve Approvals everywhere. Reuse the existing monitoring API without backend changes.
+Remove the yellow Usage & Limits notice and yellow Sample badges. Retain a small neutral example legend with starred example numbers so illustrative data is still distinguishable; retain real values and zero. No runtime or database changes.

@@ -1,0 +1,4 @@
+- [x] Skip missing owned connections in catalog discovery without changing execution authority; clarify empty state.
+- [x] Remove only shell Approvals navigation item.
+- [x] Verify missing/other-owner/valid/error/authorization cases plus frontend tests/build/types/lint/contracts/browser checks.
+- [x] Activate minimal backend patch and frontend with rollback; verify actual Operations API and unchanged graph/workflow/connection bindings.

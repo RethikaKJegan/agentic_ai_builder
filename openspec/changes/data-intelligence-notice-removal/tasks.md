@@ -1,0 +1,3 @@
+- [x] Remove the exact notice JSX only.
+- [x] Build/typecheck/lint and verify the deployed page retains controls without the notice.
+- [x] Deploy frontend only with rollback and verify unchanged existing bindings.

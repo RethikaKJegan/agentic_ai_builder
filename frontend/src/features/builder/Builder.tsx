@@ -65,7 +65,7 @@ import {
 } from "@/domain/hierarchy";
 import { NODE_META } from "./nodeMeta";
 import { RevisionHistory } from "@/features/workflows/RevisionHistory";
-import { WorkflowControls } from "@/features/workflows/WorkflowControls";
+import { EditorWorkflowActions } from "@/features/workflows/EditorWorkflowActions";
 
 import { useWorkflowTrace } from "./useWorkflowTrace";
 import { AgentCommunication } from "./AgentCommunication";
@@ -124,6 +124,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mode, setMode] = useState<"design" | "hierarchy" | "execution">("design");
   const [underlying,setUnderlying]=useState(false);
+  const [executionIntent,setExecutionIntent]=useState("");
   const trace = useWorkflowTrace(workflow.id, mode === "execution");
   const isMobile = useIsMobile();
 
@@ -469,14 +470,14 @@ function Builder({ workflow }: { workflow: Workflow }) {
           {(["design", "hierarchy", "execution"] as const).map(view => <button type="button" role="tab" key={view} aria-selected={mode === view} onClick={() => { setMode(view); setPanel(null); }} className={`rounded-lg px-3 py-2 text-sm ${mode === view ? "bg-highlight font-medium text-primary" : "text-muted-foreground hover:bg-muted"}`}>{view === "design" ? "Design" : view === "hierarchy" ? "Agent hierarchy" : "Execution"}</button>)}
         </div>
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-          <WorkflowControls workflow={current} compact onStarted={()=>{setMode('execution');setPanel(null);}}/>
+          <EditorWorkflowActions workflow={current} onExecution={()=>{setMode("execution");setPanel(null);}} onStarted={run=>{trace.acceptRun(run);setExecutionIntent(run.run_id);setMode("execution");setPanel(null);}}/>
           <AgentCommunication workflow={current} trace={trace}/>
         </div>
       </div>
       {mode === "design" && <>
       {current.serverVersion && <RevisionHistory key={`${current.id}:${current.serverVersion}`} workflowId={current.id} latest={current.serverVersion} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
       {/* Toolbar */}
-      <div className={`absolute right-3 z-20 flex max-w-[calc(100%-24px)] items-center gap-2 rounded-xl border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur ${current.canonical?.metadata["procurement_plan"]&&!underlying?"bottom-12":"top-[120px] max-sm:top-[176px]"}`}>
+      <div className={`z-20 flex max-w-[calc(100%-24px)] items-center gap-2 rounded-xl border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur ${current.canonical?.metadata["procurement_plan"]&&!underlying?"absolute right-3 bottom-12":"mx-3 my-2 shrink-0 self-end"}`}>
         {!!current.canonical?.metadata['procurement_plan']&&<button onClick={()=>setUnderlying(v=>!v)} className="rounded-lg border px-3 py-1 text-xs">{underlying?'Show process overview':'Edit underlying graph'}</button>}
         <div className="flex-1" />
         <button
@@ -574,7 +575,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
 
 
       </>}
-      {mode === "execution" ? <div className="min-h-0 flex-1 overflow-hidden"><ExecutionView trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="flex min-h-0 flex-1 flex-col"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setUnderlying(true);setSelectedId(id);setPanel("inspector");}} /></div> : current.canonical?.metadata["procurement_plan"]&&!underlying ? <ProcurementProjectCommunication workflowId={current.id} version={current.serverVersion??1} view="design"/> : (
+      {mode === "execution" ? <div className="min-h-0 flex-1 overflow-hidden"><ExecutionView key={executionIntent||"history"} preferRun={!!executionIntent} trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="flex min-h-0 flex-1 flex-col"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setUnderlying(true);setSelectedId(id);setPanel("inspector");}} /></div> : current.canonical?.metadata["procurement_plan"]&&!underlying ? <ProcurementProjectCommunication workflowId={current.id} version={current.serverVersion??1} view="design"/> : (
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Canvas */}
         <div className="relative min-w-0 flex-1 bg-canvas">

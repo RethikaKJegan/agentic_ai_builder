@@ -7,7 +7,7 @@ import { useRunFeed, sharedRead } from "@/features/runs/useRunFeed";
 import { ApprovalControl, ServerRunView } from "@/features/runs/ServerRunView";
 import { AgentControlTab } from "@/features/governance/AgentControlTab";
 import Governance from "@/screens/app.governance";
-import { LiveRuntimePanel } from "@/screens/app.monitoring";
+import { RunMonitoring } from "@/features/runs/RunMonitoring";
 import type { RunEvent } from "./contracts.generated";
 const run={run_id:"run_phase6",workflow_id:"wf_phase6",workflow_version:1,status:"running" as const,approvals:[]};
 const event=(sequence:number):RunEvent=>({event_id:`evt_${sequence}`,run_id:run.run_id,workflow_id:run.workflow_id,workflow_version:1,event_type:"node.started",timestamp:"2026-10-17T00:00:00Z",source:"runtime",details:{node_id:`node_${sequence}`,recorded_sequence:sequence}});
@@ -62,11 +62,11 @@ it("local organization-admin flags cannot enable draft control edits for a serve
   useMesh.setState({role:"org-admin"} as never);useBackend.setState({session:{...useBackend.getState().session!,auth:{...useBackend.getState().session!.auth,roles:["viewer"],permissions:["runs.view"]}}});
   render(<AgentControlTab />);expect(screen.getByRole("switch",{name:"organization agent execution"})).toBeDisabled();expect(screen.getByText(/Effective browser draft:/)).toBeVisible();
 });
-it("describes production rules as read-only while browser drafts remain separate",()=>{
+it("keeps organization governance read-only without draft editors",()=>{
   vi.spyOn(api,"monitoring").mockReturnValue(new Promise(()=>{}));render(<Governance />);
-  expect(screen.getByText(/Enforced production rules are read-only/)).toBeVisible();expect(screen.getByRole("tab",{name:"Draft policies"})).toBeVisible();
+  expect(screen.getByText("Read-only",{exact:true})).toBeVisible();expect(screen.getByRole("tab",{name:"Organization Policies"})).toBeVisible();expect(screen.queryByRole("tab",{name:"Draft policies"})).toBeNull();
 });
 it("shows disabled source, schedule, preparation and versioned enforcement scope",async()=>{
   vi.spyOn(api,"monitoring").mockResolvedValue({runs:{total:0,active:0,completed:0,failed:0},events:0,usage:{llm_calls:0,tool_calls:0,tokens:0,retries:0,estimated_cost_usd:0},latest:[],sources:[{binding_id:"binding",workflow_id:"workflow",provider_id:"generic_rest",health:"disabled",release_state:"disabled",delivery:"poll",event_type:"row.created",workflow_version:3,source:"resource",preparation_succeeded:false,baseline_ready:false,schedule:"*/5 * * * *",timezone:"UTC"}],policies:[{workflow_id:"workflow",version:2,scope:"workspace:local-workspace",enforcement:"active_release",policy_version:7,action_approval_required:true,agents:[]}]});
-  render(<LiveRuntimePanel />);await screen.findByText(/Release: disabled/);expect(screen.getByText(/Preparation: not ready/)).toHaveTextContent("Schedule:");expect(screen.getByText(/cannot receive active automation/)).toBeVisible();expect(screen.getByText(/Policy version 7/)).toHaveTextContent("v2");
+  render(<RunMonitoring />);fireEvent.click(screen.getByText("Runtime monitoring",{exact:true}));await screen.findByText(/Release: disabled/);expect(screen.getByText(/Preparation: not ready/)).toHaveTextContent("Schedule:");expect(screen.getByText(/cannot receive active automation/)).toBeVisible();expect(screen.getByText(/Policy version 7/)).toHaveTextContent("v2");
 });

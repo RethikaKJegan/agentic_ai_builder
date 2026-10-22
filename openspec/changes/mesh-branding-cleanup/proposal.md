@@ -1,0 +1,3 @@
+# MESH branding and Integrations notice cleanup
+
+Owner requested three UI-only changes: replace the Lovable browser icon with the existing MESH mark; remove only the sidebar Create workflow shortcut and enlarge the sidebar branding with readable Powered by PraxilonAI attribution; remove only the two marked informational banners under Google accounts (shared identity and callback registration). Preserve account cards, granted permissions, actions, runtime errors, setup-unavailable feedback and all navigation/creation controls elsewhere. No backend, authentication, OAuth/configuration, graph, database or workflow changes.

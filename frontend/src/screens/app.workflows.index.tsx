@@ -89,7 +89,7 @@ export default function WorkflowsPage() {
         </div>
         <Link to="/app" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-deep"><Plus className="h-4 w-4" /> New</Link>
       </div>
-      <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted-foreground">Describe → generate → review and edit → configure → save → validate → approve → publish → activate → run and monitor. Open a workflow for its lifecycle guidance. Draft revision and active release are separate.</p>
+      <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted-foreground">Open a workflow, review its design and configuration, then use Prepare & Activate. Run the active release directly in the editor and follow its progress in Execution. Draft revisions and active releases remain separate.</p>
       {backend.status === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading server workflows…</p>}
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <span className={`h-2 w-2 rounded-full ${backend.liveStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />

@@ -58,10 +58,10 @@ export default function Overview() {
   };
   return <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
     <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-5xl font-semibold tracking-tight md:text-6xl">What should we automate today?</motion.h1>
-    <p className="mt-3 text-lg text-muted-foreground">Describe your requirement in one prompt. MESH uses available sources and knowledge to draft the workflow, agents, tools and approvals.</p>
+    <p className="mt-3 text-lg text-muted-foreground">Describe your requirement in one prompt. PraxilonAI uses available sources and knowledge to draft the workflow, agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
           <textarea value={description} disabled={planning} onChange={(e) => setDescription(e.target.value)} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
-      <p className="mt-4 text-sm text-muted-foreground">Describe what you need. MESH identifies relevant connected sources and saved knowledge automatically. Include any additional source links or details in your prompt.</p>
+      <p className="mt-4 text-sm text-muted-foreground">Describe what you need. PraxilonAI identifies relevant connected sources and saved knowledge automatically. Include any additional source links or details in your prompt.</p>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}

@@ -29,7 +29,7 @@ export default function Login() {
   return <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-atmosphere px-4 py-12">
     <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid opacity-30" />
     <div className="relative w-full max-w-md">
-      <Link href="/" className="mb-8 flex items-center justify-center gap-2 font-display text-xl font-semibold"><LogoMark className="h-7 w-7" />MESH</Link>
+      <Link href="/" className="mb-8 flex items-center justify-center gap-2 font-display text-xl font-semibold"><LogoMark className="h-7 w-7" />PraxilonAI</Link>
       <section className="rounded-2xl border border-border bg-background/90 p-6 shadow-soft backdrop-blur-xl sm:p-9" aria-labelledby="login-title">
         <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><LockKeyhole className="h-5 w-5" /></div>
         <h1 id="login-title" className="font-display text-2xl font-semibold tracking-tight">Welcome back</h1>

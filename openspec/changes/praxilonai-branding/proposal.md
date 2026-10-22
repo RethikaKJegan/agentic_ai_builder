@@ -1,0 +1,2 @@
+# PraxilonAI visible branding
+Replace visible MESH product name with PraxilonAI across landing/login/application copy, accessible labels, page titles and frontend catalog publisher labels. Remove Powered by attribution. Keep existing three-dot icon. Remove only Knowledge shell navigation entry (including shared mobile navigation), leaving Knowledge route, API and other access unchanged. Preserve imports, node types, browser storage and existing user content/identifiers. No backend, workflow or database changes.

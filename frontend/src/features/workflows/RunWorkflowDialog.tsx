@@ -1,7 +1,7 @@
 "use client";
 import { displayText } from "@/lib/display-text";
 import { fieldMessages, InputError } from "@/api/feedback";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { api, ApiError, type RunRecord } from "@/api/client";
 import { useBackend } from "@/api/state";
@@ -10,7 +10,7 @@ import { Link } from "@/lib/navigation";
 import { ApiFeedback } from "./ApiFeedback";
 import { parseRunInputs, eventOnly } from "./run-inputs";
 
-export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWorkflow; onClose: () => void }) {
+export function RunWorkflowDialog({ workflow, onClose, onStarted, beforeRun, autoStart = false }: { workflow: CanonicalWorkflow; onClose: () => void; onStarted?: (run: RunRecord) => void; beforeRun?: () => Promise<void>; autoStart?: boolean }) {
   const backend = useBackend(); const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false); const [error, setError] = useState<Error>(); const [run, setRun] = useState<RunRecord>();
   const executionKey = useRef<string | undefined>(undefined);
@@ -27,7 +27,9 @@ export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWo
       // One explicit dialog is one execution intent. Retries keep this key;
       // reopening Run must not return an older terminal run for identical inputs.
       executionKey.current ??= crypto.randomUUID();
-      setRun((await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs }, executionKey.current)).run);
+      await beforeRun?.();
+      const accepted = (await api.request("execute_workflow", { workflow_id: workflow.workflow_id, workflow_version: workflow.version, inputs }, executionKey.current)).run;
+      setRun(accepted);onStarted?.(accepted);
       void backend.refreshOverview();
     } catch (caught) {
       if (caught instanceof ApiError && ["INVALID_INPUT", "OPERATION_NOT_AUTHORIZED", "REVISION_CONFLICT", "WORKFLOW_NOT_FOUND", "REVISION_NOT_PUBLISHED"].includes(caught.error.error_code)) submittedPayload.current = undefined;
@@ -35,6 +37,11 @@ export function RunWorkflowDialog({ workflow, onClose }: { workflow: CanonicalWo
     }
     finally { submitting.current = false; setBusy(false); }
   };
+  useEffect(() => {
+    if (autoStart && !automatic && workflow.inputs.length === 0) void submit();
+    // A mounted dialog represents one explicit Run click; retries retain its execution key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <Dialog open onOpenChange={open => { if (!open && !submitting.current) onClose(); }}>
     <DialogContent className="max-h-[85vh] w-[calc(100vw-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy) event.preventDefault(); }}>
       <DialogHeader><DialogTitle>Run {displayText(workflow.name)}</DialogTitle><DialogDescription>Published revision v{workflow.version}. Submission starts real execution subject to its approval and budget policies.</DialogDescription></DialogHeader>

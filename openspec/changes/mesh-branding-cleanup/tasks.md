@@ -1,0 +1,5 @@
+- [x] Replace favicon assets/metadata with the existing MESH mark.
+- [x] Tidy responsive sidebar branding and remove only its Create workflow shortcut.
+- [x] Remove only the two highlighted Google informational banners.
+- [x] Verify account controls, responsive/collapsed shell, favicon, types/lint/build and focused tests.
+- [x] Deploy frontend only with rollback and verify live desktop/mobile presentation.

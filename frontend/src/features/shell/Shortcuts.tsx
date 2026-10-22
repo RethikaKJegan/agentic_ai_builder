@@ -3,7 +3,7 @@ import { useNavigate } from "@/lib/navigation";
 import { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const JUMPS = { o: "/app", w: "/app/workflows", a: "/app/agents", r: "/app/runs", m: "/app/monitoring", p: "/app/approvals", g: "/app/governance" } as const;
+const JUMPS = { o: "/app", w: "/app/workflows", a: "/app/agents", r: "/app/runs", p: "/app/approvals", g: "/app/governance" } as const;
 
 export const SHORTCUTS: { keys: string; label: string; group: string }[] = [
   { keys: "⌘/Ctrl K", label: "Search or jump to…", group: "Global" },
@@ -13,7 +13,6 @@ export const SHORTCUTS: { keys: string; label: string; group: string }[] = [
   { keys: "G then A", label: "Go to Agents", group: "Global" },
   { keys: "G then P", label: "Go to Approvals", group: "Global" },
   { keys: "G then R", label: "Go to Runs", group: "Global" },
-  { keys: "G then M", label: "Go to Monitoring", group: "Global" },
   { keys: "G then G", label: "Go to Governance", group: "Global" },
   { keys: "⌘/Ctrl Z", label: "Undo", group: "Workflow editor" },
   { keys: "⌘/Ctrl ⇧ Z", label: "Redo", group: "Workflow editor" },

@@ -4,7 +4,7 @@ import { displayText } from "@/lib/display-text";
 import { usePathname } from "next/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
 import { useCallback, useState, type ReactNode } from "react";
-import { Database, Activity, History, Inbox, Settings as SettingsIcon, ShieldCheck, BookOpen, Plug, Store, Bell, Bot, ChevronsLeft, ChevronsRight, LayoutGrid, Plus, RotateCcw, Search, Workflow as WfIcon } from "lucide-react";
+import { Database, History, Settings as SettingsIcon, ShieldCheck, Plug, Store, Bell, Bot, ChevronsLeft, ChevronsRight, LayoutGrid, RotateCcw, Search, Workflow as WfIcon } from "lucide-react";
 import { LogoMark } from "@/components/mesh/Logo";
 import { CommandPalette } from "@/features/shell/CommandPalette";
 import { ShortcutsDialog, useGlobalShortcuts } from "@/features/shell/Shortcuts";
@@ -31,12 +31,9 @@ const NAV = [
   { group: "Control", items: [
     { to: "/app/integrations", label: "Integrations", icon: Plug, exact: false },
     { to: "/app/data-intelligence", label: "Data Intelligence", icon: Database, exact: false },
-    { to: "/app/knowledge", label: "Knowledge", icon: BookOpen, exact: false },
   ] },
   { group: "Operate", items: [
-    { to: "/app/approvals", label: "Approvals", icon: Inbox, exact: false },
     { to: "/app/runs", label: "Runs", icon: History, exact: false },
-    { to: "/app/monitoring", label: "Monitoring", icon: Activity, exact: false },
     { to: "/app/governance", label: "Governance", icon: ShieldCheck, exact: false },
     { to: "/app/settings", label: "Settings", icon: SettingsIcon, exact: false },
   ] },
@@ -76,16 +73,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className={`hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 md:flex ${collapsed || inBuilder ? "w-[60px]" : "w-[60px] lg:w-60"}`}>
-        <div className="flex h-14 items-center gap-2 px-4">
-          <Link to="/" aria-label="MESH home"><LogoMark /></Link>
-          {!(collapsed || inBuilder) && (
-            <span className="hidden font-display font-semibold lg:inline">MESH</span>
-          )}
-        </div>
-        <div className="px-3 pb-2">
-          <Link to="/app" className={`flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-deep ${collapsed || inBuilder ? "w-9" : "w-9 lg:w-full"}`} title="Create workflow">
-            <Plus className="h-4 w-4" />
-            {!(collapsed || inBuilder) && <span className="hidden lg:inline">Create workflow</span>}
+        <div className="flex min-h-24 items-center justify-center px-3 py-5 lg:justify-start lg:px-4">
+          <Link to="/" aria-label="PraxilonAI home" title="PraxilonAI" className="flex min-w-0 items-center gap-3">
+            <LogoMark className="h-9 w-9 shrink-0" />
+            {!(collapsed || inBuilder) && <div className="hidden min-w-0 lg:block">
+              <span className="block font-display text-xl font-semibold tracking-tight">PraxilonAI</span>
+            </div>}
           </Link>
         </div>
         <nav className="flex-1 space-y-5 px-3 pt-3">
@@ -103,7 +96,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 >
                   <it.icon className="h-4 w-4 shrink-0" />
                   {!(collapsed || inBuilder) && <span className="hidden flex-1 lg:inline">{displayText(it.label)}</span>}
-                  {!(collapsed || inBuilder) && it.to === "/app/approvals" && ready && pending > 0 && <span className="hidden rounded-full lg:inline bg-warning/15 px-1.5 text-[11px] font-medium text-warning">{pending}</span>}
                 </Link>
               ))}
             </div>
@@ -118,7 +110,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
-          <Link to="/app" className="md:hidden"><LogoMark /></Link>
+          <Link to="/app" className="flex min-w-0 items-center gap-2 md:hidden" aria-label="PraxilonAI workspace"><LogoMark className="h-8 w-8 shrink-0" /><span className="min-w-0"><span className="block font-display text-sm font-semibold">PraxilonAI</span></span></Link>
           <span className="hidden rounded-md border border-border px-2 py-1 text-xs font-medium sm:inline">Local workspace</span>
           <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground sm:flex">
             <span>/</span>
@@ -152,7 +144,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </PopoverContent>
           </Popover>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background" aria-label="User menu">M</DropdownMenuTrigger>
+            <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background" aria-label="User menu">P</DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <p>Local workspace</p>
@@ -168,7 +160,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {ready ? children : <div className="mx-auto max-w-5xl space-y-4 p-6 md:p-10" aria-label="Loading workspace"><Skeleton className="h-9 w-72" /><Skeleton className="h-4 w-96 max-w-full" /><div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}
         </main>
         <nav className="flex border-t border-border md:hidden">
-          {NAV.flatMap((g) => [...g.items]).filter((it) => ["/app", "/app/workflows", "/app/agents", "/app/approvals", "/app/monitoring"].includes(it.to)).map((it) => (
+          {NAV.flatMap((g) => [...g.items]).filter((it) => ["/app", "/app/workflows", "/app/agents", "/app/approvals", "/app/runs"].includes(it.to)).map((it) => (
             <Link key={it.to} to={it.to} activeOptions={{ exact: it.exact }} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-muted-foreground" activeProps={{ className: "!text-primary" }}>
               <it.icon className="h-4 w-4" />{displayText(it.label)}
             </Link>

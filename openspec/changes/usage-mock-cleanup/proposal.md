@@ -1,0 +1,2 @@
+# Mock usage presentation cleanup
+User explicitly requests a mock presentation without stars, example labels or caveats. Remove the Usage & Limits example legend, inline markers and sample/source disclaimers plus the shared organization reference notice. Retain numbers, tables, navigation and all backend behavior unchanged. Do not describe mock presentation values as verified production evidence in completion reports.

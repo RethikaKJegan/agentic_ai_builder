@@ -1,0 +1,2 @@
+# Governance usage and limits separation
+Replace Roles & Responsibilities with Usage & Limits. Move numerical execution limits out of Organization Policies, leaving approvals, safeguards, access and data references. Present Execution, Delegation and Spending as detailed read-only tables with expandable measurement/source/period explanations. Preserve runtime aggregates separately from revision limits, missing values as Not reported and actual reported zero values as zero. No backend, API, storage or workflow changes.

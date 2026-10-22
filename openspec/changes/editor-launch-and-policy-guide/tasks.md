@@ -1,0 +1,5 @@
+- [x] Implement exact-version Prepare & Activate with progress, pause/failure handling and safe recovery.
+- [x] Add active-release Run in editor and open the exact accepted run in Execution.
+- [x] Replace Governance placeholders with policy guidance and omit missing technical metadata.
+- [x] Verify sequential transitions, permission boundaries, failures, duplicates, dirty/active revision separation and policy rendering; build/types/lint/contracts and responsive browser checks.
+- [x] Deploy frontend only with rollback and verify live read-only editor/governance plus unchanged backend/workflow state.

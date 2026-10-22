@@ -1,0 +1,4 @@
+- [x] Move Monitoring to Runs with compact real-data KPIs and expandable details; remove standalone navigation and redirect old route.
+- [x] Remove yellow sample UI while retaining concise neutral example attribution.
+- [x] Validate KPIs, unavailable/stale data, details/pagination and approval preservation with tests/types/lint/build/contracts/browser checks.
+- [x] Deploy frontend only with rollback and live desktop/mobile verification.

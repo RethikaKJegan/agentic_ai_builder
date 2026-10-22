@@ -163,12 +163,19 @@ class DataOperations:
         for target in policy['targets']:
             if (target['workspace_id'], target['subject_id']) != (workspace, owner):
                 continue
-            for action in target['operations']:
-                # Catalog discovery does not require a fabricated key value.
+            # A removed or no-longer-owned connection must not break the catalog.
+            # Exact connection authority is still checked by context() on every action.
+            try:
                 with self.store.transaction(write=False) as db:
                     _, connection = self.manager.owned(db, auth, target['connection_id'])
                     row = db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',
                                      (target['connection_id'], connection['metadata_revision'])).fetchone()
+            except ApiFailure as exc:
+                if exc.code == 'DATA_SOURCE_NOT_FOUND' and exc.status == 404:
+                    continue
+                raise
+            for action in target['operations']:
+                # Catalog discovery does not require a fabricated key value.
                 dataset = next((d for d in json.loads(row[0])['datasets'] if d['dataset_id'] == target['dataset_id']), None) if row else None
                 if not dataset or connection['connection_status'] != 'connected':
                     break

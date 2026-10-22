@@ -1,0 +1,3 @@
+- [x] Rename visible product branding and remove attribution; remove Knowledge sidebar entry only.
+- [x] Verify no legacy visible branding, responsive logo layout and preserved Knowledge route; build/types/lint/domain/contracts.
+- [x] Deploy frontend only with rollback and verify unchanged workflow/backend/connection bindings.

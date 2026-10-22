@@ -137,8 +137,10 @@ export default function DatabaseOperations({ canManage }: { canManage: boolean }
       {!status && !error && <p role="status">Loading authorized database targets…</p>}
       {status && status.targets.length === 0 && (
         <p role="status" className="rounded-xl border p-4 text-sm">
-          No database operation targets are enabled for your account. A server policy must
-          explicitly allow the datasets, operations and writable fields.
+          No available database operation targets are enabled for your account. A target may
+          reference a removed or disconnected connection. Connect the intended source and
+          have its current connection and dataset explicitly authorized by server policy;
+          existing permissions are not transferred automatically.
         </p>
       )}
       {target && (

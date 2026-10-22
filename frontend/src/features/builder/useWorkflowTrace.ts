@@ -62,6 +62,6 @@ export function useWorkflowTrace(workflowId: string, enabled = true) {
     return states;
   }, [events]);
   const activeEdges = useMemo(() => new Set(events.flatMap((event) => Array.isArray(event.details?.["selected_edges"]) ? event.details["selected_edges"].filter((id): id is string => typeof id === "string") : [])), [events]);
-  return { available, runs, runId, selectRun: setSelection, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error:error??feed.error, loading:feed.loading, hasMoreRuns:!!cursor, loadMoreRuns:()=>setHistoryPage(cursor??undefined), hasMoreEvents:feed.hasMore, loadMoreEvents:feed.refresh, retry: () => setAttempt(n => n + 1) };
+  return { available, runs, runId, selectRun: setSelection, acceptRun: (run: RunRecord) => { if (run.workflow_id !== workflowId) return; setRuns(current => [run, ...current.filter(item => item.run_id !== run.run_id)]); setSelection(run.run_id); setHistoryPage(undefined); setAttempt(value => value + 1); }, run: current?.run ?? null, revision: current?.revision ?? null, events, runState, activeEdges, error:error??feed.error, loading:feed.loading, hasMoreRuns:!!cursor, loadMoreRuns:()=>setHistoryPage(cursor??undefined), hasMoreEvents:feed.hasMore, loadMoreEvents:feed.refresh, retry: () => setAttempt(n => n + 1) };
 }
-export type WorkflowTrace = ReturnType<typeof useWorkflowTrace>;
+export type WorkflowTrace = Omit<ReturnType<typeof useWorkflowTrace>, "acceptRun">;

@@ -1,0 +1,4 @@
+- [x] Replace roles with Usage & Limits and remove duplicated policy limits.
+- [x] Verify scope separation, missing/zero values, optional reported limits and existing audit behavior.
+- [x] Pass build/types/lint/contracts/domain tests and responsive browser checks.
+- [x] Deploy frontend only and verify live UI plus unchanged workflow/backend bindings.

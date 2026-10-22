@@ -1,0 +1,2 @@
+# Usage limit sample presentation
+Keep the supported direct-child concept (frontend hierarchy.ts maxChildren, used by Builder.addChild), labelled Sub-agents per agent. Fill absent Usage & Limits numeric cells with explicitly tagged deterministic illustrative values, preserving all reported values including zero. Distinguish sample scopes and source/period availability. Samples are UI-only, never sent to backend or stored as configuration. Other pending Monitoring/navigation requests remain unexecuted.

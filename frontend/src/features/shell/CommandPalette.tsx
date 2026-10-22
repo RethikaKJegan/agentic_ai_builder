@@ -1,7 +1,7 @@
 import { displayText } from "@/lib/display-text";
 import { useNavigate } from "@/lib/navigation";
 import { useEffect } from "react";
-import { Database, Activity, Bot, BookOpen, History, Inbox, LayoutGrid, Plug, Plus, Settings, ShieldCheck, Store, Workflow as WfIcon } from "lucide-react";
+import { Database, Bot, BookOpen, History, Inbox, LayoutGrid, Plug, Plus, Settings, ShieldCheck, Store, Workflow as WfIcon } from "lucide-react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useMesh } from "@/domain/store";
 
@@ -46,7 +46,6 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/knowledge" }))}><BookOpen className="mr-2 h-4 w-4" /> Knowledge</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/approvals" }))}><Inbox className="mr-2 h-4 w-4" /> Approvals</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/runs" }))}><History className="mr-2 h-4 w-4" /> Runs</CommandItem>
-          <CommandItem onSelect={() => go(() => navigate({ to: "/app/monitoring" }))}><Activity className="mr-2 h-4 w-4" /> Monitoring</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/governance" }))}><ShieldCheck className="mr-2 h-4 w-4" /> Governance</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/app/settings" }))}><Settings className="mr-2 h-4 w-4" /> Settings</CommandItem>
         </CommandGroup>
