@@ -1,0 +1,4 @@
+- [x] Add three preset/toggle groups with local apply/persistence and conditional language selector.
+- [x] Add compact actual-limit reference and link to the existing tab without adding tabs.
+- [x] Verify preset/custom/apply/reload behavior and no runtime/state crossover; types/lint/build/contracts/domain and responsive checks.
+- [x] Deploy frontend only with rollback; verify live UI and unchanged backend/workflow bindings.

@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, BookOpen, ChevronRight, FileText, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { api } from "@/api/client";
+import { AgentBehaviourPanel } from "@/features/governance/AgentBehaviourPanel";
 import { UsageLimits } from "@/features/governance/UsageLimits";
 import { Link } from "@/lib/navigation";
 import { displayText } from "@/lib/display-text";
@@ -31,6 +32,7 @@ export default function Governance() {
   const [retrieved, setRetrieved] = useState("");
   const [revision, setRevision] = useState(0);
   const [cursor, setCursor] = useState<string>();
+  const [activeTab,setActiveTab]=useState("policies");
   const [section, setSection] = useState<Section>("approvals");
   const [search, setSearch] = useState("");
   const [eventType, setEventType] = useState("");
@@ -55,7 +57,7 @@ export default function Governance() {
       <div><p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Organization governance</p><h1 className="font-display text-3xl font-semibold tracking-tight">Governance</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">A clear reference for policies, usage boundaries and execution evidence.</p></div>
       <div className="flex items-center gap-3"><Tag>Read-only</Tag><button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">{loading ? "Loading…" : "Refresh evidence"}</button></div>
     </div>
-    <Tabs defaultValue="policies">
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
       <TabsList className="mb-6 grid h-auto w-full grid-cols-1 gap-1 rounded-xl bg-muted/50 p-1 sm:grid-cols-3">
         <TabsTrigger className="justify-start gap-2 whitespace-normal px-3 py-3 sm:justify-center" value="policies"><BookOpen className="h-4 w-4 shrink-0"/>Organization Policies</TabsTrigger>
         <TabsTrigger className="justify-start gap-2 whitespace-normal px-3 py-3 sm:justify-center" value="limits"><SlidersHorizontal className="h-4 w-4 shrink-0"/>Usage &amp; Limits</TabsTrigger>
@@ -64,6 +66,7 @@ export default function Governance() {
       <ApiFeedback error={error}/>
       {loading && <p role="status" className="mb-4 text-sm text-muted-foreground">Loading reported policies and activity…</p>}
       <TabsContent value="policies" className="mt-0">
+        <AgentBehaviourPanel policies={policies} onViewLimits={()=>setActiveTab("limits")}/>
         <div className="grid gap-6 lg:grid-cols-[225px_minmax(0,1fr)]">
           <nav aria-label="Policy sections" className="space-y-1 lg:border-r lg:pr-5"><p className="mb-3 px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Policy reference</p>{sections.map(item => <button type="button" key={item.id} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors ${section === item.id ? "bg-primary/5 font-medium text-primary" : "text-muted-foreground hover:bg-muted"}`}>{item.label}<ChevronRight className="h-3.5 w-3.5"/></button>)}</nav>
           <section aria-label={selectedSection.label} className="min-w-0">

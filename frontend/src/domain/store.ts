@@ -10,6 +10,7 @@ import { makeAgent } from "./templates";
 import { DEFAULT_CONTROLS, resolveControls, usageFrom, type AgentControls, type Policy, type Role } from "./governance";
 import type { ControlContext } from "./simulator";
 import { draftStorage } from "./draft-storage";
+import { DEFAULT_AGENT_BEHAVIOUR, type AgentBehaviourPreferences } from "./agent-behaviour";
 import { fromCanonical, hasWorkflowEdits, ownsAgent, stableSnapshot, olderDocument } from "@/api/mapping";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
 
@@ -23,6 +24,8 @@ export const SEED_POLICIES: Policy[] = [
 ];
 
 interface MeshState {
+  agentBehaviourPreferences: AgentBehaviourPreferences;
+  applyAgentBehaviourPreferences: (preferences: AgentBehaviourPreferences) => void;
   acceptWorkflow: (document: CanonicalWorkflow) => void;
   observeWorkflows: (documents: CanonicalWorkflow[]) => void;
   workflows: Workflow[];
@@ -57,6 +60,7 @@ function seed() {
   return {
     workflows: [] as Workflow[], agents: [] as Agent[], runs: [] as Run[],
     controls: DEFAULT_CONTROLS,
+    agentBehaviourPreferences: structuredClone(DEFAULT_AGENT_BEHAVIOUR),
     connectors: SEED_CONNECTORS.map((c) => ({ ...c, status: "needs-config" as const, account: undefined })),
     knowledge: [] as KnowledgeSource[], installed: {} as Record<string, string>,
     role: "builder" as Role,
@@ -68,6 +72,7 @@ export const useMesh = create<MeshState>()(
   persist(
     (set, get) => ({
       ...seed(),
+      applyAgentBehaviourPreferences: (preferences) => set({agentBehaviourPreferences: structuredClone(preferences)}),
       acceptWorkflow: (document) => {
         const mapped = fromCanonical(document);
         set((s) => ({ workflows: [mapped.workflow, ...s.workflows.filter((w) => w.id !== mapped.workflow.id)],
@@ -193,7 +198,7 @@ export const useMesh = create<MeshState>()(
       skipHydration: true,
       partialize: (s) => {
         const drafts=s.workflows.filter(w=>w.serverVersion===undefined||hasWorkflowEdits(w,s.agents));
-        return {workflows:drafts.map(w=>({...w,tabConflict:undefined})),agents:s.agents.filter(a=>a.origin!=="backend"||drafts.some(w=>ownsAgent(w,a))),runs:s.runs,activity:s.activity,connectors:s.connectors,knowledge:s.knowledge,installed:s.installed,role:s.role,policies:s.policies,controls:s.controls,audit:s.audit};
+        return {agentBehaviourPreferences:s.agentBehaviourPreferences,workflows:drafts.map(w=>({...w,tabConflict:undefined})),agents:s.agents.filter(a=>a.origin!=="backend"||drafts.some(w=>ownsAgent(w,a))),runs:s.runs,activity:s.activity,connectors:s.connectors,knowledge:s.knowledge,installed:s.installed,role:s.role,policies:s.policies,controls:s.controls,audit:s.audit};
       },
     },
   ),

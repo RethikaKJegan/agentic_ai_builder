@@ -427,3 +427,8 @@ Deployed frontend-only visible MESH→PraxilonAI branding across landing/login/a
 ## Data Intelligence notice removal — 22 October 2026
 
 Removed only the requested shared-demo identity paragraph. All tabs/controls/backend behavior preserved. Build/TypeScript/lint, 78 existing tests and live desktop/mobile checks passed. Frontend-only deployment; auth/connections/graph/workflow bindings unchanged. Evidence: openspec/changes/data-intelligence-notice-removal/verification.md.
+
+
+### Agent behaviour browser preferences — 2026-10-22
+
+Deployed frontend-only Agent Behaviour & Safety inside Organization Policies: three groups, nine presets, eight switches, conditional language and explicit Apply with browser persistence. Manual changes show Custom; existing limits reference links to the same Usage & Limits tab. Exactly three tabs preserved. No runtime enforcement, agent/workflow payload, backend, database or contract changes. 79 targeted tests, lint/types/build/contracts/OpenSpec and isolated/live desktop/mobile flows passed; auth/connections/graph/workflow bindings unchanged. Evidence: openspec/changes/agent-behaviour-preferences/verification.md. Owner visual acceptance pending.
