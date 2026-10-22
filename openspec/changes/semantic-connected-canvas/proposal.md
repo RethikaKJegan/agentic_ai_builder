@@ -1,0 +1,3 @@
+# Connect and clarify the existing Semantic Intelligence canvas
+
+Update the existing Data Intelligence Semantic Intelligence visualization in place. Resolve field-only concepts using actual primary/foreign keys, preserve evidence-backed business predicates, attach unresolved attributes to their owning dataset, and connect genuine source components through their owned connection/workspace provenance. Distinguish provenance from business claims and retain original relationship review IDs/direction. Improve the same canvas layout and inspection. No new graph tab/service, metadata/API contract change, source writes, mapping reviews, executable join additions, planner changes or approval actions.

@@ -1,7 +1,8 @@
 "use client";
 import { displayText } from "@/lib/display-text";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import dagre from "@dagrejs/dagre";
+import { semanticCanvasLayout } from "@/domain/semantic-canvas-layout";
+import { semanticCanvas } from "@/domain/semantic-canvas";
 import { api } from "@/api/client";
 import type { SemanticView as OntologyView } from "@/api/semantic-kg";
 import type { RelationshipView } from "@/api/data-relationships";
@@ -9,6 +10,15 @@ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import AutomaticRefresh from "./AutomaticRefresh";
 import KGRelationshipReview from "./KGRelationshipReview";
 
+function wrapLabel(text: string, width: number) {
+  const lines: string[] = []; let line = "";
+  for (const word of text.split(/\s+/)) {
+    if (line && (line + " " + word).length > width) { lines.push(line); line = ""; }
+    line = line ? line + " " + word : word;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 const control = "rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-40";
 export default function BusinessOntology({
   canManage,
@@ -63,45 +73,17 @@ export default function BusinessOntology({
   const connections = useMemo(
     () => [...new Map((view?.entities ?? []).flatMap(e => e.sources.map(source =>
       [source.connection_id, displayText(source.label).split(" / ")[0]] as const))).entries()], [view]);
-  const connectionDatasets = new Set((view?.datasets ?? []).filter(d => !connection || d.connection_id === connection).map(d => d.dataset_id));
-  const scopedEdges = (view?.relationships ?? []).filter(e => !connection ||
-    (connectionDatasets.has(e.source_dataset_id) && connectionDatasets.has(e.target_dataset_id)));
-  const scopedEntities = (view?.entities ?? []).map(e => ({...e, sources: e.sources.filter(s => !connection || s.connection_id === connection)})).filter(e => e.sources.length > 0);
-  const semanticMatches=new Set(scopedEdges.filter(e=>e.predicate?.toLowerCase().includes(search.toLowerCase())).flatMap(e=>[e.source_entity_id,e.target_entity_id]));
-  const filtered = scopedEntities.filter(
-    (e) =>
-      (!connection || e.sources.some((s) => s.connection_id === connection)) &&
-      (`${e.label} ${e.sources.map((s) => s.label).join(" ")}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) || (!!search&&semanticMatches.has(e.entity_id))),
-  );
-  const visible = filtered.slice(0, 80);
-  const ids = new Set(visible.map((e) => e.entity_id));
-  const edges = scopedEdges.filter(
-    (e) => ids.has(e.source_entity_id) && ids.has(e.target_entity_id) && (semanticFilter==="all"||e.status===semanticFilter),
-  );
-  const layout = useMemo(() => {
-    const graph = new dagre.graphlib.Graph({ multigraph: true });
-    graph.setGraph({ rankdir: "LR", nodesep: 65, ranksep: 170, marginx: 70, marginy: 70 });
-    graph.setDefaultEdgeLabel(() => ({}));
-    for (const entity of visible) graph.setNode(entity.entity_id, { width: 210, height: 95 });
-    for (const edge of edges)
-      graph.setEdge(
-        edge.source_entity_id,
-        edge.target_entity_id,
-        { width: 155, height: 40 },
-        edge.relationship_id,
-      );
-    dagre.layout(graph);
-    return graph;
-    // The Semantic Intelligence revision versions entities, relationships and reviews together.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view?.revision, search, connection,semanticFilter]);
+  const canvas = useMemo(() => view ? semanticCanvas(view, { connection, search, status: semanticFilter }) :
+    { entities: [], relationships: [], resolvedIdentifiers: 0 }, [view, connection, search, semanticFilter]);
+  const visible = canvas.entities;
+  const edges = canvas.relationships;
+  const layout = useMemo(() => semanticCanvasLayout(canvas), [canvas]);
   const width = Math.max(500, layout.graph().width ?? 500),
     height = Math.max(320, layout.graph().height ?? 320);
-  const label = (id: string) => view?.entities.find((e) => e.entity_id === id)?.label ?? id;
+  const label = (id: string) => canvas.entities.find((e) => e.entity_id === id)?.label ?? id;
   const entity = visible.find(e => e.entity_id === selected);
-  const edge = edges.find(e => e.relationship_id === selected);
+  const selectedLink = edges.find(e => e.relationship_id === selected);
+  const edge = selectedLink?.original;
   async function saveReview(body: object) {
     if (!view || !edge || !canManage || view.stale || lock.current) return;
     lock.current = true;
@@ -141,7 +123,7 @@ export default function BusinessOntology({
       {view && (
         <>
           <p role="status" className="text-xs text-muted-foreground">
-            {visible.length} entities · {edges.length} relationships · {view.build_status === "ready" ? "Current" : view.build_status}
+            {visible.filter(n => n.kind === "entity").length} entities · {edges.filter(e => e.kind === "business").length} relationships · {edges.filter(e => e.kind !== "business").length} source/field links · {view.build_status === "ready" ? "Current" : view.build_status}
             {view.semantic_status.state === "running" || view.semantic_status.state === "queued" ? " · Updating relationship meanings…" : ""}
           </p>
           {view.semantic_status.last_error && <p role="alert" className="text-sm text-destructive">{view.semantic_status.last_error}</p>}
@@ -189,16 +171,11 @@ export default function BusinessOntology({
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Drag to pan. Solid edges are confirmed business meanings; dashed edges need review.
-            Faded edges are rejected. Arrows show business direction.
+            Blue links show business relationships; dashed blue meanings need review. Slate links show source membership or field ownership.
+            Every entity is connected through its metadata evidence. Drag to pan or zoom to inspect.
           </p>
-          {filtered.length > 80 && (
-            <p className="text-sm">
-              Showing 80 of {filtered.length} entities. Search or filter to inspect the rest.
-            </p>
-          )}
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="h-[min(65vh,650px)] min-h-[360px] min-w-0 overflow-hidden rounded-xl border bg-muted/10">
+          <div className={`grid min-w-0 gap-4 ${entity || selectedLink ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
+            <div className="h-[min(75vh,820px)] min-h-[440px] min-w-0 overflow-hidden rounded-xl border bg-muted/10">
               <svg
                 ref={svg}
                 role="img"
@@ -242,6 +219,9 @@ export default function BusinessOntology({
                   >
                     <path d="M 0 0 L 10 5 L 0 10 z" className="fill-primary" />
                   </marker>
+                  <marker id={`${marker}-source`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" className="fill-slate-500" />
+                  </marker>
                 </defs>
                 {edges.map((e) => {
                   const route = layout.edge({
@@ -253,7 +233,8 @@ export default function BusinessOntology({
                     <g
                       key={e.relationship_id}
                       {...activate(e.relationship_id)}
-                      aria-label={displayText(`Relationship ${label(e.source_entity_id)} ${e.predicate??"meaning needs review"} ${label(e.target_entity_id)}`)}
+                      aria-label={displayText(`${e.kind === "business" ? "Relationship" : "Source link"} ${label(e.source_entity_id)} ${e.predicate} ${label(e.target_entity_id)}${e.kind === "business" && (e.status === "ambiguous" || e.status === "needs_review") ? " · meaning needs review" : ""}`)}
+                      data-source={e.source_entity_id} data-target={e.target_entity_id} data-link-kind={e.kind}
                       className={`cursor-pointer ${e.status === "rejected" ? "opacity-30" : ""}`}
                     >
                       <path
@@ -263,40 +244,40 @@ export default function BusinessOntology({
                               `${i ? "L" : "M"} ${p.x} ${p.y}`,
                           )
                           .join(" ")}
-                        className="stroke-primary"
+                        className={e.kind === "business" ? "stroke-primary" : "stroke-slate-400"}
                         strokeWidth={selected === e.relationship_id ? 3 : 1.7}
-                        strokeDasharray={e.status === "confirmed" ? undefined : "7 5"}
+                        strokeDasharray={e.kind !== "business" ? "3 4" : e.status === "confirmed" ? undefined : "7 5"}
                         fill="none"
-                        markerEnd={e.predicate?`url(#${marker})`:undefined}
+                        markerEnd={`url(#${e.kind === "business" ? marker : `${marker}-source`})`}
                       />
                       <rect
-                        x={route.x - 80}
-                        y={route.y - 20}
-                        width="160"
-                        height="40"
+                        x={route.x - 85}
+                        y={route.y - 26}
+                        width="170"
+                        height="52"
                         rx="6"
-                        className="fill-background stroke-primary/20"
+                        className={e.kind === "business" ? "fill-background stroke-primary/20" : "fill-background stroke-slate-300"}
                       />
                       <text
                         x={route.x}
-                        y={route.y - 2}
+                        y={route.y - 10}
                         textAnchor="middle"
                         fontSize="12"
                         className="fill-foreground"
                       >
-                        {(e.predicate??"Meaning needs review").length > 24 ? (e.predicate??"").slice(0,23)+"…" : e.predicate??"Meaning needs review"}
+                        {wrapLabel(e.predicate, 26).map((line, i) => <tspan key={i} x={route.x} dy={i ? 13 : 0}>{line}</tspan>)}
                       </text>
                       <text
                         x={route.x}
-                        y={route.y + 14}
+                        y={route.y + 19}
                         textAnchor="middle"
                         fontSize="10"
                         className="fill-muted-foreground"
                       >
-                        {e.status.replaceAll("_", " ")}
+                        {e.status === "ambiguous" ? "meaning needs review" : e.status.replaceAll("_", " ")}
                       </text>
                       <title>
-                        {e.predicate} · {e.status} · Technical link {e.technical_status}
+                        {e.predicate} · {e.status} · {e.kind === "business" ? `Technical link ${e.original?.technical_status}` : "Metadata evidence; no business claim"}
                       </title>
                     </g>
                   );
@@ -309,7 +290,9 @@ export default function BusinessOntology({
                       {...activate(e.entity_id)}
                       className="cursor-pointer"
                       aria-label={displayText(`Entity ${e.label}`)}
+                      data-entity-id={e.entity_id} data-node-kind={e.kind}
                     >
+                      {e.kind === "entity" ? (
                       <ellipse
                         cx={p.x}
                         cy={p.y}
@@ -318,24 +301,25 @@ export default function BusinessOntology({
                         className="fill-background stroke-primary"
                         strokeWidth={selected === e.entity_id ? 3 : 1.5}
                       />
+                      ) : <rect x={p.x - 105} y={p.y - 36} width="210" height="72" rx="14" className="fill-slate-50 stroke-slate-400" strokeWidth={selected === e.entity_id ? 3 : 1.5} />}
                       <text
                         x={p.x}
-                        y={p.y - 5}
+                        y={p.y - 12}
                         textAnchor="middle"
                         fontSize="15"
                         fontWeight="600"
                         className="fill-foreground"
                       >
-                        {displayText(e.label.length > 23 ? e.label.slice(0, 22) + "…" : e.label)}
+                        {wrapLabel(displayText(e.label), 25).map((line,i) => <tspan key={i} x={p.x} dy={i ? 17 : 0}>{line}</tspan>)}
                       </text>
                       <text
                         x={p.x}
-                        y={p.y + 17}
+                        y={p.y + 29}
                         textAnchor="middle"
                         fontSize="11"
                         className="fill-muted-foreground"
                       >
-                        {e.sources.length} source mappings
+                        {e.kind === "workspace" ? "Source membership" : e.kind === "connection" ? "Database connection" : `${e.sources.length} source mappings`}
                       </text>
                       <title>{displayText(e.label)}</title>
                     </g>
@@ -347,7 +331,8 @@ export default function BusinessOntology({
               <h3 className="font-semibold">Inspect</h3>
               {entity ? <>
                 <h4 className="font-medium">{displayText(entity.label)}</h4>
-                <p className="break-all text-xs text-muted-foreground">Entity ID: {entity.entity_id}</p>
+                <p className="break-all text-xs text-muted-foreground">{entity.kind === "entity" ? "Entity" : "Source"} ID: {entity.entity_id}</p>
+                {entity.kind !== "entity" && <p className="text-sm text-muted-foreground">Source membership connects existing metadata. It does not establish business relationships or authorize joins.</p>}
                 {entity.sources.map(source => <details key={source.node_id} className="rounded-lg border p-3">
                   <summary className="cursor-pointer break-words text-sm">{displayText(source.label)}</summary>
                   <p className="mt-2 text-xs">{source.role} · {source.status} · {source.types.join(", ")}</p>
@@ -355,8 +340,9 @@ export default function BusinessOntology({
                   <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{displayText(JSON.stringify({connection_id: source.connection_id, node_id: source.node_id, metadata: source.metadata}, null, 2))}</pre>
                 </details>)}
               </> : edge ? <>
-                <h4 className="font-medium">{displayText(label(edge.source_entity_id))} → {edge.predicate ?? "Meaning needs review"} → {displayText(label(edge.target_entity_id))}</h4>
+                <h4 className="font-medium">{displayText(label(selectedLink!.source_entity_id))} → {selectedLink!.predicate} → {displayText(label(selectedLink!.target_entity_id))}</h4>
                 <p className="text-sm">Business: {edge.status} · Technical: {edge.technical_status}</p>
+                {selectedLink!.source_entity_id !== edge.source_entity_id && <p className="text-xs text-muted-foreground">Stored direction for review: {displayText(label(edge.source_entity_id))} → {edge.predicate} → {displayText(label(edge.target_entity_id))}. The canvas uses the equivalent inverse wording.</p>}
                 <KGRelationshipReview
                   key={`${edge.relationship_id}:${edge.semantic_evidence_hash}:${edge.inferred_at}:${edge.reviewed_at}`}
                   edge={edge} disabled={!canManage || busy || view.stale} save={body => void saveReview(body)}
@@ -369,6 +355,10 @@ export default function BusinessOntology({
                 <details open className="rounded-lg border p-3"><summary className="cursor-pointer text-sm">Evidence trace</summary>
                   <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{displayText(JSON.stringify({relationship_id: edge.relationship_id, graph_revision: view.graph_revision, inferred_at: edge.inferred_at, reviewed_at: edge.reviewed_at, evidence_refs: edge.evidence_refs, provenance: edge.provenance, evidence: edge.evidence, qualification: edge.qualification}, null, 2))}</pre>
                 </details>
+              </> : selectedLink ? <>
+                <h4 className="font-medium">{displayText(label(selectedLink.source_entity_id))} → {selectedLink.predicate} → {displayText(label(selectedLink.target_entity_id))}</h4>
+                <p className="text-sm">{selectedLink.kind === "provenance" ? "Source membership" : "Field ownership"} · Metadata evidence</p>
+                {selectedLink.evidence.map((e,i) => <p key={i} className="break-words text-sm text-muted-foreground">{displayText(e)}</p>)}
               </> : <p className="text-sm text-muted-foreground">Select a node or relationship to inspect its source metadata and evidence trace.</p>}
             </aside>
           </div>

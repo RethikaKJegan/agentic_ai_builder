@@ -114,3 +114,15 @@ for (const stale of [false,true]) it(`disables review for ${stale?"stale":"read-
   expect(screen.getByRole("button",{name:"Confirm relationship"})).toBeDisabled();
   expect(screen.getByLabelText("Relationship label")).toBeDisabled();
 });
+
+it("inspects membership evidence without offering a business-relationship review", async()=>{
+  const v=view(), call=vi.spyOn(api,"knowledgeGraph").mockResolvedValue(v);
+  render(<BusinessOntology canManage />);
+  const links=await screen.findAllByRole("button",{name:/^Source link .*includes source/});
+  fireEvent.click(links[0]!);
+  const details=screen.getByLabelText("Semantic Intelligence details");
+  expect(details).toHaveTextContent("Metadata evidence");
+  expect(details).toHaveTextContent("membership");
+  expect(screen.queryByRole("button",{name:"Confirm relationship"})).not.toBeInTheDocument();
+  expect(call.mock.calls.every(args=>args[0]===undefined)).toBe(true);
+});

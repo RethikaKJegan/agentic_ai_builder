@@ -1,5 +1,9 @@
 # Handoff — Harihar
 
+## Connected existing Semantic Intelligence canvas — 2026-10-22
+
+Deployed an in-place frontend canvas update: key-backed identifier resolution, truthful source membership for disconnected components, retained original semantic predicates/review authority, compact label-aware layout and scoped inspection. Current live view: 29 entities + 3 sources, 42 existing relationships + 5 source links, zero isolated nodes. 22 focused tests, types/lint/build/contracts/OpenSpec and isolated/live desktop/mobile checks pass. Backend graph, workflow scope/steps/approval gates and connection IDs verified unchanged; frontend alone restarted. See `docs/semantic-intelligence-canvas.md` and `openspec/changes/semantic-connected-canvas/tasks.md`.
+
 ## Fixed workspace website login — 2026-10-22
 
 Owner-authorized source implementation adds Launch Workspace → /login → /app,
