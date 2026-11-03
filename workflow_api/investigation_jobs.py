@@ -53,13 +53,16 @@ class InvestigationJobs:
     def list(self,auth):
         auth,scope=self.service.authorize(auth)
         with self.store.transaction(write=False) as db:
-            rows=db.execute('SELECT document FROM business_investigation_plans WHERE workspace=? AND owner=? ORDER BY rowid DESC LIMIT 50',scope).fetchall()
+            rows=db.execute('SELECT p.document FROM business_investigation_plans p LEFT JOIN business_investigation_metadata m ON m.workspace=p.workspace AND m.owner=p.owner AND m.workflow_id=p.workflow_id WHERE p.workspace=? AND p.owner=? AND m.deleted_at IS NULL ORDER BY p.rowid DESC LIMIT 50',scope).fetchall()
             runs=db.execute('SELECT document FROM business_investigation_runs WHERE workspace=? AND owner=? ORDER BY rowid DESC LIMIT 100',scope).fetchall()
             jobs=db.execute('SELECT document FROM business_investigation_jobs WHERE workspace=? AND owner=? ORDER BY rowid DESC LIMIT 50',scope).fetchall()
+            metadata={r[0]:dict(name=r[1],deleted=r[2]) for r in db.execute('SELECT workflow_id,display_name,deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=?',scope).fetchall()}
         run_docs=[json.loads(r[0]) for r in runs];items=[]
         for row in rows:
-            p=json.loads(row[0]);r=next((r for r in run_docs if r['workflow_id']==p['workflow_id']),None)
-            items.append(dict(workflow_id=p['workflow_id'],objective=p['objective'],created_at=p['created_at'],node_count=len(p['graph']['nodes']),run_id=r['run_id'] if r else None,status=r['status'] if r else 'planned'))
+            p=json.loads(row[0]);meta=metadata.get(p['workflow_id'],{})
+            if meta.get('deleted'):continue
+            r=next((r for r in run_docs if r['workflow_id']==p['workflow_id']),None)
+            items.append(dict(workflow_id=p['workflow_id'],display_name=meta.get('name') or p['objective'],objective=p['objective'],created_at=p['created_at'],node_count=len(p['graph']['nodes']),run_id=r['run_id'] if r else None,status=r['status'] if r else 'planned'))
         return dict(items=items,jobs=[self.public(json.loads(r[0])) for r in jobs])
 
     def tick(self):

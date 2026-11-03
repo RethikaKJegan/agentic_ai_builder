@@ -57,7 +57,7 @@ def retrieval(knowledge,tmp_path):
     groups={}
     for m in k['source_mappings']:
         if m['id'] in ('mapping:engine_build_date','mapping:invoice_model'):continue
-        groups.setdefault((m['source_role'],m['collection']),{})[m['field_path']]=dict(name=m['field_path'],types=[next(t for t in m['stored_datatypes'] if t in ('string','integer','number','date','datetime','ObjectId'))])
+        groups.setdefault((m['source_role'],m['collection']),{})[m['field_path']]=dict(name=m['field_path'],types=[next(t for t in m['stored_datatypes'] if t in ('string','integer','number','date','datetime','ObjectId','boolean'))])
     for rule in k['identity_rules']:
         for side in ('source','target'):
             s=rule[side]
@@ -476,7 +476,64 @@ def test_compound_numeric_filters_and_multiple_statuses(retrieval):
     p=preview(x,'Show complaints over 100 hours and under 2000 hours.')
     assert len(p['intent']['filters'])==2
     assert [r['fields']['_id'] for r in execute(x,p)['records']]==['C123']
-    assert all(c['filters']=={} for c in x.reader.calls)
+    assert all(c['filters']=={} for c in x.reader.calls if c['collection']=='tickets')
+    assert all(c['filters'] for c in x.reader.calls if c['collection']!='tickets')
     i=interpret('Show OPENED and CLOSED complaints for engine E123.',x.snapshot)
     assert i['ambiguities'] and not i['filters']
     assert interpret('Show complaints with hours > 100 for engine E123.',x.snapshot)['unsupported']
+
+
+def test_controlled_code_and_engineer_native_reference_resolution(retrieval):
+    x=retrieval;x.reader.rows['tickets'][0]['complaintRecord']['natureOfCustomerComplaint']='symptom-key'
+    x.reader.rows['tickets'][0]['serviceEngineer']='engineer-key'
+    x.reader.rows['simpsoncodes']=[dict(_id='symptom-key',code='C07',description='Observed source description',codeType='COMPLAINT',active=True)]
+    x.reader.rows['users']=[dict(_id='engineer-key',name='Fixture engineer',active=False,password='must-not-project')]
+    r=execute(x,preview(x,'Compare complaint C123 with inspection.'))
+    views={v['kind']:v for v in r['resolved_references']}
+    assert views['controlled_code']['original_value']=='symptom-key'
+    assert views['controlled_code']['resolved_values']['mapping:code_description']=='Observed source description'
+    assert views['engineer']['status']=='resolved'
+    assert views['engineer']['resolved_values']['mapping:engineer_active'] is False
+    assert all('password' not in call['fields'] for call in x.reader.calls)
+    assert all(len(v['source_references'])==2 for v in views.values())
+
+
+def test_invoice_path_is_an_explicit_candidate_not_a_physical_merge(retrieval):
+    x=retrieval;x.reader.rows['enginedetails'].append(dict(_id='I2',engineSerialNumber='E123',invoiceDate=datetime(2025,12,2,tzinfo=timezone.utc)))
+    p=preview(x,'Check warranty for complaint C123.');r=execute(x,p)
+    invoice=next(s for s in p['steps'] if s['collection']=='enginedetails')
+    assert invoice['reference']['classification']=='candidate'
+    assert {v['fields']['_id'] for v in r['records'] if v['collection']=='enginedetails'}=={'I1','I2'}
+    assert len([c for c in r['ambiguous_associations'] if c['binding_id']=='identity:ticket_invoice_serial'])==2
+    assert not any(e['binding_id']=='identity:ticket_invoice_serial' for e in r['reference_edges'])
+    gap=next(g for g in r['normalized_gaps'] if g['fact_id']=='invoice_association')
+    assert gap['state']=='ambiguous_value' and len(gap['source_references'])==2
+    assert r['physical_engine_identity']=='unresolved' and not r['business_conclusions']
+
+
+@pytest.mark.parametrize('raw,state,value',[('21-03-2026','value','2026-03-21'),('31-04-2026','conversion_issue',None),('03/04/2026','ambiguous_value',None),(None,'unknown',None)])
+def test_source_date_raw_value_precision_and_no_fallback(retrieval,raw,state,value):
+    x=retrieval;x.reader.rows['jointinspectionreports'][0]['dateOfFailure']=raw
+    r=execute(x,preview(x,'Compare complaint C123 with inspection.'))
+    rec=next(v for v in r['records'] if v['collection']=='jointinspectionreports')
+    date=rec['values']['mapping:inspection_failure_date']
+    assert date['raw_value']==raw and date['state']==state and date['value']==value
+    assert date['precision']=='calendar_day' and not date['timezone_inferred']
+    assert rec['fields']['dateOfFailure']==raw
+
+
+def test_missing_lookup_has_an_actionable_gap_without_description_invention(retrieval):
+    x=retrieval;x.reader.rows['tickets'][0]['complaintRecord']['natureOfCustomerComplaint']='unknown-key'
+    r=execute(x,preview(x,'Show complaints for engine E123.'))
+    v=next(v for v in r['resolved_references'] if v['kind']=='controlled_code')
+    assert v['status']=='not_found' and not v['resolved_values']
+    g=next(g for g in r['normalized_gaps'] if g['fact_id']=='symptom_description')
+    assert g['recovery_action']['id']=='resolve_code' and g['impact']=='optional_supporting_evidence'
+
+
+def test_timeline_native_link_is_observation_not_verified_completion(retrieval):
+    x=retrieval;x.reader.rows['tickettimelines']=[dict(_id='T1',ticketId='C123',stage='CLOSED',description='Source closure explanation',createdAt=datetime(2026,1,3,tzinfo=timezone.utc)),dict(_id='T9',ticketId='C999',stage='CLOSED',description='Unrelated')]
+    r=execute(x,preview(x,'Show history for engine E123.'))
+    assert {v['fields']['_id'] for v in r['records'] if v['collection']=='tickettimelines'}=={'T1'}
+    assert next(q for q in r['evidence_requirements'] if q['fact_id']=='closure_rationale')['state']=='satisfied'
+    assert r['physical_engine_identity']=='unresolved' and not r['business_conclusions']

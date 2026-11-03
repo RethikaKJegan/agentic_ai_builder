@@ -1,6 +1,6 @@
 {
   "package_id": "simpson-connected-foundation",
-  "revision": 1,
+  "revision": 2,
   "schema_version": "simpson-knowledge-v1",
   "evidence_bundle_sha256": "fa1d087310047e3c795b4d51c8ca5c2c511ea7567e224c6e54ba9472159768c9",
   "new_concepts": [
@@ -238,7 +238,21 @@
     },
     {
       "id": "organization:person",
-      "layer": "common"
+      "layer": "common",
+      "properties": [
+        {
+          "name": "recorded_name",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded recorded name from users.name."
+        },
+        {
+          "name": "recorded_active",
+          "datatype": "boolean",
+          "required": false,
+          "description": "Recorded recorded active from users.active."
+        }
+      ]
     },
     {
       "id": "complaints:warranty_ticket",
@@ -352,6 +366,18 @@
           "datatype": "string",
           "required": false,
           "description": "Recorded model observation from enginedetails.engineModel."
+        },
+        {
+          "name": "invoice_company_reference",
+          "datatype": "reference",
+          "required": false,
+          "description": "Recorded invoice company reference from enginedetails.oem."
+        },
+        {
+          "name": "invoice_list",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded invoice list from enginedetails.listNo."
         }
       ]
     },
@@ -488,6 +514,53 @@
           "datatype": "datetime",
           "required": false,
           "description": "Timestamp of the assessment; supplied explicitly, not substituted from failure or registration dates."
+        }
+      ]
+    },
+    {
+      "id": "evidence:source_record",
+      "properties": [
+        {
+          "name": "controlled_code",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded controlled code from simpsoncodes.code."
+        },
+        {
+          "name": "controlled_description",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded controlled description from simpsoncodes.description."
+        },
+        {
+          "name": "controlled_code_type",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded controlled code type from simpsoncodes.codeType."
+        },
+        {
+          "name": "controlled_code_active",
+          "datatype": "boolean",
+          "required": false,
+          "description": "Recorded controlled code active from simpsoncodes.active."
+        },
+        {
+          "name": "timeline_stage",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded timeline stage from tickettimelines.stage."
+        },
+        {
+          "name": "timeline_description",
+          "datatype": "string",
+          "required": false,
+          "description": "Recorded timeline description from tickettimelines.description."
+        },
+        {
+          "name": "timeline_created",
+          "datatype": "datetime",
+          "required": false,
+          "description": "Recorded timeline created from tickettimelines.createdAt."
         }
       ]
     }
@@ -1022,6 +1095,63 @@
       "predicate": "monitors",
       "module_id": "monitoring",
       "status": "draft"
+    },
+    {
+      "id": "complaints:symptom_code",
+      "label": "Uses controlled record \u2014 reported_symptom",
+      "definition": "complaints:reported_symptom uses_controlled_record evidence:source_record. This defines meaning; source traversal requires an explicit supported binding.",
+      "layer": "domain",
+      "evidence": [
+        {
+          "source_id": "ref_retrieval_contract_v2",
+          "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+        }
+      ],
+      "confidence": 0.7,
+      "unknowns": [],
+      "source": "complaints:reported_symptom",
+      "target": "evidence:source_record",
+      "predicate": "uses_controlled_record",
+      "module_id": "complaints",
+      "status": "draft"
+    },
+    {
+      "id": "complaints:assigned_engineer",
+      "label": "References engineer \u2014 warranty_ticket",
+      "definition": "complaints:warranty_ticket references_engineer organization:person. This defines meaning; source traversal requires an explicit supported binding.",
+      "layer": "domain",
+      "evidence": [
+        {
+          "source_id": "ref_retrieval_contract_v2",
+          "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+        }
+      ],
+      "confidence": 0.7,
+      "unknowns": [],
+      "source": "complaints:warranty_ticket",
+      "target": "organization:person",
+      "predicate": "references_engineer",
+      "module_id": "complaints",
+      "status": "draft"
+    },
+    {
+      "id": "complaints:timeline_record",
+      "label": "Records case event for \u2014 source_record",
+      "definition": "evidence:source_record records_case_event_for complaints:warranty_ticket. This defines meaning; source traversal requires an explicit supported binding.",
+      "layer": "domain",
+      "evidence": [
+        {
+          "source_id": "ref_retrieval_contract_v2",
+          "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+        }
+      ],
+      "confidence": 0.7,
+      "unknowns": [],
+      "source": "evidence:source_record",
+      "target": "complaints:warranty_ticket",
+      "predicate": "records_case_event_for",
+      "module_id": "complaints",
+      "status": "draft"
     }
   ],
   "knowledge": {
@@ -1501,6 +1631,59 @@
                 {
                   "source_id": "ref_e80beaf3aba0ee4e02005ea9",
                   "quote": "engineSerialNumber"
+                }
+              ]
+            }
+          },
+          {
+            "name": "invoice_company_reference",
+            "business_meaning": "Recorded invoice company reference from enginedetails.oem.",
+            "business_datatype": "reference",
+            "stored_datatypes": [
+              "string",
+              "ObjectId"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "invoice_list",
+            "business_meaning": "Recorded invoice list from enginedetails.listNo.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
                 }
               ]
             }
@@ -2380,6 +2563,273 @@
             }
           ]
         }
+      },
+      {
+        "concept_id": "evidence:source_record",
+        "entity_kind": "class",
+        "aliases": [],
+        "attributes": [
+          {
+            "name": "controlled_code",
+            "business_meaning": "Recorded controlled code from simpsoncodes.code.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "controlled_description",
+            "business_meaning": "Recorded controlled description from simpsoncodes.description.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "controlled_code_type",
+            "business_meaning": "Recorded controlled code type from simpsoncodes.codeType.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "controlled_code_active",
+            "business_meaning": "Recorded controlled code active from simpsoncodes.active.",
+            "business_datatype": "boolean",
+            "stored_datatypes": [
+              "boolean"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "timeline_stage",
+            "business_meaning": "Recorded timeline stage from tickettimelines.stage.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "timeline_description",
+            "business_meaning": "Recorded timeline description from tickettimelines.description.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "timeline_created",
+            "business_meaning": "Recorded timeline created from tickettimelines.createdAt.",
+            "business_datatype": "datetime",
+            "stored_datatypes": [
+              "date",
+              "datetime"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": "instant",
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          }
+        ],
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "concept_id": "organization:person",
+        "entity_kind": "class",
+        "aliases": [],
+        "attributes": [
+          {
+            "name": "recorded_name",
+            "business_meaning": "Recorded recorded name from users.name.",
+            "business_datatype": "string",
+            "stored_datatypes": [
+              "string"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          },
+          {
+            "name": "recorded_active",
+            "business_meaning": "Recorded recorded active from users.active.",
+            "business_datatype": "boolean",
+            "stored_datatypes": [
+              "boolean"
+            ],
+            "unit": null,
+            "allowed_values": [],
+            "nullable": true,
+            "missing_behavior": "unknown",
+            "reference_target": null,
+            "min_count": 0,
+            "max_count": 1,
+            "date_precision": null,
+            "measurement_origin": "recorded",
+            "provenance": {
+              "origin": "configured_logic",
+              "evidence": [
+                {
+                  "source_id": "ref_retrieval_contract_v2",
+                  "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+                }
+              ]
+            }
+          }
+        ],
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
       }
     ],
     "relationship_details": [
@@ -2821,6 +3271,57 @@
             {
               "source_id": "ref_95891f25490dcf43787b5044",
               "quote": "MonitoredEnginePopulation"
+            }
+          ]
+        }
+      },
+      {
+        "relationship_id": "complaints:symptom_code",
+        "inverse_label": "inverse of uses_controlled_record",
+        "min_count": 0,
+        "max_count": 1,
+        "traversable": true,
+        "binding_id": "identity:complaint_code",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "relationship_id": "complaints:assigned_engineer",
+        "inverse_label": "inverse of references_engineer",
+        "min_count": 0,
+        "max_count": 1,
+        "traversable": true,
+        "binding_id": "identity:ticket_engineer",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "relationship_id": "complaints:timeline_record",
+        "inverse_label": "inverse of records_case_event_for",
+        "min_count": 0,
+        "max_count": 1,
+        "traversable": true,
+        "binding_id": "identity:timeline_ticket",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
             }
           ]
         }
@@ -3283,15 +3784,15 @@
           "string"
         ],
         "business_datatype": "date",
-        "conversion": "iso_date",
+        "conversion": "source_dmy_date",
         "unit": null,
         "missing_behavior": "unknown",
         "provenance": {
-          "origin": "application_behavior",
+          "origin": "configured_logic",
           "evidence": [
             {
-              "source_id": "ref_4a62bf039dcaa22ed4d09d25",
-              "quote": "ticketId"
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
             }
           ]
         }
@@ -3309,15 +3810,15 @@
           "string"
         ],
         "business_datatype": "date",
-        "conversion": "iso_date",
+        "conversion": "iso_calendar_component",
         "unit": null,
         "missing_behavior": "unknown",
         "provenance": {
-          "origin": "application_behavior",
+          "origin": "configured_logic",
           "evidence": [
             {
-              "source_id": "ref_4a62bf039dcaa22ed4d09d25",
-              "quote": "ticketId"
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
             }
           ]
         }
@@ -3706,6 +4207,272 @@
             }
           ]
         }
+      },
+      {
+        "id": "mapping:code_value",
+        "concept_id": "evidence:source_record",
+        "attribute": "controlled_code",
+        "source_role": "service",
+        "collection": "simpsoncodes",
+        "field_path": "code",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:code_description",
+        "concept_id": "evidence:source_record",
+        "attribute": "controlled_description",
+        "source_role": "service",
+        "collection": "simpsoncodes",
+        "field_path": "description",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:code_type",
+        "concept_id": "evidence:source_record",
+        "attribute": "controlled_code_type",
+        "source_role": "service",
+        "collection": "simpsoncodes",
+        "field_path": "codeType",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:code_active",
+        "concept_id": "evidence:source_record",
+        "attribute": "controlled_code_active",
+        "source_role": "service",
+        "collection": "simpsoncodes",
+        "field_path": "active",
+        "stored_datatypes": [
+          "boolean"
+        ],
+        "business_datatype": "boolean",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:engineer_name",
+        "concept_id": "organization:person",
+        "attribute": "recorded_name",
+        "source_role": "service",
+        "collection": "users",
+        "field_path": "name",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:engineer_active",
+        "concept_id": "organization:person",
+        "attribute": "recorded_active",
+        "source_role": "service",
+        "collection": "users",
+        "field_path": "active",
+        "stored_datatypes": [
+          "boolean"
+        ],
+        "business_datatype": "boolean",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:timeline_stage",
+        "concept_id": "evidence:source_record",
+        "attribute": "timeline_stage",
+        "source_role": "service",
+        "collection": "tickettimelines",
+        "field_path": "stage",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:timeline_description",
+        "concept_id": "evidence:source_record",
+        "attribute": "timeline_description",
+        "source_role": "service",
+        "collection": "tickettimelines",
+        "field_path": "description",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:timeline_created",
+        "concept_id": "evidence:source_record",
+        "attribute": "timeline_created",
+        "source_role": "service",
+        "collection": "tickettimelines",
+        "field_path": "createdAt",
+        "stored_datatypes": [
+          "date",
+          "datetime"
+        ],
+        "business_datatype": "datetime",
+        "conversion": "iso_datetime",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:invoice_company_reference",
+        "concept_id": "engines:engine_invoice_record",
+        "attribute": "invoice_company_reference",
+        "source_role": "service",
+        "collection": "enginedetails",
+        "field_path": "oem",
+        "stored_datatypes": [
+          "string",
+          "ObjectId"
+        ],
+        "business_datatype": "reference",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping:invoice_list",
+        "concept_id": "engines:engine_invoice_record",
+        "attribute": "invoice_list",
+        "source_role": "service",
+        "collection": "enginedetails",
+        "field_path": "listNo",
+        "stored_datatypes": [
+          "string"
+        ],
+        "business_datatype": "string",
+        "conversion": "identity",
+        "unit": null,
+        "missing_behavior": "unknown",
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
       }
     ],
     "identity_rules": [
@@ -3951,6 +4718,106 @@
             {
               "source_id": "ref_9a8531ed559d38f1ffbcd55f",
               "quote": "engineSerialNumber"
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity:complaint_code",
+        "kind": "direct_reference",
+        "source": {
+          "source_role": "service",
+          "collection": "tickets",
+          "field_path": "complaintRecord.natureOfCustomerComplaint"
+        },
+        "target": {
+          "source_role": "service",
+          "collection": "simpsoncodes",
+          "field_path": "_id"
+        },
+        "comparison": "native_type_and_value",
+        "permits_physical_merge": false,
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity:ticket_engineer",
+        "kind": "direct_reference",
+        "source": {
+          "source_role": "service",
+          "collection": "tickets",
+          "field_path": "serviceEngineer"
+        },
+        "target": {
+          "source_role": "service",
+          "collection": "users",
+          "field_path": "_id"
+        },
+        "comparison": "native_type_and_value",
+        "permits_physical_merge": false,
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity:timeline_ticket",
+        "kind": "direct_reference",
+        "source": {
+          "source_role": "service",
+          "collection": "tickettimelines",
+          "field_path": "ticketId"
+        },
+        "target": {
+          "source_role": "service",
+          "collection": "tickets",
+          "field_path": "_id"
+        },
+        "comparison": "native_type_and_value",
+        "permits_physical_merge": false,
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity:ticket_invoice_serial",
+        "kind": "candidate",
+        "source": {
+          "source_role": "service",
+          "collection": "tickets",
+          "field_path": "engineNo"
+        },
+        "target": {
+          "source_role": "service",
+          "collection": "enginedetails",
+          "field_path": "engineSerialNumber"
+        },
+        "comparison": "exact_serial_candidate",
+        "permits_physical_merge": false,
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
             }
           ]
         }
@@ -4309,6 +5176,24 @@
             {
               "source_id": "ref_f959a870c7c3585594b1312d",
               "quote": "InspectionReport"
+            }
+          ]
+        }
+      },
+      {
+        "id": "time:timeline_created",
+        "concept_id": "evidence:source_record",
+        "attribute": "timeline_created",
+        "meaning": "Recorded timeline created from tickettimelines.createdAt.",
+        "mapping_id": "mapping:timeline_created",
+        "precision": "instant",
+        "fallback_mapping_id": null,
+        "provenance": {
+          "origin": "configured_logic",
+          "evidence": [
+            {
+              "source_id": "ref_retrieval_contract_v2",
+              "quote": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal."
             }
           ]
         }

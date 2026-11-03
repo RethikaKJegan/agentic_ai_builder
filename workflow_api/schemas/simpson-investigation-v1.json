@@ -44,6 +44,7 @@
               "retrieve_warranty",
               "retrieve_replacement",
               "retrieve_history",
+              "retrieve_recurrence",
               "compare_inspection",
               "warranty_readiness",
               "prepare_summary",

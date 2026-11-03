@@ -1,0 +1,7 @@
+- [x] Extend versioned authoring mappings, native references and field date conversion.
+- [x] Implement conservative bounded lookup/candidate retrieval with provenance.
+- [x] Add reusable requirements, gap normalization and recovery registry.
+- [x] Integrate scoped evidence into existing investigation reports and CLI.
+- [x] Add isolated scenarios and independent backend acceptance/security tests.
+- [x] Run Phase 1–3 regressions and read-only real-source acceptance.
+- [x] Document exact commands, results and deferred/unavailable evidence.

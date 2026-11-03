@@ -1,0 +1,16 @@
+{
+  "source_id": "ref_retrieval_contract_v2",
+  "title": "Verified retrieval contracts and field-specific conversion configuration",
+  "kind": "evidence",
+  "module_ids": [
+    "complaints",
+    "inspection",
+    "organization",
+    "engines",
+    "evidence",
+    "replacement"
+  ],
+  "text": "Configured retrieval contracts verified against bounded Simpson source metadata and native reference reads on 2026-11-03. tickets.complaintRecord.natureOfCustomerComplaint references simpsoncodes._id; retain code, description, codeType and active. tickets.serviceEngineer references users._id; retrieve name and active only. tickettimelines.ticketId references tickets._id; stage, description and createdAt are recorded observations, not confirmed lifecycle transitions. jointinspectionreports.dateOfFailure accepts explicit DD-MM-YYYY or ISO calendar dates; dateOfInspection accepts ISO calendar dates or ISO timestamp calendar components without timezone invention. Ticket engineNo and enginedetails.engineSerialNumber permit exact serial candidate lookup only; company/model equality does not establish physical identity. No fallback to another business date. Work-order complaintReferenceNumber requires a verified reference contract before traversal.",
+  "sha256": "ae450daa2ab56a5654521c94ef4332cd3f0302f414f24b023fcd39e7657aba86",
+  "origin": "configured_retrieval_contract"
+}

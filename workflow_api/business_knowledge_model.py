@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator
 from .service import ApiFailure
 
 SCHEMA = 'simpson-knowledge-v1'
-CONVERSIONS = {'identity', 'parse_nonnegative_decimal', 'iso_date', 'iso_datetime'}
+CONVERSIONS = {'identity', 'parse_nonnegative_decimal', 'iso_date', 'iso_datetime', 'source_dmy_date', 'iso_calendar_component'}
 OPERATORS = {'is_present', 'is_nonnegative', 'equals', 'greater_or_equal', 'less_or_equal', 'in', 'date_on_or_after'}
 ROOT_KEYS = {'schema_version', 'concept_details', 'relationship_details', 'source_mappings', 'identity_rules', 'state_models', 'temporal_models', 'structured_rules', 'dependencies', 'manifest'}
 
@@ -118,7 +118,7 @@ def validate_knowledge(snapshot):
         if m['attribute'] not in props or props[m['attribute']]['datatype']!=m['business_datatype']:fail('Source mapping references an absent or incompatible property.')
         if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*',m['field_path']):fail('Unsafe field path.')
         if m['conversion']=='parse_nonnegative_decimal' and m['business_datatype'] not in ('decimal','integer'):fail('Numeric conversion requires numeric business type.')
-        if m['conversion']=='iso_date' and m['business_datatype']!='date':fail('Date conversion requires a date property.')
+        if m['conversion'] in ('iso_date','source_dmy_date','iso_calendar_component') and m['business_datatype']!='date':fail('Date conversion requires a date property.')
         if m['conversion']=='iso_datetime' and m['business_datatype']!='datetime':fail('Datetime conversion requires a datetime property.')
     for i in identities.values():
         if i['kind']=='source_identity' and (i['target'] is not None or i['comparison']!='source_scoped_native_id'):fail('Invalid source identity definition.')
@@ -193,6 +193,15 @@ def convert(value, conversion, datatype):
             number=Decimal(str(value))
             if not number.is_finite() or number<0 or (datatype=='integer' and number!=number.to_integral_value()):raise ValueError()
             result=int(number) if datatype=='integer' else format(number,'f')
+        elif conversion in ('source_dmy_date','iso_calendar_component'):
+            if isinstance(value,datetime):result=value.date().isoformat()
+            elif isinstance(value,date):result=value.isoformat()
+            elif not isinstance(value,str):raise ValueError()
+            elif re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):result=date.fromisoformat(value).isoformat()
+            elif conversion=='source_dmy_date' and re.fullmatch(r'\d{2}-\d{2}-\d{4}',value):result=datetime.strptime(value,'%d-%m-%Y').date().isoformat()
+            elif conversion=='iso_calendar_component' and re.fullmatch(r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?',value):result=datetime.fromisoformat(value.replace('Z','+00:00')).date().isoformat()
+            elif re.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}',value):return dict(state='ambiguous_value',value=None)
+            else:raise ValueError()
         elif conversion=='iso_date':
             if isinstance(value,datetime):result=value.date().isoformat()
             elif isinstance(value,date):result=value.isoformat()

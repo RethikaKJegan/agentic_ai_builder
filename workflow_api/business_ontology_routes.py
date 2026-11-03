@@ -140,6 +140,12 @@ def install(app, service, auth, reference, env=None):
     @app.get('/business-ontology/v1/investigations/plans/{workflow_id}')
     async def investigation_get_plan(workflow_id:str):return await call(investigations.get_plan,workflow_id)
 
+    @app.put('/business-ontology/v1/investigations/plans/{workflow_id}')
+    async def investigation_rename(workflow_id:str,request:Request):return await call(investigations.manage,workflow_id,await body(request))
+
+    @app.delete('/business-ontology/v1/investigations/plans/{workflow_id}')
+    async def investigation_delete(workflow_id:str):return await call(investigations.manage,workflow_id,{},True)
+
     @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/validate')
     async def investigation_validate(workflow_id:str,request:Request):
         if await body(request)!={}:return await call(investigations.plan,None)

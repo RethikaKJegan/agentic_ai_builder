@@ -1,0 +1,5 @@
+- [x] Implement strict investigation response format and safe diagnostics.
+- [x] Correct excluded task handling and add regression tests.
+- [x] Run affected model, investigation, planning and contract checks.
+- [x] Back up state and deploy backend/worker after idle checks.
+- [x] Verify public availability and document UI retest steps and limits.

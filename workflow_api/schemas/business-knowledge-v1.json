@@ -396,9 +396,11 @@
           "conversion": {
             "enum": [
               "identity",
+              "iso_calendar_component",
               "iso_date",
               "iso_datetime",
-              "parse_nonnegative_decimal"
+              "parse_nonnegative_decimal",
+              "source_dmy_date"
             ]
           },
           "unit": {

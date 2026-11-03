@@ -309,6 +309,8 @@ Capability changes require catalogue/schema updates and tests; existing saved pl
 
 ## Remaining boundaries before visual integration
 
+The later [backend evidence refinement](evidence-refinement.md) adds task requirements, supported lookups and normalized gaps. It was deployed with the [report-schema reliability fix](../../openspec/changes/investigation-report-schema/verification.md) after explicit user approval, importing live revision 8. Generate a fresh plan for its updated catalogue.
+
 The implementation supports the listed Simpson request families, not arbitrary enterprise workflows. There is no canvas, general visual editing, distributed worker fleet, streaming scheduler, arbitrary loop, approved business-write capability or external notification. Human input currently supplies an initial lookup context or acknowledges report gaps; it cannot certify missing business evidence. Cross-source model/company identity context remains limited by saved mappings. Natural-language scope filters beyond the supported Phase 2 grammar require new validated capabilities, not an LLM guess.
 
 The original backend-only acceptance did not deploy or import live knowledge. The subsequent authorized UI rollout is deployed; see [the workflow UI guide](investigation-workflow-ui.md) and [rollout verification](../../openspec/changes/investigation-workflow-ui/verification.md). See [backend verification](../../openspec/changes/simpson-workflows-phase3/verification.md) for the earlier provider evaluations and limitations.

@@ -80,6 +80,9 @@ class BusinessRetrieval:
             fail('Policy selection must name a revision pinned in this ontology version.')
         intent=self.interpreter.run(question,snapshot,inputs,use_ai)
         result=resolve(snapshot,question,inputs,intent,LIMITS['max_knowledge_items'])
+        from .business_evidence import definitions,REGISTRY_SHA256
+        result['evidence_requirements']=definitions(intent['task'],result['policies'],inputs)
+        result['requirement_registry_sha256']=REGISTRY_SHA256
         k=snapshot['knowledge']; mappings={m['id']:m for m in result['mappings']}
         identifiers=intent['identifiers']; groups={}; available=[]
         for m in result['mappings']:
@@ -117,7 +120,7 @@ class BusinessRetrieval:
             progress=False
             for key,mids in list(unplanned.items()):
                 for rule in k['identity_rules']:
-                    if rule['kind']!='direct_reference':continue
+                    if rule['kind'] not in ('direct_reference','candidate'):continue
                     a,b=rule['source'],rule['target'];ak=(a['source_role'],a['collection']);bk=(b['source_role'],b['collection'])
                     if key==ak and bk in planned:local,remote=a,b
                     elif key==bk and ak in planned:local,remote=b,a
@@ -126,7 +129,7 @@ class BusinessRetrieval:
                     parent.setdefault('reference_fields',[]).append(remote['field_path'])
                     local_filters=[dict(field_path=mappings[f['mapping_id']]['field_path'],operator='eq',value=f['value'],origin='supported_status_filter') for f in intent['filters'] if f['mode']=='exact' and f['mapping_id'] in mids]
                     step=dict(id='read_'+str(len(steps)+1),source_role=key[0],collection=key[1],mapping_ids=mids,filters=local_filters,bounded_scan=False,
-                              reference=dict(binding_id=rule['id'],parent_step=parent['id'],parent_field=remote['field_path'],field_path=local['field_path'],classification='direct_reference'))
+                              reference=dict(binding_id=rule['id'],parent_step=parent['id'],parent_field=remote['field_path'],field_path=local['field_path'],classification='candidate' if rule['kind']=='candidate' else 'direct_reference'))
                     steps.append(step);planned[key]=step;del unplanned[key];progress=True;break
             if not progress:break
         for key,mids in unplanned.items():result['missing'].append(dict(mapping_ids=mids,reason='no_supported_anchored_path'))
@@ -260,9 +263,11 @@ class BusinessRetrieval:
                         from datetime import datetime, timezone
                         if isinstance(v,datetime) and v.tzinfo is None:v=v.replace(tzinfo=timezone.utc)
                     converted=convert(v,m['conversion'],m['business_datatype'])
+                    if m['conversion'] in ('source_dmy_date','iso_calendar_component'):
+                        converted.update(raw_value=public_record(pack({'value':v},binding['engine']))['value'],conversion=m['conversion'],precision='calendar_day',business_event=m['attribute'],timezone_inferred=False)
                     if converted['state']=='reference_unresolved':converted['value']=public_record(pack({'value':v},binding['engine']))['value']
                     values[mid]=converted
-                    if converted['state']=='conversion_issue':issues.append(dict(step_id=step['id'],mapping_id=mid,record_reference=public_record(pack({'_id':at(row,'_id')},binding['engine'])),state='invalid_source_value'))
+                    if converted['state'] in ('conversion_issue','ambiguous_value'):issues.append(dict(step_id=step['id'],mapping_id=mid,record_reference=public_record(pack({'_id':at(row,'_id')},binding['engine'])),state='ambiguous_value' if converted['state']=='ambiguous_value' else 'invalid_source_value'))
                     for f in post_filters:
                         if f['mapping_id']!=mid or f['mode']=='exact':continue
                         if converted['state']!='value':keep=False;continue
@@ -281,13 +286,13 @@ class BusinessRetrieval:
                 if byte_count>LIMITS['bytes'] or len(records)>=LIMITS['total_records']:fail('Evidence exceeds total resource limits.','BUSINESS_RETRIEVAL_LIMIT',422)
                 records.append(record);accepted.append(row)
                 native_records.setdefault(step['id'],[]).append((row,rid))
-                if ref:
+                if ref and ref['classification']=='direct_reference':
                     for parent,parent_id in native_records.get(ref['parent_step'],[]):
                         a,b=at(row,ref['field_path']),at(parent,ref['parent_field'])
                         if a is not None and type(a) is type(b) and a==b:
                             edges.append(dict(record_id=rid,parent_record_id=parent_id,parent_step=ref['parent_step'],binding_id=ref['binding_id'],classification='direct_reference',physical_merge=False))
             raw_by_step[step['id']]=accepted
-            outcomes.append(dict(step_id=step['id'],records=len(accepted),examined=len(raw),truncated=truncated,
+            outcomes.append(dict(step_id=step['id'],collection=step['collection'],source_role=step['source_role'],records=len(accepted),examined=len(raw),truncated=truncated,
                                  bounded_scan=step['bounded_scan'],unresolved=sorted(set(unresolved)),empty=not accepted))
         # Saved cross-source candidate bindings establish associations only, never joins or merges.
         candidates=[]
@@ -299,7 +304,9 @@ class BusinessRetrieval:
             for l in left:
                 for r in right:
                     x,y=l['fields'].get(a['field_path']),r['fields'].get(b['field_path'])
-                    if isinstance(x,str) and x and x==y:candidates.append(dict(binding_id=rule['id'],left=l['record_id'],right=r['record_id'],classification='candidate',physical_merge=False,qualification='Equal reported serial only; company/model context and physical identity remain unverified.'))
+                    if isinstance(x,str) and x and x==y:candidates.append(dict(binding_id=rule['id'],left=l['record_id'],right=r['record_id'],classification='candidate',physical_merge=False,
+                        context_evidence={side:{field:rec['fields'][field] for field in ('oem','engineModel','listNo','organizationName') if field in rec['fields']} for side,rec in [('left',l),('right',r)]},
+                        qualification='Equal reported serial only; company/model context and physical identity remain unverified.'))
         self.sources.authorize(auth)
         for step in plan['steps']:self.checked_binding(auth,step)
         missing=deepcopy(plan['missing'])
@@ -335,6 +342,11 @@ class BusinessRetrieval:
                       record_reads_complete=not any(o['truncated'] or o['unresolved'] for o in outcomes) and not population_limited,
                       population_scope='Source records matching the saved read filters; no physical-engine cohort or business decision is inferred.',
                       population_complete=False if incomplete or population_limited else True,read_only=True,company_writes=0,model_calls=plan['intent']['model_calls'])
+        from .business_evidence import evaluate
+        evaluation=evaluate(plan['intent']['task'],evidence,plan['inputs'],plan['policies'])
+        evidence.update(evidence_requirements=evaluation['requirements'],requirement_results=evaluation,
+                        normalized_gaps=evaluation['gaps'],resolved_references=evaluation['resolutions'],
+                        recovery_actions=[dict(gap_id=g['gap_id'],**g['recovery_action']) for g in evaluation['gaps']])
         if len(canonical(evidence).encode())>LIMITS['bytes']:fail('Complete evidence package exceeds the byte limit.','BUSINESS_RETRIEVAL_LIMIT',422)
         if time.monotonic()>deadline:fail('Evidence preparation exceeded the deadline.','BUSINESS_RETRIEVAL_TIMEOUT',504)
         plan['evidence']=evidence
@@ -347,6 +359,8 @@ class BusinessRetrieval:
     @staticmethod
     def validate_plan(snapshot,plan):
         """Verify executable grammar and saved mapping/reference authority again."""
+        from .business_evidence import REGISTRY_SHA256
+        if plan.get('requirement_registry_sha256',REGISTRY_SHA256)!=REGISTRY_SHA256:fail('Evidence requirements changed; create a fresh preview.','BUSINESS_SOURCE_STALE',409)
         maps={m['id']:m for m in snapshot['knowledge']['source_mappings']}
         identities={r['id']:r for r in snapshot['knowledge']['identity_rules']}
         for m in plan['mappings']:
@@ -369,7 +383,8 @@ class BusinessRetrieval:
             ref=step['reference']
             if ref:
                 rule=identities.get(ref['binding_id']);parent=seen.get(ref['parent_step'])
-                if not rule or rule['kind']!='direct_reference' or not parent:fail('Unsupported reference traversal.')
+                if not rule or rule['kind'] not in ('direct_reference','candidate') or not parent:fail('Unsupported reference traversal.')
+                if ref['classification']!=('candidate' if rule['kind']=='candidate' else 'direct_reference'):fail('Reference classification differs from its saved contract.')
                 a=dict(source_role=step['source_role'],collection=step['collection'],field_path=ref['field_path'])
                 b=dict(source_role=parent['source_role'],collection=parent['collection'],field_path=ref['parent_field'])
                 if not ((a==rule['source'] and b==rule['target']) or (b==rule['source'] and a==rule['target'])):fail('Reference does not match the saved binding.')

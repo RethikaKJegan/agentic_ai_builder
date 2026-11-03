@@ -1,5 +1,17 @@
 # Handoff — Harihar
 
+## Investigation list rename/delete — 3 November 2026
+
+Deployed build `A8GKRkwv5mpFqeJJ5XTSx`: three-dot menu beside each business investigation, persistent display-name editing and confirmed deletion with retained audit history. Owner-scoped metadata preserves immutable plans; current workflow.edit/delete and workspace write permissions enforced. Active work blocks deletion. 46 backend, 6 frontend presentation and 6 desktop/mobile browser checks passed; types/lint/build/contracts/OpenSpec passed. Actual public menus/dialogs checked without changing user workflows. No paid calls or company writes. Details: `openspec/changes/investigation-list-actions/verification.md`.
+
+## Report schema fix and evidence rollout — 3 November 2026
+
+After explicit user deployment approval, backend/worker restarted and evidence package imported as live revision 8. Strict request-specific report schema transport prevents unconstrained JSON generation; local validation and one-call budgets remain. Explicit negative goals no longer request excluded warranty tasks. 82 affected tests plus 10 subtests and 2 diagnostic checks passed; authenticated public session/worker/registry checks passed. Original versions/runs preserved byte-identical, no company writes or paid deployment calls. Existing plans need regeneration; failed runs remain inspectable. See `openspec/changes/investigation-report-schema/verification.md`. This supersedes the local-only rollout status below.
+
+## Task-specific evidence refinement — 3 November 2026, local only
+
+Backend mappings/code/date resolution, conservative candidate reads, requirement registry, normalized gaps/recovery and isolated scenarios are implemented. Broad regression: 689 passed; final affected packet/scenario/report suite: 80 passed (overlapping coverage). Twelve independent read-only source checks and real history CLI passed. No frontend, live import, deployment, company writes or paid calls. Existing shared contracts are unchanged; future rollout needs fresh versioned knowledge/plans. See `docs/simpson-business-ontology/evidence-refinement.md` and `openspec/changes/task-evidence-refinement/verification.md`. This is an in-repository handoff, not external notification.
+
 ## Warranty knowledge and stable revisions — deployed 2026-11-01
 
 Live build `2ffYX6_wB2IeyuqzFrhrw` fixes the empty knowledge experience and async revision selector reset. Imports four reviewed source-cited implementation-derived warranty drafts atomically/idempotently from the existing owned code. Shows invoice/sale/hour limits, basis, selector/source hash and original quotations; unknown effectivity, account/model scope and exclusions stay unknown. Code is not relabelled written policy. Stable ID/loading/stale handling and explicit refresh propagation connect newly saved/imported drafts to case comparisons.

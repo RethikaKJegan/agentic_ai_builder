@@ -158,8 +158,35 @@ def build():
     dependency('inspection','inspection:joint_inspection',['complaints:warranty_ticket','inspection:inspection_report','inspection:inspection_observation','organization:person'],['inspection:activity_complaint','inspection:report_complaint','inspection:activity_engineer'],['mapping:inspection_status','mapping:engineer_reference'],['inspection:report_readiness'],['inspection_activity_completion_evidence'])
     dependency('replacement','replacement:replacement_case',['complaints:warranty_ticket','inspection:inspection_report','replacement:replacement_approval'],['replacement:case_complaint'],rules=['replacement:readiness'],facts=['technical_disposition','commercial_authorization'])
     dependency('recurrence','monitoring:recurrence_event',['effectivity:change_applicability','effectivity:production_verification','failure:failure_mechanism','failure:root_cause'],facts=['physical_identity','actual_incorporation','comparable_confirmed_failure','operating_exposure'])
+    # Versioned retrieval bindings; resolved references confer no authority.
+    contract=next(s for s in sources if s['source_id']=='ref_retrieval_contract_v2')
+    cp=dict(origin='configured_logic',evidence=[dict(source_id=contract['source_id'],quote=contract['text'])])
+    for mid,attr,collection,path,kind,types,cid in [
+      ('code_value','controlled_code','simpsoncodes','code','string',['string'],'evidence:source_record'),
+      ('code_description','controlled_description','simpsoncodes','description','string',['string'],'evidence:source_record'),
+      ('code_type','controlled_code_type','simpsoncodes','codeType','string',['string'],'evidence:source_record'),
+      ('code_active','controlled_code_active','simpsoncodes','active','boolean',['boolean'],'evidence:source_record'),
+      ('engineer_name','recorded_name','users','name','string',['string'],'organization:person'),
+      ('engineer_active','recorded_active','users','active','boolean',['boolean'],'organization:person'),
+      ('timeline_stage','timeline_stage','tickettimelines','stage','string',['string'],'evidence:source_record'),
+      ('timeline_description','timeline_description','tickettimelines','description','string',['string'],'evidence:source_record'),
+      ('timeline_created','timeline_created','tickettimelines','createdAt','datetime',['date','datetime'],'evidence:source_record'),
+      ('invoice_company_reference','invoice_company_reference','enginedetails','oem','reference',['string','ObjectId'],'engines:engine_invoice_record'),
+      ('invoice_list','invoice_list','enginedetails','listNo','string',['string'],'engines:engine_invoice_record'),
+    ]:
+        mapping(mid,cid,attr,kind,'service',collection,path,types,cp,precision='instant' if kind=='datetime' else None,conversion='iso_datetime' if kind=='datetime' else 'identity')
+    for mid,conversion in [('inspection_failure_date','source_dmy_date'),('inspection_date','iso_calendar_component')]:
+        m=next(m for m in k['source_mappings'] if m['id']=='mapping:'+mid)
+        m['conversion']=conversion;m['provenance']=deepcopy(cp)
+    identity_rule('complaint_code','direct_reference',bind('service','tickets','complaintRecord.natureOfCustomerComplaint'),bind('service','simpsoncodes','_id'),cp)
+    identity_rule('ticket_engineer','direct_reference',bind('service','tickets','serviceEngineer'),bind('service','users','_id'),cp)
+    identity_rule('timeline_ticket','direct_reference',bind('service','tickettimelines','ticketId'),bind('service','tickets','_id'),cp)
+    identity_rule('ticket_invoice_serial','candidate',bind('service','tickets','engineNo'),bind('service','enginedetails','engineSerialNumber'),cp)
+    relation('complaints:symptom_code','complaints:reported_symptom','uses_controlled_record','evidence:source_record',cp,'complaint_code')
+    relation('complaints:assigned_engineer','complaints:warranty_ticket','references_engineer','organization:person',cp,'ticket_engineer')
+    relation('complaints:timeline_record','evidence:source_record','records_case_event_for','complaints:warranty_ticket',cp,'timeline_ticket')
     k['concept_details']=list(details.values())
-    package=dict(package_id='simpson-connected-foundation',revision=1,schema_version=SCHEMA,evidence_bundle_sha256=digest(bundle),new_concepts=new,concept_changes=list(changes.values()),relationships=relationships,knowledge=k)
+    package=dict(package_id='simpson-connected-foundation',revision=2,schema_version=SCHEMA,evidence_bundle_sha256=digest(bundle),new_concepts=new,concept_changes=list(changes.values()),relationships=relationships,knowledge=k)
     return package,dict(revision=1,rules=rules)
 
 

@@ -1,0 +1,4 @@
+- [x] Add scoped metadata, rename/delete API and active-work protection.
+- [x] Add accessible list menu and rename/delete dialogs.
+- [x] Verify backend, UI, types/lint/build and desktop/mobile flows.
+- [x] Deploy and verify live availability without modifying user workflows.

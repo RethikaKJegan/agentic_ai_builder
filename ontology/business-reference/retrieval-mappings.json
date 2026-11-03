@@ -1,0 +1,8 @@
+{
+  "revision": 1,
+  "items": [
+    {"role":"service","collection":"simpsoncodes","fields":["_id","code","description","codeType","active"],"retrieval_only":true,"label":"simpsoncodes"},
+    {"role":"service","collection":"users","fields":["_id","name","active"],"retrieval_only":true,"label":"users"},
+    {"role":"service","collection":"tickettimelines","fields":["_id","ticketId","stage","description","createdAt"],"retrieval_only":true,"label":"tickettimelines"}
+  ]
+}

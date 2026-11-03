@@ -46,7 +46,7 @@ def test_complete_fixture_investigation_and_provenance(investigation):
     assert run['status']=='completed',run['node_errors']
     assert run['branches']=={'found':'true','has_inspection':'true'}
     report=run['outputs']['end']
-    assert {r['fields']['_id'] for r in report['source_records']}=={'C123','J1'}
+    assert {r['fields']['_id'] for r in report['source_records']}=={'C123','J1','I1'}
     assert 'J9' not in {r['fields']['_id'] for r in report['source_records']}
     assert report['completion_status']=='completed_with_gaps'
     assert report['warranty_approval']=='not_performed' and report['physical_engine_identity']=='unresolved'
@@ -55,6 +55,52 @@ def test_complete_fixture_investigation_and_provenance(investigation):
     assert x.service.get_run(x.a,run['run_id'])['status']=='completed'
     calls=len(x.reader.calls)
     assert x.service.execute(x.a,run['run_id'],{})['status']=='completed' and len(x.reader.calls)==calls
+
+
+def test_agent_suggestions_cannot_create_unrelated_requirements(investigation):
+    x=investigation
+    def suggest(*args):
+        return dict(summary='Source comparison.',findings=[],classification='agent_interpretation',mode='offline',missing_information=['Warranty approval','warranty approval.','Actual incorporation','Confirmed root cause']),dict(llm_calls=0,tokens=0,estimated_cost_usd=0)
+    x.service.agents.run=suggest
+    r=execute(x,plan(x,'Compare complaint C123 with its linked inspection.'))
+    report=r['outputs']['end'];facts={g['fact_id'] for g in report['missing_information']}
+    assert not {'applicable_policy','commercial_authorization','actual_incorporation','confirmed_root_cause'} & facts
+    assert not any(g['fact_id']=='inspection_activity_completion_evidence' for g in report['missing_information'])
+    assert any(g['fact_id']=='inspection_activity_completion_evidence' for g in report['downstream_requirements'])
+    assert report['gap_reconciliation']['mandatory_requirements_created_by_agents']==0
+    assert all(a['missing_information']==[] for a in report['agent_interpretations'])
+    assert r['outputs']['compare']['missing_information'] # exact original trace retained
+
+
+@pytest.mark.parametrize('path,retained', [('properties/findings/maxItems',True),('sensitive value: company record',False)])
+def test_schema_failure_retains_only_safe_schema_path(investigation,path,retained):
+    from runtime.service import RuntimeFailure
+    x=investigation
+    def invalid(*args):
+        exc=RuntimeFailure('MODEL_OUTPUT_SCHEMA_INVALID','Invalid output')
+        exc.validation_field=path
+        raise exc
+    x.service.agents.run=invalid
+    r=execute(x,plan(x,'Compare complaint C123 with its linked inspection.'))
+    error=r['node_errors']['compare']
+    assert r['status']=='failed' and error['code']=='MODEL_OUTPUT_SCHEMA_INVALID'
+    assert ('validation_field' in error)==retained
+    assert error['retryable'] is False
+
+
+def test_effectiveness_evidence_workflow_preserves_unavailable_prerequisites(investigation):
+    x=investigation;r=execute(x,plan(x,'Review corrective-action effectiveness evidence for engine E123 and prepare a report.'))
+    assert r['status']=='completed',r['node_errors']
+    report=r['outputs']['end']
+    assert {'actual_incorporation','operating_exposure','comparable_confirmed_failure'} <= {g['fact_id'] for g in report['missing_information']}
+    assert {g['task'] for g in report['missing_information']}=={'recurrence'}
+    assert report['confirmed_findings']==[] and report['warranty_approval']=='not_performed'
+    assert all(a['executable'] is False for a in report['recovery_actions'])
+
+
+def test_scenario_overrides_cannot_enter_live_investigation_inputs(investigation):
+    x=investigation
+    with pytest.raises(ApiFailure):plan(x,inputs={'identifiers':{'complaint_id':'C123'},'events':[{'fact_id':'physical_identity','value':True}]})
 
 
 @pytest.mark.parametrize('objective,cap',[('Show complaint history for engine E123.','retrieve_history'),('Review replacement evidence for complaint C123.','retrieve_replacement'),('Compare complaint C123 with its inspection.','compare_inspection'),('Check warranty readiness for engine E124.','warranty_readiness')])

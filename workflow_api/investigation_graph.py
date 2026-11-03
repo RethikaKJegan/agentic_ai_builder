@@ -3,6 +3,7 @@ from copy import deepcopy
 import re
 from jsonschema import Draft202012Validator
 from .business_knowledge_model import digest
+from .business_evidence import REGISTRY_SHA256
 from .service import ApiFailure
 
 VERSION='simpson-investigation-v1'
@@ -42,13 +43,14 @@ CAPABILITIES=[
  capability('retrieve_warranty','Collect warranty assessment inputs','retrieval','warranty',('context',),concepts=('warranty:warranty_assessment',)),
  capability('retrieve_replacement','Review replacement evidence','retrieval','replacement',('context',),concepts=('replacement:replacement_case',)),
  capability('retrieve_history','Retrieve complaint, invoice and QA history','retrieval','history',('context',),concepts=('engines:engine_invoice_record',)),
+ capability('retrieve_recurrence','Review effectiveness evidence and prerequisites','retrieval','recurrence',('context',),concepts=('monitoring:recurrence_event',)),
  capability('compare_inspection','Compare complaint and inspection observations','agent',required=('evidence',)),
  capability('warranty_readiness','Review pinned warranty readiness and gaps','agent',required=('evidence',)),
  capability('prepare_summary','Prepare source-backed investigation summary','agent',required=('bundle',)),
  capability('request_missing','Identify missing information','deterministic',optional=('bundle',)),
 ]
 CATALOGUE={c['id']:c for c in CAPABILITIES}
-CATALOGUE_HASH=digest(CAPABILITIES)
+CATALOGUE_HASH=digest([CAPABILITIES,REGISTRY_SHA256])
 
 BINDING_SCHEMA=object_schema({'name':{'type':'string','enum':['context','evidence','bundle']},'source':{'type':'string','pattern':'^[a-z][a-z0-9_]{0,63}$'},'type':{'type':'string','enum':TYPES}})
 NODE_SCHEMA=object_schema({'id':{'type':'string','pattern':'^[a-z][a-z0-9_]{0,63}$'},'type':{'type':'string','enum':NODE_TYPES},
@@ -63,9 +65,14 @@ GRAPH_SCHEMA=object_schema({'schema_version':{'type':'string','const':VERSION},'
 def requirements(objective):
     if not isinstance(objective,str) or not 1<=len(objective.strip())<=4000:fail('Provide an objective of 1–4000 characters.')
     q=objective.lower()
+    # Excluded clauses must not add capabilities just because they name them.
+    # Keep subsequent positive clauses ("but", "however", "instead") separate.
+    q=re.sub(r"\b(?:do not|don't|don’t|must not|should not|without)\b(?:(?!\b(?:but|however|instead)\b)[^.;\n])*",' ',q)
     if re.search(r'\b(delete|update|approve|authorize|insert|modify|send|email|notify|dispatch an? engine|schedule a meeting)\b',q):fail('Operational actions are not investigation capabilities.','INVESTIGATION_UNSUPPORTED')
-    if re.search(r'\b(count|percentage|rate|average|rank|trend|recurrence|cut.in)\b',q):fail('Population, recurrence and arbitrary query workflows are outside this investigation scope.','INVESTIGATION_UNSUPPORTED')
+    evidence_review=bool(re.search(r'\b(recurrence|effectiveness|corrective.action)\b',q) and re.search(r'\b(evidence|readiness)\b',q))
+    if re.search(r'\b(count|percentage|rate|average|rank|trend|cut.in)\b',q) or re.search(r'\brecurrence\b',q) and not evidence_review:fail('Population metrics and operational recurrence workflows are outside this investigation scope.','INVESTIGATION_UNSUPPORTED')
     result=dict(inspection=bool(re.search(r'\b(inspect\w*|compare|joint|jir)\b',q)),warranty=bool(re.search(r'\b(warranty|eligib\w*|coverage)\b',q)),replacement=bool(re.search(r'\b(replacement|replace)\b',q)),history=bool(re.search(r'\b(history|historical|qa|quality)\b',q)),summary=True)
+    result['recurrence']=evidence_review
     if not re.search(r'\b(complaint|complaints|ticket|engine|motor|investigat\w*|service issue|inspection|warranty|replacement)\b',q):fail('No supported Simpson investigation objective was identified.','INVESTIGATION_UNSUPPORTED')
     return result
 
@@ -132,6 +139,7 @@ def validate_graph(graph,required=None):
         if required['warranty']:must|={'retrieve_warranty','warranty_readiness'}
         if required['replacement']:must.add('retrieve_replacement')
         if required['history']:must.add('retrieve_history')
+        if required.get('recurrence'):must.add('retrieve_recurrence')
         if not must<=caps:issue('MISSING_REQUIRED_CAPABILITY')
         allowed=must|{'request_missing'}
         if caps-{None}-allowed:issue('UNRELATED_CAPABILITY')
@@ -150,11 +158,11 @@ def template(required):
     node('found','condition',predicate='complaint_found',inputs=[('evidence','complaint','evidence')]);edge('complaint','found')
     node('not_found','deterministic','request_missing');edge('found','not_found','false')
     node('uncertain_complaint','deterministic','request_missing');edge('found','uncertain_complaint','unknown')
-    tasks=[name for name in ('inspection','warranty','replacement','history') if required[name]]
+    tasks=[name for name in ('inspection','warranty','replacement','history','recurrence') if required.get(name)]
     node('work','parallel' if len(tasks)>1 else 'deterministic',None if len(tasks)>1 else 'request_missing',output='control' if len(tasks)>1 else None);edge('found','work','true')
     tails=[]
     for task in tasks:
-        cap={'inspection':'retrieve_inspection','warranty':'retrieve_warranty','replacement':'retrieve_replacement','history':'retrieve_history'}[task]
+        cap={'inspection':'retrieve_inspection','warranty':'retrieve_warranty','replacement':'retrieve_replacement','history':'retrieve_history','recurrence':'retrieve_recurrence'}[task]
         node(task,'retrieval',cap,inputs=[('context','anchor','context')]);edge('work',task)
         if task=='inspection':
             node('has_inspection','condition',predicate='inspection_available',inputs=[('evidence',task,'evidence')]);edge(task,'has_inspection')
@@ -185,6 +193,8 @@ def predicate(name,evidence):
     if name in ('complaint_found','inspection_available'):
         collection='tickets' if name=='complaint_found' else 'jointinspectionreports'
         if any(r['collection']==collection for r in records):return 'true'
+        scoped=[s for s in steps if s.get('collection')==collection]
+        if scoped:return 'unknown' if any(s.get('truncated') or s.get('unresolved') for s in scoped) else 'false'
         if incomplete:return 'unknown'
         if any(m.get('reason') in ('no_supported_anchored_path','reference_or_projection_unavailable') for m in evidence.get('missing',[])):return 'unknown'
         # A completed empty exact collection read is evidence of no linked match.

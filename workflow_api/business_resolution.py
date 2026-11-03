@@ -6,6 +6,12 @@ from .business_knowledge_model import digest, fail
 from .kg_retrieval import terms
 
 VERSION = 'simpson-retrieval-v1'
+SUPPORT_MAPPINGS = {
+ 'complaints':['code_value','code_description','code_type','code_active'],
+ 'inspection':['code_value','code_description','code_type','code_active','engineer_name','engineer_active','timeline_stage','timeline_description','timeline_created'],
+ 'history':['code_value','code_description','code_type','code_active','timeline_stage','timeline_description','timeline_created','invoice_company_reference','invoice_list'],
+ 'warranty':['invoice_company_reference','invoice_list'],
+}
 TASKS = {
     'complaints': ('complaints:warranty_ticket', ['ticket_serial','ticket_id','complaint_symptom','complaint_oem_notes','complaint_hours','ticket_hours','complaint_status','complaint_created']),
     'inspection': ('inspection:joint_inspection', ['ticket_serial','ticket_id','complaint_symptom','complaint_oem_notes','inspection_status','inspection_date','inspection_failure_date','inspection_potential_cause','inspection_complaint_text','inspection_defect_text']),
@@ -178,6 +184,8 @@ def resolve(snapshot, question, inputs=None, intent=None, max_items=96):
     intent=deepcopy(intent or interpret(question,snapshot,inputs))
     maps={m['id']:m for m in k['source_mappings']}
     base_ids={'mapping:'+x for x in TASKS[intent['task']][1]}
+    base_ids.update('mapping:'+x for x in SUPPORT_MAPPINGS.get(intent['task'],[]) if 'mapping:'+x in maps)
+    if intent['task']=='recurrence' and intent['identifiers'].get('complaint_id'):base_ids.update({'mapping:ticket_id','mapping:ticket_serial'})
     base_ids.update(f['mapping_id'] for f in intent['filters'])
     if re.search(r'\b(build date|manufactur\w* date)\b',question,re.I):base_ids.add('mapping:engine_build_date')
     if re.search(r'\b(model)\b',question,re.I):base_ids.add('mapping:invoice_model')

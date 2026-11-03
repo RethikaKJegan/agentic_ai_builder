@@ -55,6 +55,60 @@ def test_queued_work_survives_service_restart(jobs):
  assert restarted.tick()
  assert restarted.get(x.a,j['job_id'])['state']=='succeeded'
 
+
+def management_plan(x):
+ for permission in ['workflow.edit','workflow.delete']:
+  x.a['permissions'].append(permission);x.current['permissions'].append(permission)
+ return x.service.plan(x.a,dict(objective=OBJECTIVE,request_key='manage_plan_key_001',planning_mode='offline',analysis_mode='offline'))
+
+
+def test_rename_persists_without_changing_plan_and_delete_retains_history(jobs):
+ x=jobs;p=management_plan(x)
+ original=json.dumps(p,sort_keys=True)
+ result=x.service.manage(x.a,p['workflow_id'],{'display_name':'  Service review  '})
+ assert result['display_name']=='Service review'
+ assert x.jobs.list(x.a)['items'][0]['display_name']=='Service review'
+ assert json.dumps(x.service.get_plan(x.a,p['workflow_id']),sort_keys=True)==original
+ restarted=InvestigationJobs(x.service,lambda w,o:x.current)
+ assert restarted.list(x.a)['items'][0]['display_name']=='Service review'
+ r=x.service.create_run(x.a,p['workflow_id'],{'request_key':'manage_run_key_001'})
+ r=x.service.execute(x.a,r['run_id'],{})
+ assert r['status']=='completed'
+ assert x.service.manage(x.a,p['workflow_id'],{},True)['deleted']
+ assert x.jobs.list(x.a)['items']==[]
+ assert x.service.manage(x.a,p['workflow_id'],{},True)['deleted']
+ with pytest.raises(ApiFailure):x.service.create_run(x.a,p['workflow_id'],{'request_key':'manage_run_key_002'})
+ with x.f.store.transaction(write=False) as db:
+  assert db.execute('SELECT document FROM business_investigation_runs WHERE run_id=?',(r['run_id'],)).fetchone()[0]
+
+
+@pytest.mark.parametrize('name',['', ' '*3,'x'*161,'line\nbreak',None])
+def test_rename_rejects_invalid_names(jobs,name):
+ x=jobs;p=management_plan(x)
+ with pytest.raises(ApiFailure):x.service.manage(x.a,p['workflow_id'],{'display_name':name})
+ assert x.jobs.list(x.a)['items'][0]['display_name']==OBJECTIVE
+
+
+def test_management_owner_permissions_and_active_run_protection(jobs):
+ x=jobs;p=management_plan(x)
+ with pytest.raises(ApiFailure):x.service.manage(auth(owner='bob'),p['workflow_id'],{'display_name':'Other owner'})
+ x.current['permissions'].remove('workflow.delete')
+ with pytest.raises(ApiFailure):x.service.manage(x.a,p['workflow_id'],{},True)
+ x.current['permissions'].append('workflow.delete')
+ x.service.create_run(x.a,p['workflow_id'],{'request_key':'active_management_run'})
+ with pytest.raises(ApiFailure) as exc:x.service.manage(x.a,p['workflow_id'],{},True)
+ assert exc.value.code=='INVESTIGATION_BUSY'
+ assert len(x.jobs.list(x.a)['items'])==1
+
+
+def test_stale_plan_can_be_renamed_and_deleted_without_rewriting_it(jobs):
+ x=jobs;p=management_plan(x)
+ with x.f.store.transaction() as db:
+  stale=deepcopy(p);stale['catalogue_sha256']='old'
+  db.execute('UPDATE business_investigation_plans SET document=?',(json.dumps(stale),))
+ assert x.service.manage(x.a,p['workflow_id'],{'display_name':'Old investigation'})['display_name']=='Old investigation'
+ assert x.service.manage(x.a,p['workflow_id'],{},True)['deleted']
+
 def test_execute_jobs_call_same_executor_with_exact_run_id(jobs,monkeypatch):
  x=jobs;j=x.jobs.submit(x.a,body());x.jobs.tick();j=x.jobs.get(x.a,j['job_id'])
  r=x.service.create_run(x.a,j['workflow_id'],dict(request_key='queued_run_001'))

@@ -6,6 +6,7 @@ or bypass approved production workflow releases and cannot execute write tools.
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from copy import deepcopy
 import json
+import re
 import secrets
 import time
 from jsonschema import Draft202012Validator
@@ -24,7 +25,7 @@ NODE_TRANSITIONS={
  'pending':{'ready','skipped'},'ready':{'running','failed'},'running':{'succeeded','failed','waiting_for_input','pending'},
  'waiting_for_input':{'pending'},'failed':{'pending'},'succeeded':set(),'skipped':set(),
 }
-QUESTIONS={'complaints':'Show complaints','inspection':'Show inspection findings','warranty':'Check warranty evidence','replacement':'Show replacement evidence','history':'Show history'}
+QUESTIONS={'complaints':'Show complaints','inspection':'Show inspection findings','warranty':'Check warranty evidence','replacement':'Show replacement evidence','history':'Show history','recurrence':'Check recurrence evidence'}
 
 
 class BusinessInvestigations:
@@ -32,6 +33,7 @@ class BusinessInvestigations:
         self.retrieval,self.ontology,self.store=retrieval,retrieval.ontology,retrieval.store
         self.env=env or {};self.planner=planner or InvestigationPlanner(self.env);self.agents=agents or InvestigationAgents(self.env);self.clock=clock
         with self.store.transaction() as db:
+            db.execute('CREATE TABLE IF NOT EXISTS business_investigation_metadata (workspace TEXT NOT NULL,owner TEXT NOT NULL,workflow_id TEXT NOT NULL,display_name TEXT,deleted_at TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(workspace,owner,workflow_id))')
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_plans (workspace TEXT NOT NULL,owner TEXT NOT NULL,workflow_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,workflow_id),UNIQUE(workspace,owner,request_key))')
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_runs (workspace TEXT NOT NULL,owner TEXT NOT NULL,run_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,lease_owner TEXT,lease_until REAL NOT NULL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,run_id),UNIQUE(workspace,owner,request_key))')
 
@@ -56,9 +58,39 @@ class BusinessInvestigations:
 
     def get_plan(self,auth,workflow_id):
         auth,scope=self.authorize(auth)
-        with self.store.transaction(write=False) as db:p=self.row(db,'business_investigation_plans',scope,'workflow_id',workflow_id)
+        with self.store.transaction(write=False) as db:
+            meta=db.execute('SELECT deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=? AND workflow_id=?',(*scope,workflow_id)).fetchone()
+            if meta and meta[0]:fail('Investigation artifact not found.','INVESTIGATION_NOT_FOUND',404)
+            p=self.row(db,'business_investigation_plans',scope,'workflow_id',workflow_id)
         self.check_plan(auth,p)
         return p
+
+    def manage(self,auth,workflow_id,body,delete=False):
+        auth,scope=self.authorize(auth)
+        permission='workflow.delete' if delete else 'workflow.edit'
+        if permission not in auth.get('permissions',[]) or 'workspace:write' not in auth.get('scopes',[]):fail('Workflow management permission is required.','INVESTIGATION_DENIED',403)
+        if not isinstance(body,dict) or set(body)!=(set() if delete else {'display_name'}):fail('Supply a display name only, or an empty delete request.')
+        name=None if delete else body['display_name']
+        if not delete:
+            if not isinstance(name,str) or not 1<=len(name.strip())<=160 or any(ord(c)<32 for c in name):fail('Use a name of 1–160 characters without control characters.')
+            name=name.strip();reject_secrets(name)
+        with self.store.transaction() as db:
+            self.row(db,'business_investigation_plans',scope,'workflow_id',workflow_id)
+            meta=db.execute('SELECT display_name,deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=? AND workflow_id=?',(*scope,workflow_id)).fetchone()
+            if meta and meta[1]:
+                if delete:return dict(workflow_id=workflow_id,deleted=True)
+                fail('Investigation artifact not found.','INVESTIGATION_NOT_FOUND',404)
+            if delete:
+                runs=[json.loads(r[0]) for r in db.execute('SELECT document FROM business_investigation_runs WHERE workspace=? AND owner=?',scope).fetchall()]
+                if any(r['workflow_id']==workflow_id and r['status'] in ('queued','running') for r in runs):fail('Wait for the investigation to stop before deleting it.','INVESTIGATION_BUSY',409)
+                ids={r['run_id'] for r in runs if r['workflow_id']==workflow_id}
+                # Jobs exist whenever the API/worker is installed; direct service
+                # diagnostics need not create that table.
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='business_investigation_jobs'").fetchone():
+                    jobs=[json.loads(r[0]) for r in db.execute("SELECT document FROM business_investigation_jobs WHERE workspace=? AND owner=? AND state IN ('queued','running')",scope).fetchall()]
+                    if any(j.get('workflow_id')==workflow_id or j.get('run_id') in ids for j in jobs):fail('Wait for queued investigation work to stop before deleting it.','INVESTIGATION_BUSY',409)
+            db.execute('INSERT INTO business_investigation_metadata VALUES (?,?,?,?,?,?) ON CONFLICT(workspace,owner,workflow_id) DO UPDATE SET display_name=excluded.display_name,deleted_at=excluded.deleted_at,updated_at=excluded.updated_at',(*scope,workflow_id,meta[0] if delete and meta else name,now() if delete else None,now()))
+        return dict(workflow_id=workflow_id,deleted=True) if delete else dict(workflow_id=workflow_id,display_name=name)
 
     def check_plan(self,auth,p):
         self.authorize(auth)
@@ -75,7 +107,9 @@ class BusinessInvestigations:
 
     def catalogue(self,auth):
         self.authorize(auth)
-        return dict(schema_version=VERSION,sha256=CATALOGUE_HASH,capabilities=deepcopy(CAPABILITIES),limits=deepcopy(LIMITS))
+        from .business_evidence import definitions,REGISTRY,REGISTRY_SHA256
+        return dict(schema_version=VERSION,sha256=CATALOGUE_HASH,capabilities=deepcopy(CAPABILITIES),limits=deepcopy(LIMITS),
+                    evidence_requirements={t:definitions(t) for t in REGISTRY},requirement_registry_sha256=REGISTRY_SHA256)
 
     @staticmethod
     def question(task,context):
@@ -108,14 +142,14 @@ class BusinessInvestigations:
         context=deepcopy(context);context['identifiers']=parsed['identifiers']
         if parsed['ambiguities'] and parsed['identifiers']:fail('Conflicting identifiers: '+str(parsed['ambiguities']))
         previews={};stamps={}
-        tasks=['complaints']+[t for t in ('inspection','warranty','replacement','history') if required[t]]
+        tasks=['complaints']+[t for t in ('inspection','warranty','replacement','history','recurrence') if required.get(t)]
         for task in tasks:
             preview=self.retrieval.prepare(auth,v,self.question(task,context),dict(context['identifiers'],**{k:context[k] for k in ('assessment_date','policy_id') if k in context}))
             previews[task]=preview
             for m in preview['mappings']:
                 b=self.retrieval.binding(auth,m['source_role'],m['collection'],[])
                 stamps[(m['source_role'],m['collection'])]=dict(source_role=m['source_role'],collection=m['collection'],connection_id=b['connection_id'],stamp=b['stamp'])
-        knowledge=dict(version_id=vid,knowledge_sha256=v['knowledge_sha256'],tasks={name:dict(intent=p['intent'],concepts=p['concepts'],dependencies=p['dependency_resolution'],mappings=p['mappings'],rules=p['rules'],missing=p['missing']) for name,p in previews.items()})
+        knowledge=dict(version_id=vid,knowledge_sha256=v['knowledge_sha256'],tasks={name:dict(intent=p['intent'],concepts=p['concepts'],dependencies=p['dependency_resolution'],mappings=p['mappings'],rules=p['rules'],missing=p['missing'],evidence_requirements=p['evidence_requirements']) for name,p in previews.items()})
         graph,planning=self.planner.plan(body['objective'],required,knowledge,body.get('planning_mode','model'))
         if not validate_graph(graph,required)['valid']:fail('The proposed graph is invalid.','INVESTIGATION_GRAPH_REJECTED')
         p=dict(schema_version=VERSION,workflow_id='investigation_'+secrets.token_hex(12),revision=1,objective=body['objective'],requirements=required,
@@ -145,6 +179,8 @@ class BusinessInvestigations:
                  events=[],created_at=now(),updated_at=now(),company_writes=0)
         self.event(run,'run.created')
         with self.store.transaction() as db:
+            deleted=db.execute('SELECT deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=? AND workflow_id=?',(*scope,workflow_id)).fetchone()
+            if deleted and deleted[0]:fail('Investigation artifact not found.','INVESTIGATION_NOT_FOUND',404)
             db.execute('INSERT INTO business_investigation_runs VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(workspace,owner,request_key) DO NOTHING',(*scope,run['run_id'],key,fingerprint,None,0,canonical(run)))
             row=db.execute('SELECT fingerprint,document FROM business_investigation_runs WHERE workspace=? AND owner=? AND request_key=?',(*scope,key)).fetchone()
         if row[0]!=fingerprint:fail('Run request key conflict.','INVESTIGATION_CONFLICT',409)
@@ -225,15 +261,37 @@ class BusinessInvestigations:
             for r in e['records']:
                 key=(e['request_id'],r['record_id'])
                 if key not in seen:records.append(dict(evidence_id=e['request_id'],**r));seen.add(key)
-        missing=[m for e in evidence for m in e['missing']]
-        missing.extend(dict(reason=msg) for o in run['outputs'].values() for msg in o.get('missing_information',[]))
+        from .business_evidence import evaluate,normalize_gaps,reconcile_suggestions,REGISTRY_SHA256
+        requested=set(p['ontology_context']['tasks'])-{'complaints'}
+        if not requested:requested={'complaints'}
+        task_results=[]
+        for task in sorted(requested):
+            selected=[e for e in evidence if e['intent']['task']==task]
+            if selected:
+                task_results.extend(e.get('requirement_results') or evaluate(task,e,p['inputs']) for e in selected)
+            else:
+                task_results.append(evaluate(task,dict(records=[],selected_mappings=p['ontology_context']['tasks'][task]['mappings']),p['inputs']))
+        all_gaps=normalize_gaps([g for result in task_results for g in result['gaps']])
+        missing=[g for g in all_gaps if g['requirement_level']!='downstream']
+        # Original model outputs remain in run.outputs. Report copies remove
+        # repeated model prose; only registered task facts create requirements.
+        suggestions=reconcile_suggestions(analyses,task_results)
+        analyses=[dict(a,missing_information=[]) for a in analyses]
         candidates=[c for e in evidence for c in e.get('ambiguous_associations',[])]
-        incomplete=bool(missing or candidates or run['node_errors']) or any(e['completeness']!='complete_for_scoped_reads' for e in evidence)
+        incomplete=bool(missing or run['node_errors']) or any(not e.get('record_reads_complete',False) for e in evidence)
         return dict(objective=p['objective'],workflow_id=p['workflow_id'],workflow_revision=p['revision'],run_id=run['run_id'],version_id=p['version_id'],knowledge_sha256=p['knowledge_sha256'],
                     completion_status='completed_with_gaps' if incomplete else 'completed',source_records=records,
                     retrieved_facts=[dict(evidence_id=e['request_id'],**f) for e in evidence for f in e['findings']],
                     configured_rule_outcomes=[r for e in evidence for r in e.get('rule_results',[])],agent_interpretations=analyses,
-                    missing_information=missing,ambiguous_associations=candidates,conversion_issues=[i for e in evidence for i in e.get('conversion_issues',[])],
+                    missing_information=missing,normalized_gaps=missing,task_evidence=task_results,
+                    requirement_registry_sha256=REGISTRY_SHA256,
+                    gap_sections={impact:[g for g in missing if g['impact']==impact] for impact in ('blocking_current_task','blocking_requested_conclusion','optional_supporting_evidence')},
+                    downstream_requirements=[g for g in all_gaps if g['requirement_level']=='downstream'],
+                    recovery_actions=[dict(gap_id=g['gap_id'],**g['recovery_action']) for g in missing],
+                    gap_reconciliation=dict(agent_suggestion_count=len(suggestions),mandatory_requirements_created_by_agents=0,original_suggestions_location='run.outputs'),
+                    resolved_references=[v for e in evidence for v in e.get('resolved_references',[])],
+                    confirmed_findings=[],unverified_findings=[dict(f,classification='agent_interpretation') for a in analyses for f in a.get('findings',[])],
+                    ambiguous_associations=candidates,conversion_issues=[i for e in evidence for i in e.get('conversion_issues',[])],
                     executed_nodes={k:v for k,v in run['node_states'].items() if v!='pending'},branch_decisions=run['branches'],execution_errors=run['node_errors'],
                     user_assertions=dict(values=run['assertions'],verification='unverified_user_input'),
                     physical_engine_identity='unresolved',warranty_approval='not_performed',company_writes=0,
@@ -344,6 +402,9 @@ class BusinessInvestigations:
                             except Exception as exc:
                                 output,outcome,usage=None,None,{}
                                 error=dict(code=getattr(exc,'code','INVESTIGATION_NODE_FAILED'),retryable=getattr(exc,'code',None) in ('BUSINESS_SOURCE_UNAVAILABLE','INVESTIGATION_MODEL_REQUIRED'),message='Node execution failed; inspect code and evidence gaps.')
+                                if error['code']=='MODEL_OUTPUT_SCHEMA_INVALID':
+                                    path=getattr(exc,'validation_field',None)
+                                    if isinstance(path,str) and re.fullmatch(r'[A-Za-z0-9_/-]{1,300}',path):error['validation_field']=path
                             with self.store.transaction() as db:
                                 current=self.owned(db,scope,run_id,owner)
                                 if current['status']=='canceled':continue

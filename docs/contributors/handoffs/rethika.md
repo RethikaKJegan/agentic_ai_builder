@@ -1,5 +1,17 @@
 # Handoff — Rethika
 
+## Investigation list management — 3 November 2026
+
+Live list supports scoped rename and retained-history delete through separate metadata; signed plans/run histories stay unchanged. Tombstones block new plan access/execution, queued/running work blocks deletion, and run creation rechecks deletion transactionally. Backend/worker/frontend deployed after idle checks with database/build recovery artifacts. 46 backend, 6 presentation and 6 browser checks passed; live desktop/mobile acceptance canceled all user mutations. No company writes/model calls. See `openspec/changes/investigation-list-actions/verification.md`.
+
+## Report schema fix and evidence rollout — 3 November 2026
+
+Explicitly approved backend/worker deployment and knowledge revision 8 are live. Investigation model requests now use exact strict schemas with schema token accounting and safe failure paths; no hidden retries, false citations or made-up reports. Explicit task exclusions are honored. 82 affected tests plus 10 subtests, 2 diagnostic tests and public authenticated availability checks passed. Original versions/runs unchanged; no company writes or paid deployment calls. Generate fresh plans rather than replaying stale catalogue fingerprints. Details: `openspec/changes/investigation-report-schema/verification.md`. This supersedes earlier local-only status.
+
+## Task-specific evidence refinement — 3 November 2026, local only
+
+Existing phases are refined with native code/engineer/timeline lookups, field dates, candidate invoice reads and task-scoped gap reporting. Existing report fields are retained; new structured sections are available to future consumers. No UI/deployment/live import or company writes. Broad 689 checks, final affected 80 checks and 12 independent source checks passed; counts overlap. Missing authoritative identity/policy/diagnosis/authorization/incorporation evidence stays unknown. See `docs/simpson-business-ontology/evidence-refinement.md` and `openspec/changes/task-evidence-refinement/verification.md`. This repository handoff does not replace earlier deployed UI history or constitute external notification.
+
 ## Workflow Rename menu — 2026-10-19
 
 Added Rename to workflow dropdown with a focused dialog. Owned workspace display

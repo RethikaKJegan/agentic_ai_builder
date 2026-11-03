@@ -149,6 +149,8 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 
 export class WorkflowClient {
   async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}
+  async renameInvestigation(id:string,display_name:string) {return z.object({workflow_id:z.string(),display_name:z.string()}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name})}));}
+  async deleteInvestigation(id:string) {return z.object({workflow_id:z.string(),deleted:z.literal(true)}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'DELETE'}));}
   async investigationPlan(id:string) {return investigationPlanSchema.parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`));}
   async investigationRun(id:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}`));}
   async investigationJob(id:string) {return investigationJobSchema.parse(await this.read(`business-ontology/v1/investigations/jobs/${encodeURIComponent(id)}`));}

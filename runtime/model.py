@@ -32,6 +32,7 @@ class BoundedLLM(BaseLLM):
         self.actual_usage = {'llm_calls': 0, 'tokens': 0, 'estimated_cost_usd': 0.0}
         self.control_format = None
         self.control_context = None
+        self.structured_format = None
 
     def call(self, messages, tools=None, callbacks=None, available_functions=None, **kwargs):
         try:
@@ -122,6 +123,8 @@ class OpenAIModelFactory:
             if bridge.control_format is not None:
                 from .model_protocol import INSTRUCTIONS
                 extra = json.dumps(bridge.control_format) + INSTRUCTIONS
+            elif bridge.structured_format is not None:
+                extra = json.dumps(bridge.structured_format)
             return len(encoding.encode(json.dumps(messages))) + len(encoding.encode(extra)) + 1024
         def invoke(messages, cap, timeout):
             response_format = {'type':'json_object'}
@@ -129,6 +132,8 @@ class OpenAIModelFactory:
                 from .model_protocol import INSTRUCTIONS
                 messages = [*messages,{'role':'system','content':INSTRUCTIONS}]
                 response_format = bridge.control_format
+            elif bridge.structured_format is not None:
+                response_format = bridge.structured_format
             response = client.responses.create(model=model['model_id'], input=messages, max_output_tokens=cap,
                                                timeout=timeout, store=False, text={'format': response_format})
             if getattr(response, 'status', None) == 'incomplete':

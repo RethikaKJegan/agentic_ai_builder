@@ -23,7 +23,8 @@ def reference_sources(bundle):
     basis=json.loads((AUTHORING/'identity-basis.json').read_text())
     text='Supplied application model excerpts; not deployed-index verification.\n'+ '\n'.join(s['path']+' ['+s['sha256']+']\n'+'\n'.join(s['quotes']) for s in basis['sources'])
     source=dict(source_id='phase1_identity_basis',title='Existing typed identity reference excerpts',kind='application_code',module_ids=['organization','engines','complaints','warranty','quality'],text=text,sha256=sha256(text.encode()).hexdigest(),origin='existing_identity_basis')
-    return deepcopy(bundle['documents'])+[source]
+    contract=json.loads((AUTHORING/'retrieval-contract.json').read_text())
+    return deepcopy(bundle['documents'])+[source,contract]
 
 
 def load_package():
@@ -35,6 +36,9 @@ def load_package():
     if digest(bundle)!=pack['evidence_bundle_sha256']:fail('The source evidence bundle changed; update the knowledge package explicitly.')
     pack['sources']=reference_sources(bundle)
     pack['source_catalog']=json.loads((AUTHORING/'source-mappings.json').read_text())
+    # Auxiliary projections are pinned with the package, outside the legacy
+    # saved-graph inventory and without exposing unrelated user fields.
+    pack['source_catalog']['items'].extend(json.loads((AUTHORING/'retrieval-mappings.json').read_text())['items'])
     pack['identity_basis']=json.loads((AUTHORING/'identity-basis.json').read_text())
     return pack
 
