@@ -222,12 +222,16 @@ class LivePlannerProvider:
                     supplied['validation_feedback'] = [{'code': exc.code, 'hint': str(exc)}]
                     continue
                 raise
+            from .database_budgets import normalize as normalize_database_budgets
+            normalize_database_budgets(workflow)
             normalize_generated_inputs(workflow)
             normalize_tool_agent_capabilities(workflow)
             normalize_generated_record_schemas(workflow)
             from runtime.email_recipients import normalize_generated_email_approvals
             normalize_generated_email_approvals(workflow)
             try:
+                from .business_planning import bind as validate_business_bindings
+                validate_business_bindings(deepcopy(workflow), supplied)
                 WorkflowService.validate_document(workflow)
                 validate_output_mappings(workflow, supplied['tool_output_schemas'])
                 from runtime.sheet_records import validate_record_workflow
@@ -240,19 +244,34 @@ class LivePlannerProvider:
                     from .database_workflows import bind_generated
                     try:
                         bind_generated(deepcopy(workflow), supplied)
-                    except (ValueError, TypeError, KeyError):
+                    except (ValueError, TypeError, KeyError) as exc:
+                        from .database_workflows import SourceBindingError
                         raise PlannerFailure('KG_SOURCE_BINDING_INVALID',
                             'Use exact catalog dataset IDs and explicit specialist source assignments within the selected scope.',
-                            field='metadata.database_source_ids') from None
+                            field=getattr(exc, 'field', 'metadata.database_source_ids'),
+                            details={'source_binding_issue': str(exc) if isinstance(exc, SourceBindingError) else 'The proposed source metadata shape is invalid.'}) from None
             except PlannerFailure as exc:
                 if exc.code == 'SHEETS_SOURCE_AMBIGUOUS':
                     raise
                 hints = {
+                    'BUSINESS_ONTOLOGY_BINDING_INVALID': 'Include metadata.business_ontology_step_bindings with node_id for actual action nodes, exact refs from context.business_ontology_retrieval, and a concrete application explanation. Put the corresponding checks into those steps or agent instructions. Do not invent citations.',
                     'EMAIL_SOURCE_MAPPING_REQUIRED': 'The initial graph sends only to the source-row customer. Remove manager email nodes and reply-loop branches; the inbox worker handles those using customer_automation metadata.',
                     'WORKFLOW_VALIDATION_FAILED': 'Include a kind=trigger node and a kind=output node, and connect every graph node to a path from the trigger. Use canonical schema fields and restricted expressions only. No len(), methods, function calls, dict literals or JavaScript. Required source columns are enforced by poll_input.required_fields.',
                     'OUTPUT_FIELD_NOT_DECLARED': 'Map only fields declared in each source output schema using the graph node ID, with no result/output wrapper. Profile returns email_address, report creation spreadsheet_url, mail message_id and calendar event_id.',
                 }
-                errors.append({'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})})
+                item = {'code': exc.code, 'field': exc.field, **({'hint':hints[exc.code]} if exc.code in hints else {})}
+                if exc.code == 'KG_SOURCE_BINDING_INVALID':
+                    item['source_binding_issue'] = exc.details.get('source_binding_issue')
+                    item['valid_dataset_ids'] = [s['dataset_id'] for s in supplied.get('database_catalog', {}).get('sources', [])]
+                    item['valid_agent_ids'] = [a['agent_id'] for a in workflow.get('agents', [])]
+                    item['selected_dataset_ids'] = workflow.get('metadata', {}).get('database_source_ids')
+                    item['hint'] = 'Correct the specific source_binding_issue. Use one to four exact valid_dataset_ids in metadata.database_source_ids. Map actual valid_agent_ids to nonempty subsets of that selection in metadata.agent_database_source_ids. Do not replace a valid selected source to hide a metadata size issue.'
+                if exc.code == 'BUSINESS_ONTOLOGY_BINDING_INVALID':
+                    item['binding_issue'] = exc.details.get('binding_issue')
+                    item['binding_index'] = exc.details.get('binding_index')
+                    item['valid_action_node_ids'] = [n['node_id'] for n in workflow.get('nodes', []) if n.get('kind') in ('agent', 'tool', 'condition', 'transform')]
+                    item['valid_refs'] = [r['ref'] for r in supplied.get('business_ontology_retrieval', {}).get('references', [])]
+                errors.append(item)
             agents_by_id = {agent['agent_id']: agent for agent in workflow.get('agents', [])}
             reserved_cost = sum(agents_by_id.get(node.get('agent_id'), {}).get('limits', {}).get('max_estimated_cost_usd', 0)
                                 for node in workflow.get('nodes', []) if node.get('kind') == 'agent')
@@ -343,6 +362,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     from .scheduler import TriggerScheduler
     from .trigger_sources import ProviderTriggerSource
     client = client if client is not None else OpenAI(api_key=env['OPENAI_API_KEY'], base_url=env.get('OPENAI_BASE_URL'), max_retries=0, timeout=60)
+    from .business_extraction import OpenAIExtraction
+    app.state.business_generation.provider=OpenAIExtraction(env,client,model)
     direct_send = env.get('BUILDER_EMAIL_DIRECT_SEND') == '1'
     from runtime.sheet_records import GoogleSheetsRecordConnector, write_targets, validate_record_workflow
     targets = write_targets(env['BUILDER_SHEETS_WRITE_TARGETS']) if env.get('BUILDER_SHEETS_WRITE_TARGETS') else []
@@ -473,7 +494,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             reply_stop.set()
             if reply_thread:reply_thread.join(timeout=5)
     from .worker_control import WorkerSupervisor
-    components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs]
+    components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs,app.state.business_generation]
     if hasattr(service,'reply_cases'):components.append(ReplyWorker())
     supervisor=WorkerSupervisor(service.store,components,role=process_role)
     app.state.worker_supervisor=supervisor

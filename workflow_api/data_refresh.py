@@ -24,10 +24,11 @@ class DataRefresh:
         if row is None:
             row = (1,300,self.clock()+300,None,None,None,0)
         enabled, interval, due, attempt, success, change, failures = row
+        active = db.execute("SELECT j.state FROM data_source_profile_jobs j JOIN data_source_auto_jobs a ON a.job_id=j.job_id WHERE j.connection_id=? AND j.state IN ('queued','running')", (cid,)).fetchone()
         return dict(connection_id=cid, name=doc.get('name',cid), enabled=bool(enabled), interval_seconds=interval,
                     next_check_at=due if enabled and doc['connection_status']!='disconnected' else None,
                     last_attempt_at=attempt, last_success_at=success, last_change_at=change,
-                    consecutive_failures=failures, profiling_status=doc.get('profiling_status','ready'),
+                    consecutive_failures=failures, profiling_status=active[0] if active else doc.get('profiling_status','ready'),
                     connection_status=doc['connection_status'], metadata_revision=doc['metadata_revision'],
                     last_error_message=doc.get('last_error_message'))
 
@@ -66,6 +67,11 @@ class DataRefresh:
                 # An automatic check preserves credential generation. Its job token
                 # and the generation guard still reject obsolete publications.
                 job = self.manager.queue(db,doc,invalidate=False)
+                # Automatic discovery checks do not revoke a ready snapshot.
+                # Publication still invalidates consumers if its shape changes.
+                previous = json.loads(raw)
+                if previous.get('profiling_status') == 'ready' and previous.get('metadata_revision', 0) > 0:
+                    doc['profiling_status'] = 'ready'
                 self.manager.save(db,doc)
                 db.execute('INSERT INTO data_source_auto_jobs VALUES (?,?)',(job,cid))
                 db.execute('UPDATE data_source_refresh SET next_check=? WHERE connection_id=?',(self.clock()+60,cid))

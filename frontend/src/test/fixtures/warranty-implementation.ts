@@ -1,0 +1,5 @@
+import data from './warranty-implementation.json' with {type:'json'};
+import {businessPolicySchema,businessPolicyListSchema} from '../../api/business-ontology';
+import {policyLibrary} from './business-policy';
+export function implementationDraft(index=0){const branch=data.branches[index]!;return businessPolicySchema.parse({...branch,interpretation_basis:'descriptive_implementation',policy_id:'impl_'+index,revision:1,created_at:'2026-11-01',schema_version:'simpson-policy-draft-v2',status:'draft',source_id:data.source.source_id,source:data.source,missing_clauses:Object.entries(branch.clauses).filter(([,c])=>c.value===null).map(([k])=>k),business_policy_verified:false,executable:false,sha256:'fixture_hash'});}
+export function implementationLibrary(){return businessPolicyListSchema.parse({...policyLibrary(),sources:[data.source],items:data.branches.map((_,i)=>{const draft=implementationDraft(i);return {...draft,coverage_limits:Object.fromEntries(['invoice_months','sale_months','max_hours'].map(k=>[k,draft.clauses[k]!.value]))};})});}

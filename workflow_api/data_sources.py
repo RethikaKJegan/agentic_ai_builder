@@ -76,6 +76,10 @@ class DataSources:
         from .semantic_kg import SemanticKnowledgeGraph
         self.semantic = SemanticKnowledgeGraph(self)
         self.relationships.ontology.semantic = self.semantic
+        from .source_evidence import SourceEvidence
+        self.source_evidence = SourceEvidence(self)
+        from .ontology_foundation import OntologyFoundation
+        self.ontology_foundation = OntologyFoundation(self)
 
     def configured(self):
         if not self.cipher:
@@ -211,6 +215,7 @@ class DataSources:
                     db.execute(f'DELETE FROM {table} WHERE connection_id=?',(cid,))
                 self.audit(db,auth,cid,'deleted')
                 self.relationships.enqueue(db,*GoogleConnections.identity(auth))
+                self.ontology_foundation.source_changed(db,GoogleConnections.identity(auth))
                 return doc
             if action=='disconnect':
                 if secret:
@@ -222,6 +227,7 @@ class DataSources:
                 db.execute("UPDATE data_source_profile_jobs SET state='cancelled',token=NULL WHERE connection_id=? AND state IN ('queued','running')",(cid,))
                 self.save(db,doc);self.audit(db,auth,cid,'disconnected')
                 self.relationships.enqueue(db,*GoogleConnections.identity(auth))
+                self.ontology_foundation.source_changed(db,GoogleConnections.identity(auth))
                 return doc
             if not secret:raise ApiFailure('DATA_SOURCE_DISCONNECTED','Connect the database again to use it.',409)
             if action=='refresh-metadata':
@@ -264,12 +270,23 @@ class DataSources:
                 db.execute("UPDATE data_source_profile_jobs SET state='cancelled' WHERE job_id=?",(job,));return True
             token=secrets.token_hex(16)
             db.execute("UPDATE data_source_profile_jobs SET state='running',token=?,lease_until=?,attempts=? WHERE job_id=?",(token,time.time()+180,attempts+1,job))
-            doc['profiling_status']='running';self.save(db,doc)
+            automatic = db.execute('SELECT 1 FROM data_source_auto_jobs WHERE job_id=?',(job,)).fetchone()
+            if not (automatic and doc.get('profiling_status') == 'ready' and doc.get('metadata_revision', 0) > 0):
+                doc['profiling_status']='running'
+            self.save(db,doc)
             self.refresh.started(db,cid)
         try:
             self.configured()
             if attempts>=3:raise ApiFailure('DATA_SOURCE_PROFILING_INTERRUPTED','Profiling was repeatedly interrupted. Refresh metadata to retry.',503)
-            result=self.adapter.profile(json.loads(self.cipher.decrypt(secret.encode())),cid)
+            config=json.loads(self.cipher.decrypt(secret.encode()))
+            with self.store.transaction(write=False) as db:
+                profile_requested=self.source_evidence.requested(db,job)
+            if profile_requested:config['_ontology_profile']=True
+            result=self.adapter.profile(config,cid)
+            ontology_profiles=result.pop('ontology_profiles',{})
+            if len(json.dumps(ontology_profiles).encode())>2_000_000:
+                ontology_profiles={}
+                result.setdefault('warnings',[]).append('Ontology profile evidence limit reached; use a smaller dataset scope.')
             if len(json.dumps(result).encode())>2_000_000:
                 raise ApiFailure('DATA_SOURCE_METADATA_LIMIT','Metadata exceeded the 2 MB snapshot limit. Profile a smaller database/schema selection.',400)
             failure=None
@@ -289,6 +306,10 @@ class DataSources:
             else:
                 previous=db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',(cid,doc['metadata_revision'])).fetchone()
                 previous=json.loads(previous[0]) if previous else None
+                from .data_drift import retain_targeted_observations
+                observation=self.source_evidence.observations(db,cid)
+                retained=observation.get('observations',[]) if observation.get('credential_fingerprint')==hashlib.sha256(secret.encode()).hexdigest() else []
+                result=retain_targeted_observations(previous,result,retained)
                 automatic=db.execute('SELECT 1 FROM data_source_auto_jobs WHERE job_id=?',(job,)).fetchone()
                 from .data_graph_v2 import structural
                 shape=lambda value:structural({k:value.get(k) for k in ('datasets','coverage','warnings','limits')})
@@ -297,6 +318,8 @@ class DataSources:
                     result.update(connection_id=cid,engine=doc['engine'],revision=doc['metadata_revision']+1,discovered_at=now(),changes=changes(previous,result))
                     db.execute('INSERT INTO data_source_snapshots VALUES (?,?,?)',(cid,result['revision'],json.dumps(result)))
                     doc['metadata_revision']=result['revision']
+                if ontology_profiles:
+                    self.source_evidence.store_profiles(db,cid,generation,doc['metadata_revision'],ontology_profiles)
                 doc.update(connection_status='connected',profiling_status='ready',last_profiled_at=now(),last_error_code=None,last_error_message=None)
                 state='succeeded'
             self.refresh.finished(db,cid,bool(failure),changed)
@@ -305,6 +328,7 @@ class DataSources:
             row=db.execute('SELECT workspace,owner FROM data_source_connections WHERE connection_id=?',(cid,)).fetchone()
             db.execute('INSERT INTO data_source_audit VALUES (?,?,?,?,?,?)',('dba_'+secrets.token_hex(16),cid,*row,'profile_'+state,now()))
             if changed:self.relationships.enqueue(db,*row)
+            if not failure:self.ontology_foundation.source_changed(db,tuple(row))
         return True
 
 

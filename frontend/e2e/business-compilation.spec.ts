@@ -1,0 +1,56 @@
+import {policyLibrary} from '../src/test/fixtures/business-policy';
+import {graphPlan} from '../src/test/fixtures/business-graph';
+import {ruleCatalogue} from '../src/test/fixtures/business-rules';
+import {businessVersionSchema} from '../src/api/business-ontology';
+import {test,expect} from '@playwright/test';
+import {createHmac,randomBytes} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+const catalog=JSON.parse(readFileSync(new URL('../src/test/fixtures/business-ontology.json',import.meta.url),'utf8'));
+for(const mobile of [false,true])test(`version compilation and export ${mobile?'mobile':'desktop'}`,async({page})=>{
+ const secret=process.env['BUILDER_LOGIN_SECRET'];test.skip(!secret,'Use an isolated browser-test signing key.');
+ const payload=`${Math.floor(Date.now()/1000)+3600}.${randomBytes(24).toString('hex')}`;
+ await page.context().addCookies([{name:'builder_workspace_access',value:`${payload}.${createHmac('sha256',secret!).update(payload).digest('hex')}`,domain:'127.0.0.1',path:'/'}]);
+ if(mobile)await page.setViewportSize({width:390,height:844});
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ const workspace={ontology_id:'simpson',title:'Simpson',namespace:'urn:fixture:',revision:2,status:'draft',created_at:'2026-10-31',sources:{service:'db1',quality:'db2'},source_revisions:{service:1,quality:1}};
+ const source={source_id:'doc1',title:'Warranty process evidence',kind:'process',module_ids:['engines'],text:'An engine has operating hours.',sha256:'fixture_hash',origin:'owner_supplied'};
+ const concept={id:'engines:engine',label:'Engine',definition:source.text,layer:'domain',module_id:'engines',status:'draft',evidence:[{source_id:'doc1',quote:source.text}],confidence:.8,unknowns:[],parent_id:null,properties:[]};
+ const first={version_id:'v1',revision:1,kind:'foundation',created_at:'2026-10-31',concepts:[],relationships:[],rules:[],sources:[],questions:{}};
+ const second={...first,version_id:'v2',revision:2,kind:'draft',concepts:[concept],sources:[source]};
+ const current={...catalog,modules:catalog.modules.map((m:{id:string})=>({...m,concept_count:m.id==='engines'?1:0})),workspace,documents:[source],source_bindings:[],versions:[first,second],current_version_id:'v2',generation_status:'draft_available',counts:{concepts:1,relationships:0,rules:0},definitions:{concepts:[concept],relationships:[],rules:[]},questions:{}};
+ const content='<urn:fixture:engine> a <http://www.w3.org/2002/07/owl#Class> .\n';
+ const compiled={version_id:'v2',compiler_version:'simpson-owl-shacl-v1',input_sha256:'fixture_input_hash',compiled_at:'2026-10-31',report:{status:'passed',compiler_version:'simpson-owl-shacl-v1',version_id:'v2',revision:2,checks:{snapshot:'passed',rdf_syntax:'passed',shapes_meta_shacl:'passed',definition_shacl:'passed'},definition_conforms:true,instance_validation:'not_run',owl_reasoning:'not_run',business_policy_verified:false,counts:{concepts:1},issues:[],warnings:[{code:'REFERENCE_TARGET_UNSPECIFIED',focus:'engines:engine',message:'Reference target is unspecified.'}]},artifacts:[{name:'ontology.ttl',media_type:'text/turtle',content,sha256:'fixture_artifact_hash'}]};
+ let stored:typeof compiled|null=null,submissions=0,legacyWrites=0;
+ await page.route('**/api/backend/**',async route=>{
+  const request=route.request(),path=new URL(request.url()).pathname.replace('/api/backend/','');let data:unknown={items:[],configured:true};
+  if(path==='business-ontology/v1/warranty-policies')data=policyLibrary();
+  else if(path==='session')data={mode:'local-development',auth:{subject:{subject_id:'alice',workspace_id:'one'},roles:['admin'],permissions:['workflow.view','tools.read','tools.assign'],scopes:['workspace:read','workspace:write'],decision:'allow'},planning_available:false,runtime_available:false,approval_service_available:false};
+  else if(path==='data-sources')data={configured:true,shared_demo_identity:false,items:[]};
+  else if(path==='data-refresh')data={version:1,items:[]};
+  else if(path==='business-ontology/v1')data=current;
+  else if(path.endsWith('/rule-catalogue'))data=ruleCatalogue(businessVersionSchema.parse(path.includes('/versions/v1/')?first:second),false);
+  else if(path.endsWith('/graph-plan'))data={...graphPlan(path.includes('/versions/v1/')?'v1':'v2'),available:false,unavailable_reason:'Graph mappings are not configured in this fixture.'};
+  else if(path==='business-ontology/v1/versions/v1')data=first;
+  else if(path==='business-ontology/v1/versions/v2')data=second;
+  else if(path==='business-ontology/v1/versions/v2/compilation'){
+   if(request.method()==='POST'){expect(request.postDataJSON()).toEqual({});stored=compiled;submissions++;}
+   data={compilation:stored};
+  }else if(path==='business-ontology/v1/versions/v1/compilation')data={compilation:null};
+  if(path.startsWith('ontology/')&&request.method()!=='GET')legacyWrites++;
+  await route.fulfill({status:200,json:{request_id:'req_compilation_browser',status:200,data}});
+ });
+ await page.goto('/app/data-intelligence');await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Ontology compilation'});
+ const compile=panel.getByRole('button',{name:'Compile & validate version'});await expect(compile).toBeEnabled();expect(submissions).toBe(0);
+ await compile.click();await expect(panel.getByText('Definition validation passed · Revision 2')).toBeVisible();
+ await expect(panel.getByText(/This compilation validates definitions only/)).toBeVisible();
+ await panel.getByText(/Unresolved information and mapping limits/).click();await expect(panel.getByText('Reference target is unspecified.')).toBeVisible();
+ const downloadPromise=page.waitForEvent('download');await panel.getByRole('button',{name:'Download Ontology (Turtle)'}).click();
+ const download=await downloadPromise;expect(download.suggestedFilename()).toBe('simpson-revision-2-ontology.ttl');
+ const stream=await download.createReadStream();const chunks:Buffer[]=[];for await(const chunk of stream!)chunks.push(Buffer.from(chunk));expect(Buffer.concat(chunks).toString()).toBe(content);
+ await panel.scrollIntoViewIfNeeded();await page.screenshot({path:`test-results/business-compilation-${mobile?'mobile':'desktop'}.png`,fullPage:true});
+ await page.getByLabel('Definition version').selectOption('v1');await expect(panel.getByText('Generate a module draft before compiling this version.')).toBeVisible();
+ await expect(panel.getByRole('button',{name:'Download Ontology (Turtle)'})).toHaveCount(0);
+ await page.getByLabel('Definition version').selectOption('v2');await expect(panel.getByText('Definition validation passed · Revision 2')).toBeVisible();
+ expect(submissions).toBe(1);expect(legacyWrites).toBe(0);expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

@@ -194,7 +194,7 @@ class KnowledgeRetrieval:
                     chosen.append(did)
                     reasons[did].add('Required intermediate dataset on a declared/accepted relationship path.')
         selected=[indexed[did] for did in chosen]
-        if len(json.dumps(selected).encode())>70000:
+        if not (planning and selection is None) and len(json.dumps(selected).encode())>70000:
             raise ApiFailure('KG_RETRIEVAL_LIMIT','The selected field metadata is too large. Choose fewer sources.',422)
         selected_ids=set(chosen)
         path_edges=[e for e in edges if {e['source_dataset_id'],e['target_dataset_id']}<=selected_ids]
@@ -213,10 +213,24 @@ class KnowledgeRetrieval:
             # Retrieval proposes bounded candidates; only validated model choices
             # become the execution scope in bind_generated. No extra model call.
             pool=list(dict.fromkeys([*candidates,*chosen]))[:16]
-            pool_sources=[indexed[did] for did in pool]
-            if len(json.dumps(pool_sources).encode())>70000:
-                raise ApiFailure('KG_RETRIEVAL_LIMIT','Relevant source metadata exceeds the bounded planning context.',422)
-            pool_ids=set(pool)
+            # Fit complete ranked descriptors rather than reject a useful pool
+            # because an optional wide collection exhausts the metadata budget.
+            pool_sources=[];omitted=[]
+            for did in pool:
+                source=indexed[did]
+                if len(json.dumps([*pool_sources,source]).encode())>70000:
+                    omitted.append(did)
+                    continue
+                pool_sources.append(source)
+            if not pool_sources and pool:
+                raise ApiFailure('KG_RETRIEVAL_LIMIT','No matching complete source schema fits the planning metadata budget. Narrow the connected schema metadata.',422)
+            pool_ids={source['dataset_id'] for source in pool_sources}
+            if omitted:
+                preview['warnings'].append(f'{len(omitted)} matching source schema(s) were omitted to fit the planning metadata budget; use only supplied catalog sources. No source fields were altered.')
+            preview['source_ids']=[did for did in chosen if did in pool_ids]
+            for candidate in preview['candidates']:
+                candidate['selected']=candidate['dataset_id'] in preview['source_ids']
+            preview['relationships']=[edge for edge in preview['relationships'] if {edge['source_dataset_id'],edge['target_dataset_id']}<=set(preview['source_ids'])]
             selected=pool_sources
             path_edges=[e for e in edges if {e['source_dataset_id'],e['target_dataset_id']}<=pool_ids]
             preview['semantic_relationships']=[{k:e[k] for k in ('relationship_id','technical_relationship_id','source_dataset_id','target_dataset_id','predicate','reversed','status','semantic_evidence_hash','evidence_refs','confidence')} for e in state.get('business_relationships',[]) if {e['source_dataset_id'],e['target_dataset_id']}<=pool_ids]

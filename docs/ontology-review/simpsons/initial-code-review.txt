@@ -1,0 +1,201 @@
+Written for: the ontology review team. Each answer gives what the app does, followed by "Business" where the team needs to confirm the policy. The answers are taken from the `simpcare-admin-console` code; I didn't query the database.
+
+## Engine identity and OEM accounts
+
+**1. Same serial on two physical engines?** Needs business confirmation. The app allows the same serial once per company (`oem + engineSerialNumber`), but every lookup uses the serial alone and returns whichever record it finds first.
+
+**2. Ignore spaces, hyphens, leading zeros, case?** The app does no normalisation: `AB-123` and `ab123` are different engines. The only exception is the engine search box, which ignores case. Business: needs confirmation.
+
+**3. Return, transfer, re-invoice?** Unknown. There is one `enginedetails` row per serial per company and no invoice history; one import path skips a serial that already exists, so a re-invoice is never recorded.
+
+**4. Current owner/user recorded?** No. Only the billed-to company is stored. Customer names exist only as free text in some forms (infant care, FOC).
+
+**5. Tickets for serials missing from `enginedetails` intentional?** It looks deliberate. The ticket goes to stage `ENTER_ENGINE_DETAILS` and an alert email is sent. Business: needs confirmation.
+
+**6. Personal, plant and branch logins all legitimate?** The app doesn't distinguish them. An account has one email, one address and an `admin` flag (company admin). Business: needs confirmation.
+
+**7. Can an account change company? Do old tickets keep the original?** `oemNameId` can be edited. Tickets keep their original `oemOrg` because it is copied at creation. However, a company admin's ticket list is filtered by the ticket's company, while some dashboards resolve the account's current company, so the two can disagree. Business: needs confirmation.
+
+## Ticket lifecycle and business rules
+
+**8. Statuses, transitions, and status vs phase vs stage vs state:**
+- `status`: `OPENED`, `RESOLVED`, `CLOSED`, `REOPENED`. The only enforced rule is that `REOPENED` requires `RESOLVED` or `CLOSED`. Any other status change is accepted.
+- `stage`: the workflow step, with 27 values in `ticket-stage-enum.js`.
+- `state`: the Indian state of the engine's location.
+- `phase`: always 2 (default) and never read. Not used.
+
+**9. RESOLVED vs CLOSED, and who can do each?** The app records `resolvedAt` and `mttr` on resolve, and `closedAt` and `mttc` on close. Both actions are open to staff with the `admin` or `serviceEngineer` role; OEM accounts can't change status. The business meaning of each needs confirmation.
+
+**10. Reopen after a newer ticket exists?** The app allows it with no check, which can leave two open tickets for one engine. Business: needs a rule.
+
+**11. Serial alone, or company plus serial?** The app checks serial alone. Business: needs confirmation.
+
+**12. Multiple defects, parts, inspections or repairs in one ticket?**
+- One defect code, one action code and one inspection report (JIR) per ticket.
+- Several replaced parts are allowed.
+- Repeat repairs mean a new ticket.
+
+Business: needs confirmation.
+
+**13. Ticket fields vs timeline: which is authoritative?** In the app, the ticket fields are the current state; the timeline is a write-only log that is never read back to rebuild state. Business: needs confirmation.
+
+## Staff, roles and visibility
+
+**14. What is `users`?** Simpson staff logins, with roles set by `limits`. There is no "external engineer" type. The same email can exist in both `users` and `oems`, because they are separate collections with no cross-check.
+
+**15. Multiple engineers on one ticket?**
+- `serviceEngineer` is the primary engineer and the only one who sees the ticket in their list.
+- `additionalServiceEngineer` is a second engineer.
+- `expertise` is a subject expert.
+
+Reassignment overwrites the field and sets `isServiceReassigned`. History survives only as `REASSIGN_SE` events in the timeline.
+
+**16. `limits`?** Role flags, all true/false with no units: `admin`, `serviceEngineer`, `approver`, `floatEngineManager`, `qualityAdmin`, `qualityCreator`, `qualityApprover`.
+
+**17. Visibility:**
+- OEM account: its own tickets. An OEM company admin sees all of the company's tickets.
+- Engineer: tickets where they are the primary engineer.
+- Approver: tickets assigned to them for approval.
+- Admin, float-engine manager and quality admin: all tickets.
+
+Gaps:
+- **Any OEM account can read the latest ticket on any engine, from any company,** through `/ticket/past-history/:engineNo`.
+- **These ticket endpoints need no login at all:** `/stage/view/:id`, `/stage/comment/:id`, `/stage/other-action-states/:id`, `/stage/part-replacement/:id` and `/stage/check-warranty/:id`. Ticket IDs are sequential (`A-2026-10-001`), so they are easy to guess.
+
+## Inspections, replacements and work orders
+
+**18. Multiple joint inspection reports?** No. One per ticket (unique `ticketId`), status `DRAFTED` then `PUBLISHED`. Edits overwrite the report, so there are no revisions. `jirlogs` records submissions from the mobile app.
+
+**19. FOC?** The app doesn't expand the acronym; "free of charge" is likely but needs confirmation. An OEM creates the FOC against a ticket, with dealer, failure details, parts (part number and quantity) and a warranty claim number. A float-engine manager sets it to `REJECTED` or `COMPLETED`. It has no link to the inspection report or to engine-replacement approval.
+
+**20. `workorders`?** An inward record for the failed engine: inward date, transporter, missing or damaged items, who approved the replacement. Float-engine managers create it. Its ticket link is commented out, so it connects to a ticket only through free-text reference numbers. Nothing limits how many a ticket has.
+
+**21. Float vs advanced vs replacement engines:**
+- `enginedetails`: physical engines (the invoice master).
+- `engineReplacement`: the request. Either Simpson replaces (`new_engine` or `float_engine`) or the OEM does (`from_oem_plant`, `through_spd_mode`, `from_oem_deposit`).
+- `floatengines`: the dispatch of a replacement engine for a ticket.
+- `floatengineftps`: Simpson's SAP stock of float engines, one row per serial.
+- `advaced-engine-replacements`: advance engines sent to an OEM, with no ticket link.
+- `advancedEngineNumbers`: a lookup list.
+
+**22. Linking original and replacement serials?** `floatengines.replacementEngineNumber` holds the new serial, and the ticket's `engineNo` holds the old one; they are linked only through the ticket. `enginedetails` is never updated. Which serial later tickets should use needs business confirmation.
+
+**23. `mode`, `scope`, `extra`?** Free text from the UI with no allowed values, so their meaning is unknown. `part` is free text, with one row and one cost per part. No quantity is stored here; only FOC records hold part number and quantity.
+
+**24. `parts` vs Simpson part numbers?** They can't be matched. `parts` holds only a description; part numbers exist only in claims (`simpsonPartNumber`) and FOC records.
+
+## Claims, money and approvals
+
+**25. `claims` vs `claimsftps`?**
+- `claims`: entered or bulk-uploaded by OEM accounts.
+- `claimsftps`: imported automatically from Simpson's SAP files over FTP by a scheduled job. FTP is the file-transfer protocol.
+
+The dashboards and MIS figures count only `claimsftps`. Whether these are two stages of one claim needs business confirmation.
+
+**26. Claim across tickets, engines or parts?** Each row is one engine and one part line. There is no ticket reference; the only links are the serial number and claim number as text.
+
+**27. Currencies and units, and which amounts include tax?** Unknown: there are no currency fields. Several amounts are stored as text (advance engine `invoiceValue` and `taxValue`, float engine `invoiceValues`, claim `partValue`). Tax is stored separately only on advance and float engines.
+
+**28. Who approves?**
+- Engine replacement: an admin assigns one approver, who approves or rejects.
+- FOC: a float-engine manager.
+- Float-engine dispatch: created by a float-engine manager with no separate approval.
+- Claims: no approval in the app; `status` comes from SAP.
+- Service bulletins, service information and workshop manuals: an approver.
+- Failed engine and part analyses: the quality approver named on the record.
+
+Approval never depends on amount, plant or level.
+
+**29. Multiple approvals, rejection, resubmission?** Every flow has a single approval. After an engine-replacement rejection, the stage is `ENGINE_REPLACEMENT_REJECTED`. Resubmitting would mean setting the action code again; there is no dedicated path. Note that a submitted request stores `engineReplacementStatus = 'PENDING'`, a value outside the field's allowed list.
+
+## Products, quality and documents
+
+**30. `engineModel` vs `engineModal`; `listNo` vs `listNumber` vs `listData`?** They look the same, but the app never joins them. Tickets have both `engineModal` (spelled that way) and `model`. Business: needs confirmation.
+
+**31. What is a list number?** Unknown. `products.listData` tracks per-list readiness (alpha/beta stage, workshop-manual and parts-catalogue readiness), which suggests a build or configuration variant of an engine model. Uniqueness is not enforced.
+
+**32. Code types in `simpsoncodes`?** Three types (`COMPLAINT`, `DEFECT`, `ACTION`) in one collection; each code is unique across all types. The older `complaintcodes` and `defectcodes` collections still exist, on a different database connection.
+
+**33. Internal cut-ins vs service bulletins vs service information?** Service bulletins and service information have identical schemas: OEM company, defect code, engine models, list numbers, and a cut-in number and date per plant. Internal cut-ins are per plant, list number and cut-in number. Applicability is OEM company + model + list number + plant cut-in. How bulletin and information differ needs business confirmation.
+
+**34. Failed engine/part analysis, ICA/CAPA, infant care, export tracking?**
+- Failed engine analysis: per serial.
+- Failed part analysis: per part number.
+- ICA/CAPA: per defect. The app doesn't define the term; Interim Containment Action / Corrective and Preventive Action is likely.
+- Infant care: an early-life inspection visit on one engine.
+- Export engine tracking: complaints on exported engines, with codes stored as text.
+
+**None of these links to tickets.** They are separate processes.
+
+**35. Workshop manuals?** Identified by model, OEM, list number and version. Revisions sit in a separate collection, and an approver approves them. There is no "effective" or "superseded" field, only `archive`. Business: needs confirmation.
+
+**36. FAQs and knowledge sharing?** No review fields. Any logged-in staff member can create or edit FAQs. Business: needs confirmation.
+
+## Training, stock and reporting
+
+**37. Training relationships?**
+- `courseschedules`: a scheduled course (model, dates, status); OEMs can request one.
+- `trainingschedules`: an OEM's booking against a course, with participants; an admin accepts or rejects it.
+- `events`: standalone calendar entries.
+- `training-modules`: uploaded training material.
+
+**38. Who are participants? Attendance vs registration?** Participants are typed in by name, age, qualification and designation; they are not accounts. Attendance is only implied by booking status `COMPLETED` plus a per-participant certificate.
+
+**39. Touchpoints and man-hours?** Monthly target and actual figures are stored as plain numbers. I found no formula. Business: needs definition.
+
+**40. `floatengineftps` vs `floatinventories`?** `floatengineftps` holds individual engines from SAP (stock, `NEW`/`DEFECTIVE`/`REPAIRED`, amount). `floatinventories` is a monthly count and cost summary calculated from them.
+
+**41. `mis.salesCount` and `ticketsCount`?** Nothing writes these fields, so they stay 0. Not used. The MIS charts are calculated as SAP claims ÷ sales × 1,000,000. **Sales come from a hardcoded list in the dashboard code, not from data.**
+
+## Source mappings and remaining uncertainties
+
+**42. What each `oem` field points to:**
+
+| Points to | Fields |
+|---|---|
+| OEM account (`oems`) | `tickets.oem`, `claims`, JIR, FOC, `floatengines`, advance engines, `workorders.oem`, `courseschedules.requestedBy` |
+| Company (`oemnames`) | `tickets.oemOrg`, `enginedetails`, `workorders.oemOrg`, internal cut-ins, service bulletins, service information |
+| Plain text | `claimsftps`, `products`, workshop manuals, infant care, export tracking, `trainingschedules`, `floatengineftps` |
+| Array of text | ICA/CAPA, failed engine analysis, failed part analysis |
+| No `oem` field | engine and part replacements |
+
+**43. Links that are not guaranteed:**
+- Every serial-number link (`engineNo`, `engineSerialNumber`, `replacementEngineNumber`).
+- List numbers and engine models.
+- Work order → ticket, and claim → ticket.
+- `tickets.createdBy`, declared as an OEM account but sometimes a staff user.
+- `wcl`, which sits on a different database connection.
+- References that cross from one database connection to another, such as failed part analysis and manual-revision `approvedBy` → `users`. These cannot be resolved.
+
+Reliable IDs: `ticketId` / `ticket` on timeline, comment, JIR, FOC, float engine, engine replacement and part replacement records, plus `oemNameId`.
+
+**44. Hours and metrics:**
+- `hmr`: hour-meter reading entered on the complaint form.
+- `hmrBucket`: its band (0–100, 101–250 … 8000+).
+- `mttr` / `mttc`: whole days from ticket creation to resolved / closed. Reopening clears them.
+- `hoursCovered` / `failureHours`: hours at failure, presumed; the meaning is unconfirmed.
+
+**45. Collections with no discovered fields:**
+- `emms`: active. It stores engine-model names as the record ID, with no other fields.
+- `icacapas`, `failedpartanalyses`, `performers`, `workshopmanualrevisions`: active features with screens; they may simply be empty.
+- `saledatas`: not used. No code reads or writes it.
+
+**46. Operational collections?**
+- `filecheckers`: which import files have been processed.
+- `ticketidcounters`: ticket numbering.
+- `jirlogs`: JIR submissions from the mobile app.
+
+These are operational metadata, not business facts. Backup logs aren't in this repo.
+
+**47. How fresh does data need to be?** The app polls SAP files on a schedule for claims, float engines and engine invoices. Acceptable staleness is a business decision.
+
+**48. Rules needing expert approval:** Business decision. My suggestions: engine identity and serial matching, the warranty decision, engine replacement and money amounts, and cross-company visibility.
+
+**49. Who decides authoritative definitions and gives final approval?** Business decision. Unknown from code.
+
+**50. Three representative questions:**
+1. *"Full service history of engine X?"* Find the engine in `enginedetails` by serial → find tickets by `engineNo` → add each ticket's timeline, JIR, FOC, replacements and float engines by ticket ID → add claims by `engineSerialNumber` (text match, flag as unverified).
+2. *"Engine replacements approved for company Y this financial year, and their dispatch status?"* Tickets filtered by `oemOrg`, `financialYear` and `engineReplacementStatus = APPROVED` → their float engines by ticket ID (`YET_TO_DISPATCH` / `ENGINE_DISPATCHED`).
+3. *"Which open tickets on model Z fall before a service-bulletin cut-in?"* The bulletin's company, models, list numbers and plant cut-in numbers → open tickets matching company, model and list number → compare the serial with the cut-in number (needs the serial-ordering rule from question 2).
+
+Two issues need attention outside the ontology review. The ticket endpoints that need no login (17) and the cross-company `past-history` endpoint (17) are real data-exposure problems. Sales figures are hardcoded (41), so the MIS charts don't reflect live data.

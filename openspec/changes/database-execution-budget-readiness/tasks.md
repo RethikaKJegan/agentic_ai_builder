@@ -1,0 +1,7 @@
+- [x] 1. Add connector-aware draft budget normalization and readiness validation.
+- [x] 2. Verify tool dispatch and complete result synthesis with meaningful offline execution tests.
+- [x] 3. Deploy, repair as a new revision, and record the explicitly approved execution tests.
+- [x] 4. Correct executable clarification semantics and support catalog-backed nested MongoDB scalar evidence, with narrow per-specialist field choices.
+- [ ] 5. Establish successful real end-to-end execution after a fresh explicit single-execution approval.
+- [x] 6. Replay the actual saved published revision in an isolated local store with deterministic model/source fixtures and external networking blocked; verify final output mapping, source citations, and ontology trace without paid calls. This does not satisfy task 5.
+- [x] 7. Keep previously ready metadata available during automatic refresh, while retaining invalidation for real changes, manual refresh, credential changes and failures. Hide tools whose remaining reviewed allowance cannot cover their reservation, and verify both failures from run_848b5537aeca427b9fbdff8d500bbece without paid calls.

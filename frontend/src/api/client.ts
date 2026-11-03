@@ -1,3 +1,12 @@
+import {businessSourcesSchema,businessSourceRecordsSchema,businessSourceProfileSchema,type BusinessRecordRequest} from './business-sources';
+import {businessRuleExecutionCatalogueSchema,businessRuleEvidenceSchema,businessRuleExecutionResultSchema,type BusinessRuleExecuteRequest,type BusinessRuleEvidenceRequest} from './business-ontology';
+import {businessMonitoringSchema,type BusinessMonitoringRequest} from './business-ontology';
+import {businessWarrantyAssessmentSchema,type BusinessWarrantyAssessmentRequest} from './business-ontology';
+import {businessAssociationsSchema} from './business-ontology';
+import {businessPolicySchema,businessPolicyListSchema,businessPolicyComparisonSchema,type BusinessPolicySave,type BusinessPolicyCompareRequest} from './business-ontology';
+import {businessWarrantyReadinessSchema} from './business-ontology';
+import {businessModuleCoverageSchema,businessReferenceResultSchema,businessIntelligenceCatalogueSchema,businessIntelligenceReportSchema,type BusinessIntelligenceRequest} from './business-ontology';
+import { businessGraphPlanSchema, businessGraphSchema, type BusinessGraphRequest, businessRuleCatalogueSchema, businessCompetencyResultSchema, type BusinessCompetencyRequest, businessCompilationSchema, businessOntologySchema, businessVersionSchema, businessDocumentSchema, businessJobSchema, businessJobsSchema } from './business-ontology';
 import { semanticViewSchema, recordGraphSchema } from "./semantic-kg";
 import { knowledgePreviewSchema, type KnowledgeSelection } from "./knowledge-graph";
 import { plannedQuerySchema, queryResultSchema, queryStatusSchema, queryJobSchema, queryJobListSchema } from "./data-queries";
@@ -138,6 +147,49 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async businessRuleExecutionCatalogue(vid:string,gid:string) {return businessRuleExecutionCatalogueSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rule-execution`));}
+  async businessRuleEvidence(id:string) {return businessRuleEvidenceSchema.parse(await this.read(`business-ontology/v1/rule-evidence/${encodeURIComponent(id)}`));}
+  async saveBusinessRuleEvidence(vid:string,gid:string,body:BusinessRuleEvidenceRequest) {return businessRuleEvidenceSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rule-evidence`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async executeBusinessRule(vid:string,gid:string,body:BusinessRuleExecuteRequest) {return businessRuleExecutionResultSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rules/execute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async businessOntology() { return businessOntologySchema.parse(await this.read("business-ontology/v1")); }
+  async businessMonitoring(versionId:string,graphId:string,body:BusinessMonitoringRequest) { return businessMonitoringSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/monitoring-readiness`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async assessBusinessWarranty(versionId:string,graphId:string,body:BusinessWarrantyAssessmentRequest) { return businessWarrantyAssessmentSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/warranty-assessment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessAssociations(versionId:string,graphId:string,ticketNodeId:string) { return businessAssociationsSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/associations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket_node_id:ticketNodeId})})); }
+  async businessPolicies() { return businessPolicyListSchema.parse(await this.read('business-ontology/v1/warranty-policies')); }
+  async businessPolicy(id:string) { return businessPolicySchema.parse(await this.read(`business-ontology/v1/warranty-policies/${encodeURIComponent(id)}`)); }
+  async saveBusinessPolicy(body:BusinessPolicySave) { return businessPolicySchema.parse(await this.read('business-ontology/v1/warranty-policies',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async compareBusinessPolicy(versionId:string,graphId:string,body:BusinessPolicyCompareRequest) { return businessPolicyComparisonSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/policy-comparison`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessWarrantyReadiness(id:string,graphId:string,ticketNodeId:string) { return businessWarrantyReadinessSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graphs/${encodeURIComponent(graphId)}/warranty-readiness`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket_node_id:ticketNodeId})})); }
+  async businessModuleCoverage(id:string) { return businessModuleCoverageSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/module-coverage`)); }
+  async addBusinessReferenceModules(body:{expected_revision:number;request_key:string}) { return businessReferenceResultSchema.parse(await this.read('business-ontology/v1/reference-modules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessIntelligenceCatalogue(id:string,graphId:string) { return businessIntelligenceCatalogueSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graphs/${encodeURIComponent(graphId)}/intelligence`)); }
+  async runBusinessIntelligence(id:string,graphId:string,body:BusinessIntelligenceRequest) { return businessIntelligenceReportSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graphs/${encodeURIComponent(graphId)}/intelligence/run`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessVersion(id:string) { return businessVersionSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}`)); }
+  async businessCompilation(id:string) { return businessCompilationSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/compilation`)); }
+  async compileBusinessVersion(id:string) { return businessCompilationSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/compilation`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})); }
+  async businessRuleCatalogue(id:string) { return businessRuleCatalogueSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/rule-catalogue`)); }
+  async runBusinessCompetency(id:string,body:BusinessCompetencyRequest) { return businessCompetencyResultSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/competency-queries/run`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessGraphPlan(id:string) { return businessGraphPlanSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graph-plan`)); }
+  async businessSourceGraph(id:string,graphId:string) { return businessGraphSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graphs/${encodeURIComponent(graphId)}`)); }
+  async buildBusinessGraph(id:string,body:BusinessGraphRequest) { return businessGraphSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(id)}/graphs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
+  async businessSource(id:string) { return businessDocumentSchema.parse(await this.read(`business-ontology/v1/documents/${encodeURIComponent(id)}`)); }
+  async addBusinessSource(body:{title:string;kind:string;module_ids:string[];text:string}) {
+    return this.read('business-ontology/v1/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  }
+  async importBusinessReference() { return businessOntologySchema.parse(await this.read('business-ontology/v1/import-reference',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})); }
+  async businessGenerationJobs() { return businessJobsSchema.parse(await this.read('business-ontology/v1/jobs')); }
+  async generateBusinessModule(body:{module_id:string;expected_revision:number;request_key:string}) {
+    return businessJobSchema.parse(await this.read('business-ontology/v1/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+  }
+  async importWarrantyImplementation() { return businessPolicyListSchema.parse(await this.read('business-ontology/v1/warranty-policies/import-implementation',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})); }
+  async cancelBusinessGeneration(id:string) { return businessJobSchema.parse(await this.read(`business-ontology/v1/jobs/${encodeURIComponent(id)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})); }
+
+  async initializeBusinessOntology(sources:{service:string;quality:string}) {
+    return businessOntologySchema.parse(await this.read("business-ontology/v1/initialize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sources})}));
+  }
+  async businessSources() { return businessSourcesSchema.parse(await this.read('business-ontology/v1/sources')); }
+  async profileBusinessSource(id:string) { return businessSourceProfileSchema.parse(await this.read(`business-ontology/v1/sources/${encodeURIComponent(id)}/profile`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})); }
+  async businessSourceRecords(body:BusinessRecordRequest) { return businessSourceRecordsSchema.parse(await this.read('business-ontology/v1/source-records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
   async knowledgeGraph(relationshipId?:string,body?:object) {
     const value=await this.read(relationshipId?`knowledge-graph/review/${encodeURIComponent(relationshipId)}`:"knowledge-graph",relationshipId?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);
     const parsed=semanticViewSchema.safeParse(value);

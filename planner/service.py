@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import uuid
 from typing import Any
@@ -48,11 +49,18 @@ class PlannerService:
             if context_resolver is not None:
                 context = context_resolver(context)
             reject_sensitive(context)
+            business_evidence = deepcopy(context.get("business_ontology_retrieval")) if isinstance(context, dict) else None
             workflow = self.provider.generate(objective.strip(), context)
             # Planning proposes content, never server revision history.
             workflow['version'], workflow['status'] = 1, 'draft'
             from workflow_api.database_workflows import bind_generated
             bind_generated(workflow, context)
+            from workflow_api.database_budgets import normalize as normalize_database_budgets
+            normalize_database_budgets(workflow)
+            from workflow_api.planning_requirements import separate_coverage_notes
+            separate_coverage_notes(workflow)
+            from workflow_api.business_planning import bind as bind_business
+            bind_business(workflow, {"business_ontology_retrieval": business_evidence} if business_evidence else {})
             reject_sensitive(workflow)
             mark_automatic_inputs(workflow, context)
             self._clear_proposed_assignments(workflow)
@@ -62,6 +70,11 @@ class PlannerService:
             retrieval = context.get('knowledge_graph_retrieval') if isinstance(context, dict) else None
             if retrieval:
                 identity_objective += '\n[knowledge-graph-retrieval-v1:' + retrieval['revision'] + ':' + ','.join(retrieval['source_ids']) + ']'
+            if business_evidence:
+                from workflow_api.business_planning import digest as business_digest
+                identity_objective += '\n[business-ontology:' + business_digest(business_evidence) + ']'
+            if workflow.get('metadata', {}).get('database_scope'):
+                identity_objective += '\n[database-execution-budgets-v2]'
             selected_google = context.get('google_connection_id') if isinstance(context, dict) else None
             if selected_google:
                 identity_objective += '\n[google-connection:' + str(selected_google) + ']'

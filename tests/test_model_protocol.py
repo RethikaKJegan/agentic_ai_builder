@@ -8,7 +8,7 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 from runtime.delegation import DECISION_SCHEMA, TOOL_DECISION_SCHEMA
 from runtime.model import OpenAIModelFactory
-from runtime.model_protocol import response_format,decode_response
+from runtime.model_protocol import response_format,decode_response,encode_object_fields
 from runtime.service import RuntimeFailure
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -39,7 +39,7 @@ class ControlProtocolTests(unittest.TestCase):
         invalid=deepcopy(wire);invalid['decision']['tasks'][0]['agent_id']='unregistered'
         self.assertTrue(list(Draft202012Validator(response_format('master',context)['schema']).iter_errors(invalid)))
         report={'records':[{'arbitrary_column':'actual fact'}]}
-        wire={'decision':{'action':'finish','reason':'Report evidence.','output_json':json.dumps(report)}}
+        wire={'decision':{'action':'finish','reason':'Report evidence.','output_fields':encode_object_fields(report)}}
         Draft202012Validator(response_format('tool',{'available_tools':[]})['schema']).validate(wire)
         result=json.loads(decode_response(json.dumps(wire)))
         Draft202012Validator(TOOL_DECISION_SCHEMA).validate(result)
@@ -156,7 +156,7 @@ class ControlProtocolTests(unittest.TestCase):
         first={'decision':{'action':'tool','reason':'Read actual sources.','tool_id':SEARCH['tool_id'],
                            'inputs':{'query':'food wholesale supply risk','region':'wt-wt','max_results':3}}}
         second=deepcopy(first);second['decision']['inputs']['query']='speculative second query'
-        finish={'decision':{'action':'finish','reason':'Speculative completion.','output_json':'{}'}}
+        finish={'decision':{'action':'finish','reason':'Speculative completion.','output_fields':[]}}
         stream=''.join(json.dumps(w) for w in (first,second,finish))
         result=json.loads(decode_response(stream,context,schema))
         self.assertEqual(result,first['decision'])
@@ -173,7 +173,7 @@ class ControlProtocolTests(unittest.TestCase):
         context={'available_tools':[SEARCH]}
         first={'decision':{'action':'tool','reason':'Search actual public evidence.','tool_id':SEARCH['tool_id'],
                            'inputs':{'query':'food wholesale supply risks','region':'wt-wt','max_results':3}}}
-        finish={'decision':{'action':'finish','reason':'No results yet.','output_json':'{}'}}
+        finish={'decision':{'action':'finish','reason':'No results yet.','output_fields':[]}}
         class Client:
             def with_options(self,**kwargs):return self
             @property
@@ -190,3 +190,53 @@ class ControlProtocolTests(unittest.TestCase):
         self.assertEqual(json.loads(result.removeprefix('Final Answer: ')),first['decision'])
         self.assertEqual(model.actual_usage['tokens'],50)
         self.assertEqual(model.actual_usage['llm_calls'],1)
+
+    def test_open_report_uses_recursive_typed_values_without_embedded_json(self):
+        report={'summary':{'text':'Quoted "case" with \\ and Unicode α.', 'checked':False,'missing':None},
+                'sources':[{'dataset_id':'synthetic','ids':['R1','R2']}], 'counts':{'read':10,'total':9000},
+                'findings':[{'value':3.5,'flags':[True,False,None]}]}
+        context={'available_tools':[],'final_output_schema':{'type':'object','properties':{'summary':{'type':'object'}},'required':['summary']}}
+        fmt=response_format('tool',context)
+        wire={'decision':{'action':'finish','reason':'Cite checked facts.','output_fields':encode_object_fields(report)}}
+        Draft202012Validator.check_schema(fmt['schema'])
+        Draft202012Validator(fmt['schema']).validate(wire)
+        self.assertNotIn('output_json',json.dumps(fmt))
+        result=json.loads(decode_response(json.dumps(wire),context,fmt['schema']))
+        self.assertEqual(result['output'],report)
+        self.assertIs(result['output']['summary']['checked'],False)
+        self.assertIsNone(result['output']['summary']['missing'])
+
+    def test_open_report_rejects_duplicate_keys_and_invalid_business_shape(self):
+        context={'final_output_schema':{'type':'object','required':['summary'],'properties':{'summary':{'type':'object'}}}}
+        schema=response_format('master',context)['schema']
+        fields=encode_object_fields({'summary':{}})
+        for entries in (fields+fields, encode_object_fields({'unexpected':'missing summary'}),
+                        [{'key':'summary','value':{'entries':[{'key':'id','value':1},{'key':'id','value':2}]}}]):
+            wire={'decision':{'action':'finish','reason':'Reviewed.', 'output_fields':entries}}
+            with self.subTest(entries=entries),self.assertRaises(RuntimeFailure):
+                decode_response(json.dumps(wire),context,schema)
+
+    def test_open_finish_crosses_actual_crewai_and_model_factory_offline(self):
+        from runtime.crew import CrewAdapter
+        report={'summary':{'text':'Checked "synthetic" evidence.','flag':False,'unknown':None},'sources':[{'id':'synthetic'}]}
+        final_schema={'type':'object','properties':{'summary':{'type':'object'},'sources':{'type':'array','items':{'type':'object'}}},'required':['summary','sources'],'additionalProperties':False}
+        context={'available_tools':[],'final_output_schema':final_schema}
+        wire={'decision':{'action':'finish','reason':'Report checked synthetic evidence.','output_fields':encode_object_fields(report)}}
+        calls=[]
+        class Client:
+            def with_options(self,**kwargs):return self
+            @property
+            def responses(self):return self
+            def create(self,**kwargs):
+                calls.append(kwargs)
+                Draft202012Validator(kwargs['text']['format']['schema']).validate(wire)
+                return SimpleNamespace(output_text=json.dumps(wire),usage=SimpleNamespace(input_tokens=10,output_tokens=20))
+        agent=json.loads((ROOT/'shared/contracts/examples/agents/valid-classifier.json').read_text())
+        agent.update(input_schema={'type':'object'},output_schema=TOOL_DECISION_SCHEMA,allowed_tool_ids=[])
+        with patch('tiktoken.encoding_for_model',return_value=SimpleNamespace(encode=lambda value:[0]*10)):
+            factory=OpenAIModelFactory({'gpt-5':{'input_per_token':0,'output_per_token':0}},Client())
+            result=CrewAdapter(factory).execute(agent,context,protocol='tool')
+        self.assertEqual(result['output'],report)
+        self.assertEqual(len(calls),1)
+        self.assertTrue(calls[0]['text']['format']['strict'])
+        self.assertIn('$defs',calls[0]['text']['format']['schema'])

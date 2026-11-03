@@ -25,10 +25,16 @@ BOOL = {'boolean', 'bool'}
 DATE = {'date', 'timestamp without time zone', 'timestamp with time zone'}
 
 
-def physical_plan(plan, needed, datasets, expressions, joins=None):
+def physical_plan(plan, needed, datasets, expressions, joins=None, *, sampled_evidence=False):
     engines = {datasets[d]['connection']['engine'] for d in needed}
     connections = {datasets[d]['connection']['connection_id'] for d in needed}
     reason = ''
+    if (sampled_evidence and needed and engines == {'mongodb'} and not any(plan[k] for k in ('metrics','joins','filters','group_by'))
+            and any(datasets[did].get('discovery_method') == 'sampled' for did in needed)):
+        return dict(strategy='mongodb_evidence_sample', sampled_scalar_evidence=True,
+                    reason='Sampled MongoDB scalar evidence retains actual source values rather than imposing sample-only BSON types.',
+                    operations=['source scalar projection', 'same-facet count and bounded sample', 'BSON ordering when requested'], max_source_rows=1_000_000,
+                    snapshot='sample and count in one MongoDB facet')
     from .data_query_federation import federation_spec
     if len(connections) > 1 and federation_spec(plan, needed, datasets, expressions, joins):
         return dict(strategy='federated',

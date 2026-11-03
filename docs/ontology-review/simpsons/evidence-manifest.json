@@ -1,0 +1,24 @@
+{
+  "evidence": [
+    {
+      "file": "initial-code-review.txt",
+      "sha256": "ac26708e7265632e28ffa0dfc14d68ad88bd290b8b24084df1226ba0071b7bd7",
+      "source_attachment": "/home/raf/.codex/attachments/97d09514-54c9-4ccd-82e9-0b42a827258b/Pasted text.txt",
+      "classification": "documented_current_application_behaviour",
+      "provenance": "User-supplied review of simpcare-admin-console code; not independently re-audited here.",
+      "business_policy_approved": false,
+      "record_level_database_validation": false
+    },
+    {
+      "file": "follow-up-code-review.txt",
+      "sha256": "954c2d960911f87413b7dee07a7d3401628ff330ce3cd79fa847b45bc186ae63",
+      "source_attachment": "/home/raf/.codex/attachments/423788f3-8ec7-47da-9a76-b4d4a8c19967/Pasted text.txt",
+      "classification": "documented_current_application_behaviour",
+      "provenance": "User-supplied review of simpcare-admin-console code; not independently re-audited here.",
+      "business_policy_approved": false,
+      "record_level_database_validation": false
+    }
+  ],
+  "publication_status": "unpublished",
+  "policy_approval_status": "unconfirmed"
+}

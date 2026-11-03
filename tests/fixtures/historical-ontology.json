@@ -1,0 +1,170 @@
+{
+  "basis": "Synthetic historical records generated before retirement, not company evidence",
+  "records": [
+    {
+      "id": "customer",
+      "kind": "concept",
+      "layer": "organization",
+      "label": "customer",
+      "definition": "Reviewed fixture definition",
+      "dependencies": [
+        "party"
+      ],
+      "source_refs": [
+        "pg_orders"
+      ],
+      "evidence_class": "unverified_hypothesis",
+      "properties": {},
+      "revision": 2,
+      "status": "approved",
+      "source_signatures": {
+        "pg_orders": "38e6ec347b5af211c4d546ca8c9864bbfa220a8f3652069ce51c3a0105783b39"
+      },
+      "source_lineage": {
+        "pg_orders": {
+          "connection_id": "pg",
+          "dataset_id": "pg_orders",
+          "revision": 1,
+          "signature": "38e6ec347b5af211c4d546ca8c9864bbfa220a8f3652069ce51c3a0105783b39"
+        }
+      },
+      "created_at": "2026-11-02T05:05:48.659608+00:00",
+      "updated_at": "2026-11-02T05:05:48.686913+00:00",
+      "original_proposal": {
+        "id": "customer",
+        "kind": "concept",
+        "layer": "organization",
+        "label": "customer",
+        "definition": "Reviewed fixture definition",
+        "dependencies": [
+          "party"
+        ],
+        "source_refs": [
+          "pg_orders"
+        ],
+        "evidence_class": "unverified_hypothesis",
+        "properties": {}
+      },
+      "dependency_revisions": {
+        "party": 2
+      },
+      "assessment": {
+        "method_version": "evidence-signals-v1",
+        "signals": {
+          "schema_compatibility": null,
+          "key_compatibility": null,
+          "semantic_similarity": 0.0,
+          "value_overlap": null,
+          "referential_consistency": null,
+          "constraint_consistency": null,
+          "freshness": null
+        },
+        "heuristic_score": 0.0,
+        "calibrated_score": null,
+        "calibration_id": null,
+        "contradictions": [],
+        "value_evidence": [],
+        "status": "uncalibrated"
+      },
+      "stale": false,
+      "reviewed_at": "2026-11-02T05:05:48.686906+00:00",
+      "reviewed_by": "alice",
+      "review_reason": "Fixture review, not a Simpsons SME decision."
+    },
+    {
+      "id": "party",
+      "kind": "concept",
+      "layer": "organization",
+      "label": "party",
+      "definition": "Reviewed fixture definition",
+      "dependencies": [],
+      "source_refs": [],
+      "evidence_class": "unverified_hypothesis",
+      "properties": {},
+      "revision": 2,
+      "status": "approved",
+      "source_signatures": {},
+      "source_lineage": {},
+      "created_at": "2026-11-02T05:05:48.614814+00:00",
+      "updated_at": "2026-11-02T05:05:48.638913+00:00",
+      "original_proposal": {
+        "id": "party",
+        "kind": "concept",
+        "layer": "organization",
+        "label": "party",
+        "definition": "Reviewed fixture definition",
+        "dependencies": [],
+        "source_refs": [],
+        "evidence_class": "unverified_hypothesis",
+        "properties": {}
+      },
+      "dependency_revisions": {},
+      "assessment": {
+        "method_version": "evidence-signals-v1",
+        "signals": {
+          "schema_compatibility": null,
+          "key_compatibility": null,
+          "semantic_similarity": null,
+          "value_overlap": null,
+          "referential_consistency": null,
+          "constraint_consistency": null,
+          "freshness": null
+        },
+        "heuristic_score": null,
+        "calibrated_score": null,
+        "calibration_id": null,
+        "contradictions": [],
+        "value_evidence": [],
+        "status": "uncalibrated"
+      },
+      "stale": false,
+      "reviewed_at": "2026-11-02T05:05:48.638905+00:00",
+      "reviewed_by": "alice",
+      "review_reason": "Fixture review, not a Simpsons SME decision."
+    }
+  ],
+  "manifest": {
+    "selection_id": "os_ca65cea49a57b19b77cde7049a2a4c85",
+    "version_id": "ov_9a07eac6637bf4dd313a9bca004c1c7322a153a0",
+    "record_ids": [
+      "customer",
+      "party"
+    ],
+    "record_revisions": {
+      "customer": 2,
+      "party": 2
+    },
+    "evidence": {
+      "customer": {
+        "pg_orders": "38e6ec347b5af211c4d546ca8c9864bbfa220a8f3652069ce51c3a0105783b39"
+      },
+      "party": {}
+    },
+    "valid": true,
+    "created_at": "2026-11-02T05:05:48.728362+00:00"
+  },
+  "expected_binding": {
+    "selection_id": "binding:122e06997477d9492bfa9a714b44623828051a2c",
+    "version_id": "ov_9a07eac6637bf4dd313a9bca004c1c7322a153a0",
+    "record_ids": [
+      "customer",
+      "party"
+    ],
+    "record_revisions": {
+      "customer": 2,
+      "party": 2
+    },
+    "evidence": {
+      "customer": {
+        "pg_orders": "38e6ec347b5af211c4d546ca8c9864bbfa220a8f3652069ce51c3a0105783b39"
+      },
+      "party": {}
+    },
+    "valid": true,
+    "created_at": "2026-11-02T05:05:48.728362+00:00",
+    "origin_selection_id": "os_ca65cea49a57b19b77cde7049a2a4c85",
+    "workflow_id": "workflow",
+    "workflow_version": 1,
+    "run_id": "run"
+  }
+}

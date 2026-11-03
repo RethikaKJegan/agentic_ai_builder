@@ -1,0 +1,56 @@
+{
+  "basis_version": "simpson-identity-reference-v1",
+  "kind": "supplied_application_code",
+  "sources": [
+    {
+      "path": "src/models/engine-details.model.js",
+      "sha256": "1c50e68ba66326ecbcde25b7f07886b5e3aa4c40429b96fd8e4b3e6364a7d3a7",
+      "quotes": [
+        "ref: 'OemName'",
+        "engineDetailsSchema.index({ oem: 1, engineSerialNumber: 1 }, { unique: true });"
+      ]
+    },
+    {
+      "path": "src/models/ticket.model.js",
+      "sha256": "41c29128796b9d4fda53fff9d7b6fa2135f3b3e999cbf1b9258e85d5512a7497",
+      "quotes": [
+        "oem: { ...reqString, ref: 'Oem' }",
+        "oemOrg: { ...reqString, ref: 'OemName' }"
+      ]
+    },
+    {
+      "path": "src/models/oem.model.js",
+      "sha256": "a71acf97963d3123c93594ca5648199c72bae34e91223ffe98b61eaae7b14f73",
+      "quotes": [
+        "oemNameId: {",
+        "ref: 'OemName'"
+      ]
+    },
+    {
+      "path": "src/models/claims.model.js",
+      "sha256": "28cdc7b7f81655272b0cb7c3b96392e8112fda23b578c7aa865e901491b7b4c5",
+      "quotes": [
+        "ref: 'Oem'"
+      ]
+    },
+    {
+      "path": "src/models/claims-ftp.model.js",
+      "sha256": "3fc66bbba6d43b1ad6c4bd494fe95f1e526027ee7e8beb74725e202e050aeab7",
+      "quotes": [
+        "oem: {"
+      ]
+    },
+    {
+      "path": "src/models/failed-engine-analysis.model.js",
+      "sha256": "d75783b77311c4163e6261104110c40c2a5031d846d6eb5398b36e12d20da11c",
+      "quotes": [
+        "// ref: 'OemName'"
+      ]
+    }
+  ],
+  "limitations": [
+    "Supplied archive models are evidence of declared references, not deployed schema/index verification.",
+    "A declared unique company/serial invoice key is not confirmed permanent physical-engine identity.",
+    "Manual claims declare an OEM account reference; SAP claim strings and QA commented references do not establish a cross-database identity contract."
+  ]
+}

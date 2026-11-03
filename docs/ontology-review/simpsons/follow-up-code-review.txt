@@ -1,0 +1,119 @@
+These answers describe the platform's current behaviour, read from the code. None of it is business-confirmed policy, so please record them as "documented current application behaviour", as your note suggests.
+
+1. Engine identity
+
+
+• Different engines can share a serial: the platform stores it once per OEM company, enforced by a unique index on oem + engineSerialNumber..
+• The platform has no way to pick the right one. Every lookup, including the warranty check, takes the first match. The only attribute that separates them is the billed-to company, and lookups never use it..
+
+2. Serial matching and cut-ins
+
+
+• Matching: exact text. No formatting differences are ignored (spaces, hyphens, case, leading zeros), except that the engine search box ignores case..
+• Ordering: a plain text comparison (cutInNumber > serial), so SR10 sorts before SR9. The JIR path compares against the ticket's serial; the defect-code path compares against ticket.cutInNumber. Cut-ins are matched on defect code and engine model only; bulletins use their first plant's cut-in..
+
+3. Ticket policy
+
+
+• RESOLVED records the resolve date and MTTR (days since creation) and emails the resolve message to the OEM..
+• CLOSED records the close date and MTTC..
+• Staff with admin or serviceEngineer can set either, in any order..
+• Reopening needs the ticket to be RESOLVED or CLOSED. It doesn't check for a newer open ticket, so two can be open at once..
+• The one-open-ticket rule uses the serial alone..
+
+4. Accounts and visibility
+
+
+• Shared and personal accounts aren't distinguished. Each account is one email login under one company..
+• An account's company (oemNameId) can be changed. Tickets keep the company they were created with..
+• Intended visibility, excluding the defects:.
+
+Who, Sees
+OEM user, Own tickets
+OEM company admin, All of the company's tickets
+Service engineer, Tickets where they're the primary engineer
+Approver, Tickets assigned to them
+Admin, float-engine manager, quality admin, All tickets
+
+5. Service-process rules
+
+
+• These are all enforced by the platform: one JIR per ticket (unique), edits overwrite the JIR, a repeat repair needs a new ticket..
+• After an engine is replaced, the platform uses whatever serial the OEM types. The replacement serial is stored only on the float-engine dispatch record, and engine records are never updated..
+• Unregistered serials are accepted on purpose. The ticket goes to ENTER_ENGINE_DETAILS and an alert email is sent..
+
+6. Terminology
+
+Term, What the platform has
+FOC, A form tied to a ticket: dealer, failure details, parts (part number and quantity), warranty claim number. Status SUBMITTED, REJECTED or COMPLETED. The acronym isn't defined anywhere.
+ICA/CAPA, A quality record per defect: before/after improvement, cut-in serial and effective date. The acronym isn't defined anywhere.
+List number, Free text alongside engine model. Products hold several list numbers per model, each with readiness dates, so it's effectively a variant of a model. Not unique.
+Service bulletin vs service information, Identical structure; they differ only by number field (sbNumber vs siNumber).
+Mode, scope, extra, Free text with no allowed values.
+Touchpoints and man-hours, Monthly target and actual numbers entered by hand. No formula.
+hoursCovered and failureHours, Hand-entered or SAP-imported numbers. No definition.
+
+7. Money and warranty
+
+
+• No currency fields. Tax is stored separately only on advance and float engines, and several amounts are stored as text..
+• Warranty requires all three conditions:.
+
+OEM, Months since Simpson invoice, Months since machine sale, Max HMR
+TAFE, 27, 24, 2000
+CNH, 24, 21, 2000
+TEREX / Manitou, 24, 18, 2000
+All others, 15, 12, 1500
+
+Months are counted to the ticket creation date, not the failure date. Engines in depot or dealer stock skip the check.
+
+
+• Single approval applies everywhere:.
+◦ Engine replacement: an approver assigned by an admin..
+◦ FOC: a float-engine manager..
+◦ Bulletins and manuals: an approver..
+◦ Failed engine and part analyses: the quality approver named on the record..
+◦ Claims: no approval step..
+
+8. Authoritative sources
+
+
+• Manual claims (claims) and SAP claims (claimsftps) are separate collections, never matched or deduplicated. Dashboards and MIS figures count only SAP claims..
+• simpsoncodes is authoritative. It's the only code list the platform reads or writes; the old lists sit on a connection the app never opens..
+
+9. Documents and reporting
+
+
+• Manuals have no current/obsolete flag, only archive. Revisions are ordered by release date, newest first, each with its own approval status..
+• FAQs have no approval step, and any staff user can edit them..
+• "This financial year" means the ticket's financial year, taken from its creation date (April–March). The approval date is stored but not used for this..
+
+10. Definitions and governance
+
+The 27 stages:
+
+Group, Stages
+Workflow, in order (stored on the ticket), ENTER_ENGINE_DETAILS / OUT_OF_WARRANTY / ASSIGN_SE → WAITING_FOR_SE_ACKNOWLEDGEMENT → ADD_INSPECTION_DATE → SUBMIT_JIR → UPDATE_ACTION_CODE → ACTION_CODE_UPDATED, or PARTS_REPLACEMENT → PARTS_REPLACEMENT_REQ_SUBMITTED, or ENGINE_REPLACEMENT_REQ_SUBMITTED → APPROVER_ASSIGNED → ENGINE_REPLACEMENT_APPROVED / ENGINE_REPLACEMENT_REJECTED
+Timeline labels only, REASSIGN_SE, UPDATE_DEFECT_CODE, ENGINE_REPLACEMENT, COMMENT, TICKET_UPDATED, ATTACHMENT, JIR_CREATED, FOC_CREATED, FOC_UPDATED, COMPLAINT_FORM_SUBMITTED, NO_STAGE
+Never used, UNDER_WARRANTY, COMPLAINT_FORM_UPDATED
+
+• Active features with no data yet: their structure is defined in the schemas:.
+◦ ICA/CAPA: defect, OEMs, models, list numbers, improvement, cut-in..
+◦ Failed part analysis: the same fields plus part number and an approval status..
+◦ Performers: a staff user per month or year..
+◦ Manual revisions: a manual reference, version, release date and approval..
+• Freshness: SAP files are polled on a schedule when cron is on; tickets are live. There are no staleness limits..
+• Always-review decisions: none beyond the single approvals in point 7..
+• Final approval of the ontology: not recorded in the platform..
+
+Answer 43, cross-database references
+
+The application simply doesn't implement the lookup. The target data is there and the IDs match: both sides use the same UUID strings. Mongoose's built-in populate only searches the record's own connection, so the platform never follows these links, though a hand-written lookup would work. The export-tracking screen already does this. One exception: Wcl and the old code lists are on a connection the app never opens, so their data is unavailable to the app.
+
+Kept separate as defects, not rules or trusted data:
+
+
+• The ticket endpoints that need no login..
+• Cross-company access through past-history..
+• The hardcoded sales figures..
+• The text-based cut-in comparison..

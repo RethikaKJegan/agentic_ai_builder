@@ -1,0 +1,3 @@
+- [x] 1. Capture diagnostic evidence and establish the failure’s observable limits.
+- [x] 2. Implement a source-validated correction with captured-output regression tests.
+- [x] 3. Verify full planner and deploy with preserved history.

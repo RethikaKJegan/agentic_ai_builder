@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="930" viewBox="0 0 1200 930" role="img" aria-labelledby="title desc">
+ <title id="title">Proposed Simpsons ontology architecture</title>
+ <desc id="desc">Company sources and logic support a versioned business ontology and permission-scoped business object access. Applications use existing retrieval, planning and authorized execution. Object browsing is proposed, not deployed.</desc>
+ <defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#7d7399" stroke-width="1.4"/></marker>
+  <style>text{font-family:Arial,sans-serif;fill:#29213d}.title{font-size:28px;font-weight:700}.sub{font-size:15px;fill:#625c70}.head{font-size:18px;font-weight:700}.body{font-size:15px}.small{font-size:13px;fill:#625c70}.node{fill:#fff;stroke:#795ba5;stroke-width:2}.link{fill:none;stroke:#7d7399;stroke-width:2;marker-end:url(#arrow)}.pill{font-size:14px;font-weight:700}</style>
+ </defs>
+ <rect width="1200" height="930" fill="#faf9fd"/>
+ <text x="48" y="48" class="title">Simpsons · a shared business model</text>
+ <text x="48" y="75" class="sub">Proposed architecture · existing foundation + a bounded business object explorer</text>
+ <rect x="48" y="104" width="1104" height="109" rx="16" fill="#fff" stroke="#ded9e9"/>
+ <text x="72" y="134" class="head">APPLICATIONS &amp; WORKFLOWS</text>
+ <text x="72" y="166" class="body">Business model</text><text x="294" y="166" class="body">Explore records</text><text x="527" y="166" class="body">Task context</text><text x="758" y="166" class="body">Review &amp; history</text>
+ <text x="72" y="191" class="small">Understand concepts</text><text x="294" y="191" class="small">Inspect permitted objects</text><text x="527" y="191" class="small">Select definitions</text><text x="758" y="191" class="small">Correct and track impact</text>
+ <path d="M600 268V217" class="link"/>
+ <rect x="48" y="270" width="1104" height="317" rx="18" fill="#f0ebf8" stroke="#c9bcdf"/>
+ <text x="72" y="303" class="head">ONTOLOGY · DEFINITIONS, RELATIONSHIPS &amp; BUSINESS RULES</text>
+ <text x="72" y="327" class="small">Common → Domain → Organization · stable IDs · evidence · review · immutable published versions</text>
+ <rect x="100" y="363" width="202" height="57" rx="28" fill="#4b116d"/>
+ <text x="201" y="397" text-anchor="middle" style="fill:white;font-size:16px;font-weight:700">OEM company</text>
+ <rect x="453" y="363" width="231" height="57" rx="28" class="node"/>
+ <text x="568" y="397" text-anchor="middle" class="pill">OEM login account</text>
+ <rect x="836" y="363" width="222" height="57" rx="28" fill="#e7e4ff" stroke="#6458a4" stroke-width="2"/>
+ <text x="947" y="397" text-anchor="middle" class="pill">Service ticket</text>
+ <path d="M453 391H308" class="link"/><text x="337" y="378" class="small">belongs to</text>
+ <path d="M836 391H690" class="link"/><text x="724" y="378" class="small">filed under</text>
+ <rect x="100" y="479" width="235" height="57" rx="28" class="node"/>
+ <text x="217" y="513" text-anchor="middle" class="pill">Engine invoice record</text>
+ <path d="M201 479V426" class="link"/><text x="214" y="453" class="small">billed to</text>
+ <path d="M947 420V507H341" class="link" stroke-dasharray="6 5"/>
+ <rect x="524" y="487" width="315" height="30" rx="7" fill="#f0ebf8"/>
+ <text x="539" y="507" class="small">candidate serial match · not proven identity</text>
+ <text x="72" y="565" class="small">Shown: a small service-domain subset. A type-level relationship does not prove every source record is valid.</text>
+ <rect x="48" y="611" width="1104" height="85" rx="14" fill="#fff" stroke="#b8c9c6"/>
+ <text x="72" y="641" class="head">BUSINESS OBJECT ACCESS · PROPOSED EXTENSION</text>
+ <text x="72" y="668" class="body">Source-backed record identity · permission-filtered properties · bounded neighbour expansion · provenance</text>
+ <path d="M600 610V591" class="link"/>
+ <path d="M250 739V701" class="link"/><path d="M600 739V701" class="link"/><path d="M959 739V701" class="link"/>
+ <rect x="48" y="742" width="337" height="119" rx="14" fill="#e9f3fa" stroke="#bad4e7"/>
+ <text x="70" y="772" class="head">COMPANY SOURCES</text><text x="70" y="800" class="body">Existing connections and catalogue</text><text x="70" y="827" class="small">Read-only Simpsons record browsing</text>
+ <rect x="403" y="742" width="351" height="119" rx="14" fill="#efeafb" stroke="#d0c5e7"/>
+ <text x="425" y="772" class="head">LOGIC &amp; EVIDENCE</text><text x="425" y="800" class="body">Reviewed mappings, profiles, rules</text><text x="425" y="827" class="small">Uncertain findings remain labelled</text>
+ <rect x="772" y="742" width="380" height="119" rx="14" fill="#eaf2ee" stroke="#bdd3c5"/>
+ <text x="794" y="772" class="head">EXISTING WORKFLOW SERVICES</text><text x="794" y="800" class="body">Retrieval → Planning → Authorized execution</text><text x="794" y="827" class="small">Registry, approvals, runtime and audit retained</text>
+ <text x="48" y="902" class="small">Design only · source values stay in source systems · graph links grant no access or execution permission</text>
+</svg>

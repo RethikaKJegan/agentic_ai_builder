@@ -1,0 +1,1004 @@
+{
+  "schema_version": 1,
+  "evidence_report": "source-verification-2026-10-31-v2.json",
+  "sample_qualification": "Type presence does not prove nonempty/valid values, whole-population completeness, business meaning, or physical identity.",
+  "mappings": [
+    {
+      "concept": "OEM organization",
+      "source": "db1",
+      "collection": "oemnames",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 17
+          }
+        },
+        {
+          "field": "name",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 17
+          }
+        }
+      ],
+      "relationship_basis": "field_mapping_only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "OEM account",
+      "source": "db1",
+      "collection": "oems",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "oemNameId",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        }
+      ],
+      "relationship_basis": "oemNameId declares organization reference; not independently join-tested in this chunk",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Engine invoice record",
+      "source": "db1",
+      "collection": "enginedetails",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "engineSerialNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "invoiceDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        },
+        {
+          "field": "listNo",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "organizationName",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        }
+      ],
+      "relationship_basis": "Company+serial declared unique in source code; physical-engine uniqueness not established by this probe",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Complaint/service case",
+      "source": "db1",
+      "collection": "tickets",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "engineNo",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "oemOrg",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "createdAt",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        },
+        {
+          "field": "complaintRecord.dateOfSale",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 91,
+            "null": 9
+          }
+        },
+        {
+          "field": "complaintRecord.hmr",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "underWarranty",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "bool": 100
+          }
+        }
+      ],
+      "relationship_basis": "OEM account and organization references each resolved in 100/100 sampled tickets",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Joint inspection",
+      "source": "db1",
+      "collection": "jointinspectionreports",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "ticketId",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "dateOfFailure",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 7,
+            "string": 93
+          }
+        },
+        {
+          "field": "hoursCovered",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 7,
+            "string": 93
+          }
+        },
+        {
+          "field": "potentialCause",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 79,
+            "string": 21
+          }
+        },
+        {
+          "field": "defectCode",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 90,
+            "missing": 10
+          }
+        }
+      ],
+      "relationship_basis": "ticketId resolved in 100/100 sampled reports; potentialCause remains a reported/suspected cause",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Engine replacement request",
+      "source": "db1",
+      "collection": "enginereplacements",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "ticket",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "mode",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 37,
+            "string": 63
+          }
+        },
+        {
+          "field": "engineType",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        }
+      ],
+      "relationship_basis": "98/100 sampled ticket references resolved; preserve 2 unresolved without guessing",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Part replacement",
+      "source": "db1",
+      "collection": "partreplacements",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "ticket",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "part",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "mode",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "partReplacementCost",
+          "observation": "not_observed_in_bounded_sample",
+          "bson_type_counts": {
+            "missing": 100
+          }
+        }
+      ],
+      "relationship_basis": "Ticket reference declared in code; not join-tested in this chunk",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Replacement dispatch",
+      "source": "db1",
+      "collection": "floatengines",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 97
+          }
+        },
+        {
+          "field": "ticketId",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 97
+          }
+        },
+        {
+          "field": "replacementEngineNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 97
+          }
+        },
+        {
+          "field": "status",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 97
+          }
+        }
+      ],
+      "relationship_basis": "97/97 sampled ticket references resolved; replacement engine differs from complaint engine",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "FOC form",
+      "source": "db1",
+      "collection": "focs",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "ticket",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "hoursOfFailure",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 2,
+            "double": 6,
+            "int": 92
+          }
+        },
+        {
+          "field": "failureDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "focStatus",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        }
+      ],
+      "relationship_basis": "100/100 sampled ticket references resolved",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Failed-engine inward record",
+      "source": "db1",
+      "collection": "workorders",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "complaintReferenceNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "fieldWarrantyReferenceNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "fieldWarrantyEngineInwardDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        }
+      ],
+      "relationship_basis": "Text references only; no verified ticket or QA association",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Engineering effectivity boundary",
+      "source": "db1",
+      "collection": "internalcutins",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "plant",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "listNo",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "engineCutInNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "cutInDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "defectCode",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        },
+        {
+          "field": "engineModel",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 15
+          }
+        }
+      ],
+      "relationship_basis": "Applicability fields exist; serial ordering and actual change incorporation unverified",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Service bulletin",
+      "source": "db1",
+      "collection": "servicebulletins",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 89
+          }
+        },
+        {
+          "field": "plantDetails",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 89
+          }
+        },
+        {
+          "field": "approvalStatus",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 89
+          }
+        },
+        {
+          "field": "engineModel",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 89
+          }
+        },
+        {
+          "field": "listNumbers",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 89
+          }
+        }
+      ],
+      "relationship_basis": "field_mapping_only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Service information",
+      "source": "db1",
+      "collection": "serviceinformations",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 43
+          }
+        },
+        {
+          "field": "plantDetails",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 43
+          }
+        },
+        {
+          "field": "approvalStatus",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 43
+          }
+        },
+        {
+          "field": "engineModel",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 43
+          }
+        },
+        {
+          "field": "listNumbers",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 43
+          }
+        }
+      ],
+      "relationship_basis": "field_mapping_only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Manual claim line",
+      "source": "db2",
+      "collection": "claims",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 6
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 6
+          }
+        },
+        {
+          "field": "engineSerialNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 6
+          }
+        },
+        {
+          "field": "machineSaleDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 6
+          }
+        },
+        {
+          "field": "dateOfFailure",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 6
+          }
+        },
+        {
+          "field": "hoursCovered",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "double": 2,
+            "int": 4
+          }
+        },
+        {
+          "field": "status",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 6
+          }
+        },
+        {
+          "field": "reason",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 6
+          }
+        }
+      ],
+      "relationship_basis": "No direct ticket reference declared; do not merge with SAP lines by assumption",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "SAP claim line",
+      "source": "db2",
+      "collection": "claimsftps",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "engineSerialNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "machineSaleDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        },
+        {
+          "field": "failureDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        },
+        {
+          "field": "failureHours",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "int": 100
+          }
+        },
+        {
+          "field": "simpsonInvoiceDate",
+          "observation": "not_observed_in_bounded_sample",
+          "bson_type_counts": {
+            "missing": 100
+          }
+        },
+        {
+          "field": "status",
+          "observation": "not_observed_in_bounded_sample",
+          "bson_type_counts": {
+            "missing": 100
+          }
+        }
+      ],
+      "relationship_basis": "OEM is text; serial-based cross-database association remains candidate only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Failed-engine quality investigation",
+      "source": "db2",
+      "collection": "failedengineanalyses",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        },
+        {
+          "field": "engineSerialNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        },
+        {
+          "field": "defect",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        },
+        {
+          "field": "beforeImprovement",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 7,
+            "missing": 1
+          }
+        },
+        {
+          "field": "afterImprovement",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 7,
+            "missing": 1
+          }
+        },
+        {
+          "field": "cutInEsn",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        },
+        {
+          "field": "cutInEffectiveDate",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 3,
+            "date": 5
+          }
+        },
+        {
+          "field": "qualityApprover",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        },
+        {
+          "field": "status",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 8
+          }
+        }
+      ],
+      "relationship_basis": "No direct ticket/change/return reference declared; named qualityApprover is code-backed",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Failed-part analysis",
+      "source": "db2",
+      "collection": "failedpartanalyses",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "partNumber",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "qualityApprover",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        }
+      ],
+      "relationship_basis": "Empty collection; supplied model declaration only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "ICA/CAPA quality record",
+      "source": "db2",
+      "collection": "icacapas",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "defect",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "beforeImprovement",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "afterImprovement",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        },
+        {
+          "field": "cutInEsn",
+          "observation": "empty_collection",
+          "bson_type_counts": {}
+        }
+      ],
+      "relationship_basis": "Empty collection; supplied model declaration only",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Engine model product record",
+      "source": "db2",
+      "collection": "products",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 1
+          }
+        },
+        {
+          "field": "engineModel",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 1
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 1
+          }
+        },
+        {
+          "field": "listData",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "array": 1
+          }
+        }
+      ],
+      "relationship_basis": "List numbers are nested in listData; OEM is text",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "SAP float-engine stock",
+      "source": "db2",
+      "collection": "floatengineftps",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "serialNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 1,
+            "string": 99
+          }
+        },
+        {
+          "field": "model",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 99,
+            "missing": 1
+          }
+        },
+        {
+          "field": "listNumber",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 1,
+            "string": 99
+          }
+        },
+        {
+          "field": "plant",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 99,
+            "missing": 1
+          }
+        },
+        {
+          "field": "oem",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 99,
+            "missing": 1
+          }
+        },
+        {
+          "field": "stock",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "int": 100
+          }
+        },
+        {
+          "field": "status",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "missing": 1,
+            "string": 99
+          }
+        },
+        {
+          "field": "amount",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "int": 13,
+            "double": 87
+          }
+        }
+      ],
+      "relationship_basis": "Exact source serial field is serialNumber; no inferred physical identity",
+      "classification": "discovery_mapping_not_published_ontology"
+    },
+    {
+      "concept": "Inspection operation log",
+      "source": "db2",
+      "collection": "jirlogs",
+      "fields": [
+        {
+          "field": "_id",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "jirId",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "ticketId",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "operationType",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "string": 100
+          }
+        },
+        {
+          "field": "createdAt",
+          "observation": "observed_value",
+          "bson_type_counts": {
+            "date": 100
+          }
+        }
+      ],
+      "relationship_basis": "Cross-database text IDs; not full report revision history",
+      "classification": "discovery_mapping_not_published_ontology"
+    }
+  ]
+}

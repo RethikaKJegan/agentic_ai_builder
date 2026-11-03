@@ -26,12 +26,43 @@ def test_unchanged_automatic_check_preserves_graph_and_plan_identity(manager):
     Draft202012Validator(schema).validate(view)
 
 
+def test_ready_query_context_survives_queued_and_running_automatic_check(manager):
+    from workflow_api.data_queries import DataQueries
+    from workflow_api.data_relationships import fingerprint
+    cid=manager.connect(auth(),config())['connection_id'];manager.tick();manager.relationships.tick()
+    queries=DataQueries(manager)
+    before=fingerprint(queries.context(auth())[0])
+    due(manager,cid)
+    assert manager.refresh.schedule()
+    assert fingerprint(queries.context(auth())[0])==before
+    assert manager.refresh.get(auth())['items'][0]['profiling_status']=='queued'
+    observed=[]
+    def during_profile():
+        observed.append(fingerprint(queries.context(auth())[0]))
+        assert manager.refresh.get(auth())['items'][0]['profiling_status']=='running'
+    manager.adapter.hook=during_profile
+    manager.tick()
+    assert observed==[before]
+    assert fingerprint(queries.context(auth())[0])==before
+
+
+def test_manual_refresh_still_invalidates_ready_query_context(manager):
+    from workflow_api.data_queries import DataQueries
+    cid=manager.connect(auth(),config())['connection_id'];manager.tick();manager.relationships.tick()
+    manager.action(auth(),cid,'refresh-metadata')
+    with pytest.raises(ApiFailure) as exc:DataQueries(manager).context(auth())
+    assert exc.value.code=='DATA_QUERY_STALE'
+
+
 def test_changed_automatic_check_queues_graph_without_manual_refresh(manager):
     cid=manager.connect(auth(),config())['connection_id'];manager.tick();manager.relationships.tick()
     manager.adapter.field='order_id';due(manager,cid);manager.tick()
     assert manager.metadata(auth(),cid)['snapshot']['revision']==2
     assert manager.relationships.get(auth())['build_status']=='queued'
     assert manager.refresh.get(auth())['items'][0]['last_change_at']
+    from workflow_api.data_queries import DataQueries
+    with pytest.raises(ApiFailure) as exc:DataQueries(manager).context(auth())
+    assert exc.value.code=='DATA_QUERY_STALE'
     manager.relationships.tick()
     assert any(n['label']=='order_id' for n in manager.relationships.get(auth())['graph']['nodes'])
 
@@ -43,6 +74,9 @@ def test_failure_preserves_snapshot_and_backoff_then_recovery(manager):
     assert state['consecutive_failures']==1 and state['next_check_at']>manager.refresh.clock()+590
     assert manager.metadata(auth(),cid)['snapshot']['revision']==1
     assert 'private-value' not in json.dumps(state)
+    from workflow_api.data_queries import DataQueries
+    with pytest.raises(ApiFailure) as exc:DataQueries(manager).context(auth())
+    assert exc.value.code=='DATA_QUERY_STALE'
     manager.adapter.failure=None;due(manager,cid);manager.tick()
     assert manager.refresh.get(auth())['items'][0]['consecutive_failures']==0
     assert manager.metadata(auth(),cid)['snapshot']['revision']==1

@@ -1,0 +1,3 @@
+- [x] 1. Reproduce wide-schema binding and classify validation failures.
+- [x] 2. Implement bounded agent reference and precise source-binding schema/feedback.
+- [x] 3. Verify both complaint planning paths and regressions; deploy only verified changes.

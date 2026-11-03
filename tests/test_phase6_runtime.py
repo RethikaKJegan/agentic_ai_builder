@@ -83,7 +83,7 @@ def test_monitoring_aggregates_and_pages_without_loading_all_workflows(context):
 
 
 def test_http_history_preserves_envelope_auth_and_validates_filters(context):
-    ids=seed(context);context.workflows.runtime_runner=SimpleNamespace(runtime=context.runtime)
+    ids=seed(context);context.workflows.runtime_runner=SimpleNamespace(runtime=context.runtime,connectors={})
     app=create_app(context.workflows,dev_auth=True,roles=['admin'],start_workers=False)
     with TestClient(app) as client:
         response=client.get('/session');client.cookies.set(COOKIE,response.cookies[COOKIE],path='/')

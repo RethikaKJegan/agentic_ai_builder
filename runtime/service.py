@@ -73,6 +73,15 @@ class RuntimeService:
         rows = db.execute('SELECT document FROM revisions WHERE workspace=? AND workflow_id=? AND version>?', (workspace, workflow_id, version)).fetchall()
         if not allow_superseded and any(json.loads(row[0])['status'] in {'approved', 'published'} for row in rows):
             raise RuntimeFailure('STALE_REVISION', 'A newer approved revision exists.')
+        selection=document.get('metadata',{}).get('ontology_selection_id')
+        if selection:
+            ontology=getattr(getattr(getattr(self.workflows,'database_workflows',None),'manager',None),'ontology_foundation',None)
+            if ontology is None:raise RuntimeFailure('ONTOLOGY_UNAVAILABLE','Ontology service unavailable.',503)
+            try:ontology.validate_selection(db,auth,selection)
+            except Exception as exc:
+                from workflow_api.service import ApiFailure
+                if isinstance(exc,ApiFailure):raise RuntimeFailure(exc.code,str(exc),exc.status) from None
+                raise
         self.workflows.validate_document(document)
         reject_secrets(document)
         grants = self.workflows.registry_adapter.execution_assignments(document, auth)
@@ -136,6 +145,10 @@ class RuntimeService:
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
                        request_id=request['request_id'], release_bound=allow_superseded)
+            selection=workflow.get('metadata',{}).get('ontology_selection_id')
+            if selection:
+                ontology=self.workflows.database_workflows.manager.ontology_foundation
+                ontology.bind(db,auth,selection,workflow['workflow_id'],workflow['version'],run['run_id'])
             db.execute('INSERT INTO runtime_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                        (workspace, run['run_id'], run['workflow_id'], run['workflow_version'], subject, digest(key), fingerprint, json.dumps(run)))
             self.event(db, run, 'run.queued', {'status': 'queued'})

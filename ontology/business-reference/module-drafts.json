@@ -1,0 +1,1732 @@
+{
+  "kit_version": "simpson-reference-modules-v1",
+  "source_basis": "curated_supplied_blueprint_drafts",
+  "bundle_sha256": "095251c29f8a614cd1dce601496869a0ec1f6886868a0c08941b645953130d61",
+  "modules": {
+    "organization": {
+      "concepts": [
+        {
+          "id": "organization:organization",
+          "label": "Organization",
+          "definition": "An enterprise or participating organization.",
+          "layer": "organization",
+          "evidence": [
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "Organization"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Current role assignments, authority and validity intervals are not verified."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "organization:oem",
+          "label": "OEM",
+          "definition": "An original equipment manufacturer participating in the service ecosystem.",
+          "layer": "organization",
+          "evidence": [
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "\u251c\u2500\u2500 OEM"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Current role assignments, authority and validity intervals are not verified."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "organization:organizational_unit",
+          "label": "OrganizationalUnit",
+          "definition": "A department or other unit within an organization.",
+          "layer": "organization",
+          "evidence": [
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "OrganizationalUnit"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Current role assignments, authority and validity intervals are not verified."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "organization:person",
+          "label": "Person",
+          "definition": "A person who can hold organizational roles.",
+          "layer": "organization",
+          "evidence": [
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "Person"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Current role assignments, authority and validity intervals are not verified."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "organization:organizational_role_assignment",
+          "label": "OrganizationalRoleAssignment",
+          "definition": "A time-qualified assignment of a person or organization to a role.",
+          "layer": "organization",
+          "evidence": [
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "OrganizationalRoleAssignment"
+            },
+            {
+              "source_id": "ref_989505858dd5f4a1e41b7e6f",
+              "quote": "validFrom"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Current role assignments, authority and validity intervals are not verified."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "valid_from",
+              "datatype": "datetime",
+              "required": false,
+              "description": "Start of validity of a role assignment."
+            }
+          ]
+        }
+      ],
+      "relationships": [],
+      "rules": [],
+      "questions": [
+        "Current role assignments, authority and validity intervals are not verified."
+      ]
+    },
+    "engines": {
+      "concepts": [
+        {
+          "id": "engines:engine_instance",
+          "label": "EngineInstance",
+          "definition": "An individual engine whose identity must be established within its source and OEM/manufacturing scope.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineInstance"
+            },
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "engineSerialNumber"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "serial_number",
+              "datatype": "string",
+              "required": false,
+              "description": "The source-reported engine serial; equality alone does not resolve physical identity."
+            }
+          ]
+        },
+        {
+          "id": "engines:engine_model",
+          "label": "EngineModel",
+          "definition": "A model definition used to describe engine instances.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineModel"
+            },
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "engineModel"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "model_code",
+              "datatype": "string",
+              "required": false,
+              "description": "The source-reported model identifier."
+            }
+          ]
+        },
+        {
+          "id": "engines:engine_component",
+          "label": "EngineComponent",
+          "definition": "A component of an engine assembly.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineComponent"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "engines:engine_assembly",
+          "label": "EngineAssembly",
+          "definition": "An assembly containing engine components.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineAssembly"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "engines:manufacturing_batch",
+          "label": "ManufacturingBatch",
+          "definition": "A production grouping associated with engine manufacture.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "ManufacturingBatch"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [
+        {
+          "id": "engines:instance_of",
+          "label": "instance of",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineInstance INSTANCE_OF EngineModel"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "source": "engines:engine_instance",
+          "target": "engines:engine_model",
+          "predicate": "instance_of"
+        },
+        {
+          "id": "engines:part_of",
+          "label": "part of",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineComponent PART_OF EngineAssembly"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "source": "engines:engine_component",
+          "target": "engines:engine_assembly",
+          "predicate": "part_of"
+        },
+        {
+          "id": "engines:supplied_to",
+          "label": "supplied to",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_8d6c4d8bec241ef3b88b7ad4",
+              "quote": "EngineInstance SUPPLIED_TO OEM"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+          ],
+          "source": "engines:engine_instance",
+          "target": "organization:oem",
+          "predicate": "supplied_to"
+        }
+      ],
+      "rules": [],
+      "questions": [
+        "Physical-engine identity, OEM/plant scope and bill-of-material completeness are not established."
+      ]
+    },
+    "complaints": {
+      "concepts": [
+        {
+          "id": "complaints:warranty_ticket",
+          "label": "WarrantyTicket",
+          "definition": "A service case concerning an engine; ticket presence does not establish eligibility.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "WarrantyTicket"
+            },
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ticketId"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "ticket_id",
+              "datatype": "string",
+              "required": false,
+              "description": "The source-scoped ticket identifier."
+            }
+          ]
+        },
+        {
+          "id": "complaints:complaint_submission",
+          "label": "ComplaintSubmission",
+          "definition": "Information submitted about a complaint, separate from verified investigation findings.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ComplaintSubmission"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "complaints:reported_symptom",
+          "label": "ReportedSymptom",
+          "definition": "A symptom reported by a customer or OEM, not automatically verified.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ReportedSymptom"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "complaints:reported_failure",
+          "label": "ReportedFailure",
+          "definition": "A reported failure allegation, separate from confirmed failure evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ReportedFailure"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "complaints:reported_operating_hours",
+          "label": "ReportedOperatingHours",
+          "definition": "An operating-hour observation reported with a complaint.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ReportedOperatingHours"
+            },
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "reportedOperatingHours"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "hours",
+              "datatype": "decimal",
+              "required": false,
+              "description": "Reported hours; parsing does not establish measurement verification."
+            }
+          ]
+        },
+        {
+          "id": "complaints:ticket_status",
+          "label": "TicketStatus",
+          "definition": "A recorded service-case state whose vocabulary must be supplied.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "TicketStatus"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [
+        {
+          "id": "complaints:concerns",
+          "label": "concerns",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "WarrantyTicket CONCERNS EngineInstance"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "source": "complaints:warranty_ticket",
+          "target": "engines:engine_instance",
+          "predicate": "concerns"
+        },
+        {
+          "id": "complaints:has_submission",
+          "label": "has submission",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "WarrantyTicket HAS ComplaintSubmission"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "source": "complaints:warranty_ticket",
+          "target": "complaints:complaint_submission",
+          "predicate": "has_submission"
+        },
+        {
+          "id": "complaints:contains_reported_symptom",
+          "label": "contains reported symptom",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ComplaintSubmission CONTAINS ReportedSymptom"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "source": "complaints:complaint_submission",
+          "target": "complaints:reported_symptom",
+          "predicate": "contains_reported_symptom"
+        },
+        {
+          "id": "complaints:supported_by",
+          "label": "supported by",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd",
+              "quote": "ComplaintSubmission SUPPORTED_BY Evidence"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Reported and verified states require explicit source vocabulary and investigation evidence."
+          ],
+          "source": "complaints:complaint_submission",
+          "target": "evidence:evidence",
+          "predicate": "supported_by"
+        }
+      ],
+      "rules": [],
+      "questions": [
+        "Reported and verified states require explicit source vocabulary and investigation evidence."
+      ]
+    },
+    "warranty": {
+      "concepts": [
+        {
+          "id": "warranty:warranty_contract",
+          "label": "WarrantyContract",
+          "definition": "An agreement governing warranty obligations for a covered subject.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyContract"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_policy",
+          "label": "WarrantyPolicy",
+          "definition": "A versioned statement of applicable warranty terms requiring an authoritative source.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyPolicy"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_coverage",
+          "label": "WarrantyCoverage",
+          "definition": "The coverage described by a warranty policy.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyCoverage"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_exclusion",
+          "label": "WarrantyExclusion",
+          "definition": "An exclusion whose applicability must be established from policy and evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyExclusion"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_claim",
+          "label": "WarrantyClaim",
+          "definition": "A recorded request for warranty consideration, separate from the decision.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyClaim"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_assessment",
+          "label": "WarrantyAssessment",
+          "definition": "An assessment of a claim against applicable evidence and policy.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyAssessment"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_decision",
+          "label": "WarrantyDecision",
+          "definition": "A recorded assessment outcome, not inferred from ticket or claim presence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyDecision"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "warranty:warranty_evidence",
+          "label": "WarrantyEvidence",
+          "definition": "Evidence considered during a warranty assessment.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyEvidence"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [
+        {
+          "id": "warranty:governed_by",
+          "label": "governed by",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyContract GOVERNED_BY WarrantyPolicy"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "source": "warranty:warranty_contract",
+          "target": "warranty:warranty_policy",
+          "predicate": "governed_by"
+        },
+        {
+          "id": "warranty:defines_coverage",
+          "label": "defines coverage",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyPolicy DEFINES WarrantyCoverage"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "source": "warranty:warranty_policy",
+          "target": "warranty:warranty_coverage",
+          "predicate": "defines_coverage"
+        },
+        {
+          "id": "warranty:evaluates",
+          "label": "evaluates",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyAssessment EVALUATES WarrantyClaim"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "source": "warranty:warranty_assessment",
+          "target": "warranty:warranty_claim",
+          "predicate": "evaluates"
+        },
+        {
+          "id": "warranty:results_from",
+          "label": "results from",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_568e0598d4ea02383f86f967",
+              "quote": "WarrantyDecision RESULTS_FROM WarrantyAssessment"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+          ],
+          "source": "warranty:warranty_decision",
+          "target": "warranty:warranty_assessment",
+          "predicate": "results_from"
+        }
+      ],
+      "rules": [],
+      "questions": [
+        "Complete versioned coverage, exclusions, applicability and valid decision inputs are not supplied."
+      ]
+    },
+    "inspection": {
+      "concepts": [
+        {
+          "id": "inspection:investigation_case",
+          "label": "InvestigationCase",
+          "definition": "An investigation activity addressing a service or failure question.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "InvestigationCase"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Published inspection status and confirmed findings require explicit source evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "inspection:joint_inspection",
+          "label": "JointInspection",
+          "definition": "An inspection involving the relevant service and OEM participants.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "JointInspection"
+            },
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "inspectionStatus"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Published inspection status and confirmed findings require explicit source evidence."
+          ],
+          "parent_id": null,
+          "properties": [
+            {
+              "name": "inspection_status",
+              "datatype": "enumeration",
+              "required": false,
+              "description": "Literal inspection state; allowed values require the actual vocabulary."
+            }
+          ]
+        },
+        {
+          "id": "inspection:inspection_observation",
+          "label": "InspectionObservation",
+          "definition": "An observation made during inspection, distinct from a root-cause conclusion.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "InspectionObservation"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Published inspection status and confirmed findings require explicit source evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "inspection:inspection_report",
+          "label": "InspectionReport",
+          "definition": "A report recording inspection activities and findings.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "InspectionReport"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Published inspection status and confirmed findings require explicit source evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "inspection:diagnostic_test",
+          "label": "DiagnosticTest",
+          "definition": "A diagnostic test contributing evidence to an investigation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_f959a870c7c3585594b1312d",
+              "quote": "DiagnosticTest"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Published inspection status and confirmed findings require explicit source evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [],
+      "questions": [
+        "Published inspection status and confirmed findings require explicit source evidence."
+      ]
+    },
+    "failure": {
+      "concepts": [
+        {
+          "id": "failure:symptom",
+          "label": "Symptom",
+          "definition": "What is noticed about an engine or component.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "Symptom"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "failure:failure_mode",
+          "label": "FailureMode",
+          "definition": "How an item fails, separate from the underlying cause.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "FailureMode"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "failure:failure_mechanism",
+          "label": "FailureMechanism",
+          "definition": "The physical process causing a failure.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "FailureMechanism"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "failure:root_cause",
+          "label": "RootCause",
+          "definition": "An underlying reason for a failure that requires confirming evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "RootCause"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "failure:contributing_factor",
+          "label": "ContributingFactor",
+          "definition": "An additional factor contributing to a failure.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "ContributingFactor"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [
+        {
+          "id": "failure:unconfirmed_similarity",
+          "label": "unconfirmed similarity",
+          "definition": "Reference safeguard for evidence-qualified interpretation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_97540bebbd8c755ae448f372",
+              "quote": "A root cause should never be automatically inferred as a confirmed fact simply because an LLM found a similar historical incident."
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+          ],
+          "inputs": [
+            "failure:root_cause"
+          ],
+          "conditions": [
+            "Only a similar historical incident is available"
+          ],
+          "outcome": "Retain an unconfirmed root-cause hypothesis.",
+          "basis": "proposed_logic"
+        }
+      ],
+      "questions": [
+        "Confirmed mechanism and root-cause evidence must not be inferred from similarity or raw defect codes."
+      ]
+    },
+    "replacement": {
+      "concepts": [
+        {
+          "id": "replacement:replacement_case",
+          "label": "ReplacementCase",
+          "definition": "A replacement process with its own authorization, logistics and closure.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementCase"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "replacement:replacement_approval",
+          "label": "ReplacementApproval",
+          "definition": "An operational authorization associated with a replacement case.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementApproval"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "replacement:replacement_commercial_type",
+          "label": "ReplacementCommercialType",
+          "definition": "A commercial classification whose actual business meaning requires a supplied vocabulary.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementCommercialType"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "replacement:replacement_engine",
+          "label": "ReplacementEngine",
+          "definition": "An engine assigned to replace another engine, without automatically merging their identities.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementEngine"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "replacement:failed_engine",
+          "label": "FailedEngine",
+          "definition": "An engine described as failed within a replacement process; confirmation remains evidence-dependent.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "FailedEngine"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "replacement:part_replacement_case",
+          "label": "PartReplacementCase",
+          "definition": "A service process for replacement of a part.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "PartReplacementCase"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [
+        {
+          "id": "replacement:authorized_by",
+          "label": "authorized by",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementCase AUTHORIZED_BY ReplacementApproval"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "source": "replacement:replacement_case",
+          "target": "replacement:replacement_approval",
+          "predicate": "authorized_by"
+        },
+        {
+          "id": "replacement:has_commercial_type",
+          "label": "has commercial type",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementCase HAS_COMMERCIAL_TYPE ReplacementCommercialType"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "source": "replacement:replacement_case",
+          "target": "replacement:replacement_commercial_type",
+          "predicate": "has_commercial_type"
+        },
+        {
+          "id": "replacement:replaces",
+          "label": "replaces",
+          "definition": "Reference relationship described by the supplied blueprint; actual record associations need evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_10821d968794a962841c3a9b",
+              "quote": "ReplacementCase REPLACES EngineInstance"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+          ],
+          "source": "replacement:replacement_case",
+          "target": "engines:engine_instance",
+          "predicate": "replaces"
+        }
+      ],
+      "rules": [],
+      "questions": [
+        "Commercial-type meanings, authorizations and actual installation/return evidence require verification."
+      ]
+    },
+    "quality": {
+      "concepts": [
+        {
+          "id": "quality:quality_investigation",
+          "label": "QualityInvestigation",
+          "definition": "A quality investigation distinct from field inspection and engineering change.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_fb9f2abe1354183c345871c6",
+              "quote": "QualityInvestigation"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "QA observations and approver/status fields alone do not confirm engineering root cause or change approval."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "quality:returned_engine_inspection",
+          "label": "ReturnedEngineInspection",
+          "definition": "An inspection performed on an engine returned for quality investigation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_fb9f2abe1354183c345871c6",
+              "quote": "ReturnedEngineInspection"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "QA observations and approver/status fields alone do not confirm engineering root cause or change approval."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "quality:quality_observation",
+          "label": "QualityObservation",
+          "definition": "An observation recorded during a quality investigation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_fb9f2abe1354183c345871c6",
+              "quote": "QualityObservation"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "QA observations and approver/status fields alone do not confirm engineering root cause or change approval."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "quality:quality_conclusion",
+          "label": "QualityConclusion",
+          "definition": "A technical conclusion supported by quality evidence, distinct from approved engineering change.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_fb9f2abe1354183c345871c6",
+              "quote": "QualityConclusion"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "QA observations and approver/status fields alone do not confirm engineering root cause or change approval."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [],
+      "questions": [
+        "QA observations and approver/status fields alone do not confirm engineering root cause or change approval."
+      ]
+    },
+    "capa": {
+      "concepts": [
+        {
+          "id": "capa:quality_issue",
+          "label": "QualityIssue",
+          "definition": "A quality issue linking investigation to organizational action.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_0f49d1355616ae9f866d8481",
+              "quote": "QualityIssue"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete action implementation and effectiveness evidence are not established; source collections may be empty."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "capa:corrective_action",
+          "label": "CorrectiveAction",
+          "definition": "An action intended to eliminate an established root cause.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_0f49d1355616ae9f866d8481",
+              "quote": "CorrectiveAction"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete action implementation and effectiveness evidence are not established; source collections may be empty."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "capa:implementation_record",
+          "label": "ImplementationRecord",
+          "definition": "Evidence recording implementation of an action or change.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_0f49d1355616ae9f866d8481",
+              "quote": "ImplementationRecord"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete action implementation and effectiveness evidence are not established; source collections may be empty."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "capa:effectiveness_review",
+          "label": "EffectivenessReview",
+          "definition": "A review evaluating whether an action achieved its objective.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_0f49d1355616ae9f866d8481",
+              "quote": "EffectivenessReview"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Complete action implementation and effectiveness evidence are not established; source collections may be empty."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [],
+      "questions": [
+        "Complete action implementation and effectiveness evidence are not established; source collections may be empty."
+      ]
+    },
+    "effectivity": {
+      "concepts": [
+        {
+          "id": "effectivity:engineering_change",
+          "label": "EngineeringChange",
+          "definition": "A formally controlled technical change, distinct from a QA finding.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "EngineeringChange"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "effectivity:change_applicability",
+          "label": "ChangeApplicability",
+          "definition": "The scoped conditions determining where a change applies.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "ChangeApplicability"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "effectivity:change_effectivity",
+          "label": "ChangeEffectivity",
+          "definition": "The scoped serial/date/configuration effectivity of a change.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "ChangeEffectivity"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "effectivity:serial_number_range",
+          "label": "SerialNumberRange",
+          "definition": "A serial boundary or range that requires explicit scope and ordering semantics.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "SerialNumberRange"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "effectivity:production_verification",
+          "label": "ProductionVerification",
+          "definition": "Evidence checking implementation of a change in production.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "ProductionVerification"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [
+        {
+          "id": "effectivity:recurrence_needs_evidence",
+          "label": "recurrence needs evidence",
+          "definition": "Reference safeguard for evidence-qualified interpretation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_9161e4c5a4ffbae6815d6532",
+              "quote": "A post-cut-in complaint is not automatically a corrective-action failure."
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+          ],
+          "inputs": [
+            "effectivity:engineering_change"
+          ],
+          "conditions": [
+            "A post-cut-in complaint is observed"
+          ],
+          "outcome": "Require applicability, incorporation, comparability and exposure evidence before claiming recurrence.",
+          "basis": "proposed_logic"
+        }
+      ],
+      "questions": [
+        "OEM/model/plant/date scope, serial ordering, exceptions and actual incorporation require evidence."
+      ]
+    },
+    "monitoring": {
+      "concepts": [
+        {
+          "id": "monitoring:monitoring_program",
+          "label": "MonitoringProgram",
+          "definition": "A program observing a defined population and period.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "MonitoringProgram"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "monitoring:monitored_engine_population",
+          "label": "MonitoredEnginePopulation",
+          "definition": "The explicitly defined cohort of engines included in monitoring.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "MonitoredEnginePopulation"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "monitoring:failure_occurrence",
+          "label": "FailureOccurrence",
+          "definition": "A recorded failure occurrence whose confirmation and comparability require evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "FailureOccurrence"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "monitoring:recurrence_event",
+          "label": "RecurrenceEvent",
+          "definition": "A confirmed comparable recurrence that requires applicability, incorporation and exposure evidence.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "RecurrenceEvent"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "monitoring:exposure_metric",
+          "label": "ExposureMetric",
+          "definition": "An operating-exposure measure used with an appropriate population denominator.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "ExposureMetric"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [
+        {
+          "id": "monitoring:rate_requires_exposure",
+          "label": "rate requires exposure",
+          "definition": "Reference safeguard for evidence-qualified interpretation.",
+          "layer": "domain",
+          "evidence": [
+            {
+              "source_id": "ref_95891f25490dcf43787b5044",
+              "quote": "A proper quality monitoring system needs denominators and exposure data, not just ticket counts."
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+          ],
+          "inputs": [
+            "monitoring:exposure_metric"
+          ],
+          "conditions": [
+            "Only ticket counts are available"
+          ],
+          "outcome": "Do not report a failure rate without valid denominator and exposure data.",
+          "basis": "proposed_logic"
+        }
+      ],
+      "questions": [
+        "Confirmed comparable failures, eligible cohorts, operating exposure and population denominators are missing."
+      ]
+    },
+    "evidence": {
+      "concepts": [
+        {
+          "id": "evidence:evidence",
+          "label": "Evidence",
+          "definition": "Information supporting or qualifying a business assertion.",
+          "layer": "common",
+          "evidence": [
+            {
+              "source_id": "ref_5f74f5d355bd949c2037e1ca",
+              "quote": "Evidence"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:source_record",
+          "label": "SourceRecord",
+          "definition": "An identifiable record in a source system, separate from the physical engine it describes.",
+          "layer": "common",
+          "evidence": [
+            {
+              "source_id": "ref_5f74f5d355bd949c2037e1ca",
+              "quote": "SourceRecord"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:source_system",
+          "label": "SourceSystem",
+          "definition": "A system providing source records and provenance.",
+          "layer": "common",
+          "evidence": [
+            {
+              "source_id": "ref_5f74f5d355bd949c2037e1ca",
+              "quote": "SourceSystem"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:information_object",
+          "label": "InformationObject",
+          "definition": "A document or other information object used in a business process.",
+          "layer": "common",
+          "evidence": [
+            {
+              "source_id": "ref_5f74f5d355bd949c2037e1ca",
+              "quote": "InformationObject"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:entity",
+          "label": "Entity",
+          "definition": "Anything that exists within the ontology scope.",
+          "layer": "foundational",
+          "evidence": [
+            {
+              "source_id": "ref_c554e435203c2b79b6b7c8ea",
+              "quote": "Entity"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:physical_entity",
+          "label": "PhysicalEntity",
+          "definition": "A physical object, distinct from a source record.",
+          "layer": "foundational",
+          "evidence": [
+            {
+              "source_id": "ref_c554e435203c2b79b6b7c8ea",
+              "quote": "PhysicalEntity"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:process",
+          "label": "Process",
+          "definition": "An unfolding activity.",
+          "layer": "foundational",
+          "evidence": [
+            {
+              "source_id": "ref_c554e435203c2b79b6b7c8ea",
+              "quote": "Process"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:event",
+          "label": "Event",
+          "definition": "Something that happens.",
+          "layer": "foundational",
+          "evidence": [
+            {
+              "source_id": "ref_c554e435203c2b79b6b7c8ea",
+              "quote": "Event"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        },
+        {
+          "id": "evidence:role",
+          "label": "Role",
+          "definition": "A function played by an entity.",
+          "layer": "foundational",
+          "evidence": [
+            {
+              "source_id": "ref_c554e435203c2b79b6b7c8ea",
+              "quote": "Role"
+            }
+          ],
+          "confidence": 0.7,
+          "unknowns": [
+            "Source assertions need verification status, temporal validity and record-level provenance."
+          ],
+          "parent_id": null,
+          "properties": []
+        }
+      ],
+      "relationships": [],
+      "rules": [],
+      "questions": [
+        "Source assertions need verification status, temporal validity and record-level provenance."
+      ]
+    }
+  }
+}

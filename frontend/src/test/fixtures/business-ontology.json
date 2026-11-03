@@ -1,0 +1,175 @@
+{
+  "api_version": 1,
+  "workspace": null,
+  "layers": [
+    {
+      "id": "foundational",
+      "label": "Foundational",
+      "description": "Objects, events, processes, identity, causality, time and place."
+    },
+    {
+      "id": "common",
+      "label": "Common",
+      "description": "Reusable enterprise organizations, assets, evidence, documents and decisions."
+    },
+    {
+      "id": "domain",
+      "label": "Manufacturing domain",
+      "description": "Manufacturing, warranty, field service, failure analysis and engineering change."
+    },
+    {
+      "id": "organization",
+      "label": "Simpson organization",
+      "description": "Simpson departments, OEM relationships, people and role assignments."
+    },
+    {
+      "id": "business",
+      "label": "Simpson business",
+      "description": "Simpson terminology, warranty rules, replacement decisions and effectivity."
+    }
+  ],
+  "modules": [
+    {
+      "id": "organization",
+      "label": "Organization and ecosystem",
+      "description": "Organizations, OEM companies, accounts, departments and role assignments.",
+      "layers": [
+        "common",
+        "organization"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "engines",
+      "label": "Products and engines",
+      "description": "Engine families, models, instances, components, invoices and manufacturing context.",
+      "layers": [
+        "common",
+        "domain"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "complaints",
+      "label": "Complaints and tickets",
+      "description": "Complaint submissions, reported symptoms, usage and service cases.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "warranty",
+      "label": "Warranty eligibility",
+      "description": "Policy inputs, coverage, exclusions, assessments and explainable decisions.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "inspection",
+      "label": "Investigation and inspection",
+      "description": "Engineer assignment, joint inspections, observations and diagnostic evidence.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "failure",
+      "label": "Failure analysis",
+      "description": "Symptoms, failure modes, components, mechanisms and qualified root causes.",
+      "layers": [
+        "domain"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "replacement",
+      "label": "Replacement and logistics",
+      "description": "Part and engine replacement, commercial decisions, dispatch, returns and custody.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "quality",
+      "label": "Quality investigation",
+      "description": "Returned-engine examination, tests, findings and quality conclusions.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "capa",
+      "label": "Corrective and preventive action",
+      "description": "Containment, correction, CAPA, implementation and effectiveness reviews.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "effectivity",
+      "label": "Engineering change and cut-in",
+      "description": "Change applicability, scoped serial boundaries, dates and incorporation evidence.",
+      "layers": [
+        "domain",
+        "business"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "monitoring",
+      "label": "Monitoring and reliability",
+      "description": "Eligible populations, operating exposure, recurrence and change effectiveness.",
+      "layers": [
+        "domain"
+      ],
+      "concept_count": 0
+    },
+    {
+      "id": "evidence",
+      "label": "Evidence and provenance",
+      "description": "Source records, documents, assertions, verification status and temporal history.",
+      "layers": [
+        "foundational",
+        "common"
+      ],
+      "concept_count": 0
+    }
+  ],
+  "available_sources": [
+    {
+      "connection_id": "db1",
+      "name": "Simpson service db1",
+      "engine": "mongodb",
+      "connection_status": "connected",
+      "metadata_revision": 1
+    },
+    {
+      "connection_id": "db2",
+      "name": "Simpson quality db2",
+      "engine": "mongodb",
+      "connection_status": "connected",
+      "metadata_revision": 1
+    }
+  ],
+  "source_bindings": [],
+  "versions": [],
+  "counts": {
+    "concepts": 0,
+    "relationships": 0,
+    "rules": 0
+  },
+  "generation_status": "not_started"
+}

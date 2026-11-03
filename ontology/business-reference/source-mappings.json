@@ -1,0 +1,326 @@
+{
+  "mapping_version": "simpson-source-graph-v2",
+  "basis": "Reviewed supplied backend and bounded source-verification field allowlist; metadata/type observations are not business-policy authority.",
+  "items": [
+    {
+      "collection": "oemnames",
+      "label": "OEM organization",
+      "role": "service",
+      "fields": [
+        "_id",
+        "name"
+      ]
+    },
+    {
+      "collection": "oems",
+      "label": "OEM account",
+      "role": "service",
+      "fields": [
+        "_id",
+        "oemNameId"
+      ]
+    },
+    {
+      "collection": "enginedetails",
+      "label": "Engine invoice record",
+      "role": "service",
+      "fields": [
+        "_id",
+        "oem",
+        "engineSerialNumber",
+        "engineModel",
+        "listNo",
+        "organizationName",
+        "invoiceDate",
+        "buildDate"
+      ]
+    },
+    {
+      "collection": "tickets",
+      "label": "Complaint/service case",
+      "role": "service",
+      "fields": [
+        "_id",
+        "oem",
+        "oemOrg",
+        "engineNo",
+        "engineModal",
+        "createdAt",
+        "complaintRecord.dateOfSale",
+        "complaintRecord.hmr",
+        "complaintRecord.unitMachineStatus",
+        "hmr",
+        "underWarranty",
+        "invoiceDate",
+        "serviceEngineer",
+        "jointInspectionReport",
+        "defectCode",
+        "actionCode",
+        "assignedApprover",
+        "engineReplacementStatus",
+        "engineReplacementApprovedDate",
+        "cutInNumber",
+        "cutIn",
+        "cutInDetails"
+      ]
+    },
+    {
+      "collection": "jointinspectionreports",
+      "label": "Joint inspection",
+      "role": "service",
+      "fields": [
+        "_id",
+        "ticketId",
+        "oem",
+        "dateOfSale",
+        "dateOfFailure",
+        "hoursCovered",
+        "status",
+        "potentialCause",
+        "defectCode",
+        "serviceMaintenanceRecord",
+        "photos",
+        "documents"
+      ]
+    },
+    {
+      "collection": "enginereplacements",
+      "label": "Engine replacement request",
+      "role": "service",
+      "fields": [
+        "_id",
+        "ticket",
+        "mode",
+        "engineType",
+        "engineSLNo"
+      ]
+    },
+    {
+      "collection": "partreplacements",
+      "label": "Part replacement",
+      "role": "service",
+      "fields": [
+        "_id",
+        "ticket",
+        "part",
+        "mode",
+        "scope",
+        "partReplacementCost"
+      ]
+    },
+    {
+      "collection": "floatengines",
+      "label": "Replacement dispatch",
+      "role": "service",
+      "fields": [
+        "_id",
+        "ticketId",
+        "oem",
+        "replacementEngineNumber",
+        "status",
+        "engineReplacementApprovalDate"
+      ]
+    },
+    {
+      "collection": "focs",
+      "label": "FOC form",
+      "role": "service",
+      "fields": [
+        "_id",
+        "ticket",
+        "oem",
+        "hoursOfFailure",
+        "failureDate",
+        "focStatus",
+        "focReleaseRequest.warrantyClaimNo"
+      ]
+    },
+    {
+      "collection": "workorders",
+      "label": "Failed-engine inward record",
+      "role": "service",
+      "fields": [
+        "_id",
+        "complaintReferenceNumber",
+        "fieldWarrantyReferenceNumber",
+        "oem",
+        "oemOrg",
+        "fieldWarrantyEngineInwardDate",
+        "hoursCovered"
+      ]
+    },
+    {
+      "collection": "internalcutins",
+      "label": "Engineering effectivity boundary",
+      "role": "service",
+      "fields": [
+        "_id",
+        "plant",
+        "listNo",
+        "engineCutInNumber",
+        "cutInDate",
+        "oem",
+        "defectCode",
+        "engineModel"
+      ]
+    },
+    {
+      "collection": "servicebulletins",
+      "label": "Service bulletin",
+      "role": "service",
+      "fields": [
+        "_id",
+        "oem",
+        "engineModel",
+        "listNumbers",
+        "plantDetails",
+        "defectCode",
+        "approvalStatus"
+      ]
+    },
+    {
+      "collection": "serviceinformations",
+      "label": "Service information",
+      "role": "service",
+      "fields": [
+        "_id",
+        "oem",
+        "engineModel",
+        "listNumbers",
+        "plantDetails",
+        "defectCode",
+        "approvalStatus"
+      ]
+    },
+    {
+      "collection": "claims",
+      "label": "Manual claim line",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "oem",
+        "claimReferenceNumber",
+        "claimNumber",
+        "engineSerialNumber",
+        "machineSaleDate",
+        "dateOfFailure",
+        "hoursCovered",
+        "status",
+        "reason",
+        "simpsonPartNumber"
+      ]
+    },
+    {
+      "collection": "claimsftps",
+      "label": "SAP claim line",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "oem",
+        "claimReference",
+        "claimId",
+        "engineSerialNumber",
+        "machineSaleDate",
+        "failureDate",
+        "simpsonInvoiceDate",
+        "failureHours",
+        "status",
+        "defectCode",
+        "plant",
+        "partValue"
+      ]
+    },
+    {
+      "collection": "failedengineanalyses",
+      "label": "Failed-engine quality investigation",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "engineSerialNumber",
+        "defect",
+        "oem",
+        "engineModel",
+        "listNo",
+        "beforeImprovement",
+        "afterImprovement",
+        "cutInEsn",
+        "cutInEffectiveDate",
+        "qualityApprover",
+        "status",
+        "attachments"
+      ]
+    },
+    {
+      "collection": "failedpartanalyses",
+      "label": "Failed-part analysis",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "partNumber",
+        "defect",
+        "oem",
+        "engineModel",
+        "cutInEsn",
+        "cutInEffectiveDate",
+        "qualityApprover",
+        "status"
+      ]
+    },
+    {
+      "collection": "icacapas",
+      "label": "ICA/CAPA quality record",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "defect",
+        "oem",
+        "engineModel",
+        "listNo",
+        "beforeImprovement",
+        "afterImprovement",
+        "cutInEsn",
+        "cutInEffectiveDate",
+        "attachments"
+      ]
+    },
+    {
+      "collection": "products",
+      "label": "Engine model product record",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "engineModel",
+        "oem",
+        "listData"
+      ]
+    },
+    {
+      "collection": "floatengineftps",
+      "label": "SAP float-engine stock",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "serialNumber",
+        "model",
+        "listNumber",
+        "plant",
+        "oem",
+        "stock",
+        "status",
+        "amount"
+      ]
+    },
+    {
+      "collection": "jirlogs",
+      "label": "Inspection operation log",
+      "role": "quality",
+      "fields": [
+        "_id",
+        "jirId",
+        "ticketId",
+        "operationType",
+        "createdAt"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import {api} from '@/api/client';
+import {businessMonitoringSchema} from '@/api/business-ontology';
+import {sourceGraph} from '@/test/fixtures/business-graph';
+import {monitoringReport} from '@/test/fixtures/business-monitoring';
+import BusinessMonitoringPanel from './BusinessMonitoringPanel';
+afterEach(()=>vi.restoreAllMocks());
+function dates(){fireEvent.change(screen.getByLabelText('Monitoring period start'),{target:{value:'2026-01-01'}});fireEvent.change(screen.getByLabelText('Monitoring period end'),{target:{value:'2026-12-31'}});}
+it('requires explicit dates and action, shows gaps and inspects qualified source evidence',async()=>{
+ const run=vi.spyOn(api,'businessMonitoring').mockResolvedValue(monitoringReport());const inspect=vi.fn();render(<BusinessMonitoringPanel graph={sourceGraph()} onInspect={inspect}/>);expect(screen.getByRole('button',{name:'Inspect monitoring readiness'})).toBeDisabled();expect(run).not.toHaveBeenCalled();dates();expect(run).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Inspect monitoring readiness'}));
+ expect(await screen.findByText('Requires evidence · Recurrence, rates and effectiveness unavailable')).toBeVisible();expect(run).toHaveBeenCalledWith('v2','g1',{change_node_id:null,period_start:'2026-01-01',period_end:'2026-12-31',limit:20,offset:0});expect(screen.getByText(/failure rate: Unavailable/)).toBeVisible();fireEvent.click(screen.getAllByRole('button',{name:'Inspect monitoring source'})[0]!);expect(inspect).toHaveBeenCalledWith('node1');fireEvent.change(screen.getByLabelText('Monitoring period end'),{target:{value:'2026-12-30'}});expect(screen.queryByText('Requires evidence · Recurrence, rates and effectiveness unavailable')).not.toBeInTheDocument();
+});
+it('discards late results after graph changes and rejects reversed windows',async()=>{
+ let finish:(r:ReturnType<typeof monitoringReport>)=>void=()=>{};vi.spyOn(api,'businessMonitoring').mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));const view=render(<BusinessMonitoringPanel graph={sourceGraph()} onInspect={()=>{}}/>);dates();fireEvent.change(screen.getByLabelText('Monitoring period end'),{target:{value:'2025-01-01'}});expect(screen.getByRole('button',{name:'Inspect monitoring readiness'})).toBeDisabled();dates();fireEvent.click(screen.getByRole('button',{name:'Inspect monitoring readiness'}));view.rerender(<BusinessMonitoringPanel graph={{...sourceGraph('v3'),graph_id:'g2'}} onInspect={()=>{}}/>);await act(async()=>finish(monitoringReport()));expect(screen.queryByText('Requires evidence · Recurrence, rates and effectiveness unavailable')).not.toBeInTheDocument();
+});
+it('handles errors and bounded pages without retaining a failed report',async()=>{
+ const first=monitoringReport();first.has_more=true;first.next_offset=20;first.total_rows=21;const second={...first,offset:20,has_more:false,next_offset:null,rows:first.rows.slice(0,1)};const run=vi.spyOn(api,'businessMonitoring').mockResolvedValueOnce(first).mockResolvedValueOnce(second).mockRejectedValue(new Error('Unavailable'));render(<BusinessMonitoringPanel graph={sourceGraph()} onInspect={()=>{}}/>);dates();fireEvent.click(screen.getByRole('button',{name:'Inspect monitoring readiness'}));fireEvent.click(await screen.findByRole('button',{name:'Next monitoring observations'}));await waitFor(()=>expect(run).toHaveBeenLastCalledWith('v2','g1',expect.objectContaining({offset:20})));await screen.findByText('21–21 of 21');fireEvent.click(screen.getByRole('button',{name:'Inspect monitoring readiness'}));await screen.findByRole('button',{name:'Retry read'});expect(screen.queryByText('Requires evidence · Recurrence, rates and effectiveness unavailable')).not.toBeInTheDocument();
+});
+it('never accepts a computed rate or confirmed monitoring state from unverified fixtures',()=>{
+ const result=monitoringReport();expect(businessMonitoringSchema.safeParse({...result,metrics:{...result.metrics,failure_rate:0}}).success).toBe(false);expect(businessMonitoringSchema.safeParse({...result,status:'confirmed'}).success).toBe(false);
+});
+it('passes an explicitly selected saved change without treating it as verified applicability',async()=>{
+ const graph=sourceGraph();graph.records.push({...graph.records[0]!,node_id:'change1',collection:'internalcutins',key:{_id:'cut1'}});const run=vi.spyOn(api,'businessMonitoring').mockResolvedValue({...monitoringReport(),change_node_id:'change1'});render(<BusinessMonitoringPanel graph={graph} onInspect={()=>{}}/>);dates();fireEvent.change(screen.getByLabelText('Change record to inspect'),{target:{value:'change1'}});fireEvent.click(screen.getByRole('button',{name:'Inspect monitoring readiness'}));await waitFor(()=>expect(run).toHaveBeenCalledWith('v2','g1',expect.objectContaining({change_node_id:'change1'})));expect(await screen.findByText('Requires evidence · Recurrence, rates and effectiveness unavailable')).toBeVisible();
+});

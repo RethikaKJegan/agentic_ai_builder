@@ -714,7 +714,11 @@
             },
             "clarification": {
               "type": "string",
-              "maxLength": 1000
+              "maxLength": 1000,
+              "enum": [
+                ""
+              ],
+              "description": "Executable queries require an empty string. Put explanations and operating constraints in explanation. If information needed to form a query is missing, do not call this tool; report the missing information in the agent result."
             }
           },
           "required": [

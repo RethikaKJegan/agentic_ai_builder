@@ -32,3 +32,10 @@ it("distinguishes a missing route on an older Builder backend from an unrelated 
   const response = await GET(new NextRequest("http://127.0.0.1:3001/api/backend/procurement/projects/project_test"), { params: Promise.resolve({ path: ["procurement", "projects", "project_test"] }) });
   expect(await response.json()).toMatchObject({ data: { error: { error_code: "API_ROUTE_UNAVAILABLE" } } });
 });
+
+it('rejects retired ontology routes without contacting the backend',async()=>{
+ const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+ const response=await GET(new NextRequest('http://127.0.0.1:3001/api/backend/ontology/v1'),{params:Promise.resolve({path:['ontology','v1']})});
+ expect(response.status).toBe(410);expect(fetch).not.toHaveBeenCalled();
+ const other=await GET(new NextRequest('http://127.0.0.1:3001/api/backend/runs/other%3Aid'),{params:Promise.resolve({path:['runs','other:id']})});expect(other.status).toBe(400);
+});

@@ -1,0 +1,14 @@
+{
+  "approved_at": "2026-10-30",
+  "authority": "workspace_owner_user",
+  "recorded_by": "Codex on behalf of local-builder",
+  "request": "this is approved n you proceed, i want see what and all u have done in the ui so proceed with deployment",
+  "scope": "Publish reviewed ontology descriptions and deploy the UI; retain unknown bindings and documented defects as unknown, without company writes or executable policy grants.",
+  "independent_sme_review": false,
+  "production_calibration": false,
+  "bundle_sha256": "8c9d57ac9e6a16f270923f73ff6bfa1b6dfe5c1fb32de0d206633d6cc709f79d",
+  "technical_evidence_sha256": "0bd018ca7a64d87340d7a41eedb6faf55d07a5c8cca1053d77fbbfa020892c8b",
+  "publication_version": "ov_d633a24f73d20898769885f779fe39c4fb929723",
+  "approved_records": 409,
+  "unresolved_drafts": 7
+}

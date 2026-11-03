@@ -206,6 +206,7 @@ class CloudAdapters:
     @staticmethod
     def mongo(db, config, cid):
         datasets, warnings = [], []
+        profiles = {}
         deadline = time.monotonic() + PROFILE_SECONDS
         infos = list(islice(db.list_collections(maxTimeMS=8000), MAX_DATASETS + 1))
         if len(infos) > MAX_DATASETS: warnings.append('Dataset limit reached; only the first 100 collections are profiled.')
@@ -216,6 +217,9 @@ class CloudAdapters:
             did = stable_id(cid, config['database'], name)
             docs = list(db[name].find({}, limit=SAMPLE_DOCUMENTS).max_time_ms(8000))
             fields, partial = observed_fields(docs, cid, did)
+            if config.get('_ontology_profile'):
+                from .data_profiles import summarize, composite
+                profiles[did] = dict(fields=summarize(docs, fields), composite_keys=[], basis='bounded_sample', rows=len(docs))
             if partial: warnings.append('Field, array or nesting coverage limited for ' + name)
             indexes = []
             for index in ([] if info.get('type') == 'view' else db[name].list_indexes()):
@@ -227,11 +231,12 @@ class CloudAdapters:
                                  kind=info.get('type', 'collection'), fields=fields, indexes=indexes, constraints=[],
                                  sample_count=len(docs), discovery_method='sampled', has_validation_rules=bool(validator),
                                  validation_schema_json=json.dumps(validator.get('$jsonSchema', {}), default=str) if isinstance(validator, dict) else '{}'))
-        return dict(datasets=datasets, warnings=warnings, coverage='partial' if warnings else 'sampled', limits={'datasets':MAX_DATASETS,'documents_per_collection':SAMPLE_DOCUMENTS,'field_depth':MAX_DEPTH})
+        return dict(**({'ontology_profiles':profiles} if profiles else {}), datasets=datasets, warnings=warnings, coverage='partial' if warnings else 'sampled', limits={'datasets':MAX_DATASETS,'documents_per_collection':SAMPLE_DOCUMENTS,'field_depth':MAX_DEPTH})
 
     @staticmethod
     def postgres(conn, config, cid):
         datasets, warnings = [], []
+        profiles = {}
         deadline = time.monotonic() + PROFILE_SECONDS
         with conn.cursor() as cur:
             cur.execute('SELECT table_schema, table_name, table_type FROM information_schema.tables WHERE table_schema = ANY(%s) ORDER BY table_schema,table_name LIMIT %s', (config['schemas'], MAX_DATASETS+1))
@@ -259,8 +264,22 @@ class CloudAdapters:
                 index_rows=cur.fetchall()
                 if len(rows)>100 or len(index_rows)>100: warnings.append('Constraint/index coverage limited for ' + schema + '.' + name)
                 indexes=[dict(name=n,definition=d) for n,d in index_rows[:100]]
+                if config.get('_ontology_profile') and time.monotonic() < deadline:
+                    from psycopg import sql
+                    from .data_profiles import summarize, composite, SAMPLE_ROWS
+                    try:
+                        with conn.transaction():
+                            with conn.cursor() as sample:
+                                sample.execute("SELECT set_config('statement_timeout', '2000', true)")
+                                sample.execute(sql.SQL('SELECT {} FROM {}.{} LIMIT %s').format(
+                                    sql.SQL(',').join(sql.Identifier(f['name']) for f in fields),sql.Identifier(schema),sql.Identifier(name)),(SAMPLE_ROWS,))
+                                records=[dict(zip([f['name'] for f in fields],row)) for row in sample.fetchall()]
+                        profiles[did]=dict(fields=summarize(records,fields),basis='bounded_sample',rows=len(records),
+                            composite_keys=[dict(columns=c['columns'],**composite(records,c['columns'])) for c in constraints if c['kind'] in {'primary_key','foreign_key','unique'}])
+                    except Exception:
+                        profiles[did]=dict(fields={},basis='unavailable',reason='Record profiling unavailable within source access or time limits.')
                 datasets.append(dict(dataset_id=did,name=name,database=config['database'],schema=schema,kind='view' if 'VIEW' in kind else 'table',fields=fields,indexes=indexes,constraints=constraints,sample_count=0,discovery_method='declared'))
-        return dict(datasets=datasets,warnings=warnings,coverage='partial' if warnings else 'declared',limits={'datasets':MAX_DATASETS,'fields_per_dataset':MAX_FIELDS})
+        return dict(**({'ontology_profiles':profiles} if profiles else {}),datasets=datasets,warnings=warnings,coverage='partial' if warnings else 'declared',limits={'datasets':MAX_DATASETS,'fields_per_dataset':MAX_FIELDS})
 
 
 def safe_failure(exc):

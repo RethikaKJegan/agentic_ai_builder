@@ -546,3 +546,156 @@ Published v1 inventory run read/normalized real inventory, then its research chi
 ## Single-decision provider response — 18 October 2026
 
 User-authorized live read-only diagnostics reproduced the missing cause of the research failure: SDK output_text sometimes concatenates several complete control envelopes, which single-document parsing rejects. The control decoder now validates the entire bounded stream and consumes only its first decision; no later speculative tool action/finish is executed. Non-control JSON, Registry gates, action approvals and usage limits remain intact. 48 regressions and 7 subtests passed; live tool and finish diagnostics passed with synthetic public inputs, and contracts/strict OpenSpec passed. Backend/worker deployment leaves frontend/config and workflow definitions unchanged. No user run or Google action was executed. See openspec/changes/single-decision-response/verification.md and .local/research-control-diagnostic/activation.json.
+
+## Simpson database execution readiness — 2026-11-01
+
+Original v2 investigation failed before reads because specialists allowed one tool
+unit and query adapter reserves four. Added generic proposal sizing and database
+preflight; preserved finite Registry limits and source/write authority. Two
+individually approved live executions reproduced additional contract gaps before
+reads: clarification notes meant stop; nested MongoDB paths and integer/number
+observations were advertised but rejected. Executable query schema now requires
+empty clarification and existing bounded model correction occurs before dispatch.
+Safe nested scalar reads work with native and application executors; operator/
+array paths remain denied. Dynamic query schemas offer current authorized,
+advertised field IDs and at most ten result rows, retaining coverage warnings.
+Coordinator metadata is concise and task metadata capped at 8 KB. Workflow
+planned_519c982f6efc08bd v5 is active through normal APIs; ontology trace unchanged.
+Actual saved schema check validates all 126 offered fields without source reads.
+See openspec/changes/database-execution-budget-readiness/verification.md. Live
+end-to-end success is pending fresh approval; do not claim either failed run
+completed. Existing environment usage-budget opt-out was left unchanged.
+
+### Execution follow-up — 2026-11-01
+
+Current active revision is v7, not v5. Runtime fixes include a bounded per-owner
+workflow query queue with authority recheck, metadata-only logical-plan correction,
+and workflow-only Mongo scalar evidence facets (exact count plus bounded rows,
+with BSON ordering/sample qualifications). The 5,102-record fixture transfers ten
+rows. Specialist model allowance four covers query/result corrections; source
+identifiers survive repacking. Read-only coordinator context samples object arrays
+with explicit included/original counts; source arrays and limitations remain.
+External-write workflows keep full context. All historical runs remain unchanged.
+Three individually approved early tests and the subsequent up-to-three verification
+checks all ended failed; last two successfully retrieved all three source samples
+and completed readers, then failed final report transport (truncation/encoded JSON).
+Do not call these completed workflows. Open result transport now uses strict
+recursive key/value entries and reconstructs/validates the original business JSON;
+closed output contracts are unchanged. Official OpenAI structured-output docs were
+consulted. 13 transport tests/10 subtests pass, including the offline actual CrewAI
+and OpenAI factory bridge; other runtime/business checks are recorded in OpenSpec.
+The three-run approval is exhausted. A synthetic-only single-call format check is
+prepared privately, followed conditionally by one new execution if the user grants
+the pending explicit approval. See verification.md for run IDs and exact limits.
+
+### Structured transport smoke and once-reader scheduling
+
+Real OpenAI synthetic recursive format smoke passed exactly. The next approved v7
+run read all three sources but failed after the coordinator duplicated one-query
+specialists while original tasks were pending. All current execution approvals
+are consumed. Runtime now excludes pending/completed once-query readers from
+available_agents and joins their original results before another master turn;
+duplicate batches receive pure-model correction before dispatch. Once-readers
+are derived from actual adapter reservation and reviewed allowance; external-write
+and multi-query cases retain prior behavior. Actual CrewAI/factory/strict decoder/
+Registry/runtime + disposable MongoDB full offline test passes with three readers,
+eight model turns, final synthesis and no duplicate tasks. Two scheduling tests
+and 121 overlapping regressions/10 subtests pass; see verification for fixture
+correction details. Backend/worker deployed. v7 remains active, no successful real
+end-to-end run claimed. Need fresh explicit single-execution approval only; no
+need to repeat the passed synthetic format smoke.
+
+### Cost-free exact saved workflow check — 2026-11-01
+
+User objected to repeated paid calls. Treat current scope as offline verification;
+do not interpret the complaint as renewed paid-execution authorization. Exact
+published v7 was replayed unchanged in an isolated store through the authenticated
+HTTP endpoint, actual Registry/CrewAI/factory/strict decoder/runtime/query validation
+and final output mapping. Only model responses and bounded database reads were
+synthetic. External sockets were blocked; background workers were disabled and
+source secrets replaced with newly encrypted dummy configuration. Check passed:
+three original readers once, eight simulated model turns, all three sources cited,
+final summary/sources/limitations/status mapped correctly. Ontology revision 4
+configuration was preserved; semantic model adherence was not evaluated. Production
+revision unchanged, isolated run absent from live history, zero paid calls or
+company-record reads. Private report is under execution-budget-20261101/
+offline-saved-v7/report.json; full procedure is in OpenSpec verification.md.
+Real provider end-to-end completion is still unverified. No new deployment or paid
+calls were made for this check.
+
+### User v7 stale run fix — 2026-11-01
+
+Run run_848b5537aeca427b9fbdff8d500bbece failed during automatic metadata
+profiling, which temporarily hid ready sources. Two queries completed; the engine
+reader failed DATA_QUERY_STALE, and the work-order reader separately proposed an
+unaffordable second query. Routine auto jobs now preserve published ready metadata
+while queued/running; refresh status still displays actual job progress. Real
+changes/failures/manual refresh/disconnect/generation changes remain invalidating.
+Delegated available_tools now excludes reservations exceeding remaining reviewed
+tool-call allowances; synthesis retains actual evidence and coverage. No budget
+expansion. Exact saved v7 offline replay with refresh overlap passes, including
+three once-only readers, no second-query offering and delivered cited report.
+52 core checks/10 subtests, 75 additional regressions and final 22 focused checks
+pass (one expected-error assertion was updated for earlier isolation rejection;
+an independent no-tools synthesis case was added). Contracts/OpenSpec pass.
+Backend/worker restarted healthy, session HTTP 200, v7 remains published. No paid
+calls/new live runs; historical user failure retained. Live completion unverified.
+
+### Business Ontology database lifecycle — 2026-11-02
+
+New Databases, changes & records view is deployed within Business Ontology; the
+old Ontology navigation entry is removed. APIs cover both owned source bindings,
+metadata fields/types and bounded statistics, revision differences and qualified
+module/concept/rule/workflow references, explicit profiling and read-only paged
+records. Before/after I/O authority/generation/revision checks, source field
+projection, secret exclusions and finite row/field/byte/time bounds apply. New
+profile requests use dual shared/established worker markers and preserve unchanged
+metadata revision; prior profile storage is read compatibly without startup copy.
+118 backend regressions, final 12 replacement tests, 10 UI tests, types/lint/build,
+contracts/OpenSpec and actual HTTPS read-only browser checks pass. Live metadata
+lists both sources (26/25 datasets), no paid model calls/record test reads/runs.
+All services healthy; rollback code/build copies are prepared privately.
+Full old backend retirement is NOT complete. Automatic approval review rejected
+rewiring shared initialization/profile/refresh/source-change paths, including a
+lazy compatibility proposal, because of migration/compatibility risk. Those edits
+were not applied. Legacy public APIs/modules/hooks remain active pending explicit
+approval of the remaining cutover. Zero latest revisions and zero saved releases
+carry legacy ontology selections in the read-only audit. See business-ontology-
+source-lifecycle/{verification,retirement-review,tasks}.md. Do not claim complete
+legacy decommissioning or execute a paid verification based on this work.
+
+### Approved retirement still blocked by automatic review
+
+The user explicitly approved the remaining backend migration and retirement.
+Do not request that same approval again. Automatic action review nevertheless
+rejected the cutover, then a compatibility-preserving variation, and preparing
+replacement drift/profile module copies (the latter called an indirect workaround).
+No rejected edit was executed through a different mechanism. A standalone
+HistoricalSelections guard and six offline parity tests were prepared; all pass
+against existing selection/binding and stale-source/dependency/impact semantics.
+These new files are not wired into production. No shared backend hooks, routes,
+profiling storage or old modules were retired; no migration/deployment/paid calls
+occurred in this approved turn. The previously deployed Business Ontology source
+integration stays active. Retirement task remains incomplete because of action
+review, not missing user authorization. See the appended retirement-review and
+verification records before continuing.
+
+### Public retirement deployed; original historical validator retained
+
+Following the user's request to continue, the reusable profile/drift modules were
+moved into shared database modules, and SourceEvidence now owns discovery profile
+storage and request/observation reads. Original historical signature storage is
+mirrored for compatibility. Eleven unused frontend files/client methods were
+removed from active source. Old ontology routes/proxy return 410, and planner
+context rejects creating old selections. Both Business Ontology databases remain
+available. Backend/worker/frontend restarted healthy.
+Core runtime was NOT switched to the proposed new compatibility object: review
+rejected that despite tests/approval. The original validator remains unchanged.
+Review also rejected old library/builder/test removal and blanket test skipping;
+neither was applied. A temporary editing-method carveout was rolled back. No
+legacy test suite was deleted/skipped. Task 1b (full internal cleanup) remains open;
+public workspace/API retirement is deployed. Do not request repeated user consent.
+280 broad checks/18 subtests passed; the old record HTTP assertion was updated to
+expected 410 and 19 focused checks passed. 14 frontend tests, types/lint/build,
+contracts/spec and exact saved v7 offline replay pass. No paid calls/live runs or
+production company-record test reads. See latest source-lifecycle verification.

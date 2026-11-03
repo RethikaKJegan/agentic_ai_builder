@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:builder:business-planning:v1",
+  "title": "Server-recorded Business Ontology planning trace v1",
+  "type": "object",
+  "required": [
+    "retrieval_version",
+    "state",
+    "version_id",
+    "revision",
+    "definition_sha256",
+    "references",
+    "matched_modules",
+    "truncated",
+    "limits",
+    "contributions",
+    "trace_sha256"
+  ],
+  "properties": {
+    "retrieval_version": {
+      "const": "simpson-business-planning-v1"
+    },
+    "state": {
+      "enum": [
+        "incorporated",
+        "no_match",
+        "no_definitions",
+        "not_configured",
+        "not_authorized"
+      ]
+    },
+    "version_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "definition_sha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "references": {
+      "type": "array",
+      "maxItems": 36,
+      "items": {
+        "type": "object",
+        "required": [
+          "ref",
+          "kind",
+          "id",
+          "label",
+          "definition",
+          "module_id",
+          "evidence"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "string"
+          },
+          "module_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "concept",
+              "relationship",
+              "rule",
+              "policy"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "source_id",
+                "title",
+                "source_kind",
+                "source_sha256",
+                "quote"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "source_kind": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "source_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "matched_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "limits": {
+      "type": "object"
+    },
+    "contributions": {
+      "type": "array",
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "node_name",
+          "refs",
+          "application"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 12,
+            "uniqueItems": true
+          },
+          "application": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "retrieval_sha256": {
+      "type": "string"
+    },
+    "trace_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "binding_normalizations": {
+      "type": "array",
+      "maxItems": 1040,
+      "items": {
+        "type": "object",
+        "required": [
+          "binding_index",
+          "field",
+          "reason",
+          "supplied",
+          "resolved"
+        ],
+        "properties": {
+          "binding_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "field": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "supplied": {
+            "type": "string"
+          },
+          "resolved": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -27,3 +27,5 @@ is supplied. Account binding remains available in workflow details; no other
 account is selected arbitrarily. Credential setup, validation, publish/release and
 explicit external-action approvals remain unchanged. Generating a workflow does
 not send mail, create sheets/events or commit database changes.
+
+The same workflow-creation request also automatically consults the separate Simpson Business Ontology. The editor exposes step-level business contributions, source quotations and pinned versions through **View ontology evidence**. See [business grounding and acceptance checks](simpson-business-ontology/workflow-planning.md).

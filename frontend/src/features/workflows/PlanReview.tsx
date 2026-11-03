@@ -5,6 +5,7 @@ import type { CanonicalWorkflow } from "@/api/contracts.generated";
 import type { Workflow } from "@/domain/types";
 import { dependencyOrder, graphIssues } from "@/domain/graph-review";
 import { fromCanonical } from "@/api/mapping";
+import { BusinessOntologyReview } from "./BusinessOntologyReview";
 import { DatabaseWorkflowReview } from "./DatabaseWorkflowReview";
 export function PlanReview({
   document,
@@ -78,7 +79,10 @@ export function PlanReview({
         </div>
       </dl>
       {retrieved.success&&<KnowledgeSourcePreview view={retrieved.data}/>}
+      <BusinessOntologyReview document={canonical} />
       <DatabaseWorkflowReview document={canonical} />
+      {Array.isArray(canonical?.metadata["report_limitations"]) && canonical.metadata["report_limitations"].length > 0 && <details className="rounded-lg border p-3 text-sm"><summary className="cursor-pointer font-medium">Investigation scope and limitations</summary><ul className="mt-2 list-disc space-y-2 pl-4">{canonical.metadata["report_limitations"].filter((item): item is string => typeof item === "string").map((item, i) => <li key={i}>{displayText(item)}</li>)}</ul></details>}
+
       <details open={generated}>
         <summary className="cursor-pointer font-medium">Major steps and branches</summary>
         <ol className="mt-2 space-y-1">

@@ -5,17 +5,25 @@ import {semanticViewSchema} from "@/api/semantic-kg";
 import fixture from "../../../e2e/fixtures/semantic-kg.json";
 import Relationships from "./Relationships";
 afterEach(()=>{cleanup();vi.useRealTimers();vi.restoreAllMocks();});
-it.each(["ready","failed"] as const)("updates semantic inference feedback to %s without changing graph mode",async state=>{
+it.each(["ready","failed"] as const)("updates metadata rebuild feedback to %s without changing connection selection",async state=>{
  vi.useFakeTimers();let view=semanticViewSchema.parse(structuredClone(fixture));
  vi.spyOn(api,"knowledgeGraph").mockImplementation(async()=>view);
  vi.spyOn(api,"dataRefresh").mockResolvedValue({version:1,items:[]});
- vi.spyOn(api,"inferKnowledgeGraph").mockImplementation(async()=>{view={...view,semantic_status:{...view.semantic_status,state:"queued"}};return view;});
+ const rebuild=vi.spyOn(api,"relationships").mockImplementation(async()=>{
+  view={...view,build_status:"queued",stale:true};
+  return {graph:null,build_status:"queued",stale:true,last_error:null};
+ });
+ const inference=vi.spyOn(api,"inferKnowledgeGraph");
  render(<Relationships canManage/>);await act(async()=>{});
- fireEvent.click(screen.getByRole("button",{name:"Generate semantic relationships"}));await act(async()=>{});
- expect(screen.getByRole("button",{name:"Inferring semantic relationships…"})).toBeDisabled();
- view={...view,semantic_status:{...view.semantic_status,state,last_error:state==="failed"?"Inference failed; retry.":null}};
+ fireEvent.change(screen.getByLabelText("Semantic Intelligence connection"),{target:{value:"pg"}});
+ fireEvent.click(screen.getByRole("button",{name:"Regenerate Semantic Intelligence"}));await act(async()=>{});
+ expect(rebuild).toHaveBeenCalledWith("build");
+ expect(screen.getByRole("button",{name:"Updating metadata graph…"})).toBeDisabled();
+ view={...view,build_status:state,stale:false,last_error:state==="failed"?"Graph rebuild failed; retry.":null};
  await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});
- expect(screen.getByRole("button",{name:"Generate semantic relationships"})).toBeEnabled();
- expect(screen.getByRole("button",{name:"Entity types"})).toHaveAttribute("aria-pressed","true");
- if(state==="failed")expect(screen.getByRole("alert")).toHaveTextContent("Inference failed");
+ expect(screen.getByRole("button",{name:"Regenerate Semantic Intelligence"})).toBeEnabled();
+ expect(screen.getByLabelText("Semantic Intelligence connection")).toHaveValue("pg");
+ expect(screen.getByRole("img",{name:"Semantic Intelligence"})).toBeVisible();
+ expect(inference).not.toHaveBeenCalled();
+ if(state==="failed")expect(screen.getByRole("alert")).toHaveTextContent("Graph rebuild failed");
 });

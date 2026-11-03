@@ -1,0 +1,186 @@
+{
+  "checked_at": "2026-10-30T15:25:18.668847+00:00",
+  "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+  "limits": {
+    "max_time_ms_per_operation": 3000,
+    "matching_documents_per_field": 25,
+    "connector_deadline_seconds": 60
+  },
+  "basis": "point_in_time_bounded_probe_not_a_population_integrity_check",
+  "business_policy_approved": false,
+  "source_documents_exported": 0,
+  "source_writes": 0,
+  "ontology_mutations": 0,
+  "reference_targets_checked": false,
+  "ontology_published": false,
+  "credentials_exported": false,
+  "status_counts": {
+    "observed_field": 4,
+    "not_observed_in_completed_probe": 1,
+    "empty_collection_no_schema_declaration": 6
+  },
+  "fields": [
+    {
+      "collection": "advaced-engine-replacements",
+      "connection_name": "Simpsons- db1",
+      "field": "oem",
+      "collection_has_records": true,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [
+        "string"
+      ],
+      "matching_sample_count": 25,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "observed_field"
+    },
+    {
+      "collection": "tickets",
+      "connection_name": "Simpsons- db1",
+      "field": "engineReplacementStatus",
+      "collection_has_records": true,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [
+        "string"
+      ],
+      "matching_sample_count": 25,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "observed_field"
+    },
+    {
+      "collection": "tickets",
+      "connection_name": "Simpsons- db1",
+      "field": "cutInNumber",
+      "collection_has_records": true,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [
+        "string"
+      ],
+      "matching_sample_count": 2,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "observed_field"
+    },
+    {
+      "collection": "claimsftps",
+      "connection_name": "Simpsons - db2",
+      "field": "status",
+      "collection_has_records": true,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "not_observed_in_completed_probe"
+    },
+    {
+      "collection": "courseschedules",
+      "connection_name": "Simpsons - db2",
+      "field": "requestedBy",
+      "collection_has_records": true,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [
+        "string"
+      ],
+      "matching_sample_count": 2,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "observed_field"
+    },
+    {
+      "collection": "failedpartanalyses",
+      "connection_name": "Simpsons - db2",
+      "field": "partNumber",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    },
+    {
+      "collection": "failedpartanalyses",
+      "connection_name": "Simpsons - db2",
+      "field": "approvedBy",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    },
+    {
+      "collection": "icacapas",
+      "connection_name": "Simpsons - db2",
+      "field": "defect",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "connection_name": "Simpsons - db2",
+      "field": "manual",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "connection_name": "Simpsons - db2",
+      "field": "version",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "connection_name": "Simpsons - db2",
+      "field": "approvedBy",
+      "collection_has_records": false,
+      "json_schema_declared": false,
+      "declared_bson_type": null,
+      "declared_required": false,
+      "observed_bson_types": [],
+      "matching_sample_count": 0,
+      "business_policy_approved": false,
+      "reference_target_verified": false,
+      "status": "empty_collection_no_schema_declaration"
+    }
+  ]
+}

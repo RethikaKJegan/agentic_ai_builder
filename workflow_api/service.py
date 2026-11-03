@@ -203,12 +203,21 @@ class WorkflowService:
                 from contextlib import nullcontext
                 google_tools = getattr(self, 'google_tools', None)
                 scope = google_tools.planning(auth, trusted['payload'].get('context', {})) if google_tools else nullcontext(None)
+                ontology_selection=None
                 def resolve_context(context):
+                    nonlocal ontology_selection
                     result = planning_context(self.store, auth, context)
                     if selected_google:
                         result['google_connection_id'] = selected_google
+                    # Replace client business evidence with owned saved evidence.
+                    from .business_planning import retrieve as retrieve_business
+                    result.pop('business_ontology_retrieval', None)
+                    result['business_ontology_retrieval'] = retrieve_business(self.store, auth,
+                        trusted['payload'].get('objective', trusted['payload'].get('requirement', '')))
                     databases = getattr(self, 'database_workflows', None)
-                    return databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', ''))) if databases else result
+                    result=databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', ''))) if databases else result
+                    ontology_selection=result.get('ontology_selection')
+                    return result
                 with scope as selected_google:
                     result = self.planner.plan(trusted, context_resolver=resolve_context)
                 if selected_google and result.get('status', 500) < 400:
@@ -222,6 +231,8 @@ class WorkflowService:
                             'IDEMPOTENCY_KEY_REUSED': 'This retry key belongs to a different planning request.',
                             'SENSITIVE_DATA_DETECTED': 'Remove secret material from the planning request.',
                             'PLANNER_OUTPUT_UNSAFE': 'The planner generated unsafe metadata. No draft was saved. Try generating again.'}
+                    safe['KG_RETRIEVAL_LIMIT'] = 'The available database field metadata could not fit the planning budget. No model request was made. Contact the workspace administrator to narrow oversized schema metadata.'
+                    safe['BUSINESS_ONTOLOGY_BINDING_INVALID'] = 'The proposed steps did not include valid Business Ontology references. No draft was saved. Regenerate the proposal.'
                     safe['PROCUREMENT_SOURCE_REQUIRED'] = 'No accessible requirements spreadsheet was identified. Include its link or save it as a workspace source. To start from an idea, ask to generate a new BOQ first.'
                     safe['INVENTORY_LINK_REQUIRED'] = error.get('message', 'Confirm the inventory category and supplier relationships in Data Intelligence before generating this report.')
                     safe.update(PLANNER_PROVIDER_TIMEOUT='Workflow generation timed out. Retry generation.',
@@ -232,9 +243,14 @@ class WorkflowService:
                         result['status'], error.get('field'), bool(error.get('retryable')),
                         {'requirements': error['details']['requirements']} if code == 'PLANNER_OUTPUT_INVALID' and isinstance(error.get('details', {}).get('requirements'), list) else {}))
                 result = deepcopy(result)
+                metadata=result['data']['workflow'].setdefault('metadata',{})
+                if ontology_selection:metadata['ontology_selection_id']=ontology_selection['manifest']['selection_id']
+                elif not trusted['payload'].get('context',{}).get('ontology_concepts'):metadata.pop('ontology_selection_id',None)
                 self.replace_deleted_plan(result['data']['workflow'], auth['subject']['workspace_id'])
                 validate_workflow(result['data']['workflow'])
                 reject_secrets(result)
+                from .business_planning import record as record_business
+                record_business(self.store, auth, result['data']['workflow'])
                 return self.envelope(result['request_id'], 200, result['data'])
             workspace = auth['subject']['workspace_id']
             if operation in {'get_workflow', 'list_workflows'}:
@@ -360,6 +376,8 @@ class WorkflowService:
         if operation == 'save_workflow_version':
             workflow = deepcopy(payload.get('workflow'))
             validate(workflow, 'workflow')
+            from .business_planning import verify_saved as verify_business_trace
+            verify_business_trace(db, auth, workflow)
             # Canonical fields survive saving. Executable authority never comes from edits.
             if workflow['workflow_id'] != workflow_id or workflow['status'] != 'draft' or payload.get('workflow_version') != workflow['version']:
                 raise ApiFailure('INVALID_REVISION', 'Save an editable draft with the matching workflow ID.', field='workflow.status')
@@ -379,6 +397,11 @@ class WorkflowService:
             workflow['metadata']['validation_state'] = 'not_validated'
             if validator := getattr(self, 'validate_google_binding', None):
                 validator(workflow, auth, db)
+            ontology=getattr(getattr(getattr(self,'database_workflows',None),'manager',None),'ontology_foundation',None)
+            selection=workflow.get('metadata',{}).get('ontology_selection_id')
+            if selection:
+                if not ontology:raise ApiFailure('ONTOLOGY_UNAVAILABLE','Ontology service unavailable.',503)
+                ontology.bind(db,auth,selection,workflow['workflow_id'],workflow['version'])
             self.store.put(db, workspace, workflow)
             return self.envelope(request_id, 200, self.document_data(workflow, auth))
         if not current or payload.get('workflow_version') != current['version']:

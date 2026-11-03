@@ -1,8 +1,9 @@
 """Small, data-free rule feedback; never include rejected model text or secrets."""
 from copy import deepcopy
 
-OUTPUT_ERRORS = frozenset({'MODEL_OUTPUT_INVALID_JSON', 'MODEL_OUTPUT_SCHEMA_INVALID', 'AGENT_OUTPUT_INVALID'})
+OUTPUT_ERRORS = frozenset({'MODEL_OUTPUT_INVALID_JSON', 'MODEL_OUTPUT_SCHEMA_INVALID', 'AGENT_OUTPUT_INVALID', 'MODEL_OUTPUT_TRUNCATED'})
 HINTS = {
+    'MODEL_OUTPUT_TRUNCATED': 'Return one concise, complete schema-valid JSON object. Summarize findings, cite representative evidence and retain coverage and limitations; do not duplicate full record tables.',
     'PLANNER_OUTPUT_INVALID_JSON': 'Return one complete JSON object matching canonical_workflow_schema, without prose or Markdown.',
     'CONNECTOR_INPUT_INVALID': 'Correct the proposed tool inputs to match that available tool input_schema. Do not change tool permissions or claim execution.',
     'AGENT_INPUT_INVALID': 'Correct each delegated task input to match the selected specialist input_schema. Preserve the original request.',
@@ -37,6 +38,10 @@ def correct_once(invoke, before_correction):
         ):
             raise
         item = feedback(code, getattr(error, 'validation_field', None))
+        # Logical-plan feedback is metadata-only and produced by the trusted
+        # validator before any source dispatch; never echo rejected model text.
+        if getattr(error, 'invalid_model_output', False) and isinstance(getattr(error, 'validation_hint', None), str):
+            item['hint'] = error.validation_hint[:400]
         if before_correction(item) is False:
             raise
         return invoke(item)

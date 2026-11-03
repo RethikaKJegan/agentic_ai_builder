@@ -1,0 +1,1402 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-10-31T10:36:39.080636+00:00",
+  "method": "bounded_server_side_type_and_direct_reference_aggregates",
+  "limits": {
+    "documents_per_collection_or_reference": 100,
+    "max_time_ms_per_operation": 3000
+  },
+  "sampling": "first_up_to_100_unsorted_documents_not_random_or_population_evidence",
+  "source_records_exported": 0,
+  "source_values_exported": 0,
+  "source_writes": 0,
+  "ontology_mutations": 0,
+  "model_calls": 0,
+  "connection_configuration_unchanged_during_probe": true,
+  "cross_database_associations_verified": false,
+  "business_policy_verified": false,
+  "sources": [
+    {
+      "source": "db1",
+      "collections": {
+        "oemnames": {
+          "status": "sampled",
+          "sample_size": 17,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 17
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "name",
+              "bson_type_counts": {
+                "string": 17
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "oems": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oemNameId",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "enginedetails": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineSerialNumber",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "listNo",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "organizationName",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "invoiceDate",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "buildDate",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "tickets": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oemOrg",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineNo",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModal",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "createdAt",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "complaintRecord.dateOfSale",
+              "bson_type_counts": {
+                "date": 91,
+                "null": 9
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "complaintRecord.hmr",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "complaintRecord.unitMachineStatus",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "hmr",
+              "bson_type_counts": {
+                "double": 2,
+                "int": 98
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "underWarranty",
+              "bson_type_counts": {
+                "bool": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "invoiceDate",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "serviceEngineer",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "jointInspectionReport",
+              "bson_type_counts": {
+                "missing": 99,
+                "string": 1
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "string": 87,
+                "null": 13
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "actionCode",
+              "bson_type_counts": {
+                "string": 87,
+                "null": 13
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "assignedApprover",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "engineReplacementStatus",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "engineReplacementApprovedDate",
+              "bson_type_counts": {
+                "date": 24,
+                "null": 76
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "cutInNumber",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "cutIn",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "cutInDetails",
+              "bson_type_counts": {
+                "object": 4,
+                "missing": 96
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "jointinspectionreports": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticketId",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "dateOfSale",
+              "bson_type_counts": {
+                "missing": 7,
+                "string": 93
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "dateOfFailure",
+              "bson_type_counts": {
+                "missing": 7,
+                "string": 93
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "hoursCovered",
+              "bson_type_counts": {
+                "string": 93,
+                "missing": 7
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "potentialCause",
+              "bson_type_counts": {
+                "string": 21,
+                "missing": 79
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "string": 90,
+                "missing": 10
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "serviceMaintenanceRecord",
+              "bson_type_counts": {
+                "array": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "photos",
+              "bson_type_counts": {
+                "missing": 2,
+                "array": 98
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "documents",
+              "bson_type_counts": {
+                "missing": 4,
+                "array": 96
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "enginereplacements": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticket",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "mode",
+              "bson_type_counts": {
+                "missing": 37,
+                "string": 63
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineType",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineSLNo",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "partreplacements": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticket",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "part",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "mode",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "scope",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "partReplacementCost",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "floatengines": {
+          "status": "sampled",
+          "sample_size": 97,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 97
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticketId",
+              "bson_type_counts": {
+                "string": 97
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 97
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "replacementEngineNumber",
+              "bson_type_counts": {
+                "string": 97
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {
+                "string": 97
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineReplacementApprovalDate",
+              "bson_type_counts": {
+                "date": 97
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "focs": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticket",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "hoursOfFailure",
+              "bson_type_counts": {
+                "double": 6,
+                "missing": 2,
+                "int": 92
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "failureDate",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "focStatus",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "focReleaseRequest.warrantyClaimNo",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "workorders": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "complaintReferenceNumber",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "fieldWarrantyReferenceNumber",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oemOrg",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "fieldWarrantyEngineInwardDate",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "hoursCovered",
+              "bson_type_counts": {
+                "double": 3,
+                "int": 97
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "internalcutins": {
+          "status": "sampled",
+          "sample_size": 15,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "plant",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "listNo",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineCutInNumber",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "cutInDate",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "string": 15
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "servicebulletins": {
+          "status": "sampled",
+          "sample_size": 89,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "array": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "listNumbers",
+              "bson_type_counts": {
+                "array": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "plantDetails",
+              "bson_type_counts": {
+                "array": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "string": 89
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "approvalStatus",
+              "bson_type_counts": {
+                "string": 89
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "serviceinformations": {
+          "status": "sampled",
+          "sample_size": 43,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "array": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "listNumbers",
+              "bson_type_counts": {
+                "array": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "plantDetails",
+              "bson_type_counts": {
+                "array": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "string": 43
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "approvalStatus",
+              "bson_type_counts": {
+                "string": 43
+              },
+              "status": "observed_value"
+            }
+          ]
+        }
+      },
+      "direct_references": [
+        {
+          "collection": "tickets",
+          "field": "oem",
+          "target": "oems",
+          "status": "sampled",
+          "sample_size": 100,
+          "counts": {
+            "single_target": 100
+          }
+        },
+        {
+          "collection": "tickets",
+          "field": "oemOrg",
+          "target": "oemnames",
+          "status": "sampled",
+          "sample_size": 100,
+          "counts": {
+            "single_target": 100
+          }
+        },
+        {
+          "collection": "jointinspectionreports",
+          "field": "ticketId",
+          "target": "tickets",
+          "status": "sampled",
+          "sample_size": 100,
+          "counts": {
+            "single_target": 100
+          }
+        },
+        {
+          "collection": "enginereplacements",
+          "field": "ticket",
+          "target": "tickets",
+          "status": "sampled",
+          "sample_size": 100,
+          "counts": {
+            "single_target": 98,
+            "unresolved": 2
+          }
+        },
+        {
+          "collection": "floatengines",
+          "field": "ticketId",
+          "target": "tickets",
+          "status": "sampled",
+          "sample_size": 97,
+          "counts": {
+            "single_target": 97
+          }
+        },
+        {
+          "collection": "focs",
+          "field": "ticket",
+          "target": "tickets",
+          "status": "sampled",
+          "sample_size": 100,
+          "counts": {
+            "single_target": 100
+          }
+        }
+      ],
+      "connection_status": "read_succeeded"
+    },
+    {
+      "source": "db2",
+      "collections": {
+        "claims": {
+          "status": "sampled",
+          "sample_size": 6,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "claimReferenceNumber",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "claimNumber",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineSerialNumber",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "machineSaleDate",
+              "bson_type_counts": {
+                "date": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "dateOfFailure",
+              "bson_type_counts": {
+                "date": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "hoursCovered",
+              "bson_type_counts": {
+                "int": 4,
+                "double": 2
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "reason",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "simpsonPartNumber",
+              "bson_type_counts": {
+                "string": 6
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "claimsftps": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "claimReference",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "claimId",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "engineSerialNumber",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "machineSaleDate",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "failureDate",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "simpsonInvoiceDate",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "failureHours",
+              "bson_type_counts": {
+                "int": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "defectCode",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "plant",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "partValue",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "failedengineanalyses": {
+          "status": "sampled",
+          "sample_size": 8,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineSerialNumber",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "defect",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "array": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "array": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "listNo",
+              "bson_type_counts": {
+                "array": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "beforeImprovement",
+              "bson_type_counts": {
+                "missing": 1,
+                "string": 7
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "afterImprovement",
+              "bson_type_counts": {
+                "missing": 1,
+                "string": 7
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "cutInEsn",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "cutInEffectiveDate",
+              "bson_type_counts": {
+                "missing": 3,
+                "date": 5
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "qualityApprover",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {
+                "string": 8
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "attachments",
+              "bson_type_counts": {
+                "array": 8
+              },
+              "status": "observed_value"
+            }
+          ]
+        },
+        "failedpartanalyses": {
+          "status": "empty_collection",
+          "sample_size": 0,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "partNumber",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "defect",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "cutInEsn",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "cutInEffectiveDate",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "qualityApprover",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "status",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            }
+          ]
+        },
+        "icacapas": {
+          "status": "empty_collection",
+          "sample_size": 0,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "defect",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "listNo",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "beforeImprovement",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "afterImprovement",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "cutInEsn",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "cutInEffectiveDate",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            },
+            {
+              "field": "attachments",
+              "bson_type_counts": {},
+              "status": "empty_collection"
+            }
+          ]
+        },
+        "products": {
+          "status": "sampled",
+          "sample_size": 1,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 1
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineModel",
+              "bson_type_counts": {
+                "string": 1
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "model",
+              "bson_type_counts": {
+                "missing": 1
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 1
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "listNo",
+              "bson_type_counts": {
+                "missing": 1
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "floatengineftps": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "engineSerialNumber",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            },
+            {
+              "field": "oem",
+              "bson_type_counts": {
+                "string": 99,
+                "missing": 1
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "stock",
+              "bson_type_counts": {
+                "int": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "condition",
+              "bson_type_counts": {
+                "missing": 100
+              },
+              "status": "not_observed_in_bounded_sample"
+            }
+          ]
+        },
+        "jirlogs": {
+          "status": "sampled",
+          "sample_size": 100,
+          "fields": [
+            {
+              "field": "_id",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "jirId",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "ticketId",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "operationType",
+              "bson_type_counts": {
+                "string": 100
+              },
+              "status": "observed_value"
+            },
+            {
+              "field": "createdAt",
+              "bson_type_counts": {
+                "date": 100
+              },
+              "status": "observed_value"
+            }
+          ]
+        }
+      },
+      "direct_references": [],
+      "connection_status": "read_succeeded"
+    }
+  ],
+  "status_counts": {
+    "sampled": 19,
+    "empty_collection": 2
+  },
+  "complete": true
+}

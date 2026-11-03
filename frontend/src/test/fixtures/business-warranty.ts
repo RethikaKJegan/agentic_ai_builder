@@ -1,0 +1,9 @@
+import {businessWarrantyReadinessSchema} from '../../api/business-ontology';
+export function warrantyReadiness(ticket='node1'){
+ const base={node_id:ticket,collection:'tickets',record_sha256:'record1',date_precision:null};
+ return businessWarrantyReadinessSchema.parse({version_id:'v2',graph_id:'g1',ticket_node_id:ticket,readiness_version:'simpson-warranty-inputs-v1',status:'requires_review',status_label:'Requires Review',eligibility:'not_evaluated',business_policy_verified:false,
+ inputs:[{...base,label:'Reported complaint hours',field:'complaintRecord.hmr',kind:'hours',source_state:'not_returned',state:'not_returned',value:null,normalized:null,syntactically_usable:false},{...base,label:'Alternate ticket hours',field:'hmr',kind:'hours',source_state:'value',state:'value',value:12,normalized:'12',syntactically_usable:true}],
+ invoice_candidates:[],selected_invoice_node_id:null,policy_sources:[],review_reasons:[{code:'POLICY_NOT_CONFIGURED',message:'Applicable policy version, scope, time basis, limits and exclusion handling are required.'},{code:'COMPLAINT_HOURS_UNUSABLE',message:'Primary complaint hours are missing; alternate ticket hours are not substituted.'},{code:'IDENTITY_UNRESOLVED',message:'Physical engine identity remains unresolved.'}],assessment_timestamp:null,policy_version:null,
+ source_outcomes:[{collection:'tickets',role:'service',status:'matched',records:1,truncated:false},{collection:'enginedetails',role:'service',status:'no_match',records:0,truncated:false}],
+ limits:['Saved evidence only; no database or model calls.','No threshold comparison or eligibility rule was executed.'],next_evidence:['Supply the applicable policy and verified complaint-to-engine association.'],provenance:{graph_created_at:'2026-10-31',source_revisions:{service:1,quality:1},graph_sha256:'graphhash',definition_sha256:'definitionhash'},company_queries:0,model_calls:0,rules_executed:false,report_sha256:'warrantyhash'});
+}

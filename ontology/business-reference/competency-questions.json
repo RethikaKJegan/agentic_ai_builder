@@ -1,0 +1,208 @@
+{
+  "source": {
+    "title": "Supplied Simpson blueprint",
+    "section": "8.3 competency questions",
+    "sha256": "138b2217b53fcf1144e9261e7ba2184eea3a55000acf95de78a669b9adf050e2"
+  },
+  "items": [
+    {
+      "id": "business_01",
+      "department": "Warranty",
+      "question": "Can we determine whether an engine was under warranty on the failure date?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped engine and failure-date observations",
+        "Versioned policy, coverage, exclusions and valid required inputs"
+      ]
+    },
+    {
+      "id": "business_02",
+      "department": "Warranty",
+      "question": "Can we identify why a claim was rejected?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped claims, rejection decisions, reasons and evidence"
+      ]
+    },
+    {
+      "id": "business_03",
+      "department": "Warranty",
+      "question": "Can we retrieve all claims for a particular OEM?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped claim-to-OEM associations with verified identifiers"
+      ]
+    },
+    {
+      "id": "business_04",
+      "department": "Warranty",
+      "question": "Can we distinguish customer-reported information from verified information?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped assertions with reported/verified status and source provenance"
+      ]
+    },
+    {
+      "id": "business_05",
+      "department": "Warranty",
+      "question": "Can we determine which warranty policy version was used for an approval?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped decision-to-policy-version links and temporal applicability"
+      ]
+    },
+    {
+      "id": "business_06",
+      "department": "Service",
+      "question": "Can we identify which engineer investigated a particular engine?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped engine, service case, investigation and engineer assignments"
+      ]
+    },
+    {
+      "id": "business_07",
+      "department": "Service",
+      "question": "Can we retrieve all observations from a joint inspection?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped joint inspections and their observation records"
+      ]
+    },
+    {
+      "id": "business_08",
+      "department": "Service",
+      "question": "Can we compare complaint details with actual inspection findings?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped complaint and inspection findings with distinct evidence status"
+      ]
+    },
+    {
+      "id": "business_09",
+      "department": "Service",
+      "question": "Can we identify previous failures of the same engine?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Resolved physical-engine identity and dated failure history"
+      ]
+    },
+    {
+      "id": "business_10",
+      "department": "Service",
+      "question": "Can we identify unresolved investigations?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped investigations and explicit unresolved/completion status"
+      ]
+    },
+    {
+      "id": "business_11",
+      "department": "Quality",
+      "question": "Can we find all engines with the same confirmed failure mechanism?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped engines and confirmed failure mechanisms with supporting evidence"
+      ]
+    },
+    {
+      "id": "business_12",
+      "department": "Quality",
+      "question": "Can we identify all returned engines associated with a particular quality issue?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped return records and verified quality-issue associations"
+      ]
+    },
+    {
+      "id": "business_13",
+      "department": "Quality",
+      "question": "Can we trace a root cause back to the original complaint and evidence?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Verified complaint-to-investigation-to-root-cause evidence path"
+      ]
+    },
+    {
+      "id": "business_14",
+      "department": "Quality",
+      "question": "Can we identify whether the same component has failed across different engine models?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped component, engine-model and comparable confirmed-failure identities"
+      ]
+    },
+    {
+      "id": "business_15",
+      "department": "Engineering",
+      "question": "Can we identify all engines affected by a particular engineering change?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped engineering changes, applicability scope and engine incorporation evidence"
+      ]
+    },
+    {
+      "id": "business_16",
+      "department": "Engineering",
+      "question": "Can we determine the exact serial-number boundary for a change?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Versioned engineering-change scope and typed serial boundaries"
+      ]
+    },
+    {
+      "id": "business_17",
+      "department": "Engineering",
+      "question": "Can we identify engines that were manufactured after cut-in but did not receive the required change?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped manufacture/cut-in dates and actual change-incorporation evidence"
+      ]
+    },
+    {
+      "id": "business_18",
+      "department": "Engineering",
+      "question": "Can we detect confirmed failures after corrective action implementation?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Confirmed comparable failures, corrective-action incorporation and operating exposure"
+      ]
+    },
+    {
+      "id": "business_19",
+      "department": "Management",
+      "question": "Which engine models have the highest warranty failure rates?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped warranty failure population and valid exposure/denominator by engine model"
+      ]
+    },
+    {
+      "id": "business_20",
+      "department": "Management",
+      "question": "Which root causes generate the highest replacement costs?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Confirmed cause-to-replacement associations and comparable cost/currency records"
+      ]
+    },
+    {
+      "id": "business_21",
+      "department": "Management",
+      "question": "Which corrective actions have not demonstrated effectiveness?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Mapped corrective actions, implementation dates, populations and effectiveness criteria"
+      ]
+    },
+    {
+      "id": "business_22",
+      "department": "Management",
+      "question": "Which OEMs experience the highest recurrence rates?",
+      "status": "requires_instance_mapping",
+      "prerequisites": [
+        "Verified OEM recurrence cohorts, comparable failures and exposure denominators"
+      ]
+    }
+  ]
+}

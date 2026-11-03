@@ -13,6 +13,8 @@ from .data_operations import DataOperations
 def install(app,service,auth,env,reference):
     manager=DataSources(service.store,env)
     app.state.data_sources=manager
+    from .business_ontology_routes import install as install_business_ontology
+    install_business_ontology(app,service,auth,reference,env)
     queries=DataQueries(manager)
     app.state.data_queries=queries
     from .kg_records import KnowledgeRecords
@@ -42,6 +44,12 @@ def install(app,service,auth,env,reference):
         except Exception:
             exc=ApiFailure('DATA_SOURCE_UNAVAILABLE','The database connection service is unavailable. Refresh status before repeating a mutation.',503)
             return JSONResponse(service.failure(reference(),exc),status_code=503,headers={'Cache-Control':'no-store'})
+
+    @app.api_route('/ontology/v1',methods=['GET','POST'])
+    @app.api_route('/ontology/v1/{retired_path:path}',methods=['GET','POST','PUT','PATCH','DELETE'])
+    async def retired_ontology(retired_path:str=''):
+        exc=ApiFailure('LEGACY_ONTOLOGY_RETIRED','Use Business Ontology for definitions, database profiling and source records.',410)
+        return JSONResponse(service.failure(reference(),exc),status_code=410,headers={'Cache-Control':'no-store'})
 
     @app.get('/knowledge-graph')
     async def semantic_graph():return await call(manager.semantic.get)

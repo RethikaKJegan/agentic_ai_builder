@@ -15,7 +15,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   let config: ReturnType<typeof backendConfig>;
   try { config = backendConfig(); } catch { return error("API_CONFIGURATION_INVALID", "The server API configuration is invalid. Contact the administrator.", 503); }
   const { path } = await context.params;
-  if (!path.length || path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) return error("INVALID_ROUTE", "Use a supported API route.", 400);
+  if(path[0]==="ontology") return error("LEGACY_ONTOLOGY_RETIRED", "Use Business Ontology for definitions, profiling and source records.",410);
+  if (!path.length || path.some((part) => part==="."||part===".."||!/^[a-zA-Z0-9_-]+$/.test(part))) return error("INVALID_ROUTE", "Use a supported API route.", 400);
   const route = path.join("/");
   const webhook = route.startsWith("webhooks/");
   const googleCallback = route === "integrations/google/callback" && request.method === "GET";

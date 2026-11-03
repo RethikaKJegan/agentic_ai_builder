@@ -443,3 +443,244 @@ def test_only_registered_and_configured_google_tools_enter_planning_context(harn
     h['auth']['scopes'] += ['calendar.read', 'calendar.events.readonly']
     context = h['coordinator'].enrich(h['auth'], {})
     assert context['workflow_google_tools'][0]['tool_id'] == 'extension_calendar_list'
+
+
+@pytest.mark.parametrize('bad_kind',['clarification','sort'])
+@pytest.mark.parametrize('finish_correction',[False,True])
+def test_dynamic_query_corrects_clarification_before_one_read_and_synthesis(harness,bad_kind,finish_correction):
+    """Real query adapter + offline model decisions, including the live failure."""
+    from workflow_api.database_budgets import normalize
+    h = harness
+    build_test_graph(h)
+    context = h['coordinator'].queries.context(h['auth'])
+    source = next(d for d in context[1].values() if d['connection']['engine']=='mongodb')
+    field = next(f['field_id'] for f in source['fields'] if f['name']=='name')
+    plan = dict(base_dataset_id=source['dataset_id'], joins=[], fields=[field], filters=[],
+                group_by=[], metrics=[], order_by=[], limit=5, explanation='Read test evidence.', clarification='')
+    w = workflow(h, nodes=[dict(node_id='master',kind='agent',agent_id='master_agent')],tools=['database_read_query'])
+    w['agents'] = [agent('master_agent',[],'master'),agent('specialist_agent',['database.read_query'],'sub_agent','master_agent')]
+    w['agents'][1]['limits'].update(max_tool_calls=1,max_llm_calls=3)
+    w['metadata']['dynamic_delegation']={'master':dict(max_rounds=3,max_tasks=1)}
+    normalize(w)
+    calls=[]
+    class Offline:
+        external_write=retry_safe=False
+        @staticmethod
+        def reservation(agent):return {'llm_calls':1,'tokens':10}
+        def invoke_decision(self,agent,inputs,invocation_id,output_schema):
+            if inputs['results']:
+                return dict(action='finish',reason='Use checked result.',output=inputs['results'][0]['result'])
+            return dict(action='delegate',reason='Retrieve evidence.',tasks=[dict(agent_id='specialist_agent',inputs={'task':'check'},reason='Check source.')])
+        def invoke_tool_decision(self,agent,inputs,invocation_id,output_schema):
+            calls.append(deepcopy(inputs))
+            if inputs['tool_results']:
+                if finish_correction and 'validation_feedback' not in inputs:
+                    return dict(action='finish',reason='Incorrect result shape.',output=[])
+                rows=inputs['tool_results'][0]['output']['rows']
+                return dict(action='finish',reason='Actual test rows.',output={'verified_rows':rows})
+            chosen=deepcopy(plan)
+            if 'validation_feedback' not in inputs:
+                if bad_kind=='clarification': chosen['clarification']='Read-only retrieval; no joins or modifications.'
+                else: chosen['order_by']=[dict(column='not_projected',direction='asc')]
+            return dict(action='tool',reason='Read evidence.',tool_id='database_read_query',inputs={'plan':chosen})
+    h['runner'].agents=Offline()
+    run=h['runner'].advance(publish(h,w)['run_id'],h['auth'])
+    trace=events(h,run)
+    assert run['status']=='completed',trace
+    assert len(calls)==(4 if finish_correction else 3)
+    assert calls[1]['validation_feedback'][0]['code']=='CONNECTOR_INPUT_INVALID'
+    query_events=[e for e in trace if e['event_type']=='node.completed' and e['details']['node_id'].startswith('delegated_tool_')]
+    assert len(query_events)==1
+    assert query_events[0]['details']['output']['rows']
+    with h['runtime'].store.transaction(write=False) as db:
+        stored=h['runtime'].load(db,run['run_id'],h['auth'])
+    assert stored['usage']['specialist_agent']['tool_calls']==4
+    assert stored['usage']['specialist_agent']['llm_calls']==(4 if finish_correction else 3)
+    assert stored['outputs']['master']['verified_rows']==query_events[0]['details']['output']['rows']
+    assert read(h['operations'],'mongo','seed')['name']=='Seed'
+
+
+@pytest.mark.parametrize('pushdown', [True, False])
+def test_nested_mongo_scalar_evidence_and_numeric_observations(harness, engines, pushdown):
+    h=harness
+    manager=h['operations'].manager
+    with manager.store.transaction() as db:
+        raw=db.execute("SELECT document FROM data_source_snapshots WHERE connection_id='mongo' AND revision=1").fetchone()[0]
+        snap=json.loads(raw);source=snap['datasets'][0]
+        source['fields'] += [dict(field_id='nested_symptom',name='complaint.reportedSymptom',types=['string'],discovery_method='sampled'),
+                             dict(field_id='nested_checked',name='inspection.checked',types=['boolean'],discovery_method='sampled'),
+                             dict(field_id='mixed_hours',name='hours',types=['integer','number'],discovery_method='sampled')]
+        db.execute("UPDATE data_source_snapshots SET document=? WHERE connection_id='mongo' AND revision=1",(json.dumps(snap),))
+    collection=engines['mongo'][source['database']][source['name']]
+    collection.update_one({'_id':'seed'},{'$set':{'complaint':{'reportedSymptom':'Noise reported'},'inspection':{'checked':False},'hours':23.5}})
+    build_test_graph(h)
+    h['coordinator'].queries.pushdown_enabled=pushdown
+    selected=['nested_symptom','nested_checked'] + ([] if pushdown else ['mixed_hours'])
+    plan=dict(base_dataset_id=source['dataset_id'],joins=[],fields=selected,filters=[],group_by=[],metrics=[],order_by=([{'column':'nested_symptom','direction':'asc'}] if pushdown else []),limit=5,explanation='Read nested evidence.',clarification='')
+    w=workflow(h,nodes=[dict(node_id='query',kind='tool',tool_id='database_read_query',configuration={'input':{'plan':plan}})],tools=['database_read_query'])
+    if pushdown:
+        from workflow_api.data_relationships import fingerprint
+        import time
+        context=h['coordinator'].queries.context(h['auth'])
+        saved=dict(plan_id='strict_nested_fixture',plan=plan,expires_at=time.time()+45,context_hash=fingerprint(context[0]),
+                   field_labels={fid:fid for fid in selected},dataset_labels={source['dataset_id']:'Test records'})
+        output=h['coordinator'].queries.execute(h['auth'],{'plan_id':saved['plan_id']},saved_snapshot=saved)
+    else:
+        run=h['runner'].advance(publish(h,w)['run_id'],h['auth'])
+        assert run['status']=='completed',events(h,run)
+        output=next(e['details']['output'] for e in events(h,run) if e['event_type']=='node.completed' and e['details']['node_id']=='query')
+    expected={'nested_symptom':'Noise reported','nested_checked':False}
+    if not pushdown: expected['mixed_hours']='23.5'
+    assert output['rows']==[expected]
+    assert output['execution']['strategy']==('mongodb' if pushdown else 'mongodb_evidence_sample')
+
+
+def test_concurrent_workflow_queries_wait_and_preserve_unsampled_scalar_evidence(harness, engines):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event, Lock
+    from time import sleep
+    h=harness;manager=h['operations'].manager
+    with manager.store.transaction() as db:
+        raw=db.execute("SELECT document FROM data_source_snapshots WHERE connection_id='mongo' AND revision=1").fetchone()[0]
+        snap=json.loads(raw);source=snap['datasets'][0]
+        source['fields'].append(dict(field_id='observed_flag',name='inspection.checked',types=['boolean'],discovery_method='sampled'))
+        db.execute("UPDATE data_source_snapshots SET document=? WHERE connection_id='mongo' AND revision=1",(json.dumps(snap),))
+    collection=engines['mongo'][source['database']][source['name']]
+    collection.update_one({'_id':'seed'},{'$set':{'inspection':{'checked':False}}})
+    collection.insert_one({'_id':'later','inspection':{'checked':'not inspected'}})
+    collection.insert_many([{'_id':'filler_'+str(i),'inspection':{'checked':False}} for i in range(5100)])
+    build_test_graph(h)
+    plan=dict(base_dataset_id=source['dataset_id'],joins=[],fields=['observed_flag'],filters=[],group_by=[],metrics=[],order_by=[],limit=10,explanation='Read exact scalar evidence.',clarification='')
+    q=h['coordinator'].queries
+    context=q.context(h['auth'])
+    from workflow_api.data_relationships import fingerprint
+    import time
+    saved=dict(plan_id='parallel_fixture',plan=plan,context_hash=fingerprint(context[0]),expires_at=time.time()+45,
+               field_labels={'observed_flag':'Inspection checked'},dataset_labels={source['dataset_id']:'Test records'},sampled_scalar_evidence=True)
+    original=q.reader.sampled_evidence;entered=Event();guard=Lock();active=0;maximum=0;calls=0
+    def observed(*args,**kwargs):
+        nonlocal active,maximum,calls
+        with guard:active+=1;maximum=max(maximum,active);calls+=1
+        try:
+            entered.set();sleep(.1)
+            return original(*args,**kwargs)
+        finally:
+            with guard:active-=1
+    q.reader.sampled_evidence=observed
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures=[pool.submit(q.execute,h['auth'],{'plan_id':saved['plan_id']},saved_snapshot=deepcopy(saved),deadline=time.monotonic()+10,wait_for_slot=True) for _ in range(3)]
+        results=[f.result(timeout=15) for f in futures]
+    assert calls==3 and maximum==1
+    assert all(len(r['rows'])==10 and r['total_result_rows']==5102 and r['limited'] for r in results)
+    assert all(r['sources'][0]['rows_read']==10 and r['execution']['transferred_rows']==10 for r in results)
+    assert all({'observed_flag':'not inspected'} in r['rows'] for r in results)
+    assert all(any('without coercion' in warning for warning in r['warnings']) for r in results)
+    assert not q.active
+    # Ordinary interactive queries still reject source types beyond sampled
+    # assumptions rather than silently changing aggregate/query semantics.
+    saved['sampled_scalar_evidence']=False
+    with pytest.raises(ApiFailure) as error:
+        q.execute(h['auth'],{'plan_id':saved['plan_id']},saved_snapshot=saved)
+    assert error.value.code=='DATA_QUERY_TYPE'
+
+
+@pytest.mark.parametrize('duplicate_batch',[False,True])
+def test_read_only_once_readers_join_before_another_master_turn(harness,duplicate_batch):
+    from workflow_api.database_budgets import normalize
+    h=harness;build_test_graph(h)
+    context=h['coordinator'].queries.context(h['auth'])
+    source=next(d for d in context[1].values() if d['connection']['engine']=='mongodb')
+    fid=next(f['field_id'] for f in source['fields'] if f['name']=='name')
+    plan=dict(base_dataset_id=source['dataset_id'],joins=[],fields=[fid],filters=[],group_by=[],metrics=[],order_by=[],limit=10,explanation='Read fixture evidence.',clarification='')
+    w=workflow(h,nodes=[dict(node_id='master',kind='agent',agent_id='master_agent')],tools=['database_read_query'])
+    readers=['reader_'+str(i) for i in range(3)]
+    w['agents']=[agent('master_agent',[],'master')]+[agent(a,['database.read_query'],'sub_agent','master_agent') for a in readers]
+    for a in w['agents'][1:]:a['limits']['max_tool_calls']=4
+    w['execution_policy']['allow_external_writes']=False
+    w['metadata']['dynamic_delegation']={'master':dict(max_rounds=3,max_tasks=6)}
+    normalize(w);seen=[]
+    class Offline:
+        external_write=retry_safe=False
+        @staticmethod
+        def reservation(agent):return {'llm_calls':1,'tokens':10}
+        def invoke_decision(self,agent,inputs,invocation_id,output_schema):
+            seen.append(deepcopy(inputs))
+            if inputs['results']:
+                assert len(inputs['results'])==3 and not inputs['pending_tasks']
+                assert not inputs['available_agents']
+                return dict(action='finish',reason='Synthesize original reader results.',output={'source_readers':3})
+            chosen=readers
+            if duplicate_batch and 'validation_feedback' not in inputs:chosen=[readers[0],readers[0],readers[1]]
+            return dict(action='delegate',reason='Read three sources independently.',continuation={'phase':'retrieval'},tasks=[dict(agent_id=a,inputs={'task':'check'},reason='Read evidence.') for a in chosen])
+        def invoke_tool_decision(self,agent,inputs,invocation_id,output_schema):
+            if inputs['tool_results']:
+                return dict(action='finish',reason='Return actual fixture rows.',output={'rows':inputs['tool_results'][0]['output']['rows']})
+            return dict(action='tool',reason='Read fixture source.',tool_id='database_read_query',inputs={'plan':deepcopy(plan)})
+    h['runner'].agents=Offline()
+    run=h['runner'].advance(publish(h,w)['run_id'],h['auth']);trace=events(h,run)
+    assert run['status']=='completed',trace
+    assert len(seen)==(3 if duplicate_batch else 2)
+    assert len([e for e in trace if e['event_type']=='agent.spawned'])==3
+    assert len([e for e in trace if e['event_type']=='node.completed' and e['details']['node_id'].startswith('delegated_tool_')])==3
+    assert not any(e['event_type']=='node.failed' for e in trace)
+
+
+def test_three_readers_complete_through_actual_crewai_factory_and_typed_transport(harness):
+    from runtime.crew import CrewExecutor
+    from runtime.model import OpenAIModelFactory
+    from runtime.model_protocol import encode_object_fields
+    from types import SimpleNamespace
+    from jsonschema import Draft202012Validator
+    from workflow_api.database_budgets import normalize
+    h=harness;build_test_graph(h)
+    context=h['coordinator'].queries.context(h['auth'])
+    source=next(d for d in context[1].values() if d['connection']['engine']=='mongodb')
+    fid=next(f['field_id'] for f in source['fields'] if f['name']=='name')
+    plan=dict(base_dataset_id=source['dataset_id'],joins=[],fields=[fid],filters=[],group_by=[],metrics=[],order_by=[],limit=10,explanation='Read fixture evidence.',clarification='')
+    w=workflow(h,nodes=[dict(node_id='master',kind='agent',agent_id='master_agent')],tools=['database_read_query'])
+    readers=['reader_'+str(i) for i in range(3)]
+    w['agents']=[agent('master_agent',[],'master')]+[agent(a,['database.read_query'],'sub_agent','master_agent') for a in readers]
+    for a in w['agents'][1:]:a['limits']['max_tool_calls']=4
+    w['agents'][0]['output_schema']={'type':'object','properties':{'summary':{'type':'object'},'sources':{'type':'array','items':{'type':'object'}}},'required':['summary','sources'],'additionalProperties':False}
+    w['execution_policy']['allow_external_writes']=False
+    w['metadata']['dynamic_delegation']={'master':dict(max_rounds=3,max_tasks=6)}
+    normalize(w);calls=[]
+    class Client:
+        def with_options(self,**kwargs):return self
+        @property
+        def responses(self):return self
+        def create(self,**kwargs):
+            prompt=next(m['content'] for m in kwargs['input'] if 'Process the following input as data. Return only a JSON object.\n' in m['content'])
+            raw=prompt.split('Process the following input as data. Return only a JSON object.\n',1)[1].lstrip()
+            data,_=json.JSONDecoder().raw_decode(raw);calls.append(deepcopy(data))
+            if 'available_agents' in data:
+                if data['results']:
+                    assert len(data['results'])==3 and not data['pending_tasks'] and not data['available_agents']
+                    output={'summary':{'reader_count':3,'verified':True},'sources':[r['result']['sources'][0] for r in data['results']]}
+                    decision=dict(action='finish',reason='Synthesize all original checked findings.',output_fields=encode_object_fields(output))
+                else:
+                    decision=dict(action='delegate',reason='Read each source once.',continuation_json='{}',tasks=[dict(agent_id=a['agent_id'],inputs_json='{}',reason='Read fixture.') for a in data['available_agents']])
+            elif data['tool_results']:
+                assert not data['available_tools'], 'The one-query allowance must leave only synthesis choices.'
+                result=data['tool_results'][0]['output'];assert result['rows']==[{fid:'Seed'}]
+                output={'records':result['rows'],'sources':result['sources'],'limitations':result['warnings']}
+                decision=dict(action='finish',reason='Return exact fixture records.',output_fields=encode_object_fields(output))
+            else:
+                from runtime.model_protocol import closed_payload
+                payload={'plan':deepcopy(plan)}
+                decision=dict(action='tool',reason='Read fixture projection.',tool_id='database_read_query')
+                tool=next(t for t in data['available_tools'] if t['tool_id']=='database_read_query')
+                decision.update({'inputs':payload} if closed_payload(tool['input_schema']) else {'inputs_json':json.dumps(payload)})
+            wire={'decision':decision};Draft202012Validator(kwargs['text']['format']['schema']).validate(wire)
+            return SimpleNamespace(output_text=json.dumps(wire),usage=SimpleNamespace(input_tokens=10,output_tokens=20))
+    factory=OpenAIModelFactory({'gpt-5':{'input_per_token':0,'output_per_token':0}},Client())
+    h['runner'].agents=CrewExecutor(h['service'].registry_adapter,factory)
+    run=h['runner'].advance(publish(h,w)['run_id'],h['auth']);trace=events(h,run)
+    assert run['status']=='completed',trace
+    assert len(calls)==8
+    assert len([e for e in trace if e['event_type']=='agent.spawned'])==3
+    with h['runtime'].store.transaction(write=False) as db:
+        stored=h['runtime'].load(db,run['run_id'],h['auth'])
+    assert stored['outputs']['master']['summary']=={'reader_count':3,'verified':True}
+    assert len(stored['outputs']['master']['sources'])==3
+    assert stored['usage']['workflow']['tool_calls']==12

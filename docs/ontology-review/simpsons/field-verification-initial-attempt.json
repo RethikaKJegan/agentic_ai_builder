@@ -1,0 +1,121 @@
+{
+  "checked_at": "2026-10-30T15:23:57.898241+00:00",
+  "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+  "limits": {
+    "max_time_ms_per_operation": 3000,
+    "matching_documents_per_field": 25,
+    "connector_deadline_seconds": 60
+  },
+  "basis": "point_in_time_bounded_probe_not_a_population_integrity_check",
+  "business_policy_approved": false,
+  "source_documents_exported": 0,
+  "source_writes": 0,
+  "ontology_mutations": 0,
+  "reference_targets_checked": false,
+  "ontology_published": false,
+  "credentials_exported": false,
+  "status_counts": {
+    "unavailable": 11
+  },
+  "fields": [
+    {
+      "collection": "tickets",
+      "field": "engineReplacementStatus",
+      "connection_name": "Simpsons- db1",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "tickets",
+      "field": "cutInNumber",
+      "connection_name": "Simpsons- db1",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "advaced-engine-replacements",
+      "field": "oem",
+      "connection_name": "Simpsons- db1",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "claimsftps",
+      "field": "status",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "failedpartanalyses",
+      "field": "partNumber",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "failedpartanalyses",
+      "field": "approvedBy",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "icacapas",
+      "field": "defect",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "field": "manual",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "field": "version",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "field": "approvedBy",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    },
+    {
+      "collection": "courseschedules",
+      "field": "requestedBy",
+      "connection_name": "Simpsons - db2",
+      "status": "unavailable",
+      "business_policy_approved": false,
+      "error_type": "OperationFailure",
+      "code": 8000
+    }
+  ]
+}

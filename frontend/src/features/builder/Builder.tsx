@@ -76,6 +76,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { dependencyOrder, graphIssues } from "@/domain/graph-review";
 import { LifecycleJourney } from "@/features/workflows/LifecycleJourney";
 import { GoogleWorkflowConnection } from "@/features/workflows/GoogleWorkflowConnection";
+import { BusinessOntologyEvidenceButton } from "@/features/workflows/BusinessOntologyReview";
 import { PlanReview } from "@/features/workflows/PlanReview";
 
 import { useDraftSync } from "@/features/workflows/useDraftSync";
@@ -462,6 +463,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
           </DialogContent>
         </Dialog>
       </header>
+      <BusinessOntologyEvidenceButton document={current.canonical} />
       <DraftConflict workflow={current} recoveryOnly={sync.storageFailed} />
       <ApiFeedback error={sync.error} />
       {sync.storageFailed&&<p role="alert" className="border-b p-3 text-xs text-destructive">A browser draft backup could not be written. Keep this tab open and export your working draft before leaving.</p>}

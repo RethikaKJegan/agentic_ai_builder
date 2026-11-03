@@ -1,0 +1,138 @@
+{
+  "next_version": "16.4.3",
+  "next_reported_vulnerable": false,
+  "counts": {
+    "info": 0,
+    "low": 0,
+    "moderate": 12,
+    "high": 2,
+    "critical": 0,
+    "total": 14
+  },
+  "remaining": [
+    {
+      "package": "@eslint/config-array",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "eslint",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "@eslint/eslintrc",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "eslint",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "@typescript-eslint/eslint-plugin",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": true
+    },
+    {
+      "package": "@typescript-eslint/parser",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "typescript-eslint",
+        "version": "8.36.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "@typescript-eslint/type-utils",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": true
+    },
+    {
+      "package": "@typescript-eslint/typescript-estree",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "typescript-eslint",
+        "version": "8.36.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "@typescript-eslint/utils",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "typescript-eslint",
+        "version": "8.36.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "@vitest/mocker",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": true
+    },
+    {
+      "package": "eslint",
+      "severity": "moderate",
+      "direct": true,
+      "fix_available": {
+        "name": "eslint",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "minimatch",
+      "severity": "moderate",
+      "direct": false,
+      "fix_available": {
+        "name": "eslint",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "typescript-eslint",
+      "severity": "moderate",
+      "direct": true,
+      "fix_available": {
+        "name": "typescript-eslint",
+        "version": "8.36.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "package": "vite",
+      "severity": "high",
+      "direct": true,
+      "fix_available": {
+        "name": "vite",
+        "version": "8.3.5",
+        "isSemVerMajor": false
+      }
+    },
+    {
+      "package": "vitest",
+      "severity": "moderate",
+      "direct": true,
+      "fix_available": true
+    },
+    {
+      "package": "zod",
+      "severity": "high",
+      "direct": true,
+      "fix_available": {
+        "name": "zod",
+        "version": "4.6.7",
+        "isSemVerMajor": true
+      }
+    }
+  ]
+}

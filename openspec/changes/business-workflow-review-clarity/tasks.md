@@ -1,0 +1,3 @@
+- [x] 1. Separate explicit supported read-only caveats from actionable setup blockers with audit/tests.
+- [x] 2. Simplify ontology contribution presentation and preserve inspectable original sources.
+- [x] 3. Verify API preparation readiness and desktop/mobile UI, then deploy and repair the draft as a new revision.

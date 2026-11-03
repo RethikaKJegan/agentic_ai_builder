@@ -1,0 +1,599 @@
+{
+  "schema_version": 1,
+  "classification": "documented_current_application_behaviour",
+  "business_policy_approved": false,
+  "common": {
+    "organization": "A business organization, distinct from its login accounts and people.",
+    "account": "An application login identity; not proof of one natural person.",
+    "person": "A natural person. No person-to-account identity is inferred from the supplied evidence.",
+    "asset": "A physical asset, whose identity is distinct from source records describing it.",
+    "case": "A recorded service or complaint case.",
+    "document": "A business document or report with its own lifecycle.",
+    "event": "A dated activity, visit or historical event.",
+    "item": "A part, stock item or configuration reference.",
+    "measurement": "A quantity with a defined or explicitly unresolved unit and calculation."
+  },
+  "domains": {
+    "manufacturer": [
+      "Sales",
+      "organization",
+      "Equipment maker buying engines; distinct from a login account or current engine owner."
+    ],
+    "service_case": [
+      "Customer Service",
+      "case",
+      "A complaint case concerning a submitted engine serial."
+    ],
+    "service_account": [
+      "Customer Service",
+      "account",
+      "An account participating in service processes; person or shared-account interpretation is unresolved."
+    ],
+    "service_document": [
+      "Customer Service",
+      "document",
+      "A report, request, work-order document or service guidance record."
+    ],
+    "service_event": [
+      "Customer Service",
+      "event",
+      "An inspection, training, assignment or service-history event."
+    ],
+    "engine_reference": [
+      "Customer Service",
+      "asset",
+      "A physical engine reference; serial-to-physical-identity resolution requires evidence."
+    ],
+    "invoice": [
+      "Finance",
+      "document",
+      "A billing record, not proof of current ownership."
+    ],
+    "claim_line": [
+      "Finance",
+      "document",
+      "A claim line concerning an engine and part; source reconciliation is separate."
+    ],
+    "stock_item": [
+      "Procurement",
+      "item",
+      "An individually represented stock engine or part reference."
+    ],
+    "inventory_summary": [
+      "Procurement",
+      "measurement",
+      "A periodic stock count/cost summary with source and unit provenance."
+    ],
+    "configuration": [
+      "Sales",
+      "item",
+      "A model/list configuration reference whose uniqueness and detailed business meaning need review."
+    ],
+    "role_set": [
+      "Customer Service",
+      "item",
+      "A set of staff application role flags, not a login account."
+    ],
+    "identifier_reference": [
+      "Customer Service",
+      "item",
+      "A lookup identifier whose relationship to physical assets requires validation."
+    ],
+    "controlled_code": [
+      "Customer Service",
+      "item",
+      "A typed application code reference, distinct from an engine configuration."
+    ],
+    "training_measure": [
+      "Customer Service",
+      "measurement",
+      "An entered training target/actual measure with unresolved formula or units."
+    ],
+    "report_measure": [
+      "Finance",
+      "measurement",
+      "A reporting measure whose authority and calculation require validation."
+    ],
+    "sales_measure": [
+      "Sales",
+      "measurement",
+      "A sales reporting source or measure, not automatically authoritative."
+    ]
+  },
+  "concepts": {
+    "oem_company": [
+      "oemnames",
+      "manufacturer",
+      "OEM company",
+      "Equipment manufacturer in the company-name master. Company name is unique in the saved index; this is not a login account.",
+      [
+        6,
+        7,
+        42
+      ]
+    ],
+    "oem_account": [
+      "oems",
+      "service_account",
+      "OEM login account",
+      "Email login under an OEM company. Personal, shared plant and branch meanings are not distinguished by the application.",
+      [
+        6,
+        7,
+        14,
+        42
+      ]
+    ],
+    "staff_account": [
+      "users",
+      "service_account",
+      "Simpson staff account",
+      "Staff login with roles from limits. A matching email in an OEM login does not establish identity equivalence.",
+      [
+        14,
+        15,
+        17
+      ]
+    ],
+    "role_flags": [
+      "limits",
+      "role_set",
+      "Staff role flags",
+      "Boolean roles for a staff account, not monetary or workload limits and not final ontology access policy.",
+      [
+        16,
+        17,
+        28
+      ]
+    ],
+    "engine": [
+      null,
+      "engine_reference",
+      "Physical engine",
+      "Physical engine as a business concept. Neither a serial-only lookup nor one invoice row guarantees globally resolved physical identity.",
+      [
+        1,
+        3,
+        4
+      ]
+    ],
+    "engine_invoice": [
+      "enginedetails",
+      "invoice",
+      "Engine invoice record",
+      "Invoice-master entry keyed by billed-to OEM company and engine serial. Billed-to company is not established current ownership; serial-first-match lookup is ambiguous.",
+      [
+        1,
+        3,
+        4,
+        42
+      ]
+    ],
+    "ticket": [
+      "tickets",
+      "service_case",
+      "Service ticket",
+      "One complaint form about one submitted engine serial, under an OEM account with company copied at creation; actual creator is separate.",
+      [
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        42,
+        43
+      ]
+    ],
+    "timeline": [
+      "tickettimelines",
+      "service_event",
+      "Ticket timeline event",
+      "Historical application log linked by ticket ID. Ticket fields, not replayed timeline events, represent current application state.",
+      [
+        13,
+        15,
+        43
+      ]
+    ],
+    "comment": [
+      "comments",
+      "service_event",
+      "Ticket comment",
+      "Comment linked to a ticket; actor kind may require its stored discriminator.",
+      [
+        43
+      ]
+    ],
+    "jir": [
+      "jointinspectionreports",
+      "service_document",
+      "Joint inspection report",
+      "One report per ticket according to code review, DRAFTED or PUBLISHED. Edits overwrite; this is not revision history.",
+      [
+        12,
+        18,
+        43
+      ]
+    ],
+    "foc": [
+      "focs",
+      "service_document",
+      "FOC form",
+      "Form against a ticket with dealer, failure, part quantity and warranty claim information. Acronym is undefined; no documented direct JIR or replacement-approval link.",
+      [
+        19,
+        23,
+        43
+      ]
+    ],
+    "replacement_request": [
+      "enginereplacements",
+      "service_document",
+      "Engine replacement request",
+      "Ticket-linked replacement request or details. Simpson/OEM replacement modes are documented behaviour, not validated policy.",
+      [
+        21,
+        28,
+        29,
+        43
+      ]
+    ],
+    "dispatch": [
+      "floatengines",
+      "service_document",
+      "Replacement engine dispatch",
+      "Ticket-linked dispatch record holding the replacement serial, while the ticket holds the complaint serial. Not the physical engine master.",
+      [
+        21,
+        22,
+        28,
+        42,
+        43
+      ]
+    ],
+    "advance_dispatch": [
+      "advaced-engine-replacements",
+      "service_document",
+      "Advance engine dispatch",
+      "Advance engine sent under an OEM account. No ticket reference is documented.",
+      [
+        21,
+        27,
+        42
+      ]
+    ],
+    "advance_number": [
+      "advancedenginenumbers",
+      "identifier_reference",
+      "Advance engine number lookup",
+      "Lookup reference, not independent proof of a physical engine or ticket relationship.",
+      [
+        21
+      ]
+    ],
+    "work_order": [
+      "workorders",
+      "service_document",
+      "Failed-engine inward record",
+      "Inward receipt/transport/condition record for a failed engine. Ticket association uses free-text references; no guaranteed ticket ID link.",
+      [
+        20,
+        42,
+        43
+      ]
+    ],
+    "part_replacement": [
+      "partreplacements",
+      "service_document",
+      "Part replacement line",
+      "Ticket-linked part line with free-text part/mode/scope/extra. Quantity is not stored here according to review.",
+      [
+        12,
+        23,
+        24,
+        43
+      ]
+    ],
+    "part_description": [
+      "parts",
+      "stock_item",
+      "Part description reference",
+      "Description-only reference. No verified mapping to Simpson part numbers in claims or FOC.",
+      [
+        24
+      ]
+    ],
+    "manual_claim": [
+      "claims",
+      "claim_line",
+      "OEM-entered claim line",
+      "Entered/uploaded claim line under an OEM account. Not reconciled with SAP claim lines and not a guaranteed ticket reference.",
+      [
+        25,
+        26,
+        27,
+        42,
+        43
+      ]
+    ],
+    "sap_claim": [
+      "claimsftps",
+      "claim_line",
+      "SAP-imported claim line",
+      "Claim data imported from SAP files. OEM is text; dashboards use this collection. No validated manual-claim deduplication or ticket link.",
+      [
+        25,
+        26,
+        41,
+        42,
+        43
+      ]
+    ],
+    "float_stock": [
+      "floatengineftps",
+      "stock_item",
+      "SAP float-engine stock item",
+      "Individual stock engine from SAP with serial, condition, stock and amount. Serial alone does not prove identity across companies.",
+      [
+        21,
+        40,
+        42
+      ]
+    ],
+    "inventory": [
+      "floatinventories",
+      "inventory_summary",
+      "Monthly float-engine inventory",
+      "Count/cost summary described as calculated from float-engine stock; currency and aggregation details remain unconfirmed.",
+      [
+        27,
+        40
+      ]
+    ],
+    "product": [
+      "products",
+      "configuration",
+      "Engine model product record",
+      "Model with multiple list-readiness entries. OEM and list numbers are text, without a guaranteed join to company/configuration masters.",
+      [
+        30,
+        31,
+        42
+      ]
+    ],
+    "engine_model": [
+      "emms",
+      "configuration",
+      "Engine model reference",
+      "Active reference using the record ID as a model name; distinct from a physical engine or invoice row.",
+      [
+        30,
+        45
+      ]
+    ],
+    "code": [
+      "simpsoncodes",
+      "controlled_code",
+      "Simpson controlled code",
+      "Active code list with COMPLAINT, DEFECT and ACTION types. Older code-list connections are not opened by the application.",
+      [
+        32
+      ]
+    ],
+    "bulletin": [
+      "servicebulletins",
+      "service_document",
+      "Service bulletin",
+      "Service guidance with company/model/list/plant cut-in information. Distinction from service information needs business review; text ordering is a defect.",
+      [
+        28,
+        33,
+        42
+      ]
+    ],
+    "service_information": [
+      "serviceinformations",
+      "service_document",
+      "Service information",
+      "Same documented structure as bulletin with a different number field. No business distinction is inferred solely from schema.",
+      [
+        28,
+        33,
+        42
+      ]
+    ],
+    "cut_in": [
+      "internalcutins",
+      "service_document",
+      "Internal cut-in record",
+      "Plant/list/defect/model cut-in record. Physical serial ordering and applicability policy are not confirmed.",
+      [
+        33
+      ]
+    ],
+    "engine_analysis": [
+      "failedengineanalyses",
+      "service_document",
+      "Failed engine analysis",
+      "Independent quality process per serial with named quality approval; not directly linked to tickets.",
+      [
+        28,
+        34,
+        42
+      ]
+    ],
+    "part_analysis": [
+      "failedpartanalyses",
+      "service_document",
+      "Failed part analysis",
+      "Independent quality process per part number. Active schema is code-reported; saved sample has no fields.",
+      [
+        28,
+        34,
+        42,
+        45
+      ]
+    ],
+    "ica_capa": [
+      "icacapas",
+      "service_document",
+      "ICA/CAPA quality record",
+      "Independent defect-based quality record. Acronym expansion is unconfirmed; saved sample has no fields.",
+      [
+        34,
+        42,
+        45
+      ]
+    ],
+    "infant_care": [
+      "infantcares",
+      "service_event",
+      "Infant-care engine visit",
+      "Early-life engine inspection visit with entered customer/representative details, not a ticket-linked record or proof of current owner.",
+      [
+        4,
+        34,
+        42
+      ]
+    ],
+    "export_tracking": [
+      "exportenginetrackings",
+      "service_case",
+      "Export engine complaint tracking",
+      "Independent export complaint tracking with text serial/codes/company references; explicit cross-connection lookups are reported by the review.",
+      [
+        34,
+        42,
+        43
+      ]
+    ],
+    "manual": [
+      "workshopmanuals",
+      "service_document",
+      "Workshop manual",
+      "Model/OEM/list/version document with archive and approval fields. Latest release is not automatically approved or effective.",
+      [
+        28,
+        35,
+        42
+      ]
+    ],
+    "manual_revision": [
+      "workshopmanualrevisions",
+      "service_document",
+      "Workshop manual revision",
+      "Code-reported revision with manual reference, version, release date and approval. No fields were observed in the saved sample.",
+      [
+        35,
+        43,
+        45
+      ]
+    ],
+    "faq": [
+      "faqs",
+      "service_document",
+      "FAQ entry",
+      "Staff-editable question/answer without an approval step; not automatically verified guidance.",
+      [
+        36
+      ]
+    ],
+    "knowledge": [
+      "knowledgesharings",
+      "service_document",
+      "Knowledge-sharing document",
+      "Uploaded topic/document reference. Business accuracy and continued validity require review.",
+      [
+        36
+      ]
+    ],
+    "course": [
+      "courseschedules",
+      "service_event",
+      "Scheduled training course",
+      "Scheduled course with model, dates and status. Requested-by account reference is code-reported but absent from current sampled fields.",
+      [
+        37,
+        42
+      ]
+    ],
+    "booking": [
+      "trainingschedules",
+      "service_event",
+      "OEM training booking",
+      "Booking against a course, with freely entered participants and admin acceptance/rejection. Participants are not account references.",
+      [
+        37,
+        38,
+        42
+      ]
+    ],
+    "training_material": [
+      "training-modules",
+      "service_document",
+      "Training material",
+      "Uploaded material; no guaranteed course/session linkage is supplied.",
+      [
+        37
+      ]
+    ],
+    "calendar_event": [
+      "events",
+      "service_event",
+      "Standalone calendar event",
+      "Calendar entry, separate from a scheduled course or training booking unless a reference is verified.",
+      [
+        37
+      ]
+    ],
+    "training_metrics": [
+      "trainingtouchpoints",
+      "training_measure",
+      "Monthly training measures",
+      "Manually entered targets and actuals. Touchpoint/man-hour definitions and formulas remain unconfirmed; domain placement is provisional.",
+      [
+        39
+      ]
+    ],
+    "performer": [
+      "performers",
+      "service_event",
+      "Staff performance period record",
+      "Code-reported staff record by month/year; no fields were observed in the saved sample.",
+      [
+        45
+      ]
+    ],
+    "engineer_movement": [
+      "engineermovements",
+      "service_event",
+      "Engineer attendance record",
+      "Staff/year attendance structure observed in metadata; detailed business interpretation is not supplied.",
+      [
+        14,
+        15
+      ]
+    ],
+    "mis": [
+      "mis",
+      "report_measure",
+      "Legacy MIS fields",
+      "salesCount/ticketsCount are documented as unused zero fields, not live business measures. Hardcoded chart denominators are not authoritative sales data.",
+      [
+        41
+      ]
+    ],
+    "sales_placeholder": [
+      "saledatas",
+      "sales_measure",
+      "Unused sales-data collection",
+      "No application reads/writes reported and no sampled fields. Does not establish an authoritative sales source.",
+      [
+        41,
+        45
+      ]
+    ]
+  }
+}

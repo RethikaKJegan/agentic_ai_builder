@@ -1,0 +1,371 @@
+{
+  "source": {
+    "source_id": "ref_621995136ad5360339474d92",
+    "title": "Implemented warranty calculation",
+    "kind": "application_code",
+    "module_ids": [
+      "warranty"
+    ],
+    "text": "const httpStatus = require('http-status');\nconst logger = require('../config/logger');\nconst { EngineDetails } = require('../models');\nconst ApiError = require('../utils/ApiError');\nconst ftp = require('basic-ftp');\nconst fs = require('fs');\nconst { FileChecker } = require('../models');\nconst emailService = require('./email.service');\nconst excelService = require('./excel.service');\nconst moment = require('moment');\nconst monthDiff = (d1, d2) => {\n  let months;\n  months = (d2.getFullYear() - d1.getFullYear()) * 12;\n  months -= d1.getMonth();\n  months += d2.getMonth();\n  return months <= 0 ? 0 : months;\n};\nconst checkWarrantySourceRecord = async (\n  serialNumber,\n  oem,\n  engineHmr1,\n  dateOfSale,\n  invoiceDate,\n  oemName,\n  forceCheck = false\n) => {\n  // TODO get engineRecord for this serial number from simpson dumped table and compute warranty\n  let engineHmr;\n  try {\n    engineHmr = parseInt(engineHmr1, 10);\n  } catch (e) {\n    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid HMR value ');\n  }\n  logger.info(`Checking warranty status for serialNumber = ${serialNumber}`);\n  if (!serialNumber || !oem || !engineHmr || !dateOfSale) {\n    throw new ApiError(\n      httpStatus.BAD_REQUEST,\n      `Invalid args to checkWarranty = Passed values => ${serialNumber}, ${oem?.name}, ${engineHmr}, ${dateOfSale}`\n    );\n  }\n  const engineDetails = forceCheck ? { invoiceDate } : await EngineDetails.findOne({ engineSerialNumber: serialNumber });\n  const emptyResponse = {\n    underWarranty: null,\n    serialNumber,\n    invoiceNumber: null,\n    hours: null,\n    listNumber: null,\n    dateOfSale: {\n      cur: null,\n      allowed: null,\n      valid: false,\n    },\n    hmr: {\n      cur: null,\n      allowed: null,\n      valid: false,\n    },\n    dateOfInvoice: {\n      cur: null,\n      allowed: null,\n      valid: false,\n    },\n    oemName: oemName.name,\n  };\n  if (!engineDetails || engineDetails.invoiceDate === null) {\n    return emptyResponse;\n  }\n  let maxDateOfSimpsonInvoiceToOEM;\n  let maxDateOfMachineSaleByOEMToEndCustomer;\n  let maxHmr;\n  if (oemName.name.includes('Tractors and Farm Equipments Ltd')) {\n    maxDateOfSimpsonInvoiceToOEM = 27; // in months\n    maxDateOfMachineSaleByOEMToEndCustomer = 24; // in months\n    maxHmr = 2000; // in hours\n  } else if (oemName.name.includes('CNH Industrial (India) Private Ltd.')) {\n    maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 21;\n    maxHmr = 2000;\n  } else if (oemName.name.includes('TEREX Equipment (P) LTD / Manitou Group')) {\n    maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 18;\n    maxHmr = 2000;\n  } else {\n    maxDateOfSimpsonInvoiceToOEM = 15;\n    maxDateOfMachineSaleByOEMToEndCustomer = 12;\n    maxHmr = 1500;\n  }\n\n  const dateOfSaleDiff = monthDiff(moment(dateOfSale, 'YYYY-MM-DD').toDate(), new Date());\n  const dateOfInvoiceDiff = monthDiff(\n    moment(\n      invoiceDate || typeof engineDetails.invoiceDate === 'string'\n        ? new Date(Date.parse(engineDetails.invoiceDate))\n        : engineDetails.invoiceDate,\n      'DD-MM-YY'\n    ).toDate(),\n    new Date()\n  );\n\n  if (isNaN(dateOfInvoiceDiff) || isNaN(dateOfInvoiceDiff)) {\n    return emptyResponse;\n  }\n\n  let underWarranty = false;\n  if (\n    engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM\n  ) {\n    underWarranty = true;\n  }\n  return {\n    underWarranty,\n    serialNumber: engineDetails.engineSerialNumber,\n    invoiceNumber: engineDetails.invoiceNumber,\n    hours: engineHmr,\n    listNumber: engineDetails.listNo,\n    egDetails: {\n      sno: engineDetails.engineSerialNumber,\n      listNo: engineDetails.listNo,\n      invoiceNumber: engineDetails.invoiceNumber,\n      invoiceDate: engineDetails.invoiceDate,\n      plant: engineDetails.organizationName,\n    },\n    dateOfSale: {\n      cur: dateOfSaleDiff,\n      allowed: maxDateOfMachineSaleByOEMToEndCustomer,\n      valid: dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer,\n    },\n    hmr: {\n      cur: engineHmr,\n      allowed: maxHmr,\n      valid: engineHmr <= maxHmr,\n    },\n    dateOfInvoice: {\n      cur: dateOfInvoiceDiff,\n      allowed: maxDateOfSimpsonInvoiceToOEM,\n      valid: dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM,\n    },\n    oemName: oem.name,\n  };\n};",
+    "sha256": "621995136ad5360339474d9234e72879b25d791babf440d76e77859120d72870",
+    "origin": "supplied-backend:src/services/warranty.service.js:1-143"
+  },
+  "branches": [
+    {
+      "policy_key": "implementation-tafe",
+      "title": "Supplied application \u00b7 Tractors and Farm Equipments Ltd",
+      "clauses": {
+        "source_version": {
+          "value": null,
+          "quote": null
+        },
+        "effective_from": {
+          "value": null,
+          "quote": null
+        },
+        "effective_to": {
+          "value": null,
+          "quote": null
+        },
+        "oem_references": {
+          "value": null,
+          "quote": null
+        },
+        "models": {
+          "value": null,
+          "quote": null
+        },
+        "date_basis": {
+          "value": null,
+          "quote": null
+        },
+        "effective_bounds": {
+          "value": null,
+          "quote": null
+        },
+        "sale_months": {
+          "value": 24,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 27; // in months\n    maxDateOfMachineSaleByOEMToEndCustomer = 24; // in months\n    maxHmr = 2000; // in hours"
+        },
+        "invoice_months": {
+          "value": 27,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 27; // in months\n    maxDateOfMachineSaleByOEMToEndCustomer = 24; // in months\n    maxHmr = 2000; // in hours"
+        },
+        "max_hours": {
+          "value": "2000",
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 27; // in months\n    maxDateOfMachineSaleByOEMToEndCustomer = 24; // in months\n    maxHmr = 2000; // in hours"
+        },
+        "coverage_boundaries": {
+          "value": null,
+          "quote": null
+        },
+        "exclusions": {
+          "value": null,
+          "quote": null
+        },
+        "coverage_mode": {
+          "value": "sale_invoice_and_hours",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "coverage_date_basis": {
+          "value": "assessment_date",
+          "quote": "const dateOfSaleDiff = monthDiff(moment(dateOfSale, 'YYYY-MM-DD').toDate(), new Date());"
+        },
+        "period_method": {
+          "value": "calendar_month_difference",
+          "quote": "const monthDiff = (d1, d2) => {\n  let months;\n  months = (d2.getFullYear() - d1.getFullYear()) * 12;\n  months -= d1.getMonth();\n  months += d2.getMonth();\n  return months <= 0 ? 0 : months;\n};"
+        },
+        "period_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "hours_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "exclusion_mode": {
+          "value": null,
+          "quote": null
+        },
+        "exclusion_checks": {
+          "value": null,
+          "quote": null
+        }
+      },
+      "implementation_reference": {
+        "reference_version": "simpson-warranty-implementation-v1",
+        "branch": "tafe",
+        "match": "oem_name_contains",
+        "selector": "Tractors and Farm Equipments Ltd",
+        "source_sha256": "621995136ad5360339474d9234e72879b25d791babf440d76e77859120d72870"
+      }
+    },
+    {
+      "policy_key": "implementation-cnh",
+      "title": "Supplied application \u00b7 CNH Industrial (India) Private Ltd.",
+      "clauses": {
+        "source_version": {
+          "value": null,
+          "quote": null
+        },
+        "effective_from": {
+          "value": null,
+          "quote": null
+        },
+        "effective_to": {
+          "value": null,
+          "quote": null
+        },
+        "oem_references": {
+          "value": null,
+          "quote": null
+        },
+        "models": {
+          "value": null,
+          "quote": null
+        },
+        "date_basis": {
+          "value": null,
+          "quote": null
+        },
+        "effective_bounds": {
+          "value": null,
+          "quote": null
+        },
+        "sale_months": {
+          "value": 21,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 21;\n    maxHmr = 2000;"
+        },
+        "invoice_months": {
+          "value": 24,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 21;\n    maxHmr = 2000;"
+        },
+        "max_hours": {
+          "value": "2000",
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 21;\n    maxHmr = 2000;"
+        },
+        "coverage_boundaries": {
+          "value": null,
+          "quote": null
+        },
+        "exclusions": {
+          "value": null,
+          "quote": null
+        },
+        "coverage_mode": {
+          "value": "sale_invoice_and_hours",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "coverage_date_basis": {
+          "value": "assessment_date",
+          "quote": "const dateOfSaleDiff = monthDiff(moment(dateOfSale, 'YYYY-MM-DD').toDate(), new Date());"
+        },
+        "period_method": {
+          "value": "calendar_month_difference",
+          "quote": "const monthDiff = (d1, d2) => {\n  let months;\n  months = (d2.getFullYear() - d1.getFullYear()) * 12;\n  months -= d1.getMonth();\n  months += d2.getMonth();\n  return months <= 0 ? 0 : months;\n};"
+        },
+        "period_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "hours_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "exclusion_mode": {
+          "value": null,
+          "quote": null
+        },
+        "exclusion_checks": {
+          "value": null,
+          "quote": null
+        }
+      },
+      "implementation_reference": {
+        "reference_version": "simpson-warranty-implementation-v1",
+        "branch": "cnh",
+        "match": "oem_name_contains",
+        "selector": "CNH Industrial (India) Private Ltd.",
+        "source_sha256": "621995136ad5360339474d9234e72879b25d791babf440d76e77859120d72870"
+      }
+    },
+    {
+      "policy_key": "implementation-terex",
+      "title": "Supplied application \u00b7 TEREX Equipment (P) LTD / Manitou Group",
+      "clauses": {
+        "source_version": {
+          "value": null,
+          "quote": null
+        },
+        "effective_from": {
+          "value": null,
+          "quote": null
+        },
+        "effective_to": {
+          "value": null,
+          "quote": null
+        },
+        "oem_references": {
+          "value": null,
+          "quote": null
+        },
+        "models": {
+          "value": null,
+          "quote": null
+        },
+        "date_basis": {
+          "value": null,
+          "quote": null
+        },
+        "effective_bounds": {
+          "value": null,
+          "quote": null
+        },
+        "sale_months": {
+          "value": 18,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 18;\n    maxHmr = 2000;"
+        },
+        "invoice_months": {
+          "value": 24,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 18;\n    maxHmr = 2000;"
+        },
+        "max_hours": {
+          "value": "2000",
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 24;\n    maxDateOfMachineSaleByOEMToEndCustomer = 18;\n    maxHmr = 2000;"
+        },
+        "coverage_boundaries": {
+          "value": null,
+          "quote": null
+        },
+        "exclusions": {
+          "value": null,
+          "quote": null
+        },
+        "coverage_mode": {
+          "value": "sale_invoice_and_hours",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "coverage_date_basis": {
+          "value": "assessment_date",
+          "quote": "const dateOfSaleDiff = monthDiff(moment(dateOfSale, 'YYYY-MM-DD').toDate(), new Date());"
+        },
+        "period_method": {
+          "value": "calendar_month_difference",
+          "quote": "const monthDiff = (d1, d2) => {\n  let months;\n  months = (d2.getFullYear() - d1.getFullYear()) * 12;\n  months -= d1.getMonth();\n  months += d2.getMonth();\n  return months <= 0 ? 0 : months;\n};"
+        },
+        "period_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "hours_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "exclusion_mode": {
+          "value": null,
+          "quote": null
+        },
+        "exclusion_checks": {
+          "value": null,
+          "quote": null
+        }
+      },
+      "implementation_reference": {
+        "reference_version": "simpson-warranty-implementation-v1",
+        "branch": "terex",
+        "match": "oem_name_contains",
+        "selector": "TEREX Equipment (P) LTD / Manitou Group",
+        "source_sha256": "621995136ad5360339474d9234e72879b25d791babf440d76e77859120d72870"
+      }
+    },
+    {
+      "policy_key": "implementation-other",
+      "title": "Supplied application \u00b7 Other OEM names (else branch)",
+      "clauses": {
+        "source_version": {
+          "value": null,
+          "quote": null
+        },
+        "effective_from": {
+          "value": null,
+          "quote": null
+        },
+        "effective_to": {
+          "value": null,
+          "quote": null
+        },
+        "oem_references": {
+          "value": null,
+          "quote": null
+        },
+        "models": {
+          "value": null,
+          "quote": null
+        },
+        "date_basis": {
+          "value": null,
+          "quote": null
+        },
+        "effective_bounds": {
+          "value": null,
+          "quote": null
+        },
+        "sale_months": {
+          "value": 12,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 15;\n    maxDateOfMachineSaleByOEMToEndCustomer = 12;\n    maxHmr = 1500;"
+        },
+        "invoice_months": {
+          "value": 15,
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 15;\n    maxDateOfMachineSaleByOEMToEndCustomer = 12;\n    maxHmr = 1500;"
+        },
+        "max_hours": {
+          "value": "1500",
+          "quote": "maxDateOfSimpsonInvoiceToOEM = 15;\n    maxDateOfMachineSaleByOEMToEndCustomer = 12;\n    maxHmr = 1500;"
+        },
+        "coverage_boundaries": {
+          "value": null,
+          "quote": null
+        },
+        "exclusions": {
+          "value": null,
+          "quote": null
+        },
+        "coverage_mode": {
+          "value": "sale_invoice_and_hours",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "coverage_date_basis": {
+          "value": "assessment_date",
+          "quote": "const dateOfSaleDiff = monthDiff(moment(dateOfSale, 'YYYY-MM-DD').toDate(), new Date());"
+        },
+        "period_method": {
+          "value": "calendar_month_difference",
+          "quote": "const monthDiff = (d1, d2) => {\n  let months;\n  months = (d2.getFullYear() - d1.getFullYear()) * 12;\n  months -= d1.getMonth();\n  months += d2.getMonth();\n  return months <= 0 ? 0 : months;\n};"
+        },
+        "period_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "hours_boundary": {
+          "value": "inclusive",
+          "quote": "engineHmr <= maxHmr &&\n    dateOfSaleDiff <= maxDateOfMachineSaleByOEMToEndCustomer &&\n    dateOfInvoiceDiff <= maxDateOfSimpsonInvoiceToOEM"
+        },
+        "exclusion_mode": {
+          "value": null,
+          "quote": null
+        },
+        "exclusion_checks": {
+          "value": null,
+          "quote": null
+        }
+      },
+      "implementation_reference": {
+        "reference_version": "simpson-warranty-implementation-v1",
+        "branch": "other",
+        "match": "otherwise",
+        "selector": null,
+        "source_sha256": "621995136ad5360339474d9234e72879b25d791babf440d76e77859120d72870"
+      }
+    }
+  ]
+}

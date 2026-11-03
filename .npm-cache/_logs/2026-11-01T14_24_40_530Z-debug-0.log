@@ -1,0 +1,13 @@
+0 verbose cli /home/raf/.nvm/versions/node/v22.23.4/bin/node /home/raf/.nvm/versions/node/v22.23.4/bin/npm
+1 info using npm@10.9.9
+2 info using node@v22.23.4
+3 silly config load:file:/home/raf/.nvm/versions/node/v22.23.4/lib/node_modules/npm/npmrc
+4 silly config load:file:/home/raf/agentic-ai-builder/.local/business-ontology/review-clarity-20261101/staged-frontend/.npmrc
+5 silly config load:file:/home/raf/.npmrc
+6 silly config load:file:/home/raf/agentic-ai-builder/frontend/etc/npmrc
+7 verbose title npm run start --hostname 127.0.0.1 --port 3100
+8 verbose argv "run" "start" "--" "--hostname" "127.0.0.1" "--port" "3100"
+9 verbose logfile logs-max:10 dir:/home/raf/agentic-ai-builder/.npm-cache/_logs/2026-11-01T14_24_40_530Z-
+10 verbose logfile /home/raf/agentic-ai-builder/.npm-cache/_logs/2026-11-01T14_24_40_530Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly logfile done cleaning log files

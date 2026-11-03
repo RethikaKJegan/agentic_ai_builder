@@ -26,7 +26,27 @@ CHECKER = Draft202012Validator(SCHEMA)
 
 def query_types(field):
     aliases={'timestamp without time zone':'datetime','timestamp with time zone':'datetime'}
-    return scalar_types({**field,'types':[aliases.get(t,t) for t in field['types']]})
+    result = scalar_types({**field,'types':[aliases.get(t,t) for t in field['types']]})
+    return {'number'} if result == {'integer', 'number'} else result
+
+
+def queryable_field(field, engine):
+    name = field['name']
+    if len(query_types(field)) != 1 or any(c in name for c in '[$\x00'):
+        return False
+    return (all(part and not part.startswith('$') for part in name.split('.'))
+            if engine == 'mongodb' else '.' not in name)
+
+
+def mongo_scalar_path(record, path):
+    value = record
+    for part in path.split('.'):
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            fail('A selected document path is not a scalar object path.', 'DATA_QUERY_TYPE', 422)
+        value = value.get(part)
+    return value
 
 
 def normalize_date_filter(field, value):
@@ -98,6 +118,94 @@ class QueryPlanner:
 class QueryReader:
     def __init__(self, manager): self.manager = manager
 
+    def objects(self, config, dataset, fields, keys, filters, offset, limit, deadline):
+        """Bounded source projection for ontology browsing; no model SQL or joins."""
+        from .data_write_adapter import value_for
+        checkpoint()
+        if time.monotonic() > deadline:
+            fail('Object read timed out.', 'ONTOLOGY_OBJECT_TIMEOUT', 504)
+        names = [f['name'] for f in fields]
+        by_name = {f['name']: f for f in fields}
+        native = {name: value_for(by_name[name], value) for name, value in filters.items()}
+        rows, byte_count = [], 0
+        def append(row):
+            nonlocal byte_count
+            from .data_write_adapter import pack
+            byte_count += len(json.dumps(pack(row, config['engine'])).encode())
+            if byte_count > MAX_BYTES:
+                fail('Object projection exceeds 2 MB.', 'ONTOLOGY_OBJECT_LIMIT', 422)
+            rows.append(row)
+        with self.manager.adapter.connection(config) as conn:
+            if config['engine'] == 'mongodb':
+                from pymongo import timeout
+                from bson.decimal128 import Decimal128
+                native = {name: Decimal128(value) if isinstance(value, Decimal) else value for name, value in native.items()}
+                projection = {name: 1 for name in names}
+                if '_id' not in projection:
+                    projection['_id'] = 0
+                with timeout(max(.001, min(10, deadline-time.monotonic()))):
+                    cursor = conn[config['database']][dataset['name']].find(
+                        {name: {'$eq': value} for name, value in native.items()}, projection
+                    ).sort([(name, 1) for name in keys]).skip(offset).limit(limit).batch_size(limit).max_time_ms(8000)
+                    try:
+                        for row in cursor:
+                            append(row)
+                    finally:
+                        cursor.close()
+            else:
+                from psycopg import sql
+                columns = sql.SQL(', ').join(sql.Identifier(name) for name in names)
+                where = sql.SQL(' AND ').join(sql.SQL('{} = %s').format(sql.Identifier(name)) for name in native)
+                query = sql.SQL('SELECT {} FROM {}.{}{} ORDER BY {} OFFSET %s LIMIT %s').format(
+                    columns, sql.Identifier(dataset['schema']), sql.Identifier(dataset['name']),
+                    sql.SQL(' WHERE ') + where if native else sql.SQL(''),
+                    sql.SQL(', ').join(sql.Identifier(name) for name in keys))
+                with track_postgres(conn), conn.cursor() as cur:
+                    cur.execute(query, [*native.values(), offset, limit])
+                    for row in cur:
+                        append(dict(zip(names, row)))
+        if time.monotonic() > deadline:
+            fail('Object read timed out.', 'ONTOLOGY_OBJECT_TIMEOUT', 504)
+        return rows
+
+    def sampled_evidence(self, config, dataset, fields, plan, deadline):
+        """Bound transfer at MongoDB; the count and sample share one read facet."""
+        from pymongo import timeout
+        checkpoint()
+        if time.monotonic() >= deadline:
+            fail('Evidence query deadline exceeded.', 'DATA_QUERY_TIMEOUT', 504)
+        projection = {'_id': 0, **{f['field_id']: {'$ifNull':['$'+f['name'],None]} for f in fields}}
+        sample = []
+        if plan['order_by']:
+            sample.append({'$sort': {s['column']: 1 if s['direction']=='asc' else -1 for s in plan['order_by']}})
+        sample.append({'$limit':plan['limit']})
+        pipeline = [{'$project':projection}, {'$facet': {'sample':sample, 'total':[{'$count':'count'}]}}]
+        with self.manager.adapter.connection(config) as conn, timeout(max(.001,min(12,deadline-time.monotonic()))):
+            cursor=conn[config['database']][dataset['name']].aggregate(pipeline,allowDiskUse=False,maxTimeMS=10000)
+            try:
+                result=next(cursor, {'sample':[], 'total':[]})
+            finally:
+                cursor.close()
+        checkpoint()
+        if time.monotonic() >= deadline:
+            fail('Evidence query deadline exceeded.', 'DATA_QUERY_TIMEOUT', 504)
+        total=result['total'][0]['count'] if result['total'] else 0
+        if total>1_000_000:
+            fail('Evidence source exceeds the one-million-row database budget.', 'DATA_QUERY_LIMIT', 422)
+        rows=[];size=0
+        for record in result['sample']:
+            row={}
+            for f in fields:
+                value=record.get(f['field_id'])
+                if isinstance(value,datetime.datetime) and value.tzinfo is None:
+                    value=value.replace(tzinfo=datetime.timezone.utc)
+                row[f['field_id']]=scalar(value)
+            size+=len(json.dumps(wire(row),ensure_ascii=False).encode())
+            if size>MAX_BYTES:
+                fail('Evidence sample exceeds the 2 MB execution limit.', 'DATA_QUERY_LIMIT', 422)
+            rows.append(row)
+        return rows,size,total
+
     def read(self, config, dataset, fields, deadline):
         def check():
             checkpoint()
@@ -137,7 +245,7 @@ class QueryReader:
                 with timeout(max(.001,min(12, deadline-time.monotonic()))):
                     cursor = conn[config['database']][dataset['name']].find({}, projection).limit(MAX_ROWS+1).batch_size(25).max_time_ms(10000)
                     try:
-                        for row in cursor: append([row.get(f['name']) for f in fields])
+                        for row in cursor: append([mongo_scalar_path(row, f['name']) for f in fields])
                     finally: cursor.close()
         check()
         return rows, size
@@ -150,6 +258,7 @@ class DataQueries:
         self.reader = reader or QueryReader(manager)
         self.pushdown_enabled = reader is None
         self.lock = threading.Lock()
+        self.slot_available = threading.Condition(self.lock)
         self.active = set()
         with self.store.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS data_query_plans (plan_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner TEXT NOT NULL, expires REAL NOT NULL, document TEXT NOT NULL)')
@@ -168,7 +277,7 @@ class DataQueries:
             for dataset in source['snapshot']['datasets']:
                 datasets[dataset['dataset_id']] = {**dataset, 'connection':source['connection']}
                 for f in dataset['fields']:
-                    if len(query_types(f)) == 1 and not any(c in f['name'] for c in '.[$\x00'):
+                    if queryable_field(f, source['connection']['engine']):
                         fields[f['field_id']] = {**f, 'dataset_id':dataset['dataset_id']}
         relationships = {e['relationship_id']:e for e in graph['relationships'] if e['status'] in ('declared','accepted')}
         return graph, datasets, fields, relationships
@@ -208,7 +317,7 @@ class DataQueries:
             labels.add(metric['label'])
             if metric['op'] == 'count' and not metric['expression']: continue
             tree, refs = expression(metric['expression'], allowed)
-            if any(scalar_types(fields[f]) not in ({'number'},{'integer'}) for f in refs): fail('Arithmetic metrics require numeric catalog fields.')
+            if any(query_types(fields[f]) not in ({'number'},{'integer'}) for f in refs): fail('Arithmetic metrics require numeric catalog fields.')
             expressions[metric['label']] = tree
             used |= refs
         for _, pairs, _ in joins:
@@ -246,7 +355,9 @@ class DataQueries:
         identity = self._enter(auth)
         try: return self._plan(auth, body, identity)
         finally:
-            with self.lock: self.active.discard(identity)
+            with self.slot_available:
+                self.active.discard(identity)
+                self.slot_available.notify_all()
 
     def _plan(self, auth, body, identity):
         if not isinstance(body,dict) or set(body) != {'question'} or not isinstance(body.get('question'),str) or not 1 <= len(body['question'].strip()) <= 2000:
@@ -282,11 +393,31 @@ class DataQueries:
             for row in rows[20:]: db.execute('DELETE FROM data_query_plans WHERE plan_id=?',(row[0],))
         return result
 
-    def execute(self, auth, body, *, saved_snapshot=None, deadline=None):
-        identity = self._enter(auth)
-        try: return self._execute(auth, body, identity, saved_snapshot=saved_snapshot, deadline=deadline)
+    def _enter_when_ready(self, auth, deadline):
+        while True:
+            checkpoint()
+            if time.monotonic() >= deadline:
+                fail('Database query slot wait exceeded the execution deadline.', 'DATA_QUERY_TIMEOUT', 504)
+            try:
+                return self._enter(auth)
+            except ApiFailure as exc:
+                if exc.code != 'DATA_QUERY_BUSY':
+                    raise
+            with self.slot_available:
+                self.slot_available.wait(min(.1, max(0, deadline-time.monotonic())))
+
+    def execute(self, auth, body, *, saved_snapshot=None, deadline=None, wait_for_slot=False, before_execute=None):
+        if wait_for_slot and deadline is None:
+            deadline = time.monotonic()+45
+        identity = self._enter_when_ready(auth, deadline) if wait_for_slot else self._enter(auth)
+        try:
+            if before_execute is not None:
+                before_execute()
+            return self._execute(auth, body, identity, saved_snapshot=saved_snapshot, deadline=deadline)
         finally:
-            with self.lock: self.active.discard(identity)
+            with self.slot_available:
+                self.active.discard(identity)
+                self.slot_available.notify_all()
 
     def _execute(self, auth, body, identity, *, saved_snapshot=None, deadline=None):
         if not isinstance(body,dict) or set(body) != {'plan_id'} or not isinstance(body['plan_id'],str): fail('Supply a saved plan ID.')
@@ -314,7 +445,9 @@ class DataQueries:
         self.manager.configured()
         datasets = context[1]
         total_size = 0
-        physical = physical_plan(plan, needed, datasets, expressions, joins)
+        physical = physical_plan(plan, needed, datasets, expressions, joins, sampled_evidence=saved.get('sampled_scalar_evidence', False))
+        if physical.get('sampled_scalar_evidence'):
+            return self._sampled_projection(auth, saved, plan, needed, datasets, deadline, fresh)
         if self.pushdown_enabled and physical['strategy'] != 'application':
             return self._native(auth, saved, plan, needed, datasets, joins, expressions, physical, deadline, fresh)
         execution_started = time.monotonic()
@@ -360,8 +493,41 @@ class DataQueries:
         return dict(plan_id=saved['plan_id'],executed_plan=plan,columns=columns,rows=result,total_result_rows=total,matched_rows=matched,
                     limited=total>plan['limit'],executed_at=now(),sources=evidence,join_checks=join_checks,
                     execution=dict(strategy='application', snapshot='independent reads', duration_ms=round((time.monotonic()-execution_started)*1000), transferred_rows=sum(len(r) for r in data.values()), transferred_bytes=total_size),
-                    explanation=plan['explanation'],warnings=['Separate sources are read at different times; no shared cross-database snapshot.',
-                    'Decimals and integers outside the exact JavaScript integer range are returned as strings.'] if len(evidence)>1 else ['Decimals and integers outside the exact JavaScript integer range are returned as strings.'])
+                    explanation=plan['explanation'],warnings=(['Sampled metadata does not constrain every record type; scalar evidence values are returned without coercion.'] if physical.get('sampled_scalar_evidence') else []) + (['Separate sources are read at different times; no shared cross-database snapshot.',
+                    'Decimals and integers outside the exact JavaScript integer range are returned as strings.'] if len(evidence)>1 else ['Decimals and integers outside the exact JavaScript integer range are returned as strings.']))
+
+    def _sampled_projection(self, auth, saved, plan, needed, datasets, deadline, fresh):
+        did,fields=next(iter(needed.items()))
+        dataset=datasets[did];cid=dataset['connection']['connection_id']
+        with self.store.transaction(write=False) as db:
+            secret,doc=self.manager.owned(db,auth,cid)
+        if not secret or doc['connection_status']=='disconnected':
+            fail('Source disconnected. Plan again.', 'DATA_QUERY_STALE',409)
+        started=now();clock_started=time.monotonic()
+        try:
+            config=json.loads(self.manager.cipher.decrypt(secret.encode()).decode())
+            rows,size,total=self.reader.sampled_evidence(config,dataset,fields,plan,deadline)
+        except ApiFailure:
+            raise
+        except Exception:
+            checkpoint()
+            fail('The bounded evidence source query failed.', 'DATA_QUERY_SOURCE_FAILED',502)
+        fresh()
+        with self.store.transaction() as db:
+            self.manager.audit(db,auth,cid,'read_only_query')
+        warnings=['Sampled metadata does not constrain every record type; scalar evidence values are returned without coercion.',
+                  'Evidence is a bounded source sample; matching fields do not establish a cross-dataset relationship.',
+                  'Decimals and integers outside the exact JavaScript integer range are returned as strings.']
+        if plan['order_by']:
+            warnings.append('Sample ordering uses MongoDB BSON value ordering; sampled metadata does not prove uniform types across the collection.')
+        return dict(plan_id=saved['plan_id'],executed_plan=plan,
+                    columns=[dict(key=fid,label=saved['field_labels'].get(fid,fid)) for fid in plan['fields']],
+                    rows=wire(rows),total_result_rows=total,matched_rows=total,limited=total>len(rows),executed_at=now(),
+                    sources=[dict(dataset_id=did,label=saved['dataset_labels'][did],metadata_revision=doc['metadata_revision'],
+                                  started_at=started,finished_at=now(),rows_read=len(rows))],join_checks=[],
+                    execution=dict(strategy='mongodb_evidence_sample',snapshot='sample and count in one MongoDB facet',
+                                   duration_ms=round((time.monotonic()-clock_started)*1000),transferred_rows=len(rows),transferred_bytes=size),
+                    explanation=plan['explanation'],warnings=warnings)
 
     def _native(self, auth, saved, plan, needed, datasets, joins, expressions, physical, deadline, fresh):
         started, clock_started = now(), time.monotonic()

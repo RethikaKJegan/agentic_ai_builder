@@ -185,8 +185,45 @@ class DelegatedToolTests(RuntimeFixture):
         with patch.object(self.connector, 'invoke') as invoke:
             result, events = self.execute()
         self.assertEqual(result['status'], 'failed')
-        self.assertIn('BUDGET_EXHAUSTED', json.dumps(events))
+        # Unaffordable tools are no longer offered. This deliberately invalid
+        # fake still requests one, so it is rejected before any reservation.
+        self.assertEqual(self.tool_contexts[0]['available_tools'], [])
+        self.assertIn('TOOL_ISOLATION_DENIED', json.dumps(events))
         invoke.assert_not_called()
+
+    def test_no_remaining_tool_allowance_can_finish_with_explicit_limitations(self):
+        self.workflow['execution_policy']['limits']['max_tool_calls'] = 0
+        self.put()
+        def finish(context):
+            self.assertEqual(context['available_tools'], [])
+            return {'action':'finish','reason':'No reviewed read allowance remains.',
+                    'output':{'claim_verified':False,'limitations':['No source query was performed.']}}
+        self.tool_choice = finish
+        with patch.object(self.connector, 'invoke') as invoke:
+            result, events = self.execute()
+        self.assertEqual(result['status'], 'completed', json.dumps(events))
+        self.assertFalse(self.master_contexts[-1]['results'][0]['result']['claim_verified'])
+        invoke.assert_not_called()
+
+    def test_four_unit_reservation_dispatches_and_consumes_actual_tool_result(self):
+        # Exercise the same four-unit reservation used by database queries,
+        # with an offline transport so no company data or paid model is needed.
+        child = next(a for a in self.workflow['agents'] if a['agent_id'] == 'research_agent')
+        child['limits']['max_tool_calls'] = 4
+        self.adapter.agents['research_agent']['definition']['limits']['max_tool_calls'] = 4
+        self.workflow['execution_policy']['limits']['max_tool_calls'] = 4
+        self.put()
+        with (patch.object(self.connector, 'reservation', return_value={'tool_calls':4}),
+              patch('runtime.connectors._google_credentials', return_value=SimpleNamespace(token='offline-oauth')),
+              patch('runtime.connectors.urlopen', side_effect=lambda *args, **kwargs: self.rows())):
+            result, events = self.execute()
+        self.assertEqual(result['status'], 'completed', json.dumps(events))
+        self.assertEqual(self.master_contexts[-1]['results'][0]['result']['actual_status'], 'pending')
+        self.assertEqual(len(self.tool_contexts), 2)
+        with self.store.transaction(write=False) as db:
+            run = self.runtime.load(db, result['run_id'], self.auth)
+        self.assertEqual(run['usage']['research_agent']['tool_calls'], 4)
+        self.assertEqual(run['usage']['research_agent']['llm_calls'], 2)
 
     def test_google_access_denial_cannot_be_reported_as_verified(self):
         with (patch('runtime.connectors._google_credentials', return_value=SimpleNamespace(token='offline-oauth')),

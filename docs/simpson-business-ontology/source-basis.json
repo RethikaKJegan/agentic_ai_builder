@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "archive_name": "simpcare-admin-console-master.zip",
+  "archive_sha256": "d7f958ffa7b970d68af9d9ab78008b18d4cf0c594982c8efef8171e63a5cbff2",
+  "blueprint_sha256": "138b2217b53fcf1144e9261e7ba2184eea3a55000acf95de78a669b9adf050e2",
+  "reference_repository": {
+    "url": "https://github.com/aws-samples/sample-industrial-ontology-mcp-server",
+    "reviewed_commit": "c74be9bb74ddb3bc83d0cebee860d49f2b7c5bd6",
+    "use": "engineering_patterns_only_no_bedrock_dependency"
+  },
+  "code_findings": [
+    {
+      "id": "warranty_eligibility",
+      "source_file": "src/services/warranty.service.js",
+      "line": 18,
+      "file_sha256": "12b09742cb7d6c2f16834cc033253b5a41d8ca7e63d25a016992a3fb12f78b2d",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Hardcoded OEM-specific invoice-month, sale-month, HMR limits; inclusive comparisons at evaluation time; no exclusion/coverage lookup."
+    },
+    {
+      "id": "warranty_date_arithmetic",
+      "source_file": "src/services/warranty.service.js",
+      "line": 11,
+      "file_sha256": "12b09742cb7d6c2f16834cc033253b5a41d8ca7e63d25a016992a3fb12f78b2d",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Calendar year/month difference, clamped to zero; ignores day of month."
+    },
+    {
+      "id": "stock_warranty_bypass",
+      "source_file": "src/controllers/complaint-form.controller.js",
+      "line": 82,
+      "file_sha256": "6f6261d2ae437ff613fa94f2b5ec45ce5b41e1a445e72b7292743ab696ab0ad8",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Depot Stock and Dealer Stock bypass automatic warranty calculation; null eligibility is not approval."
+    },
+    {
+      "id": "inspection_publication",
+      "source_file": "src/controllers/joint-inspection-report.controller.js",
+      "line": 117,
+      "file_sha256": "a90a684c2feacd8fcb51c41cc026c51f2fb4a8e0278a01d806ea00c07e87a5e4",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Assigned-engineer updates and checklist/defect publication requirements; UC06, UC07 and SJV conditional checklists."
+    },
+    {
+      "id": "replacement_authorization",
+      "source_file": "src/services/ticket.service.js",
+      "line": 907,
+      "file_sha256": "dad590fe42756fb5d88dc16ea2d31c08ca7c28f3be99a1097b6138e301af8f71",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Requires APPROVER_ASSIGNED stage; records approval/rejection and approval date. Route role check does not itself prove assigned-person enforcement."
+    },
+    {
+      "id": "out_of_warranty_support",
+      "source_file": "src/services/ticket.service.js",
+      "line": 319,
+      "file_sha256": "dad590fe42756fb5d88dc16ea2d31c08ca7c28f3be99a1097b6138e301af8f71",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Technical support may continue while underWarranty remains false."
+    },
+    {
+      "id": "cutin_classification",
+      "source_file": "src/controllers/ticket.controller.js",
+      "line": 421,
+      "file_sha256": "7c9de7b53f5a8ec5fada47de72fa4857a3a7b55528037a2811b69eaa73ad48f8",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Internal, information, bulletin fallback; string comparison on cut-in values; not confirmed recurrence evidence."
+    },
+    {
+      "id": "cutin_applicability",
+      "source_file": "src/services/service-bulletin.service.js",
+      "line": 89,
+      "file_sha256": "3b748138ee132c2a3f301bd9784835554544f31689fda972129fbe666629d81a",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Model/defect match and first plant entry; OEM/list/plant/approval are not all filtered."
+    },
+    {
+      "id": "claim_ingestion",
+      "source_file": "src/services/claim.service.js",
+      "line": 306,
+      "file_sha256": "b485cd4ba01fceb563e237f397bfce7447523afa9a4727d66aef93941bd3604d",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "SAP claim insertion; duplicate-filtering block is commented out."
+    },
+    {
+      "id": "quality_approval",
+      "source_file": "src/controllers/failed-engine-analysis.controller.js",
+      "line": 66,
+      "file_sha256": "857b06e888130b50d183672ae8e3778084c80908e643e690882b57c5673e1d2f",
+      "classification": "supplied_backend_implementation_not_live_deployment_verification",
+      "finding": "Quality-approver path checks the named qualityApprover and restricts update to status."
+    }
+  ],
+  "source_code_executed": false,
+  "credentials_copied": false
+}

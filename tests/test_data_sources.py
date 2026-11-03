@@ -349,3 +349,26 @@ def test_legacy_disconnected_add_requires_explicit_reconnect(manager):
     with pytest.raises(ApiFailure) as failure:manager.connect(auth(),config())
     assert failure.value.code=='DATA_SOURCE_RECONNECT_REQUIRED'
     assert manager.credentials(auth(),cid,config())['connection_id']==cid
+
+
+def test_targeted_field_evidence_survives_worker_sample_without_contract_changes(manager):
+    from jsonschema import Draft202012Validator
+    from pathlib import Path
+    m=manager;cid=m.connect(auth(),config())['connection_id'];m.tick()
+    previous=m.metadata(auth(),cid)['snapshot'];did=previous['datasets'][0]['dataset_id']
+    field=dict(field_id=stable_id(cid,did,'rareApproval'),name='rareApproval',types=['string'],discovery_method='sampled')
+    with m.store.transaction() as db:
+        secret=db.execute('SELECT secret FROM data_source_connections WHERE connection_id=?',(cid,)).fetchone()[0]
+        fingerprint=__import__('hashlib').sha256(secret.encode()).hexdigest()
+        db.execute('INSERT INTO ontology_source_observations VALUES (?,?)',(cid,json.dumps(dict(credential_fingerprint=fingerprint,observations=[dict(dataset_id=did,field=field,evidence_sha256='fixture')]))))
+    m.action(auth(),cid,'refresh-metadata');m.tick()
+    result=m.metadata(auth(),cid)
+    assert next(f for f in result['snapshot']['datasets'][0]['fields'] if f['name']=='rareApproval')==field
+    assert 'not observed in this bounded sample' in result['snapshot']['warnings'][0]
+    schema=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/data-sources/cloud-metadata-v1.schema.json').read_text())
+    Draft202012Validator(schema).validate(result)
+    # Evidence belongs to its credential version; it grants no wider access.
+    with m.store.transaction() as db:
+        db.execute('UPDATE ontology_source_observations SET document=? WHERE connection_id=?',(json.dumps(dict(credential_fingerprint='obsolete',observations=[dict(dataset_id=did,field=field)])),cid))
+    m.action(auth(),cid,'refresh-metadata');m.tick()
+    assert 'rareApproval' not in {f['name'] for f in m.metadata(auth(),cid)['snapshot']['datasets'][0]['fields']}

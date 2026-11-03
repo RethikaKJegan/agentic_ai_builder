@@ -1,0 +1,468 @@
+{
+  "status": "unpublished_descriptive_draft",
+  "business_policy_approved": false,
+  "source_database": ".local/ontology-foundation/simpsons-check.sqlite3",
+  "isolated_database": ".local/ontology-foundation/simpsons-domain-draft-v2.sqlite3",
+  "source_database_sha256_before": "19a74484d7564050465bbb46ddb8863f6ea130d71a4bde343473c3d81f1aa1a8",
+  "source_database_sha256_after": "19a74484d7564050465bbb46ddb8863f6ea130d71a4bde343473c3d81f1aa1a8",
+  "live_application_database_accessed": false,
+  "source_connections": 2,
+  "source_collections": 51,
+  "technically_verified_bindings": 4,
+  "technical_field_evidence": [
+    {
+      "collection": "advaced-engine-replacements",
+      "field": "oem",
+      "file": "docs/ontology-review/simpsons/field-verification.json",
+      "sha256": "0bd018ca7a64d87340d7a41eedb6faf55d07a5c8cca1053d77fbbfa020892c8b",
+      "checked_at": "2026-10-30T15:25:18.668847+00:00",
+      "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+      "matching_sample_count": 25,
+      "observed_bson_types": [
+        "string"
+      ],
+      "reference_target_verified": false,
+      "business_policy_approved": false
+    },
+    {
+      "collection": "courseschedules",
+      "field": "requestedBy",
+      "file": "docs/ontology-review/simpsons/field-verification.json",
+      "sha256": "0bd018ca7a64d87340d7a41eedb6faf55d07a5c8cca1053d77fbbfa020892c8b",
+      "checked_at": "2026-10-30T15:25:18.668847+00:00",
+      "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+      "matching_sample_count": 2,
+      "observed_bson_types": [
+        "string"
+      ],
+      "reference_target_verified": false,
+      "business_policy_approved": false
+    },
+    {
+      "collection": "tickets",
+      "field": "cutInNumber",
+      "file": "docs/ontology-review/simpsons/field-verification.json",
+      "sha256": "0bd018ca7a64d87340d7a41eedb6faf55d07a5c8cca1053d77fbbfa020892c8b",
+      "checked_at": "2026-10-30T15:25:18.668847+00:00",
+      "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+      "matching_sample_count": 2,
+      "observed_bson_types": [
+        "string"
+      ],
+      "reference_target_verified": false,
+      "business_policy_approved": false
+    },
+    {
+      "collection": "tickets",
+      "field": "engineReplacementStatus",
+      "file": "docs/ontology-review/simpsons/field-verification.json",
+      "sha256": "0bd018ca7a64d87340d7a41eedb6faf55d07a5c8cca1053d77fbbfa020892c8b",
+      "checked_at": "2026-10-30T15:25:18.668847+00:00",
+      "method": "read_only_targeted_field_presence_and_server_side_bson_type",
+      "matching_sample_count": 25,
+      "observed_bson_types": [
+        "string"
+      ],
+      "reference_target_verified": false,
+      "business_policy_approved": false
+    }
+  ],
+  "record_count": 416,
+  "kinds": {
+    "concept": 72,
+    "attribute": 228,
+    "mapping": 46,
+    "relationship": 37,
+    "constraint": 33
+  },
+  "layers": {
+    "common": 9,
+    "domain": 17,
+    "organization": 390
+  },
+  "graph_errors": [],
+  "mapping_gaps": [
+    {
+      "record_id": "simpsons:attribute:sap_claim:status",
+      "collection": "claimsftps",
+      "field": "status",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:part_analysis:partNumber",
+      "collection": "failedpartanalyses",
+      "field": "partNumber",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:part_analysis:approvedBy",
+      "collection": "failedpartanalyses",
+      "field": "approvedBy",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:ica_capa:defect",
+      "collection": "icacapas",
+      "field": "defect",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:manual_revision:manual",
+      "collection": "workshopmanualrevisions",
+      "field": "manual",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:manual_revision:version",
+      "collection": "workshopmanualrevisions",
+      "field": "version",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    },
+    {
+      "record_id": "simpsons:attribute:manual_revision:approvedBy",
+      "collection": "workshopmanualrevisions",
+      "field": "approvedBy",
+      "status": "not_observed_in_saved_sample",
+      "reason": "Code-reported meaning is retained; no source field ID, type or matching value is invented."
+    }
+  ],
+  "source_coverage": [
+    {
+      "collection": "advaced-engine-replacements",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 14
+    },
+    {
+      "collection": "advancedenginenumbers",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 3
+    },
+    {
+      "collection": "backup_logs",
+      "database": "db1",
+      "classification": "operational_metadata",
+      "field_count": 7
+    },
+    {
+      "collection": "claims",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 29
+    },
+    {
+      "collection": "claimsftps",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 22
+    },
+    {
+      "collection": "comments",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 9
+    },
+    {
+      "collection": "courseschedules",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 11
+    },
+    {
+      "collection": "emms",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 2
+    },
+    {
+      "collection": "enginedetails",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 10
+    },
+    {
+      "collection": "engineermovements",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 1000
+    },
+    {
+      "collection": "enginereplacements",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 10
+    },
+    {
+      "collection": "events",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 8
+    },
+    {
+      "collection": "exportenginetrackings",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 30
+    },
+    {
+      "collection": "failedengineanalyses",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 18
+    },
+    {
+      "collection": "failedpartanalyses",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 0
+    },
+    {
+      "collection": "faqs",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 7
+    },
+    {
+      "collection": "filecheckers",
+      "database": "db2",
+      "classification": "operational_metadata",
+      "field_count": 11
+    },
+    {
+      "collection": "floatengineftps",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 13
+    },
+    {
+      "collection": "floatengines",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 28
+    },
+    {
+      "collection": "floatinventories",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 10
+    },
+    {
+      "collection": "focs",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 44
+    },
+    {
+      "collection": "icacapas",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 0
+    },
+    {
+      "collection": "infantcares",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 143
+    },
+    {
+      "collection": "internalcutins",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 13
+    },
+    {
+      "collection": "jirlogs",
+      "database": "db2",
+      "classification": "operational_metadata",
+      "field_count": 16
+    },
+    {
+      "collection": "jointinspectionreports",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 355
+    },
+    {
+      "collection": "knowledgesharings",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 7
+    },
+    {
+      "collection": "limits",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 12
+    },
+    {
+      "collection": "mailinglists",
+      "database": "db1",
+      "classification": "operational_metadata",
+      "field_count": 6
+    },
+    {
+      "collection": "mis",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 7
+    },
+    {
+      "collection": "oemnames",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 6
+    },
+    {
+      "collection": "oems",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 19
+    },
+    {
+      "collection": "partreplacements",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 9
+    },
+    {
+      "collection": "parts",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 5
+    },
+    {
+      "collection": "performers",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 0
+    },
+    {
+      "collection": "products",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 19
+    },
+    {
+      "collection": "saledatas",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 0
+    },
+    {
+      "collection": "servicebulletins",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 20
+    },
+    {
+      "collection": "serviceinformations",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 20
+    },
+    {
+      "collection": "simpsoncodes",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 8
+    },
+    {
+      "collection": "ticketidcounters",
+      "database": "db1",
+      "classification": "operational_metadata",
+      "field_count": 7
+    },
+    {
+      "collection": "tickets",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 95
+    },
+    {
+      "collection": "tickettimelines",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 9
+    },
+    {
+      "collection": "tokens",
+      "database": "db1",
+      "classification": "operational_metadata",
+      "field_count": 9
+    },
+    {
+      "collection": "training-modules",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 8
+    },
+    {
+      "collection": "trainingschedules",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 26
+    },
+    {
+      "collection": "trainingtouchpoints",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 9
+    },
+    {
+      "collection": "users",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 11
+    },
+    {
+      "collection": "workorders",
+      "database": "db1",
+      "classification": "business_concept",
+      "field_count": 28
+    },
+    {
+      "collection": "workshopmanualrevisions",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 0
+    },
+    {
+      "collection": "workshopmanuals",
+      "database": "db2",
+      "classification": "business_concept",
+      "field_count": 15
+    }
+  ],
+  "preview_counts": {
+    "engine_service_history": 181,
+    "approved_replacements_dispatch": 88,
+    "open_tickets_before_bulletin_cutin": 91
+  },
+  "published_versions": 0,
+  "approved_records": 0,
+  "calibration_labels_created": 0,
+  "company_reads": 0,
+  "company_writes": 0,
+  "workflow_executions": 0,
+  "credentials_copied": false,
+  "approved_api_rejects_draft": true,
+  "unresolved_business_topics": [
+    "physical_engine_identity",
+    "serial_normalization_and_ordering",
+    "account_person_or_shared_identity",
+    "intended_lifecycle_and_visibility",
+    "undefined_acronyms_and_measures",
+    "currency_and_tax_interpretation",
+    "warranty_boundary_operators_and_approval",
+    "effective_document_selection",
+    "freshness_limits",
+    "ontology_approver"
+  ]
+}

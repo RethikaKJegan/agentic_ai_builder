@@ -3,3 +3,6 @@ openai>=1.109,<2
 fastapi>=0.115,<1
 uvicorn>=0.30,<1
 httpx>=0.27,<1
+# Deterministic business-ontology compilation and offline SHACL validation.
+rdflib==7.6.0
+pyshacl==0.40.2

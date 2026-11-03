@@ -1,0 +1,54 @@
+import {policyLibrary} from '../src/test/fixtures/business-policy';
+import { test, expect } from '@playwright/test';
+import { createHmac, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+const catalog=JSON.parse(readFileSync(new URL('../src/test/fixtures/business-ontology.json',import.meta.url),'utf8'));
+import { businessOntologySchema } from '../src/api/business-ontology';
+
+for (const mobile of [false,true]) test(`separate Simpson foundation ${mobile?'mobile':'desktop'}`,async({page})=>{
+ const secret=process.env['BUILDER_LOGIN_SECRET'];
+ test.skip(!secret,'Use an isolated browser-test signing key.');
+ const payload=`${Math.floor(Date.now()/1000)+3600}.${randomBytes(24).toString('hex')}`;
+ await page.context().addCookies([{name:'builder_workspace_access',value:`${payload}.${createHmac('sha256',secret!).update(payload).digest('hex')}`,domain:'127.0.0.1',path:'/'}]);
+ if(mobile)await page.setViewportSize({width:390,height:844});
+ let current=businessOntologySchema.parse(structuredClone(catalog));
+ let creates=0,legacyWrites=0;
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/api/backend/**',async route=>{
+  const request=route.request(),path=new URL(request.url()).pathname.replace('/api/backend/','');
+  let data:unknown={items:[],total:0,has_more:false,next_cursor:null};
+  if(path==='business-ontology/v1/warranty-policies')data=policyLibrary();
+  else if(path==='session') data={mode:'local-development',planning_available:true,runtime_available:false,approval_service_available:false,auth:{subject:{subject_id:'alice',workspace_id:'one'},roles:['admin'],permissions:['workflow.view','tools.read','tools.assign'],scopes:['workspace:read','workspace:write'],decision:'allow'}};
+  else if(path==='data-sources')data={configured:true,shared_demo_identity:false,items:[]};
+  else if(path==='data-refresh')data={version:1,items:[]};
+  else if(path==='business-ontology/v1')data=current;
+  else if(path==='business-ontology/v1/initialize'){
+   expect(request.postDataJSON()).toEqual({sources:{service:'db1',quality:'db2'}});creates++;
+   current={...current,workspace:{ontology_id:'simpson',title:'Simpson Business Ontology',namespace:'urn:fixture:',revision:1,status:'foundation',created_at:'2026-10-31T12:00:00Z',sources:{service:'db1',quality:'db2'},source_revisions:{service:1,quality:1}},source_bindings:[{role:'service',connection_id:'db1',name:'Simpson service db1',status:'connected'},{role:'quality',connection_id:'db2',name:'Simpson quality db2',status:'connected'}],versions:[{version_id:'foundation_fixture',revision:1,kind:'foundation',created_at:'2026-10-31T12:00:00Z'}]};data=current;
+  }else if(path==='ontology/v1')data={api_version:1,revision:'legacy1',records:[{id:'ticket',kind:'concept',layer:'organization',label:'Existing service ticket',definition:'Existing source-backed ticket concept.',dependencies:[],source_refs:[],evidence_class:'unverified_hypothesis',properties:{},revision:1,status:'draft',source_signatures:{},assessment:{heuristic_score:null,calibrated_score:null,status:'uncalibrated',contradictions:[],signals:{}}}],catalogue:[],versions:[],review_queue:[],impacts:[],metrics:{}};
+  if(path.startsWith('ontology/')&&request.method()!=='GET')legacyWrites++;
+  await route.fulfill({status:200,json:{request_id:'req_business_browser',status:200,data}});
+ });
+ await page.goto('/app/data-intelligence');
+ await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Simpson Business Ontology',exact:true})).toBeVisible();
+ await expect(page.getByRole('group',{name:'Business ontology modules'}).getByRole('button')).toHaveCount(12);
+ await page.getByRole('button',{name:'Foundational',exact:true}).click();
+ await expect(page.getByRole('article',{name:'Selected business module'}).getByRole('heading',{name:'Evidence and provenance'})).toBeVisible();
+ await page.getByRole('button',{name:'All layers',exact:true}).click();
+ await page.getByLabel('Service operations source').selectOption('db1');
+ await page.getByLabel('Claims and quality source').selectOption('db2');
+ await page.getByRole('button',{name:'Create business ontology workspace'}).click();
+ await expect(page.getByRole('heading',{name:'Foundation ready'})).toBeVisible();
+ await expect(page.getByText('Revision 1',{exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Ontology',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Ontology foundation'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Concept: Existing service ticket',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Foundation ready'})).toBeVisible();
+ await page.reload();await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Foundation ready'})).toBeVisible();
+ expect(creates).toBe(1);expect(legacyWrites).toBe(0);expect(errors).toEqual([]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/simpson-business-ontology-${mobile?'mobile':'desktop'}.png`,fullPage:true});
+});

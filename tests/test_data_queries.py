@@ -296,3 +296,25 @@ def test_large_integer_result_is_preserved_and_huge_constants_fail():
     from workflow_api.data_queries import wire
     assert wire(9007199254740993)=='9007199254740993'
     with pytest.raises(ApiFailure):expression('9'*1000,set())
+
+
+def test_workflow_slot_wait_is_bounded_and_does_not_clear_another_reader(queries):
+    queries.active.add(('one','alice'))
+    try:
+        with pytest.raises(ApiFailure) as exc:
+            queries.execute(auth(),{'plan_id':'not-dispatched'},wait_for_slot=True,deadline=time.monotonic()+.02)
+        assert exc.value.code=='DATA_QUERY_TIMEOUT'
+        assert queries.active=={('one','alice')}
+        assert not queries.reader.calls
+    finally:
+        queries.active.clear()
+
+
+def test_workflow_authority_is_rechecked_after_slot_acquisition(queries):
+    def revoked():
+        raise ApiFailure('DATABASE_WORKFLOW_AUTHORITY','Revoked while waiting.',403)
+    with pytest.raises(ApiFailure) as exc:
+        queries.execute(auth(),{'plan_id':'not-dispatched'},wait_for_slot=True,deadline=time.monotonic()+1,before_execute=revoked)
+    assert exc.value.code=='DATABASE_WORKFLOW_AUTHORITY'
+    assert not queries.active
+    assert not queries.reader.calls
