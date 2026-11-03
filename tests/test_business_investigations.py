@@ -88,6 +88,32 @@ def test_schema_failure_retains_only_safe_schema_path(investigation,path,retaine
     assert error['retryable'] is False
 
 
+def test_truncated_optional_summary_keeps_source_report_and_actual_usage(investigation):
+    from runtime.model import BoundedLLM
+    from runtime.service import RuntimeFailure
+    x=investigation;calls=[]
+    def factory(d):
+        def provider(*args):
+            calls.append(d['agent_id'])
+            if d['agent_id']=='simpson_prepare_summary':
+                failure=RuntimeFailure('MODEL_OUTPUT_TRUNCATED','Incomplete')
+                failure.provider_usage=dict(input_tokens=20000,output_tokens=30000)
+                raise failure
+            return json.dumps(dict(summary='Fixture comparison.',findings=[],missing_information=[])),100,200
+        return BoundedLLM(d,provider,lambda _:1000,0,0)
+    x.service.agents=InvestigationAgents(model_factory=factory,model_id='fixture')
+    p=x.service.plan(x.a,dict(objective='Compare complaint C123 with inspection.',request_key='truncation_report_plan',planning_mode='offline',analysis_mode='crewai'))
+    run=execute(x,p);report=run['outputs']['end']
+    assert run['status']=='completed' and not run['node_errors']
+    assert run['outputs']['summary']['classification']=='backend_evidence_compilation'
+    assert report['report_generation']['mode']=='evidence_only'
+    assert 'Model-written final narrative was unavailable' in report['qualification']
+    assert report['source_records'] and report['task_evidence'] and report['missing_information']
+    assert report['warranty_approval']=='not_performed' and not report['confirmed_findings']
+    assert run['usage']['model_calls']==2 and run['usage']['tokens']==50300
+    assert calls==['simpson_compare_inspection','simpson_prepare_summary']
+
+
 def test_effectiveness_evidence_workflow_preserves_unavailable_prerequisites(investigation):
     x=investigation;r=execute(x,plan(x,'Review corrective-action effectiveness evidence for engine E123 and prepare a report.'))
     assert r['status']=='completed',r['node_errors']

@@ -13,6 +13,7 @@ ROLES={
  'prepare_summary':('Report writer','Summarize supplied evidence and validated interpretations with exact record/mapping references. Preserve missing facts, candidate identity, conversion issues and retrieval limitations. Do not assert physical identity, confirmed root cause, official eligibility, approval or actual change incorporation.'),
 }
 OPTIONAL_CONTEXT_LIMITS={'tickettimelines':3}
+MODEL_USAGE_POLICY=dict(token_policy='provider',application_input_token_limit=None,application_output_token_limit=None,application_cost_limit_usd=None,usage_accounting='provider_reported',call_and_time_limits_enforced=True)
 
 
 def packet(evidence,analyses=(),assertions=None):
@@ -98,7 +99,7 @@ class InvestigationAgents:
         try:
             model,rates,tokenizers=model_configuration(self.env)
             self.model_id=model
-            return OpenAIModelFactory(rates,client=OpenAI(api_key=self.env['OPENAI_API_KEY'],base_url=self.env.get('OPENAI_BASE_URL'),max_retries=0,timeout=45),tokenizers=tokenizers)
+            return OpenAIModelFactory(rates,client=OpenAI(api_key=self.env['OPENAI_API_KEY'],base_url=self.env.get('OPENAI_BASE_URL'),max_retries=0,timeout=45),tokenizers=tokenizers,token_policy='provider')
         except (ValueError,KeyError):fail('Configure the existing bounded model and exact rates/tokenizer for CrewAI analysis.','INVESTIGATION_MODEL_REQUIRED',503)
 
     def run(self,capability,context,mode='crewai'):
@@ -122,9 +123,17 @@ class InvestigationAgents:
         d['instructions']+=' Keep the result concise: at most 16 findings, 12 references per finding and 24 missing-information items; summary at most 3000 characters, statements at most 1500 and missing-information items at most 500. These are hard output limits.'
         def structured_factory(agent):
             model=factory(agent)
+            model.token_policy='provider'
             model.structured_format=dict(type='json_schema',name='investigation_analysis',strict=True,schema=deepcopy(agent['output_schema']))
             return model
         usage=[]
-        output=CrewAdapter(structured_factory).execute(d,dict(context=context),usage_callback=usage.append)
+        try:
+            output=CrewAdapter(structured_factory).execute(d,dict(context=context),usage_callback=usage.append)
+        except Exception as exc:
+            if capability!='prepare_summary' or getattr(exc,'code',None)!='MODEL_OUTPUT_TRUNCATED':raise
+            # Preserve the report without inventing a replacement model answer.
+            # No partial provider text is parsed, persisted or treated as fact.
+            result=dict(summary='Model-written narrative was unavailable. Retrieved source observations, prior validated interpretations and registered evidence gaps remain available in this report.',findings=[],missing_information=[],classification='backend_evidence_compilation',verified_database_facts=False,operational_effects=False,mode='evidence_only',narrative_status='unavailable',reason_code=exc.code,model_usage_policy=deepcopy(MODEL_USAGE_POLICY))
+            return result,getattr(exc,'usage',dict(llm_calls=0,tokens=0,estimated_cost_usd=0))
         if len(usage)!=1 or usage[0]['llm_calls']!=1:fail('CrewAI must report one bounded model call.','INVESTIGATION_MODEL_USAGE')
-        result=validate_analysis(output,context);result['mode']='crewai';return result,usage[0]
+        result=validate_analysis(output,context);result['mode']='crewai';result['model_usage_policy']=deepcopy(MODEL_USAGE_POLICY);return result,usage[0]

@@ -17,7 +17,7 @@ from .business_ontology import identity
 from .business_resolution import interpret
 from .investigation_graph import VERSION,CAPABILITIES,CATALOGUE,CATALOGUE_HASH,LIMITS,CONTEXT_SCHEMA,requirements,validate_graph,predicate,fail
 from .investigation_planning import InvestigationPlanner
-from .investigation_agents import InvestigationAgents,packet
+from .investigation_agents import InvestigationAgents,packet,MODEL_USAGE_POLICY
 from .google_connections import now
 
 TERMINAL={'completed','canceled'}
@@ -109,7 +109,7 @@ class BusinessInvestigations:
         self.authorize(auth)
         from .business_evidence import definitions,REGISTRY,REGISTRY_SHA256
         return dict(schema_version=VERSION,sha256=CATALOGUE_HASH,capabilities=deepcopy(CAPABILITIES),limits=deepcopy(LIMITS),
-                    evidence_requirements={t:definitions(t) for t in REGISTRY},requirement_registry_sha256=REGISTRY_SHA256)
+                    model_usage_policy=deepcopy(MODEL_USAGE_POLICY),evidence_requirements={t:definitions(t) for t in REGISTRY},requirement_registry_sha256=REGISTRY_SHA256)
 
     @staticmethod
     def question(task,context):
@@ -278,9 +278,11 @@ class BusinessInvestigations:
         suggestions=reconcile_suggestions(analyses,task_results)
         analyses=[dict(a,missing_information=[]) for a in analyses]
         candidates=[c for e in evidence for c in e.get('ambiguous_associations',[])]
+        recovery=next((o for o in run['outputs'].values() if o.get('classification')=='backend_evidence_compilation'),None)
         incomplete=bool(missing or run['node_errors']) or any(not e.get('record_reads_complete',False) for e in evidence)
         return dict(objective=p['objective'],workflow_id=p['workflow_id'],workflow_revision=p['revision'],run_id=run['run_id'],version_id=p['version_id'],knowledge_sha256=p['knowledge_sha256'],
                     completion_status='completed_with_gaps' if incomplete else 'completed',source_records=records,
+                    model_usage_policy=deepcopy(MODEL_USAGE_POLICY),report_generation=dict(mode='evidence_only' if recovery else 'standard',narrative_status='unavailable' if recovery else 'available',reason_code=recovery.get('reason_code') if recovery else None),
                     retrieved_facts=[dict(evidence_id=e['request_id'],**f) for e in evidence for f in e['findings']],
                     configured_rule_outcomes=[r for e in evidence for r in e.get('rule_results',[])],agent_interpretations=analyses,
                     missing_information=missing,normalized_gaps=missing,task_evidence=task_results,
@@ -295,7 +297,7 @@ class BusinessInvestigations:
                     executed_nodes={k:v for k,v in run['node_states'].items() if v!='pending'},branch_decisions=run['branches'],execution_errors=run['node_errors'],
                     user_assertions=dict(values=run['assertions'],verification='unverified_user_input'),
                     physical_engine_identity='unresolved',warranty_approval='not_performed',company_writes=0,
-                    qualification='Source observations, configured rule outcomes and agent interpretations remain separate. No official eligibility, confirmed diagnosis or operational authorization is inferred.')
+                    qualification=('Model-written final narrative was unavailable; the report was compiled from retrieved evidence, prior validated interpretations and registered gaps without another model call. ' if recovery else '')+'Source observations, configured rule outcomes and agent interpretations remain separate. No official eligibility, confirmed diagnosis or operational authorization is inferred.')
 
     def invoke(self,auth,p,run,node):
         self.authorize(auth,True);nid=node['id'];kind=node['type'];cap=CATALOGUE.get(node['capability'])
@@ -402,6 +404,9 @@ class BusinessInvestigations:
                             except Exception as exc:
                                 output,outcome,usage=None,None,{}
                                 error=dict(code=getattr(exc,'code','INVESTIGATION_NODE_FAILED'),retryable=getattr(exc,'code',None) in ('BUSINESS_SOURCE_UNAVAILABLE','INVESTIGATION_MODEL_REQUIRED'),message='Node execution failed; inspect code and evidence gaps.')
+                                observed=getattr(exc,'usage',None)
+                                if isinstance(observed,dict) and all(type(observed.get(k)) in (int,float) and 0<=observed[k]<float('inf') for k in ('llm_calls','tokens','estimated_cost_usd')):
+                                    error['model_usage']=observed
                                 if error['code']=='MODEL_OUTPUT_SCHEMA_INVALID':
                                     path=getattr(exc,'validation_field',None)
                                     if isinstance(path,str) and re.fullmatch(r'[A-Za-z0-9_/-]{1,300}',path):error['validation_field']=path
@@ -410,6 +415,9 @@ class BusinessInvestigations:
                                 if current['status']=='canceled':continue
                                 current['node_times'][nid]['finished_at']=now()
                                 if error:
+                                    observed=error.get('model_usage',{})
+                                    for source,target in [('llm_calls','model_calls'),('tokens','tokens'),('estimated_cost_usd','estimated_cost_usd')]:
+                                        current['usage'][target]+=observed.get(source,0)
                                     self.transition(current,nid,'failed');current['node_errors'][nid]=error;self.event(current,'node.error',node_id=nid,**error)
                                     if node['on_error']=='stop':batch_failed=True
                                     else:

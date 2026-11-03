@@ -1,5 +1,9 @@
 # Handoff — Harihar
 
+## Provider-managed investigation tokens — 3 November 2026
+
+Explicitly user-approved backend/worker deployment removes investigation application input/output-token and cost ceilings; provider request omits max_output_tokens for planning and analysis. Effective policy exposed in capabilities/reports. Calls/time, strict citations and source scopes remain. Truncated optional final narrative retains a qualified source report; original failed run stays preserved. 130 tests plus 28 subtests, followed by 7 focused checks passed (overlap); actual saved-evidence local-provider replay and live authenticated policy checks passed. No paid replay/company writes or frontend/knowledge changes. Existing workflows can start new runs. See `openspec/changes/investigation-provider-token-policy/verification.md`.
+
 ## Investigation list rename/delete — 3 November 2026
 
 Deployed build `A8GKRkwv5mpFqeJJ5XTSx`: three-dot menu beside each business investigation, persistent display-name editing and confirmed deletion with retained audit history. Owner-scoped metadata preserves immutable plans; current workflow.edit/delete and workspace write permissions enforced. Active work blocks deletion. 46 backend, 6 frontend presentation and 6 desktop/mobile browser checks passed; types/lint/build/contracts/OpenSpec passed. Actual public menus/dialogs checked without changing user workflows. No paid calls or company writes. Details: `openspec/changes/investigation-list-actions/verification.md`.

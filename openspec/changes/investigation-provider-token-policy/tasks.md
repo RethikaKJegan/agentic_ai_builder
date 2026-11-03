@@ -1,0 +1,5 @@
+- [x] Implement opt-in provider-managed usage with actual accounting.
+- [x] Apply investigation policy to planning/analysis and qualified narrative recovery.
+- [x] Test large evidence, provider truncation, one-call enforcement and default budget preservation.
+- [x] Deploy backend/worker after idle checks and verify public availability.
+- [x] Document root cause, results, effective policy and remaining provider limits.

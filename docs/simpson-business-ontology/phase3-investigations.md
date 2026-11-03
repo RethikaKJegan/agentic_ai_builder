@@ -309,6 +309,8 @@ Capability changes require catalogue/schema updates and tests; existing saved pl
 
 ## Remaining boundaries before visual integration
 
+Current investigation token policy is provider-managed after explicit user approval: planning/analysis send no application output-token cap and enforce no application token or cost ceiling. Actual usage is recorded; call/time, source scope and validation controls remain. Final-summary truncation preserves an explicitly qualified evidence report without paid replay. Generic runtime agents retain their existing budgets. See [provider-token rollout](../../openspec/changes/investigation-provider-token-policy/verification.md). Existing workflows can start a fresh run without regeneration for this change.
+
 The later [backend evidence refinement](evidence-refinement.md) adds task requirements, supported lookups and normalized gaps. It was deployed with the [report-schema reliability fix](../../openspec/changes/investigation-report-schema/verification.md) after explicit user approval, importing live revision 8. Generate a fresh plan for its updated catalogue.
 
 The implementation supports the listed Simpson request families, not arbitrary enterprise workflows. There is no canvas, general visual editing, distributed worker fleet, streaming scheduler, arbitrary loop, approved business-write capability or external notification. Human input currently supplies an initial lookup context or acknowledges report gaps; it cannot certify missing business evidence. Cross-source model/company identity context remains limited by saved mappings. Natural-language scope filters beyond the supported Phase 2 grammar require new validated capabilities, not an LLM guess.

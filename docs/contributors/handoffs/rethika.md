@@ -1,5 +1,9 @@
 # Handoff — Rethika
 
+## Investigation provider token policy — 3 November 2026
+
+Live, explicitly approved: server-owned provider token mode for investigation planning/analysis, no application token/cost ceiling, actual failed/success usage accounting and final-summary truncation recovery with visible qualification. Generic bounded model mode and call/time/schema/authorization checks remain. 130 tests plus 28 subtests and 7 focused checks passed with overlap; saved real evidence replay used local fixtures only. Public policy/worker/session and preservation checks passed. No automatic paid replay or company writes. Original plans/run documents and frontend remain unchanged. Details: `openspec/changes/investigation-provider-token-policy/verification.md`.
+
 ## Investigation list management — 3 November 2026
 
 Live list supports scoped rename and retained-history delete through separate metadata; signed plans/run histories stay unchanged. Tombstones block new plan access/execution, queued/running work blocks deletion, and run creation rechecks deletion transactionally. Backend/worker/frontend deployed after idle checks with database/build recovery artifacts. 46 backend, 6 presentation and 6 browser checks passed; live desktop/mobile acceptance canceled all user mutations. No company writes/model calls. See `openspec/changes/investigation-list-actions/verification.md`.
