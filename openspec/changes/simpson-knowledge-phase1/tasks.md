@@ -1,0 +1,5 @@
+- [x] Implement typed knowledge definitions, source-backed authoring and semantic checks.
+- [x] Implement scoped/idempotent atomic imports, inspection and deterministic diagnostic operations.
+- [x] Preserve regeneration, historical readers, compiler and existing rule behavior.
+- [x] Add backend API/CLI, regression and bounded read-only integration checks.
+- [x] Record actual results, exact commands and remaining later-phase work.

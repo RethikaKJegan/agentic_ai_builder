@@ -50,6 +50,9 @@ def install(app, service, auth, reference, env=None):
     from .business_rule_execution import BusinessRuleExecution
     rule_execution=BusinessRuleExecution(ontology,graph,current_authority)
     app.state.business_rule_execution=rule_execution
+    from .business_knowledge import BusinessKnowledge
+    knowledge=BusinessKnowledge(ontology,current_authority)
+    app.state.business_knowledge=knowledge
 
     async def call(fn, *args):
         try:
@@ -101,6 +104,22 @@ def install(app, service, auth, reference, env=None):
             import json
             return json.loads(raw)
         except Exception:return None
+
+    @app.post('/business-ontology/v1/knowledge/import')
+    async def import_knowledge(request:Request):
+        return await call(knowledge.import_package,await body(request))
+
+    @app.get('/business-ontology/v1/versions/{version_id}/knowledge')
+    async def inspect_knowledge(version_id:str):
+        return await call(knowledge.inspect,version_id)
+
+    @app.get('/business-ontology/v1/versions/{version_id}/knowledge/concepts/{concept_id}')
+    async def inspect_knowledge_concept(version_id:str,concept_id:str):
+        return await call(knowledge.inspect,version_id,concept_id)
+
+    @app.post('/business-ontology/v1/versions/{version_id}/knowledge/diagnose')
+    async def diagnose_knowledge(version_id:str,request:Request):
+        return await call(knowledge.diagnose,version_id,await body(request))
 
     @app.post('/business-ontology/v1/documents')
     async def add_document(request:Request):

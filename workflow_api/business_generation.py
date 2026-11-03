@@ -69,9 +69,17 @@ class BusinessGeneration:
                 required={c['parent_id'] for c in retained['concepts'] if c['parent_id']}
                 required.update(v for edge in retained['relationships'] for v in (edge['source'],edge['target']))
                 required.update(v for rule in retained['rules'] for v in rule['inputs'])
+                latest=self.ontology.version(auth,self.ontology.view(db,scope)['current_version_id'])
+                required.update(latest.get('knowledge',{}).get('manifest',{}).get('protected',{}).get('concepts',[]))
                 required_concepts=[{k:c[k] for k in ('id','label','definition','layer','parent_id','properties','evidence')} for c in current['concepts'] if c['id'] in required and c['module_id']==body['module_id']]
+                protected=latest.get('knowledge',{}).get('manifest',{}).get('protected',{})
+                protected_definitions={group:[x for x in latest[group] if x['id'] in protected.get(group,[]) and x['module_id']==body['module_id']] for group in ('concepts','relationships','rules')}
+                needed_sources={e['source_id'] for items in protected_definitions.values() for x in items for e in x['evidence']}
+                available_sources={d['source_id'] for d in documents}
+                documents += [d for d in latest.get('sources',[]) if d['source_id'] in needed_sources-available_sources]
                 payload=dict(required_concepts=required_concepts,module_id=body['module_id'],module_description=next(m[2] for m in MODULES if m[0]==body['module_id']),
                     documents=documents,retained_concepts=[{k:c[k] for k in ('id','label','layer')} for c in retained['concepts']])
+                if protected:payload['protected_definitions']=protected_definitions
                 if len(json.dumps(payload))>100000:raise ApiFailure('BUSINESS_EVIDENCE_LIMIT','Selected evidence exceeds the input limit.',422)
                 doc=dict(module_id=body['module_id'],created_at=now(),base_revision=workspace['revision'],stamp=stamp,payload=payload,retained=retained)
                 job_id='boj_'+secrets.token_hex(16)
@@ -149,6 +157,8 @@ class BusinessGeneration:
                     **{kind:doc['retained'][kind]+output[kind] for kind in ('concepts','relationships','rules')},
                     questions={**previous.get('questions',{}),doc['module_id']:output['questions']},sources=list(evidence.values()),
                     extraction=dict(module_id=doc['module_id'],job_id=job_id,**usage),validation=dict(schema='passed',citations='passed',references='passed',semantic_compilation='not_run',business_policy_verified=False))
+                from .business_knowledge import preserve_knowledge
+                preserve_knowledge(previous,version)
                 for module in version['modules']:module['concept_count']=sum(c['module_id']==module['id'] for c in version['concepts'])
                 db.execute('INSERT INTO business_ontology_versions VALUES (?,?,?,?)',(*scope,version_id,json.dumps(version)))
                 db.execute('INSERT INTO business_ontology_events VALUES (?,?,?,?)',(*scope,'boe_'+secrets.token_hex(16),json.dumps(dict(action='extract_module',at=now(),version_id=version_id,module_id=doc['module_id'],job_id=job_id))))

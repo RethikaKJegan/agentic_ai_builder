@@ -61,7 +61,11 @@
         "engineReplacementApprovedDate",
         "cutInNumber",
         "cutIn",
-        "cutInDetails"
+        "cutInDetails",
+        "status",
+        "complaintRecord.natureOfCustomerComplaint",
+        "complaintRecord.investigationDetailsByOem",
+        "complaintRecord.customerComplaintDate"
       ]
     },
     {
@@ -80,7 +84,10 @@
         "defectCode",
         "serviceMaintenanceRecord",
         "photos",
-        "documents"
+        "documents",
+        "dateOfInspection",
+        "complaintDescription",
+        "defectDescription"
       ]
     },
     {

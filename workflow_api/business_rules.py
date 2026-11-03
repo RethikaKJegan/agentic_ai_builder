@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import quote
 
-from .business_compiler import COMPILER_VERSION, VOCAB_IRI, canonical, check_snapshot, dependencies
+from .business_compiler import COMPILER_VERSION, VOCAB_IRI, canonical, check_snapshot, dependencies, compiler_version
 from .business_ontology import identity
 from .service import ApiFailure
 
@@ -92,12 +92,12 @@ def compilation_problem(snapshot, compilation):
         return 'Generate and compile a module draft for this version first.'
     if not compilation:
         return 'Compile and validate this saved version before running definition queries.'
-    if (compilation.get('version_id') != snapshot['version_id'] or compilation.get('compiler_version') != COMPILER_VERSION
+    if (compilation.get('version_id') != snapshot['version_id'] or compilation.get('compiler_version') != compiler_version(snapshot)
         or compilation.get('input_sha256') != sha256(canonical(snapshot).encode()).hexdigest()):
         return 'The saved compilation does not match this definition version.'
     report = compilation.get('report', {})
     if (report.get('status') != 'passed' or report.get('definition_conforms') is not True
-        or report.get('version_id') != snapshot['version_id'] or report.get('compiler_version') != COMPILER_VERSION
+        or report.get('version_id') != snapshot['version_id'] or report.get('compiler_version') != compiler_version(snapshot)
         or any(report.get('checks',{}).get(key) != 'passed' for key in ('snapshot','rdf_syntax','shapes_meta_shacl','definition_shacl'))):
         return 'This version has no passing structural compilation.'
     artifacts = [a for a in compilation.get('artifacts', []) if a.get('name') == 'ontology.ttl']
@@ -170,7 +170,7 @@ def execute(snapshot, compilation, body):
         focus_id=body['focus_id'],columns=columns,rows=rows,offset=body['offset'],limit=body['limit'],has_more=has_more,
         next_offset=body['offset']+len(rows) if has_more else None, result_state='rows' if rows else 'no_matching_definitions',
         scope='definitions_only',business_policy_verified=False,company_records_queried=False,rules_executed=False,
-        provenance=dict(compiler_version=COMPILER_VERSION,input_sha256=compilation['input_sha256'],ontology_sha256=artifact['sha256'],query_sha256=sha256((PREFIXES+definition['select']).encode()).hexdigest()))
+        provenance=dict(compiler_version=compiler_version(snapshot),input_sha256=compilation['input_sha256'],ontology_sha256=artifact['sha256'],query_sha256=sha256((PREFIXES+definition['select']).encode()).hexdigest()))
 
 
 class BusinessRules:

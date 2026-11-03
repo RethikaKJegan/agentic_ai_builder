@@ -17,6 +17,11 @@ from .google_connections import now
 from .service import ApiFailure
 
 COMPILER_VERSION = 'simpson-owl-shacl-v1'
+KNOWLEDGE_COMPILER_VERSION = 'simpson-owl-shacl-knowledge-v1'
+
+
+def compiler_version(snapshot):
+    return KNOWLEDGE_COMPILER_VERSION if snapshot.get('knowledge') else COMPILER_VERSION
 VOCAB_IRI = 'urn:simpson-business:vocabulary:'
 
 
@@ -64,6 +69,8 @@ def check_snapshot(snapshot):
             validate_result(result, module, sources, retained)
         except ApiFailure:
             invalid()
+    from .business_knowledge_model import validate_knowledge
+    validate_knowledge(snapshot)
     return namespace
 
 
@@ -96,7 +103,7 @@ def build_graphs(snapshot):
     ontology.add((root, RDF.type, OWL.Ontology))
     ontology.add((root, OWL.versionIRI, version))
     ontology.add((root, OWL.versionInfo, Literal(snapshot['version_id'])))
-    ontology.add((root, vocab.compilerVersion, Literal(COMPILER_VERSION)))
+    ontology.add((root, vocab.compilerVersion, Literal(compiler_version(snapshot))))
     ontology.add((root, vocab.status, Literal('draft')))
     ontology.add((root, vocab.businessPolicyVerified, Literal(False)))
     # Metadata stays annotations rather than introducing formal business axioms.
@@ -227,6 +234,9 @@ def build_graphs(snapshot):
     definitions.add((evidence_shape, SH.targetClass, vocab.Evidence))
     constraint(evidence_shape, 'evidence-quote', vocab.quote, minCount=1, datatype=XSD.string)
     constraint(evidence_shape, 'evidence-source', PROV.wasDerivedFrom, minCount=1, **{'class': PROV.Entity})
+    if snapshot.get('knowledge'):
+        from .business_knowledge_model import append_rdf
+        append_rdf(snapshot,ontology,shapes,iri,vocab)
     return ontology, shapes, definitions, warnings
 
 
@@ -276,7 +286,7 @@ def compile_snapshot(snapshot):
         issues = []
         for node in results.subjects(RDF.type, SH.ValidationResult):
             issues.append(dict(focus=str(results.value(node, SH.focusNode) or ''), path=str(results.value(node, SH.resultPath) or ''), message=str(results.value(node, SH.resultMessage) or 'Definition constraint failed.')))
-        report = dict(status='passed' if conforms else 'failed', compiler_version=COMPILER_VERSION,
+        report = dict(status='passed' if conforms else 'failed', compiler_version=compiler_version(snapshot),
             version_id=snapshot['version_id'], revision=snapshot['revision'],
             checks=dict(snapshot='passed', rdf_syntax='passed', shapes_meta_shacl='passed', definition_shacl='passed' if conforms else 'failed'),
             definition_conforms=bool(conforms), instance_validation='not_run', owl_reasoning='not_run', business_policy_verified=False,
@@ -309,9 +319,9 @@ class BusinessCompiler:
 
     def get(self, auth, version_id):
         scope = identity(auth)
-        self.ontology.version(auth, version_id)
+        selected_compiler=compiler_version(self.ontology.version(auth, version_id))
         with self.store.transaction(write=False) as db:
-            row = db.execute('SELECT document FROM business_ontology_compilations WHERE workspace=? AND owner=? AND version_id=? AND compiler_version=?', (*scope, version_id, COMPILER_VERSION)).fetchone()
+            row = db.execute('SELECT document FROM business_ontology_compilations WHERE workspace=? AND owner=? AND version_id=? AND compiler_version=?', (*scope, version_id, selected_compiler)).fetchone()
         return dict(compilation=json.loads(row[0]) if row else None)
 
     def compile(self, auth, version_id, body):
@@ -324,7 +334,8 @@ class BusinessCompiler:
             return existing
         digest = sha256(canonical(snapshot).encode()).hexdigest()
         report, artifacts = compile_snapshot(deepcopy(snapshot))
-        document = dict(version_id=version_id, compiler_version=COMPILER_VERSION, input_sha256=digest, compiled_at=now(), report=report, artifacts=artifacts)
+        selected_compiler=compiler_version(snapshot)
+        document = dict(version_id=version_id, compiler_version=selected_compiler, input_sha256=digest, compiled_at=now(), report=report, artifacts=artifacts)
         with self.store.transaction() as db:
             # Recheck snapshot identity before committing, without depending on
             # a newer workspace revision or mutable company connection state.
@@ -332,8 +343,8 @@ class BusinessCompiler:
             if not row or sha256(canonical(json.loads(row[0])).encode()).hexdigest() != digest:
                 raise ApiFailure('BUSINESS_VERSION_CHANGED', 'The saved version changed during compilation.', 409)
             identity(auth, True)
-            inserted = db.execute('INSERT INTO business_ontology_compilations VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING RETURNING version_id', (*scope, version_id, COMPILER_VERSION, json.dumps(document))).fetchone()
+            inserted = db.execute('INSERT INTO business_ontology_compilations VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING RETURNING version_id', (*scope, version_id, selected_compiler, json.dumps(document))).fetchone()
             if inserted:
-                event_id = 'boe_compile_' + sha256((version_id + COMPILER_VERSION).encode()).hexdigest()[:32]
-                db.execute('INSERT INTO business_ontology_events VALUES (?,?,?,?)', (*scope, event_id, json.dumps(dict(action='compile_version', at=document['compiled_at'], version_id=version_id, compiler_version=COMPILER_VERSION, input_sha256=digest, status=report['status']))))
+                event_id = 'boe_compile_' + sha256((version_id + selected_compiler).encode()).hexdigest()[:32]
+                db.execute('INSERT INTO business_ontology_events VALUES (?,?,?,?)', (*scope, event_id, json.dumps(dict(action='compile_version', at=document['compiled_at'], version_id=version_id, compiler_version=selected_compiler, input_sha256=digest, status=report['status']))))
         return self.get(auth, version_id)

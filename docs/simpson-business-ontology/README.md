@@ -1,5 +1,7 @@
 # Simpson Business Ontology
 
+**Backend Phase 1:** [Connected knowledge package, inspection API/CLI, tests and source limits](phase1-knowledge.md) is implemented and tested locally. No frontend or live deployment is included.
+
 Status: the separate Business Ontology tab is live with source-cited definitions, saved source graphs, reports, three fixed business-rule handlers and warranty assessments. Workflow creation now automatically consults relevant saved business knowledge and shows step-level evidence. See [workflow planning and how to test it](workflow-planning.md), [foundation API and UI](foundation-api.md), [extraction and draft versions](extraction-api.md), and [OWL/RDF and SHACL compilation](compiler-api.md). Historical chunk notes below retain their original scope.
 
 **Live functional rollout (1 November 2026):** the Business Ontology tab is now active in the existing shared-workspace application. See [access, backup/recovery and live verification](functional-rollout.md). Individual login remains deferred as requested; historical local-only notes below describe earlier chunks.

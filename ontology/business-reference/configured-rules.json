@@ -1,0 +1,151 @@
+{
+  "revision": 1,
+  "rules": [
+    {
+      "id": "warranty:assessment_readiness",
+      "label": "Warranty Assessment",
+      "provenance": {
+        "origin": "configured_logic",
+        "evidence": [
+          {
+            "source_id": "ref_568e0598d4ea02383f86f967",
+            "quote": "WarrantyAssessment"
+          }
+        ]
+      },
+      "fact_types": {
+        "operating_hours": "decimal",
+        "assessment_date": "date",
+        "identity_resolved": "boolean",
+        "policy_applicable": "boolean"
+      },
+      "required_facts": [
+        "operating_hours",
+        "assessment_date",
+        "identity_resolved",
+        "policy_applicable"
+      ],
+      "conditions": {
+        "all": [
+          {
+            "fact": "operating_hours",
+            "operator": "is_nonnegative"
+          },
+          {
+            "fact": "assessment_date",
+            "operator": "is_present"
+          },
+          {
+            "fact": "identity_resolved",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "fact": "policy_applicable",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {},
+      "applicability": {
+        "oems": [],
+        "models": []
+      },
+      "outcomes": {
+        "satisfied": "assessment_inputs_ready",
+        "unsatisfied": "requirements_not_met",
+        "missing": "insufficient_information"
+      },
+      "handler": "typed_conditions_v1",
+      "executable_effects": false
+    },
+    {
+      "id": "replacement:readiness",
+      "label": "Replacement Readiness",
+      "provenance": {
+        "origin": "configured_logic",
+        "evidence": [
+          {
+            "source_id": "ref_10821d968794a962841c3a9b",
+            "quote": "ReplacementApproval"
+          }
+        ]
+      },
+      "fact_types": {
+        "inspection_evidence_present": "boolean",
+        "authorization_recorded": "boolean"
+      },
+      "required_facts": [
+        "inspection_evidence_present",
+        "authorization_recorded"
+      ],
+      "conditions": {
+        "all": [
+          {
+            "fact": "inspection_evidence_present",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "fact": "authorization_recorded",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {},
+      "applicability": {
+        "oems": [],
+        "models": []
+      },
+      "outcomes": {
+        "satisfied": "replacement_inputs_ready",
+        "unsatisfied": "requirements_not_met",
+        "missing": "insufficient_information"
+      },
+      "handler": "typed_conditions_v1",
+      "executable_effects": false
+    },
+    {
+      "id": "inspection:report_readiness",
+      "label": "Inspection Report Availability",
+      "provenance": {
+        "origin": "configured_logic",
+        "evidence": [
+          {
+            "source_id": "ref_4a62bf039dcaa22ed4d09d25",
+            "quote": "ticketId"
+          }
+        ]
+      },
+      "fact_types": {
+        "report_status": "string"
+      },
+      "required_facts": [
+        "report_status"
+      ],
+      "conditions": {
+        "all": [
+          {
+            "fact": "report_status",
+            "operator": "equals",
+            "value": "PUBLISHED"
+          }
+        ]
+      },
+      "parameters": {},
+      "applicability": {
+        "oems": [],
+        "models": []
+      },
+      "outcomes": {
+        "satisfied": "published_report_available",
+        "unsatisfied": "requirements_not_met",
+        "missing": "insufficient_information"
+      },
+      "handler": "typed_conditions_v1",
+      "executable_effects": false
+    }
+  ]
+}
