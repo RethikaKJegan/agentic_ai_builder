@@ -1,0 +1,213 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "simpson-investigation-v1"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "start",
+              "retrieval",
+              "deterministic",
+              "agent",
+              "condition",
+              "parallel",
+              "join",
+              "human_input",
+              "end"
+            ]
+          },
+          "capability": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              null,
+              "retrieve_complaint",
+              "retrieve_inspection",
+              "retrieve_warranty",
+              "retrieve_replacement",
+              "retrieve_history",
+              "compare_inspection",
+              "warranty_readiness",
+              "prepare_summary",
+              "request_missing"
+            ]
+          },
+          "predicate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              null,
+              "complaint_found",
+              "inspection_available",
+              "facts_present",
+              "identity_supported",
+              "evidence_truncated",
+              "source_value_valid",
+              "authorization_present",
+              "assessment_inputs_complete"
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "context",
+                    "evidence",
+                    "bundle"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "context",
+                    "evidence",
+                    "analysis",
+                    "gap",
+                    "control",
+                    "report",
+                    "bundle"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "source",
+                "type"
+              ]
+            }
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "context",
+              "evidence",
+              "analysis",
+              "gap",
+              "control",
+              "report",
+              "bundle"
+            ]
+          },
+          "constraints": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "max_attempts": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 45
+              }
+            },
+            "required": [
+              "max_attempts",
+              "timeout_seconds"
+            ]
+          },
+          "on_error": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "continue"
+            ]
+          },
+          "join_mode": {
+            "type": "string",
+            "enum": [
+              "all_selected",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "capability",
+          "predicate",
+          "inputs",
+          "output_type",
+          "constraints",
+          "on_error",
+          "join_mode"
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              null,
+              "true",
+              "false",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target",
+          "outcome"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "nodes",
+    "edges"
+  ]
+}

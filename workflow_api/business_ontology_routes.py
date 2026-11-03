@@ -53,6 +53,15 @@ def install(app, service, auth, reference, env=None):
     from .business_knowledge import BusinessKnowledge
     knowledge=BusinessKnowledge(ontology,current_authority)
     app.state.business_knowledge=knowledge
+    from .business_retrieval import BusinessRetrieval
+    retrieval=BusinessRetrieval(ontology,app.state.data_sources,current_authority,env=env)
+    app.state.business_retrieval=retrieval
+    from .business_investigations import BusinessInvestigations
+    investigations=BusinessInvestigations(retrieval,env=env)
+    app.state.business_investigations=investigations
+    from .investigation_jobs import InvestigationJobs
+    investigation_jobs=InvestigationJobs(investigations,current_authority)
+    app.state.investigation_jobs=investigation_jobs
 
     async def call(fn, *args):
         try:
@@ -108,6 +117,59 @@ def install(app, service, auth, reference, env=None):
     @app.post('/business-ontology/v1/knowledge/import')
     async def import_knowledge(request:Request):
         return await call(knowledge.import_package,await body(request))
+
+    @app.post('/business-ontology/v1/retrieval/preview')
+    async def retrieval_preview(request:Request):
+        return await call(retrieval.preview,await body(request))
+
+    @app.get('/business-ontology/v1/investigations/capabilities')
+    async def investigation_capabilities():return await call(investigations.catalogue)
+
+    @app.get('/business-ontology/v1/investigations')
+    async def investigation_list():return await call(investigation_jobs.list)
+
+    @app.post('/business-ontology/v1/investigations/jobs')
+    async def investigation_job_submit(request:Request):return await call(investigation_jobs.submit,await body(request))
+
+    @app.get('/business-ontology/v1/investigations/jobs/{job_id}')
+    async def investigation_job_status(job_id:str):return await call(investigation_jobs.get,job_id)
+
+    @app.post('/business-ontology/v1/investigations/plan')
+    async def investigation_plan(request:Request):return await call(investigations.plan,await body(request))
+
+    @app.get('/business-ontology/v1/investigations/plans/{workflow_id}')
+    async def investigation_get_plan(workflow_id:str):return await call(investigations.get_plan,workflow_id)
+
+    @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/validate')
+    async def investigation_validate(workflow_id:str,request:Request):
+        if await body(request)!={}:return await call(investigations.plan,None)
+        return await call(investigations.validate,workflow_id)
+
+    @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/runs')
+    async def investigation_run(workflow_id:str,request:Request):return await call(investigations.create_run,workflow_id,await body(request))
+
+    @app.get('/business-ontology/v1/investigations/runs/{run_id}')
+    async def investigation_get_run(run_id:str):return await call(investigations.get_run,run_id)
+
+    @app.post('/business-ontology/v1/investigations/runs/{run_id}/execute')
+    async def investigation_execute(run_id:str,request:Request):return await call(investigations.execute,run_id,await body(request))
+
+    @app.post('/business-ontology/v1/investigations/runs/{run_id}/resume')
+    async def investigation_resume(run_id:str,request:Request):return await call(investigations.execute,run_id,await body(request),True)
+
+    @app.post('/business-ontology/v1/investigations/runs/{run_id}/input')
+    async def investigation_input(run_id:str,request:Request):return await call(investigations.supply_input,run_id,await body(request))
+
+    @app.post('/business-ontology/v1/investigations/runs/{run_id}/cancel')
+    async def investigation_cancel(run_id:str,request:Request):return await call(investigations.cancel,run_id,await body(request))
+
+    @app.get('/business-ontology/v1/retrieval/{request_id}')
+    async def retrieval_inspect(request_id:str):
+        return await call(retrieval.inspect,request_id)
+
+    @app.post('/business-ontology/v1/retrieval/{request_id}/execute')
+    async def retrieval_execute(request_id:str,request:Request):
+        return await call(retrieval.execute,request_id,await body(request))
 
     @app.get('/business-ontology/v1/versions/{version_id}/knowledge')
     async def inspect_knowledge(version_id:str):

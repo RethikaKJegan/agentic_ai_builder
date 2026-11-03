@@ -418,3 +418,19 @@ def test_unsupported_source_remains_rejected_with_specific_reason(coordinator):
     with pytest.raises(SourceBindingError) as failure:
         bind_generated(w,{'database_catalog':coordinator.catalog(authority())})
     assert 'outside the supplied owned catalog' in str(failure.value)
+
+
+def test_pinned_ontology_required_sources_are_grounded_and_never_omitted(coordinator):
+    c=coordinator
+    preview,catalog=c.retrieval.retrieve(authority(),'List orders',planning=True,required_source_ids=['mongo_customers'])
+    assert 'mongo_customers' in {s['dataset_id'] for s in catalog['sources']}
+    assert any('pinned business ontology' in r for candidate in preview['candidates'] if candidate['dataset_id']=='mongo_customers' for r in candidate['reasons'])
+    with pytest.raises(ApiFailure):c.retrieval.retrieve(authority(),'List orders',planning=True,required_source_ids=['foreign_dataset'])
+    rev,_=c.retrieval.sync(authority())
+    with pytest.raises(ApiFailure):c.retrieval.retrieve(authority(),'List orders',{'revision':rev,'source_ids':['pg_orders']},planning=True,required_source_ids=['mongo_customers'])
+    with c.store.transaction() as db:
+        source=json.loads(db.execute("SELECT document FROM kg_retrieval_sources WHERE dataset_id='mongo_customers'").fetchone()[0])
+        source['fields'] += [dict(field_id=f'oversized_{i}',name='x'*200+str(i),types=['string']) for i in range(450)]
+        db.execute("UPDATE kg_retrieval_sources SET document=? WHERE dataset_id='mongo_customers'",(json.dumps(source),))
+    with pytest.raises(ApiFailure) as exc:c.retrieval.retrieve(authority(),'List orders',planning=True,required_source_ids=['mongo_customers'])
+    assert exc.value.code=='KG_RETRIEVAL_LIMIT'

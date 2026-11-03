@@ -21,6 +21,27 @@ class RetryableInvocation(RuntimeFailure):
     """An adapter-confirmed failure before any external effect was attempted."""
 
 
+def ready_frontier(nodes, edges, node_states, edge_states):
+    """Pure DAG frontier shared by approved workflows and read-only investigations.
+
+    Incoming edges must all resolve. One selected incoming path activates a join;
+    wholly skipped branches propagate skips without blocking later joins.
+    """
+    ready, skipped = [], []
+    for node in nodes:
+        nid = node['node_id']
+        if nid in node_states:
+            continue
+        incoming = [edge for edge in edges if edge['target'] == nid]
+        if any(edge['edge_id'] not in edge_states for edge in incoming):
+            continue
+        if not incoming or any(edge_states[e['edge_id']] == 'selected' for e in incoming):
+            ready.append(node)
+        else:
+            skipped.append(node)
+    return ready, skipped
+
+
 
 class GraphRunner:
     def invoke_agent_with_feedback(self, adapter, binding, params, run_id, auth, worker, workflow, node, reference):
@@ -83,25 +104,21 @@ class GraphRunner:
 
     def next_node(self, db, run, workflow):
         while True:
-            skipped = False
+            ready, skipped = ready_frontier(workflow['nodes'], workflow['edges'], run['node_states'], run['edge_states'])
+            # Preserve original graph-order choice between ready and skipped nodes.
+            eligible = {n['node_id'] for n in [*ready, *skipped]}
             for node in workflow['nodes']:
-                if node['node_id'] in run['node_states']:
+                if node['node_id'] not in eligible:
                     continue
-                incoming = [edge for edge in workflow['edges'] if edge['target'] == node['node_id']]
-                if any(edge['edge_id'] not in run['edge_states'] for edge in incoming):
-                    continue
-                if not incoming:
-                    if node['kind'] != 'trigger':
+                if node in ready:
+                    if not any(e['target'] == node['node_id'] for e in workflow['edges']) and node['kind'] != 'trigger':
                         raise RuntimeFailure('UNREACHABLE_EXECUTION_NODE', 'Only trigger nodes may start a graph.')
-                    return node
-                if any(run['edge_states'][edge['edge_id']] == 'selected' for edge in incoming):
                     return node
                 run['node_states'][node['node_id']] = 'skipped'
                 for edge in self.outgoing(workflow, node['node_id']):
                     run['edge_states'][edge['edge_id']] = 'skipped'
                 self.runtime.event(db, run, 'node.skipped', {'node_id': node['node_id'], 'explanation': 'All incoming paths were skipped in this run.'})
                 self.runtime.save(db, run)
-                skipped = True
             if not skipped:
                 return None
 

@@ -131,7 +131,11 @@ class QueryReader:
         def append(row):
             nonlocal byte_count
             from .data_write_adapter import pack
-            byte_count += len(json.dumps(pack(row, config['engine'])).encode())
+            from .business_graph import at
+            # Mongo's dotted scalar projections return nested documents. Budget
+            # the requested scalar fields, while retaining native rows for joins.
+            projected={name:at(row,name) for name in names}
+            byte_count += len(json.dumps(pack(projected, config['engine'])).encode())
             if byte_count > MAX_BYTES:
                 fail('Object projection exceeds 2 MB.', 'ONTOLOGY_OBJECT_LIMIT', 422)
             rows.append(row)

@@ -215,7 +215,17 @@ class WorkflowService:
                     result['business_ontology_retrieval'] = retrieve_business(self.store, auth,
                         trusted['payload'].get('objective', trusted['payload'].get('requirement', '')))
                     databases = getattr(self, 'database_workflows', None)
-                    result=databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', ''))) if databases else result
+                    result.pop('ontology_retrieval',None)
+                    required_sources=[]
+                    if databases:
+                        from .business_retrieval import planner_context as ontology_context
+                        try:
+                            grounded,required_sources=ontology_context(self.store,auth,
+                                trusted['payload'].get('objective', trusted['payload'].get('requirement', '')),databases.manager)
+                            result['ontology_retrieval']=grounded
+                        except ApiFailure as exc:
+                            result['ontology_retrieval']={'state':'unavailable','code':exc.code,'company_reads':0}
+                    result=databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', '')),required_source_ids=required_sources) if databases else result
                     ontology_selection=result.get('ontology_selection')
                     return result
                 with scope as selected_google:

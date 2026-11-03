@@ -110,7 +110,7 @@ class KnowledgeRetrieval:
             return revision, state
         raise ApiFailure('KG_RETRIEVAL_CHANGED','Metadata changed while preparing the source preview. Retry the preview.',409)
 
-    def retrieve(self, auth, objective, selection=None, *, planning=False):
+    def retrieve(self, auth, objective, selection=None, *, planning=False, required_source_ids=()):
         auth = self.c.current(auth)
         if not isinstance(objective,str) or not 1 <= len(objective.strip()) <= 12000:
             raise ApiFailure('KG_RETRIEVAL_INPUT','Provide a workflow description of 1–12000 characters.',400)
@@ -142,9 +142,20 @@ class KnowledgeRetrieval:
                 if did not in seeds and any(w>=5 and term not in covered for term,w in hits[did].items()):
                     seeds.append(did);covered.update(matched[did])
             chosen=list(selection['source_ids']) if selection else seeds[:4]
+            # Only an internal caller can supply these ontology-resolved IDs.
+            # Every descriptor still passes the owned index lookup below.
+            required=list(dict.fromkeys(required_source_ids))
+            if len(required)>16:
+                raise ApiFailure('KG_RETRIEVAL_LIMIT','Required ontology datasets exceed the planning bound.',422)
+            if required:
+                if selection and not set(required)<=set(chosen):
+                    raise ApiFailure('KG_SOURCE_SELECTION_REQUIRED','Explicit source selection omits required ontology datasets.',422)
+                candidates=list(dict.fromkeys([*required,*candidates]))[:16]
+                for did in required:
+                    reasons[did].add('Required by pinned business ontology mappings or dependencies.')
             # Explicit selection may choose any currently owned indexed source,
             # but cannot inject source descriptors, tools, fields or grants.
-            for did in chosen:
+            for did in list(dict.fromkeys([*chosen,*required])):
                 row=db.execute('SELECT document FROM kg_retrieval_sources WHERE workspace=? AND owner=? AND dataset_id=?',(workspace,owner,did)).fetchone()
                 if not row:
                     raise ApiFailure('KG_RETRIEVAL_SOURCE','A selected source is no longer available in your workspace.',403)
@@ -219,6 +230,8 @@ class KnowledgeRetrieval:
             for did in pool:
                 source=indexed[did]
                 if len(json.dumps([*pool_sources,source]).encode())>70000:
+                    if did in required:
+                        raise ApiFailure('KG_RETRIEVAL_LIMIT','Required ontology metadata cannot fit; narrow or decompose the request.',422)
                     omitted.append(did)
                     continue
                 pool_sources.append(source)

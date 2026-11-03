@@ -1,5 +1,15 @@
 import "@testing-library/jest-dom/vitest";
 
+// jsdom has no layout observer. Canvas tests still validate graph semantics;
+// actual measurement and responsive rendering are exercised in Playwright.
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 Object.defineProperty(window, "scrollTo", {
   writable: true,
   value: () => {},

@@ -1,0 +1,3169 @@
+{
+  "plan": {
+    "revision": 1,
+    "created_at": "2026-11-03T10:26:53.903812+00:00",
+    "read_only": true,
+    "ontology_context": {
+      "knowledge_sha256": "93881cfbf5d8ab2ab13e3d2313a6c503c9f6967cdeb6c692dd016cef35825849",
+      "tasks": {
+        "complaints": {
+          "concepts": [
+            {
+              "confidence": 0.7,
+              "definition": "A service case concerning an engine; ticket presence does not establish eligibility.",
+              "evidence": [
+                {
+                  "quote": "WarrantyTicket",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                },
+                {
+                  "quote": "ticketId",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:warranty_ticket",
+              "label": "WarrantyTicket",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "The source-scoped ticket identifier.",
+                  "name": "ticket_id",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded submitted serial from tickets.engineNo.",
+                  "name": "submitted_serial",
+                  "required": false
+                },
+                {
+                  "datatype": "decimal",
+                  "description": "Recorded recorded hours from tickets.hmr.",
+                  "name": "recorded_hours",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded reported sale date from tickets.complaintRecord.dateOfSale.",
+                  "name": "reported_sale_date",
+                  "required": false
+                },
+                {
+                  "datatype": "datetime",
+                  "description": "Recorded registered at from tickets.createdAt.",
+                  "name": "registered_at",
+                  "required": false
+                },
+                {
+                  "datatype": "enumeration",
+                  "description": "Recorded case status from tickets.status.",
+                  "name": "case_status",
+                  "required": false
+                },
+                {
+                  "datatype": "reference",
+                  "description": "Recorded engineer reference from tickets.serviceEngineer.",
+                  "name": "engineer_reference",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "Information submitted about a complaint, separate from verified investigation findings.",
+              "evidence": [
+                {
+                  "quote": "ComplaintSubmission",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:complaint_submission",
+              "label": "ComplaintSubmission",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Recorded oem investigation notes from tickets.complaintRecord.investigationDetailsByOem.",
+                  "name": "oem_investigation_notes",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded customer complaint date from tickets.complaintRecord.customerComplaintDate.",
+                  "name": "customer_complaint_date",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A symptom reported by a customer or OEM, not automatically verified.",
+              "evidence": [
+                {
+                  "quote": "ReportedSymptom",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:reported_symptom",
+              "label": "ReportedSymptom",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Recorded reported description from tickets.complaintRecord.natureOfCustomerComplaint.",
+                  "name": "reported_description",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An operating-hour observation reported with a complaint.",
+              "evidence": [
+                {
+                  "quote": "ReportedOperatingHours",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                },
+                {
+                  "quote": "reportedOperatingHours",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:reported_operating_hours",
+              "label": "ReportedOperatingHours",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "decimal",
+                  "description": "Reported hours; parsing does not establish measurement verification.",
+                  "name": "hours",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            }
+          ],
+          "dependencies": {
+            "complete": true,
+            "concept_ids": [
+              "complaints:complaint_submission",
+              "complaints:reported_operating_hours",
+              "complaints:reported_symptom",
+              "complaints:warranty_ticket"
+            ],
+            "conditions": [],
+            "dependencies": [],
+            "mapping_ids": [],
+            "provider_mapping_ids": [],
+            "reason": null,
+            "relationship_ids": [],
+            "required_facts": [],
+            "rule_ids": []
+          },
+          "intent": {
+            "ambiguities": [],
+            "business_scope": "Simpson",
+            "candidates": [
+              {
+                "concept_id": "complaints:warranty_ticket",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [
+                  "complaint"
+                ],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 26
+              },
+              {
+                "concept_id": "complaints:complaint_submission",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_failure",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_operating_hours",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_symptom",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:ticket_status",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "inspection:inspection_report",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [],
+                "score": 1
+              }
+            ],
+            "concept_ids": [
+              "complaints:warranty_ticket"
+            ],
+            "filters": [],
+            "identifiers": {
+              "complaint_id": "A-2022-12-013"
+            },
+            "interpretation": "deterministic",
+            "model_calls": 0,
+            "requested_facts": [],
+            "task": "complaints",
+            "time_references": [],
+            "unsupported": []
+          },
+          "mappings": [
+            {
+              "attribute": "registered_at",
+              "availability": "available",
+              "business_datatype": "datetime",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "iso_datetime",
+              "field_path": "createdAt",
+              "id": "mapping:complaint_created",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "date",
+                "datetime"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "hours",
+              "availability": "available",
+              "business_datatype": "decimal",
+              "collection": "tickets",
+              "concept_id": "complaints:reported_operating_hours",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "parse_nonnegative_decimal",
+              "field_path": "complaintRecord.hmr",
+              "id": "mapping:complaint_hours",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": "hour",
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "oem_investigation_notes",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:complaint_submission",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "complaintRecord.investigationDetailsByOem",
+              "id": "mapping:complaint_oem_notes",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "investigationDetailsByOem",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "case_status",
+              "availability": "available",
+              "business_datatype": "enumeration",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "status",
+              "id": "mapping:complaint_status",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "reported_description",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:reported_symptom",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "complaintRecord.natureOfCustomerComplaint",
+              "id": "mapping:complaint_symptom",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "natureOfCustomerComplaint",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "recorded_hours",
+              "availability": "available",
+              "business_datatype": "decimal",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "parse_nonnegative_decimal",
+              "field_path": "hmr",
+              "id": "mapping:ticket_hours",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "integer",
+                "number",
+                "int",
+                "double"
+              ],
+              "unit": "hour",
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "ticket_id",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "_id",
+              "id": "mapping:ticket_id",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "submitted_serial",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "engineNo",
+              "id": "mapping:ticket_serial",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            }
+          ],
+          "missing": [],
+          "rules": []
+        },
+        "inspection": {
+          "concepts": [
+            {
+              "confidence": 0.7,
+              "definition": "A person who can hold organizational roles.",
+              "evidence": [
+                {
+                  "quote": "Person",
+                  "source_id": "ref_989505858dd5f4a1e41b7e6f"
+                }
+              ],
+              "id": "organization:person",
+              "label": "Person",
+              "layer": "common",
+              "module_id": "organization",
+              "parent_id": null,
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Current role assignments, authority and validity intervals are not verified."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A service case concerning an engine; ticket presence does not establish eligibility.",
+              "evidence": [
+                {
+                  "quote": "WarrantyTicket",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                },
+                {
+                  "quote": "ticketId",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:warranty_ticket",
+              "label": "WarrantyTicket",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "The source-scoped ticket identifier.",
+                  "name": "ticket_id",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded submitted serial from tickets.engineNo.",
+                  "name": "submitted_serial",
+                  "required": false
+                },
+                {
+                  "datatype": "decimal",
+                  "description": "Recorded recorded hours from tickets.hmr.",
+                  "name": "recorded_hours",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded reported sale date from tickets.complaintRecord.dateOfSale.",
+                  "name": "reported_sale_date",
+                  "required": false
+                },
+                {
+                  "datatype": "datetime",
+                  "description": "Recorded registered at from tickets.createdAt.",
+                  "name": "registered_at",
+                  "required": false
+                },
+                {
+                  "datatype": "enumeration",
+                  "description": "Recorded case status from tickets.status.",
+                  "name": "case_status",
+                  "required": false
+                },
+                {
+                  "datatype": "reference",
+                  "description": "Recorded engineer reference from tickets.serviceEngineer.",
+                  "name": "engineer_reference",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "Information submitted about a complaint, separate from verified investigation findings.",
+              "evidence": [
+                {
+                  "quote": "ComplaintSubmission",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:complaint_submission",
+              "label": "ComplaintSubmission",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Recorded oem investigation notes from tickets.complaintRecord.investigationDetailsByOem.",
+                  "name": "oem_investigation_notes",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded customer complaint date from tickets.complaintRecord.customerComplaintDate.",
+                  "name": "customer_complaint_date",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A symptom reported by a customer or OEM, not automatically verified.",
+              "evidence": [
+                {
+                  "quote": "ReportedSymptom",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:reported_symptom",
+              "label": "ReportedSymptom",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Recorded reported description from tickets.complaintRecord.natureOfCustomerComplaint.",
+                  "name": "reported_description",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An inspection involving the relevant service and OEM participants.",
+              "evidence": [
+                {
+                  "quote": "JointInspection",
+                  "source_id": "ref_f959a870c7c3585594b1312d"
+                },
+                {
+                  "quote": "inspectionStatus",
+                  "source_id": "ref_f959a870c7c3585594b1312d"
+                }
+              ],
+              "id": "inspection:joint_inspection",
+              "label": "JointInspection",
+              "layer": "domain",
+              "module_id": "inspection",
+              "parent_id": "evidence:process",
+              "properties": [
+                {
+                  "datatype": "enumeration",
+                  "description": "Literal inspection state; allowed values require the actual vocabulary.",
+                  "name": "inspection_status",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Published inspection status and confirmed findings require explicit source evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An observation made during inspection, distinct from a root-cause conclusion.",
+              "evidence": [
+                {
+                  "quote": "InspectionObservation",
+                  "source_id": "ref_f959a870c7c3585594b1312d"
+                }
+              ],
+              "id": "inspection:inspection_observation",
+              "label": "InspectionObservation",
+              "layer": "domain",
+              "module_id": "inspection",
+              "parent_id": null,
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Published inspection status and confirmed findings require explicit source evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A report recording inspection activities and findings.",
+              "evidence": [
+                {
+                  "quote": "InspectionReport",
+                  "source_id": "ref_f959a870c7c3585594b1312d"
+                }
+              ],
+              "id": "inspection:inspection_report",
+              "label": "InspectionReport",
+              "layer": "domain",
+              "module_id": "inspection",
+              "parent_id": "evidence:information_object",
+              "properties": [
+                {
+                  "datatype": "enumeration",
+                  "description": "Recorded report status from jointinspectionreports.status.",
+                  "name": "report_status",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded reported failure date from jointinspectionreports.dateOfFailure.",
+                  "name": "reported_failure_date",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded inspection date from jointinspectionreports.dateOfInspection.",
+                  "name": "inspection_date",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded potential cause from jointinspectionreports.potentialCause.",
+                  "name": "potential_cause",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded complaint description from jointinspectionreports.complaintDescription.",
+                  "name": "complaint_description",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded defect description from jointinspectionreports.defectDescription.",
+                  "name": "defect_description",
+                  "required": false
+                },
+                {
+                  "datatype": "datetime",
+                  "description": "Report publication timestamp; no exact source field is established.",
+                  "name": "published_at",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Published inspection status and confirmed findings require explicit source evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A document or other information object used in a business process.",
+              "evidence": [
+                {
+                  "quote": "InformationObject",
+                  "source_id": "ref_5f74f5d355bd949c2037e1ca"
+                }
+              ],
+              "id": "evidence:information_object",
+              "label": "InformationObject",
+              "layer": "common",
+              "module_id": "evidence",
+              "parent_id": "evidence:entity",
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "Anything that exists within the ontology scope.",
+              "evidence": [
+                {
+                  "quote": "Entity",
+                  "source_id": "ref_c554e435203c2b79b6b7c8ea"
+                }
+              ],
+              "id": "evidence:entity",
+              "label": "Entity",
+              "layer": "foundational",
+              "module_id": "evidence",
+              "parent_id": null,
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An unfolding activity.",
+              "evidence": [
+                {
+                  "quote": "Process",
+                  "source_id": "ref_c554e435203c2b79b6b7c8ea"
+                }
+              ],
+              "id": "evidence:process",
+              "label": "Process",
+              "layer": "foundational",
+              "module_id": "evidence",
+              "parent_id": "evidence:entity",
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            }
+          ],
+          "dependencies": {
+            "complete": true,
+            "concept_ids": [
+              "complaints:complaint_submission",
+              "complaints:reported_symptom",
+              "complaints:warranty_ticket",
+              "evidence:entity",
+              "evidence:information_object",
+              "evidence:process",
+              "inspection:inspection_observation",
+              "inspection:inspection_report",
+              "inspection:joint_inspection",
+              "organization:person"
+            ],
+            "conditions": [],
+            "dependencies": [
+              "dependency:inspection"
+            ],
+            "mapping_ids": [
+              "mapping:engineer_reference",
+              "mapping:inspection_status"
+            ],
+            "provider_mapping_ids": [
+              "mapping:inspection_status"
+            ],
+            "reason": null,
+            "relationship_ids": [
+              "inspection:activity_complaint",
+              "inspection:activity_engineer",
+              "inspection:report_complaint"
+            ],
+            "required_facts": [
+              "inspection_activity_completion_evidence",
+              "report_status"
+            ],
+            "rule_ids": [
+              "inspection:report_readiness"
+            ]
+          },
+          "intent": {
+            "ambiguities": [],
+            "business_scope": "Simpson",
+            "candidates": [
+              {
+                "concept_id": "complaints:warranty_ticket",
+                "contextual_terms": [
+                  "complaint",
+                  "inspection"
+                ],
+                "matched_names": [
+                  "complaint"
+                ],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 27
+              },
+              {
+                "concept_id": "inspection:joint_inspection",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [
+                  "inspection"
+                ],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 26
+              },
+              {
+                "concept_id": "inspection:inspection_report",
+                "contextual_terms": [
+                  "complaint",
+                  "finding",
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 8
+              },
+              {
+                "concept_id": "complaints:complaint_submission",
+                "contextual_terms": [
+                  "complaint",
+                  "finding"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 7
+              },
+              {
+                "concept_id": "complaints:reported_failure",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_operating_hours",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_symptom",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:ticket_status",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "inspection:diagnostic_test",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "inspection:inspection_observation",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "inspection:investigation_case",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "quality:returned_engine_inspection",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "inspection"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "effectivity:engineering_change",
+                "contextual_terms": [
+                  "finding"
+                ],
+                "matched_names": [],
+                "matched_terms": [],
+                "score": 1
+              },
+              {
+                "concept_id": "quality:quality_investigation",
+                "contextual_terms": [
+                  "inspection"
+                ],
+                "matched_names": [],
+                "matched_terms": [],
+                "score": 1
+              }
+            ],
+            "concept_ids": [
+              "inspection:joint_inspection"
+            ],
+            "filters": [],
+            "identifiers": {
+              "complaint_id": "A-2022-12-013"
+            },
+            "interpretation": "deterministic",
+            "model_calls": 0,
+            "requested_facts": [
+              "inspection_activity_completion_evidence",
+              "report_status"
+            ],
+            "task": "inspection",
+            "time_references": [],
+            "unsupported": []
+          },
+          "mappings": [
+            {
+              "attribute": "oem_investigation_notes",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:complaint_submission",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "complaintRecord.investigationDetailsByOem",
+              "id": "mapping:complaint_oem_notes",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "investigationDetailsByOem",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "reported_description",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:reported_symptom",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "complaintRecord.natureOfCustomerComplaint",
+              "id": "mapping:complaint_symptom",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "natureOfCustomerComplaint",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "engineer_reference",
+              "availability": "available",
+              "business_datatype": "reference",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "serviceEngineer",
+              "id": "mapping:engineer_reference",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string",
+                "ObjectId"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "complaint_description",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "complaintDescription",
+              "id": "mapping:inspection_complaint_text",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "complaintDescription",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "inspection_date",
+              "availability": "available",
+              "business_datatype": "date",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "iso_date",
+              "field_path": "dateOfInspection",
+              "id": "mapping:inspection_date",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "ticketId",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "date",
+                "datetime",
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "defect_description",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "defectDescription",
+              "id": "mapping:inspection_defect_text",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "defectDescription",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "reported_failure_date",
+              "availability": "available",
+              "business_datatype": "date",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "iso_date",
+              "field_path": "dateOfFailure",
+              "id": "mapping:inspection_failure_date",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "ticketId",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "date",
+                "datetime",
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "potential_cause",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "potentialCause",
+              "id": "mapping:inspection_potential_cause",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "ticketId",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "report_status",
+              "availability": "available",
+              "business_datatype": "enumeration",
+              "collection": "jointinspectionreports",
+              "concept_id": "inspection:inspection_report",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "status",
+              "id": "mapping:inspection_status",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "ticketId",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "ticket_id",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "_id",
+              "id": "mapping:ticket_id",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "submitted_serial",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "engineNo",
+              "id": "mapping:ticket_serial",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            }
+          ],
+          "missing": [
+            {
+              "fact": "inspection_activity_completion_evidence",
+              "reason": "missing"
+            }
+          ],
+          "rules": [
+            {
+              "applicability": {
+                "models": [],
+                "oems": []
+              },
+              "conditions": {
+                "all": [
+                  {
+                    "fact": "report_status",
+                    "operator": "equals",
+                    "value": "PUBLISHED"
+                  }
+                ]
+              },
+              "executable_effects": false,
+              "fact_types": {
+                "report_status": "string"
+              },
+              "handler": "typed_conditions_v1",
+              "id": "inspection:report_readiness",
+              "label": "Inspection Report Availability",
+              "outcomes": {
+                "missing": "insufficient_information",
+                "satisfied": "published_report_available",
+                "unsatisfied": "requirements_not_met"
+              },
+              "parameters": {},
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "ticketId",
+                    "source_id": "ref_4a62bf039dcaa22ed4d09d25"
+                  }
+                ],
+                "origin": "configured_logic"
+              },
+              "required_facts": [
+                "report_status"
+              ]
+            }
+          ]
+        },
+        "warranty": {
+          "concepts": [
+            {
+              "confidence": 0.7,
+              "definition": "A service case concerning an engine; ticket presence does not establish eligibility.",
+              "evidence": [
+                {
+                  "quote": "WarrantyTicket",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                },
+                {
+                  "quote": "ticketId",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:warranty_ticket",
+              "label": "WarrantyTicket",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "The source-scoped ticket identifier.",
+                  "name": "ticket_id",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded submitted serial from tickets.engineNo.",
+                  "name": "submitted_serial",
+                  "required": false
+                },
+                {
+                  "datatype": "decimal",
+                  "description": "Recorded recorded hours from tickets.hmr.",
+                  "name": "recorded_hours",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded reported sale date from tickets.complaintRecord.dateOfSale.",
+                  "name": "reported_sale_date",
+                  "required": false
+                },
+                {
+                  "datatype": "datetime",
+                  "description": "Recorded registered at from tickets.createdAt.",
+                  "name": "registered_at",
+                  "required": false
+                },
+                {
+                  "datatype": "enumeration",
+                  "description": "Recorded case status from tickets.status.",
+                  "name": "case_status",
+                  "required": false
+                },
+                {
+                  "datatype": "reference",
+                  "description": "Recorded engineer reference from tickets.serviceEngineer.",
+                  "name": "engineer_reference",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An operating-hour observation reported with a complaint.",
+              "evidence": [
+                {
+                  "quote": "ReportedOperatingHours",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                },
+                {
+                  "quote": "reportedOperatingHours",
+                  "source_id": "ref_4b7fd81d8ea3b5c9d3d269fd"
+                }
+              ],
+              "id": "complaints:reported_operating_hours",
+              "label": "ReportedOperatingHours",
+              "layer": "domain",
+              "module_id": "complaints",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "decimal",
+                  "description": "Reported hours; parsing does not establish measurement verification.",
+                  "name": "hours",
+                  "required": false
+                }
+              ],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Reported and verified states require explicit source vocabulary and investigation evidence."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A document or other information object used in a business process.",
+              "evidence": [
+                {
+                  "quote": "InformationObject",
+                  "source_id": "ref_5f74f5d355bd949c2037e1ca"
+                }
+              ],
+              "id": "evidence:information_object",
+              "label": "InformationObject",
+              "layer": "common",
+              "module_id": "evidence",
+              "parent_id": "evidence:entity",
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "Anything that exists within the ontology scope.",
+              "evidence": [
+                {
+                  "quote": "Entity",
+                  "source_id": "ref_c554e435203c2b79b6b7c8ea"
+                }
+              ],
+              "id": "evidence:entity",
+              "label": "Entity",
+              "layer": "foundational",
+              "module_id": "evidence",
+              "parent_id": null,
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A physical object, distinct from a source record.",
+              "evidence": [
+                {
+                  "quote": "PhysicalEntity",
+                  "source_id": "ref_c554e435203c2b79b6b7c8ea"
+                }
+              ],
+              "id": "evidence:physical_entity",
+              "label": "PhysicalEntity",
+              "layer": "foundational",
+              "module_id": "evidence",
+              "parent_id": "evidence:entity",
+              "properties": [],
+              "source_basis": "curated_supplied_blueprint_draft",
+              "status": "draft",
+              "unknowns": [
+                "Source assertions need verification status, temporal validity and record-level provenance."
+              ]
+            },
+            {
+              "confidence": 0.99,
+              "definition": "A physical engine. A serial is an identifier observation and does not alone resolve physical identity across source records.",
+              "evidence": [
+                {
+                  "quote": "EngineInstance",
+                  "source_id": "ref_8d6c4d8bec241ef3b88b7ad4"
+                },
+                {
+                  "quote": "Your quality analysis must primarily operate at the engine-instance level",
+                  "source_id": "ref_8d6c4d8bec241ef3b88b7ad4"
+                },
+                {
+                  "quote": "engineSerialNumber: {",
+                  "source_id": "ref_e80beaf3aba0ee4e02005ea9"
+                }
+              ],
+              "id": "engines:engine_instance",
+              "label": "EngineInstance",
+              "layer": "domain",
+              "module_id": "engines",
+              "parent_id": "engines:physical_product",
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "An observed engine serial; physical identity requires source-scoped association evidence.",
+                  "name": "engine_serial_number",
+                  "required": true
+                },
+                {
+                  "datatype": "date",
+                  "description": "Build date stored for the engine detail record.",
+                  "name": "build_date",
+                  "required": false
+                },
+                {
+                  "datatype": "enumeration",
+                  "description": "Stored engine status when available; allowed values are not established as policy.",
+                  "name": "engine_status",
+                  "required": false
+                },
+                {
+                  "datatype": "reference",
+                  "description": "OEM associated with the stored engine details.",
+                  "name": "oem",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": [
+                "Allowed values for engine_status are not established as policy."
+              ]
+            },
+            {
+              "confidence": 0.96,
+              "definition": "A policy that governs warranty coverage and may define eligibility criteria and exclusions.",
+              "evidence": [
+                {
+                  "quote": "Actual policies might include different commencement dates, commercial terms, application-specific limits, service requirements and exclusions.",
+                  "source_id": "ref_568e0598d4ea02383f86f967"
+                }
+              ],
+              "id": "warranty:warranty_policy",
+              "label": "WarrantyPolicy",
+              "layer": "business",
+              "module_id": "warranty",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Version of the policy used for an assessment.",
+                  "name": "policy_version",
+                  "required": false
+                },
+                {
+                  "datatype": "reference",
+                  "description": "Period during which the policy applies.",
+                  "name": "effective_period",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": [
+                "The authoritative policy document, policy version structure and approval status are not supplied."
+              ]
+            },
+            {
+              "confidence": 0.97,
+              "definition": "A policy condition that may prevent otherwise potentially applicable warranty coverage.",
+              "evidence": [
+                {
+                  "quote": "WarrantyExclusion",
+                  "source_id": "ref_568e0598d4ea02383f86f967"
+                }
+              ],
+              "id": "warranty:warranty_exclusion",
+              "label": "WarrantyExclusion",
+              "layer": "domain",
+              "module_id": "warranty",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Description of the exclusion.",
+                  "name": "description",
+                  "required": false
+                },
+                {
+                  "datatype": "boolean",
+                  "description": "Recorded applicability of the exclusion, if assessed.",
+                  "name": "applicable",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": [
+                "Specific exclusions and their applicability tests are not supplied."
+              ]
+            },
+            {
+              "confidence": 0.94,
+              "definition": "Evidence considered during a warranty assessment, such as dates, operating hours, service history or supporting documents.",
+              "evidence": [
+                {
+                  "quote": "WarrantyAssessment CONSIDERS WarrantyEvidence",
+                  "source_id": "ref_568e0598d4ea02383f86f967"
+                }
+              ],
+              "id": "warranty:warranty_evidence",
+              "label": "WarrantyEvidence",
+              "layer": "domain",
+              "module_id": "warranty",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "enumeration",
+                  "description": "Type of evidence, such as date, operating-hours value, service history or proof of purchase.",
+                  "name": "evidence_type",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded evidence value or reference.",
+                  "name": "value",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": [
+                "Evidence sufficiency, provenance and verification requirements are not defined."
+              ]
+            },
+            {
+              "confidence": 0.98,
+              "definition": "An evaluation of a warranty claim using applicable policy criteria and evidence.",
+              "evidence": [
+                {
+                  "quote": "WarrantyAssessment EVALUATES WarrantyClaim",
+                  "source_id": "ref_568e0598d4ea02383f86f967"
+                }
+              ],
+              "id": "warranty:warranty_assessment",
+              "label": "WarrantyAssessment",
+              "layer": "domain",
+              "module_id": "warranty",
+              "parent_id": null,
+              "properties": [
+                {
+                  "datatype": "datetime",
+                  "description": "Time at which the assessment was recorded.",
+                  "name": "assessed_at",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Policy version preserved for reproducibility.",
+                  "name": "policy_version_used",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": [
+                "Assessment responsibilities, review stages and evidentiary standards are not supplied."
+              ]
+            },
+            {
+              "confidence": 0.7,
+              "definition": "A physical product, distinguished from its model and source records.",
+              "evidence": [
+                {
+                  "quote": "Product",
+                  "source_id": "ref_c554e435203c2b79b6b7c8ea"
+                }
+              ],
+              "id": "engines:physical_product",
+              "label": "PhysicalProduct",
+              "layer": "common",
+              "module_id": "engines",
+              "parent_id": "evidence:physical_entity",
+              "properties": [],
+              "status": "draft",
+              "unknowns": []
+            },
+            {
+              "confidence": 0.7,
+              "definition": "An engine invoice entry, not a globally resolved physical engine identity.",
+              "evidence": [
+                {
+                  "quote": "engineSerialNumber",
+                  "source_id": "ref_e80beaf3aba0ee4e02005ea9"
+                }
+              ],
+              "id": "engines:engine_invoice_record",
+              "label": "EngineInvoiceRecord",
+              "layer": "domain",
+              "module_id": "engines",
+              "parent_id": "evidence:information_object",
+              "properties": [
+                {
+                  "datatype": "string",
+                  "description": "Recorded serial number from enginedetails.engineSerialNumber.",
+                  "name": "serial_number",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded invoice date from enginedetails.invoiceDate.",
+                  "name": "invoice_date",
+                  "required": false
+                },
+                {
+                  "datatype": "date",
+                  "description": "Recorded build date from enginedetails.buildDate.",
+                  "name": "build_date",
+                  "required": false
+                },
+                {
+                  "datatype": "string",
+                  "description": "Recorded model observation from enginedetails.engineModel.",
+                  "name": "model_observation",
+                  "required": false
+                }
+              ],
+              "status": "draft",
+              "unknowns": []
+            }
+          ],
+          "dependencies": {
+            "complete": true,
+            "concept_ids": [
+              "complaints:reported_operating_hours",
+              "complaints:warranty_ticket",
+              "engines:engine_instance",
+              "engines:engine_invoice_record",
+              "engines:physical_product",
+              "evidence:entity",
+              "evidence:information_object",
+              "evidence:physical_entity",
+              "warranty:warranty_assessment",
+              "warranty:warranty_evidence",
+              "warranty:warranty_exclusion",
+              "warranty:warranty_policy"
+            ],
+            "conditions": [
+              {
+                "predicate": "selected policy requires sale date",
+                "state": "unknown"
+              },
+              {
+                "predicate": "selected policy requires invoice date",
+                "state": "unknown"
+              }
+            ],
+            "dependencies": [
+              "dependency:warranty"
+            ],
+            "mapping_ids": [
+              "mapping:complaint_hours",
+              "mapping:invoice_date",
+              "mapping:sale_date"
+            ],
+            "provider_mapping_ids": [
+              "mapping:complaint_hours",
+              "mapping:invoice_date",
+              "mapping:sale_date"
+            ],
+            "reason": null,
+            "relationship_ids": [],
+            "required_facts": [
+              "applicable_policy",
+              "assessment_date",
+              "engine_identity",
+              "exclusion_findings",
+              "identity_resolved",
+              "invoice_date",
+              "operating_hours",
+              "policy_applicable",
+              "sale_date"
+            ],
+            "rule_ids": [
+              "warranty:assessment_readiness"
+            ]
+          },
+          "intent": {
+            "ambiguities": [],
+            "business_scope": "Simpson",
+            "candidates": [
+              {
+                "concept_id": "warranty:warranty_evidence",
+                "contextual_terms": [
+                  "evidence",
+                  "warranty"
+                ],
+                "matched_names": [
+                  "WarrantyEvidence"
+                ],
+                "matched_terms": [
+                  "evidence",
+                  "warranty"
+                ],
+                "score": 32
+              },
+              {
+                "concept_id": "complaints:warranty_ticket",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [
+                  "complaint"
+                ],
+                "matched_terms": [
+                  "complaint",
+                  "warranty"
+                ],
+                "score": 31
+              },
+              {
+                "concept_id": "evidence:evidence",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [
+                  "Evidence"
+                ],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 26
+              },
+              {
+                "concept_id": "complaints:reported_failure",
+                "contextual_terms": [
+                  "complaint",
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 7
+              },
+              {
+                "concept_id": "warranty:warranty_assessment",
+                "contextual_terms": [
+                  "evidence",
+                  "warranty"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "warranty"
+                ],
+                "score": 7
+              },
+              {
+                "concept_id": "complaints:complaint_submission",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_operating_hours",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:reported_symptom",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "complaints:ticket_status",
+                "contextual_terms": [
+                  "complaint"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "complaint"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:entity",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:event",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:information_object",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:physical_entity",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:process",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:role",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              },
+              {
+                "concept_id": "evidence:source_record",
+                "contextual_terms": [
+                  "evidence"
+                ],
+                "matched_names": [],
+                "matched_terms": [
+                  "evidence"
+                ],
+                "score": 6
+              }
+            ],
+            "concept_ids": [
+              "warranty:warranty_assessment"
+            ],
+            "filters": [],
+            "identifiers": {
+              "complaint_id": "A-2022-12-013"
+            },
+            "interpretation": "deterministic",
+            "model_calls": 0,
+            "requested_facts": [
+              "applicable_policy",
+              "assessment_date",
+              "engine_identity",
+              "exclusion_findings",
+              "identity_resolved",
+              "invoice_date",
+              "operating_hours",
+              "policy_applicable",
+              "sale_date"
+            ],
+            "task": "warranty",
+            "time_references": [],
+            "unsupported": []
+          },
+          "mappings": [
+            {
+              "attribute": "hours",
+              "availability": "available",
+              "business_datatype": "decimal",
+              "collection": "tickets",
+              "concept_id": "complaints:reported_operating_hours",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "parse_nonnegative_decimal",
+              "field_path": "complaintRecord.hmr",
+              "id": "mapping:complaint_hours",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": "hour",
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "invoice_date",
+              "availability": "available",
+              "business_datatype": "date",
+              "collection": "enginedetails",
+              "concept_id": "engines:engine_invoice_record",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "iso_date",
+              "field_path": "invoiceDate",
+              "id": "mapping:invoice_date",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineSerialNumber",
+                    "source_id": "ref_e80beaf3aba0ee4e02005ea9"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "date",
+                "datetime"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "serial_number",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "enginedetails",
+              "concept_id": "engines:engine_invoice_record",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "engineSerialNumber",
+              "id": "mapping:invoice_serial",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineSerialNumber",
+                    "source_id": "ref_e80beaf3aba0ee4e02005ea9"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "reported_sale_date",
+              "availability": "available",
+              "business_datatype": "date",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "iso_date",
+              "field_path": "complaintRecord.dateOfSale",
+              "id": "mapping:sale_date",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "date",
+                "datetime"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "recorded_hours",
+              "availability": "available",
+              "business_datatype": "decimal",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "parse_nonnegative_decimal",
+              "field_path": "hmr",
+              "id": "mapping:ticket_hours",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "integer",
+                "number",
+                "int",
+                "double"
+              ],
+              "unit": "hour",
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "ticket_id",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "_id",
+              "id": "mapping:ticket_id",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            },
+            {
+              "attribute": "submitted_serial",
+              "availability": "available",
+              "business_datatype": "string",
+              "collection": "tickets",
+              "concept_id": "complaints:warranty_ticket",
+              "connection_id": "dbconn_897964ed8cd9de2073f5497b50b80361",
+              "conversion": "identity",
+              "field_path": "engineNo",
+              "id": "mapping:ticket_serial",
+              "metadata_revision": 9,
+              "missing_behavior": "unknown",
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "engineNo",
+                    "source_id": "ref_8dd14a73e0a55638fa465ca1"
+                  }
+                ],
+                "origin": "application_behavior"
+              },
+              "source_role": "service",
+              "stored_datatypes": [
+                "string"
+              ],
+              "unit": null,
+              "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+            }
+          ],
+          "missing": [
+            {
+              "fact": "applicable_policy",
+              "reason": "missing"
+            },
+            {
+              "fact": "assessment_date",
+              "reason": "missing"
+            },
+            {
+              "fact": "exclusion_findings",
+              "reason": "missing"
+            },
+            {
+              "mapping_ids": [
+                "mapping:invoice_date",
+                "mapping:invoice_serial"
+              ],
+              "reason": "no_supported_anchored_path"
+            }
+          ],
+          "rules": [
+            {
+              "applicability": {
+                "models": [],
+                "oems": []
+              },
+              "conditions": {
+                "all": [
+                  {
+                    "fact": "operating_hours",
+                    "operator": "is_nonnegative"
+                  },
+                  {
+                    "fact": "assessment_date",
+                    "operator": "is_present"
+                  },
+                  {
+                    "fact": "identity_resolved",
+                    "operator": "equals",
+                    "value": true
+                  },
+                  {
+                    "fact": "policy_applicable",
+                    "operator": "equals",
+                    "value": true
+                  }
+                ]
+              },
+              "executable_effects": false,
+              "fact_types": {
+                "assessment_date": "date",
+                "identity_resolved": "boolean",
+                "operating_hours": "decimal",
+                "policy_applicable": "boolean"
+              },
+              "handler": "typed_conditions_v1",
+              "id": "warranty:assessment_readiness",
+              "label": "Warranty Assessment",
+              "outcomes": {
+                "missing": "insufficient_information",
+                "satisfied": "assessment_inputs_ready",
+                "unsatisfied": "requirements_not_met"
+              },
+              "parameters": {},
+              "provenance": {
+                "evidence": [
+                  {
+                    "quote": "WarrantyAssessment",
+                    "source_id": "ref_568e0598d4ea02383f86f967"
+                  }
+                ],
+                "origin": "configured_logic"
+              },
+              "required_facts": [
+                "operating_hours",
+                "assessment_date",
+                "identity_resolved",
+                "policy_applicable"
+              ]
+            }
+          ]
+        }
+      },
+      "version_id": "bov_77aada53e5217147f397992a17dc88f6"
+    },
+    "planning": {
+      "mode": "model",
+      "model_calls": 1,
+      "validation": {
+        "errors": [],
+        "topological_order": [
+          "start",
+          "anchor",
+          "complaint",
+          "found",
+          "not_found",
+          "uncertain_complaint",
+          "work",
+          "inspection",
+          "warranty",
+          "has_inspection",
+          "warranty_review",
+          "compare",
+          "no_inspection",
+          "unknown_inspection",
+          "inspection_join",
+          "results",
+          "summary",
+          "end"
+        ],
+        "valid": true
+      }
+    },
+    "workflow_id": "investigation_fixture",
+    "objective": "Compare complaint C123 with its inspection and check warranty readiness.",
+    "version_id": "version_fixture",
+    "knowledge_sha256": "fixture_knowledge_hash",
+    "inputs": {
+      "identifiers": {
+        "complaint_id": "C123"
+      }
+    },
+    "graph": {
+      "schema_version": "simpson-investigation-v1",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "start",
+          "capability": null,
+          "predicate": null,
+          "inputs": [],
+          "output_type": "context",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "anchor",
+          "type": "human_input",
+          "capability": null,
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "context",
+              "source": "start",
+              "type": "context"
+            }
+          ],
+          "output_type": "context",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "complaint",
+          "type": "retrieval",
+          "capability": "retrieve_complaint",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "context",
+              "source": "anchor",
+              "type": "context"
+            }
+          ],
+          "output_type": "evidence",
+          "constraints": {
+            "max_attempts": 2,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "found",
+          "type": "condition",
+          "capability": null,
+          "predicate": "complaint_found",
+          "inputs": [
+            {
+              "name": "evidence",
+              "source": "complaint",
+              "type": "evidence"
+            }
+          ],
+          "output_type": "control",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "not_found",
+          "type": "deterministic",
+          "capability": "request_missing",
+          "predicate": null,
+          "inputs": [],
+          "output_type": "gap",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "uncertain_complaint",
+          "type": "deterministic",
+          "capability": "request_missing",
+          "predicate": null,
+          "inputs": [],
+          "output_type": "gap",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "work",
+          "type": "parallel",
+          "capability": null,
+          "predicate": null,
+          "inputs": [],
+          "output_type": "control",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "inspection",
+          "type": "retrieval",
+          "capability": "retrieve_inspection",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "context",
+              "source": "anchor",
+              "type": "context"
+            }
+          ],
+          "output_type": "evidence",
+          "constraints": {
+            "max_attempts": 2,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "has_inspection",
+          "type": "condition",
+          "capability": null,
+          "predicate": "inspection_available",
+          "inputs": [
+            {
+              "name": "evidence",
+              "source": "inspection",
+              "type": "evidence"
+            }
+          ],
+          "output_type": "control",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "compare",
+          "type": "agent",
+          "capability": "compare_inspection",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "evidence",
+              "source": "inspection",
+              "type": "evidence"
+            }
+          ],
+          "output_type": "analysis",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "no_inspection",
+          "type": "deterministic",
+          "capability": "request_missing",
+          "predicate": null,
+          "inputs": [],
+          "output_type": "gap",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "unknown_inspection",
+          "type": "deterministic",
+          "capability": "request_missing",
+          "predicate": null,
+          "inputs": [],
+          "output_type": "gap",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "inspection_join",
+          "type": "join",
+          "capability": null,
+          "predicate": null,
+          "inputs": [],
+          "output_type": "bundle",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "all_selected"
+        },
+        {
+          "id": "warranty",
+          "type": "retrieval",
+          "capability": "retrieve_warranty",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "context",
+              "source": "anchor",
+              "type": "context"
+            }
+          ],
+          "output_type": "evidence",
+          "constraints": {
+            "max_attempts": 2,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "warranty_review",
+          "type": "agent",
+          "capability": "warranty_readiness",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "evidence",
+              "source": "warranty",
+              "type": "evidence"
+            }
+          ],
+          "output_type": "analysis",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "results",
+          "type": "join",
+          "capability": null,
+          "predicate": null,
+          "inputs": [],
+          "output_type": "bundle",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "all_selected"
+        },
+        {
+          "id": "summary",
+          "type": "agent",
+          "capability": "prepare_summary",
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "bundle",
+              "source": "results",
+              "type": "bundle"
+            }
+          ],
+          "output_type": "analysis",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        },
+        {
+          "id": "end",
+          "type": "end",
+          "capability": null,
+          "predicate": null,
+          "inputs": [
+            {
+              "name": "bundle",
+              "source": "results",
+              "type": "bundle"
+            }
+          ],
+          "output_type": "report",
+          "constraints": {
+            "max_attempts": 1,
+            "timeout_seconds": 45
+          },
+          "on_error": "stop",
+          "join_mode": "none"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_1",
+          "source": "start",
+          "target": "anchor",
+          "outcome": null
+        },
+        {
+          "id": "edge_2",
+          "source": "anchor",
+          "target": "complaint",
+          "outcome": null
+        },
+        {
+          "id": "edge_3",
+          "source": "complaint",
+          "target": "found",
+          "outcome": null
+        },
+        {
+          "id": "edge_4",
+          "source": "found",
+          "target": "not_found",
+          "outcome": "false"
+        },
+        {
+          "id": "edge_5",
+          "source": "found",
+          "target": "uncertain_complaint",
+          "outcome": "unknown"
+        },
+        {
+          "id": "edge_6",
+          "source": "found",
+          "target": "work",
+          "outcome": "true"
+        },
+        {
+          "id": "edge_7",
+          "source": "work",
+          "target": "inspection",
+          "outcome": null
+        },
+        {
+          "id": "edge_8",
+          "source": "inspection",
+          "target": "has_inspection",
+          "outcome": null
+        },
+        {
+          "id": "edge_9",
+          "source": "has_inspection",
+          "target": "compare",
+          "outcome": "true"
+        },
+        {
+          "id": "edge_10",
+          "source": "has_inspection",
+          "target": "no_inspection",
+          "outcome": "false"
+        },
+        {
+          "id": "edge_11",
+          "source": "has_inspection",
+          "target": "unknown_inspection",
+          "outcome": "unknown"
+        },
+        {
+          "id": "edge_12",
+          "source": "compare",
+          "target": "inspection_join",
+          "outcome": null
+        },
+        {
+          "id": "edge_13",
+          "source": "no_inspection",
+          "target": "inspection_join",
+          "outcome": null
+        },
+        {
+          "id": "edge_14",
+          "source": "unknown_inspection",
+          "target": "inspection_join",
+          "outcome": null
+        },
+        {
+          "id": "edge_15",
+          "source": "work",
+          "target": "warranty",
+          "outcome": null
+        },
+        {
+          "id": "edge_16",
+          "source": "warranty",
+          "target": "warranty_review",
+          "outcome": null
+        },
+        {
+          "id": "edge_17",
+          "source": "inspection_join",
+          "target": "results",
+          "outcome": null
+        },
+        {
+          "id": "edge_18",
+          "source": "warranty_review",
+          "target": "results",
+          "outcome": null
+        },
+        {
+          "id": "edge_19",
+          "source": "not_found",
+          "target": "results",
+          "outcome": null
+        },
+        {
+          "id": "edge_20",
+          "source": "uncertain_complaint",
+          "target": "results",
+          "outcome": null
+        },
+        {
+          "id": "edge_21",
+          "source": "results",
+          "target": "summary",
+          "outcome": null
+        },
+        {
+          "id": "edge_22",
+          "source": "summary",
+          "target": "end",
+          "outcome": null
+        }
+      ]
+    }
+  },
+  "run": {
+    "run_id": "run_fixture",
+    "workflow_id": "investigation_fixture",
+    "status": "completed",
+    "version_id": "version_fixture",
+    "knowledge_sha256": "fixture_knowledge_hash",
+    "node_states": {
+      "start": "succeeded",
+      "anchor": "succeeded",
+      "complaint": "succeeded",
+      "found": "succeeded",
+      "not_found": "skipped",
+      "uncertain_complaint": "skipped",
+      "work": "succeeded",
+      "inspection": "succeeded",
+      "has_inspection": "succeeded",
+      "compare": "succeeded",
+      "no_inspection": "skipped",
+      "unknown_inspection": "skipped",
+      "inspection_join": "succeeded",
+      "warranty": "succeeded",
+      "warranty_review": "succeeded",
+      "results": "succeeded",
+      "summary": "succeeded",
+      "end": "succeeded"
+    },
+    "outputs": {
+      "complaint": {
+        "records": [
+          {
+            "record_id": "record_ticket",
+            "evidence_id": "evidence_fixture",
+            "collection": "tickets",
+            "fields": {
+              "_id": "C123",
+              "engineNo": "E123",
+              "complaintRecord.symptom": "Cooling water leak"
+            },
+            "source_reference": {
+              "field": "_id",
+              "native_value": "C123"
+            },
+            "read_at": "2026-11-03T10:00:00Z",
+            "values": {
+              "mapping:complaint_symptom": {
+                "state": "value",
+                "value": "Cooling water leak"
+              }
+            }
+          }
+        ],
+        "completeness": "complete_for_scoped_reads"
+      },
+      "inspection": {
+        "records": [
+          {
+            "record_id": "record_ticket",
+            "evidence_id": "evidence_fixture",
+            "collection": "tickets",
+            "fields": {
+              "_id": "C123",
+              "engineNo": "E123",
+              "complaintRecord.symptom": "Cooling water leak"
+            },
+            "source_reference": {
+              "field": "_id",
+              "native_value": "C123"
+            },
+            "read_at": "2026-11-03T10:00:00Z",
+            "values": {
+              "mapping:complaint_symptom": {
+                "state": "value",
+                "value": "Cooling water leak"
+              }
+            }
+          },
+          {
+            "record_id": "record_inspection",
+            "evidence_id": "evidence_fixture",
+            "collection": "jointinspectionreports",
+            "fields": {
+              "_id": "J123",
+              "ticketId": "C123",
+              "status": "PUBLISHED"
+            },
+            "source_reference": {
+              "field": "_id",
+              "native_value": "J123"
+            },
+            "read_at": "2026-11-03T10:00:00Z",
+            "values": {
+              "mapping:inspection_status": {
+                "state": "value",
+                "value": "PUBLISHED"
+              }
+            }
+          }
+        ],
+        "completeness": "incomplete"
+      },
+      "compare": {
+        "summary": "The reported complaint and inspection were compared. Policy applicability remains unavailable.",
+        "findings": [
+          {
+            "kind": "observation",
+            "statement": "A published inspection report was retrieved; activity completion is not established.",
+            "references": [
+              {
+                "record_id": "record_inspection",
+                "mapping_id": "mapping:inspection_status"
+              }
+            ],
+            "classification": "agent_interpretation"
+          }
+        ],
+        "missing_information": [
+          "Verified policy applicability"
+        ],
+        "classification": "agent_interpretation",
+        "mode": "crewai"
+      },
+      "end": {
+        "completion_status": "completed_with_gaps",
+        "source_records": [
+          {
+            "record_id": "record_ticket",
+            "evidence_id": "evidence_fixture",
+            "collection": "tickets",
+            "fields": {
+              "_id": "C123",
+              "engineNo": "E123",
+              "complaintRecord.symptom": "Cooling water leak"
+            },
+            "source_reference": {
+              "field": "_id",
+              "native_value": "C123"
+            },
+            "read_at": "2026-11-03T10:00:00Z",
+            "values": {
+              "mapping:complaint_symptom": {
+                "state": "value",
+                "value": "Cooling water leak"
+              }
+            }
+          },
+          {
+            "record_id": "record_inspection",
+            "evidence_id": "evidence_fixture",
+            "collection": "jointinspectionreports",
+            "fields": {
+              "_id": "J123",
+              "ticketId": "C123",
+              "status": "PUBLISHED"
+            },
+            "source_reference": {
+              "field": "_id",
+              "native_value": "J123"
+            },
+            "read_at": "2026-11-03T10:00:00Z",
+            "values": {
+              "mapping:inspection_status": {
+                "state": "value",
+                "value": "PUBLISHED"
+              }
+            }
+          }
+        ],
+        "agent_interpretations": [
+          {
+            "summary": "The reported complaint and inspection were compared. Policy applicability remains unavailable.",
+            "findings": [
+              {
+                "kind": "observation",
+                "statement": "A published inspection report was retrieved; activity completion is not established.",
+                "references": [
+                  {
+                    "record_id": "record_inspection",
+                    "mapping_id": "mapping:inspection_status"
+                  }
+                ],
+                "classification": "agent_interpretation"
+              }
+            ],
+            "missing_information": [
+              "Verified policy applicability"
+            ],
+            "classification": "agent_interpretation",
+            "mode": "crewai"
+          }
+        ],
+        "missing_information": [
+          {
+            "fact": "policy_applicable",
+            "reason": "missing"
+          },
+          {
+            "fact": "inspection_activity_completion_evidence",
+            "reason": "missing"
+          }
+        ],
+        "configured_rule_outcomes": [
+          {
+            "record_id": "record_ticket",
+            "result": {
+              "rule_id": "warranty:assessment_readiness",
+              "outcome": "insufficient_information",
+              "state": "missing",
+              "missing_facts": [
+                "identity_resolved",
+                "policy_applicable"
+              ],
+              "provenance": {
+                "origin": "configured_logic"
+              }
+            }
+          }
+        ],
+        "ambiguous_associations": [],
+        "conversion_issues": [],
+        "qualification": "Reported observations, configured rule outcomes and agent interpretations remain separate.",
+        "physical_engine_identity": "unresolved",
+        "warranty_approval": "not_performed"
+      }
+    },
+    "branches": {
+      "found": "true",
+      "has_inspection": "true"
+    },
+    "edge_states": {
+      "edge_1": "selected",
+      "edge_2": "selected",
+      "edge_3": "selected",
+      "edge_4": "skipped",
+      "edge_5": "skipped",
+      "edge_6": "selected",
+      "edge_7": "selected",
+      "edge_8": "selected",
+      "edge_9": "selected",
+      "edge_10": "skipped",
+      "edge_11": "skipped",
+      "edge_12": "selected",
+      "edge_13": "skipped",
+      "edge_14": "skipped",
+      "edge_15": "selected",
+      "edge_16": "selected",
+      "edge_17": "selected",
+      "edge_18": "selected",
+      "edge_19": "skipped",
+      "edge_20": "skipped",
+      "edge_21": "selected",
+      "edge_22": "selected"
+    },
+    "node_errors": {},
+    "attempts": {
+      "complaint": 1
+    },
+    "pending_inputs": [],
+    "usage": {
+      "model_calls": 3
+    },
+    "events": [
+      {
+        "sequence": 1,
+        "type": "run.completed",
+        "at": "2026-11-03T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-11-03T10:00:00Z",
+    "updated_at": "2026-11-03T10:01:00Z"
+  }
+}

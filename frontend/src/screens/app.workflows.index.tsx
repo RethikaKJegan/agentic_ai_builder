@@ -14,6 +14,7 @@ import { RenameWorkflowDialog } from "@/features/workflows/RenameWorkflowDialog"
 import type { Workflow } from "@/domain/types";
 import type { CanonicalWorkflow } from "@/api/contracts.generated";
 import { useEffect, useRef, useState } from "react";
+import {InvestigationList} from '@/features/investigations/InvestigationList';
 
 
 
@@ -136,6 +137,7 @@ export default function WorkflowsPage() {
           })}
         </div>
       )}
+      <InvestigationList/>
     </div>
   );
 }

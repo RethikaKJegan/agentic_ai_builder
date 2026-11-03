@@ -699,3 +699,12 @@ public workspace/API retirement is deployed. Do not request repeated user consen
 expected 410 and 19 focused checks passed. 14 frontend tests, types/lint/build,
 contracts/spec and exact saved v7 offline replay pass. No paid calls/live runs or
 production company-record test reads. See latest source-lifecycle verification.
+
+
+## Simpson Phase 3 read-only investigations — 3 November 2026
+
+Ready for repository handoff: versioned investigation capabilities, typed model-planned DAGs, deterministic three-valued branches, bounded parallel source reads, durable leased checkpoints, typed input/resume/cancel, real bounded CrewAI analysis and terminal/API inspection. Reuses Phase 1/2 evidence and existing runtime scheduling/model/lease helpers; generic production release/registry gates and shared contracts remain unchanged.
+
+Verification: 683 relevant backend tests and 18 subtests passed; final affected Phase 3 suite 51 passed. Explicitly user-authorized api.openai.com evaluation generated a valid 18-node graph on its first proposal and completed the real A-2022-12-013 investigation with three CrewAI calls. Independent ticket/inspection IDs matched; 25 agent findings retained validated source references. Report completed with gaps, unresolved physical identity and no warranty approval. Company/live-application writes and copied credentials were zero. No frontend/canvas, worker restart, production knowledge import or deployment.
+
+Commands, file inventory, graph/report, persistence, permissions, retry/parallelism limits and unsupported scope: `docs/simpson-business-ontology/phase3-investigations.md`. Detailed evidence: `openspec/changes/simpson-workflows-phase3/verification.md`. Next integration work is the separately authorized visual/API consumer and operational hosting/retention decisions, not company writes or arbitrary agents. This is a repository handoff, not external notification or downstream acceptance.

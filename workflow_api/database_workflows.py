@@ -265,7 +265,7 @@ class DatabaseWorkflows:
                 ((has_sources and item['tool_id'] in TOOLS) or
                  (runner is not None and item['tool_id'] in runner.connectors and (item['tool_id'].startswith(('extension_calendar_', 'extension_mail_', 'extension_sheets_', 'smtp_')) or item['tool_id'] in {'supplier_web_search','supplier_read_page','extension_inventory_rank','extension_report_delivery','extension_inventory_normalize'})))]
 
-    def enrich(self, auth, context, objective=None):
+    def enrich(self, auth, context, objective=None, *, required_source_ids=()):
         context = deepcopy(context)
         selected_ontology=context.pop('ontology_concepts',None)
         context.pop('ontology_selection',None)
@@ -282,7 +282,7 @@ class DatabaseWorkflows:
             if objective is None:  # Compatibility for existing internal consumers.
                 catalog = self.catalog(auth)
             else:
-                preview, catalog = self.retrieval.retrieve(auth, objective, selection, planning=True)
+                preview, catalog = self.retrieval.retrieve(auth, objective, selection, planning=True, required_source_ids=required_source_ids)
                 preview['tools'] = self.preview_tools(auth, bool(catalog['sources']))
                 if expected_revision is not None and expected_revision != preview['revision']:
                     raise ApiFailure('KG_RETRIEVAL_STALE', 'Knowledge graph metadata changed. Refresh the source preview before generating.', 409)

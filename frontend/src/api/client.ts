@@ -16,6 +16,7 @@ import { databaseConnectionSchema, databaseConnectionsSchema, databaseMetadataSc
 import { ontologySchema, refreshSchema } from "./data-ontology";
 import { safeError } from "./feedback";
 import { z } from "zod";
+import {investigationPlanSchema,investigationRunSchema,investigationJobSchema,investigationListSchema} from './investigations';
 import { assertWorkflowReferences } from "./control";
 import {
   ApiResponseSchema, ApiRequestSchema, AuthContextSchema, CanonicalWorkflowSchema, CanonicalToolSchema,
@@ -147,6 +148,14 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}
+  async investigationPlan(id:string) {return investigationPlanSchema.parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`));}
+  async investigationRun(id:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}`));}
+  async investigationJob(id:string) {return investigationJobSchema.parse(await this.read(`business-ontology/v1/investigations/jobs/${encodeURIComponent(id)}`));}
+  async submitInvestigation(kind:'plan'|'execute'|'resume',payload:Record<string,unknown>,key:string) {return investigationJobSchema.parse(await this.read('business-ontology/v1/investigations/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,payload,request_key:key})}));}
+  async createInvestigationRun(id:string,key:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}/runs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key:key})}));}
+  async investigationInput(id:string,body:Record<string,unknown>) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}/input`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async cancelInvestigation(id:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
   async businessRuleExecutionCatalogue(vid:string,gid:string) {return businessRuleExecutionCatalogueSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rule-execution`));}
   async businessRuleEvidence(id:string) {return businessRuleEvidenceSchema.parse(await this.read(`business-ontology/v1/rule-evidence/${encodeURIComponent(id)}`));}
   async saveBusinessRuleEvidence(vid:string,gid:string,body:BusinessRuleEvidenceRequest) {return businessRuleEvidenceSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rule-evidence`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}

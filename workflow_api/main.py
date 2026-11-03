@@ -95,6 +95,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             app.state.data_source_worker.start()
             app.state.data_query_jobs.start()
             app.state.business_generation.start()
+            app.state.investigation_jobs.start()
 
     @app.on_event('shutdown')
     async def stop_workers():
@@ -102,6 +103,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         app.state.data_source_worker.stop()
         app.state.data_query_jobs.stop()
         app.state.business_generation.stop()
+        app.state.investigation_jobs.stop()
         for worker in app.state.workers:
             worker.stop()
 

@@ -494,7 +494,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             reply_stop.set()
             if reply_thread:reply_thread.join(timeout=5)
     from .worker_control import WorkerSupervisor
-    components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs,app.state.business_generation]
+    components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs,app.state.business_generation,app.state.investigation_jobs]
     if hasattr(service,'reply_cases'):components.append(ReplyWorker())
     supervisor=WorkerSupervisor(service.store,components,role=process_role)
     app.state.worker_supervisor=supervisor

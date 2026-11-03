@@ -13,11 +13,16 @@ import { useBackend } from "@/api/state";
 import { hasWorkflowEdits } from "@/api/mapping";
 import { useRef } from "react";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
+import {isInvestigationPrompt} from '@/api/investigations';
+import {InvestigationList} from '@/features/investigations/InvestigationList';
 
 export default function Overview() {
   const navigate = useNavigate();
   const workflows = useMesh((s) => s.workflows);
   const [description, setDescription] = useState("");
+  const [workflowMode,setWorkflowMode]=useState('auto');
+  const [optionsOpen,setOptionsOpen]=useState(false);
+  const investigationKey=useRef<{prompt:string;key:string}|null>(null);
   const generationLock = useRef(false);
   const [planning, setPlanning] = useState(false);
   const [planningJob, setPlanningJob] = useState<PlanningJob | null>(null);
@@ -47,6 +52,13 @@ export default function Overview() {
       if (currentBackend.status !== "connected") throw currentBackend.error ?? new InputError("Could not connect to the workflow API. Retry when it is connected.");
       if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
       if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
+      if(isInvestigationPrompt(prompt,workflowMode)) {
+        if(investigationKey.current?.prompt!==prompt)investigationKey.current={prompt,key:crypto.randomUUID()};
+        const key=investigationKey.current.key;
+        const job=await api.submitInvestigation('plan',{objective:prompt,request_key:key,planning_mode:'model',analysis_mode:'crewai'},key);
+        navigate({to:'/app/workflows/investigate',search:{job:job.job_id}});
+        return;
+      }
       const saved = await createWorkflow({ objective: prompt, context });
       if (saved.existing) toast.info("Opened the existing saved workflow for this request. Your previous revision was preserved.");
       const state = useMesh.getState();
@@ -61,7 +73,8 @@ export default function Overview() {
     <p className="mt-3 text-lg text-muted-foreground">Describe your requirement in one prompt. PraxilonAI uses available sources and knowledge to draft the workflow, agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
           <textarea value={description} disabled={planning} onChange={(e) => setDescription(e.target.value)} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
-      <p className="mt-4 text-sm text-muted-foreground">Describe what you need. PraxilonAI identifies relevant connected sources and saved knowledge automatically. Include any additional source links or details in your prompt.</p>
+      <p className="mt-4 text-sm text-muted-foreground">Describe what you need. Supported engine, complaint, inspection and warranty investigations generate a branching workflow you can run and inspect. Other automation requests use the existing workflow builder.</p>
+      <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}</details>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}
@@ -73,5 +86,6 @@ export default function Overview() {
       <ApiFeedback error={apiError} />
     </section>
     <section className="mt-12"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium">Recent workflows</h2><Link to="/app/workflows" className="text-sm text-primary">View all</Link></div>{workflows.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Generate a workflow above to see it here.</p> : <div className="divide-y divide-border rounded-xl border border-border">{workflows.slice(0, 5).map((w) => <Link key={w.id} to="/app/workflows/$id" params={{ id: w.id }} className="flex items-center justify-between px-4 py-3 hover:bg-canvas"><span><span className="block font-medium">{displayText(w.name)}</span><span className="text-xs text-muted-foreground">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : "local draft"}</span></span><ArrowRight className="h-4 w-4 text-primary" /></Link>)}</div>}</section>
+    <InvestigationList/>
   </div>;
 }

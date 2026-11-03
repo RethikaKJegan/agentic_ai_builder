@@ -152,6 +152,9 @@ it("shows newer draft separately from the older active release and unavailable s
   render(<LifecycleJourney workflow={g} />);
   await waitFor(() => expect(screen.getByText(/Release: active · v1/)).toBeInTheDocument());
   expect(screen.getByText(/Draft revision: v2/)).toBeInTheDocument();
+  const lifecycle = screen.getByText("Workflow lifecycle · 14 stages").closest("details")!;
+  const outer = lifecycle.parentElement!.closest("details")!;
+  fireEvent.click(outer.querySelector("summary")!);
   fireEvent.click(screen.getByText("Workflow lifecycle · 14 stages"));
   expect(screen.getByText(/8. Simulate safely · unavailable/)).toBeVisible();
   expect(screen.getAllByText(/Activate release · blocked/).length).toBeGreaterThan(0);
@@ -208,6 +211,7 @@ it("hierarchy labels presentation relationships separately from execution depend
   d.nodes.push({ node_id: "helper", kind: "agent", label: "Helper", agent_id: "agent_one" });
   const mapped = fromCanonical(d);
   render(<HierarchyView workflow={mapped.workflow} agents={mapped.agents} onEdit={() => {}} />);
+  fireEvent.click(screen.getByText("Agent responsibilities and configuration"));
   expect(
     screen.getByText(/Presentation-only hierarchy links do not create runtime delegation/),
   ).toBeVisible();
@@ -394,6 +398,7 @@ it("shows canonical master and delegated specialist templates even without speci
   d.metadata["dynamic_delegation"] = { master_step: { max_rounds: 2, max_tasks: 3 } };
   const mapped = fromCanonical(d);
   render(<HierarchyView workflow={mapped.workflow} agents={mapped.agents} onEdit={() => {}} />);
+  fireEvent.click(screen.getByText("Agent responsibilities and configuration"));
   expect(screen.getByText("Master · Master role")).toBeVisible();
   expect(screen.getByText("Delegated · Specialist role")).toBeVisible();
   expect(screen.getByText(/Specialist template; runtime delegation configured/)).toBeVisible();

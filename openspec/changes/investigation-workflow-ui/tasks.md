@@ -1,0 +1,8 @@
+- [x] Verify frontend/hosting/auth and prepare source-safe deployment plan.
+- [x] Add durable current-authority investigation jobs/listing and backend tests.
+- [x] Add validated client API and prompt-to-investigation routing.
+- [x] Add branching canvas, real status, node/results/report/input/evidence panels.
+- [x] Test frontend types/lint/unit and desktop/mobile browser scenarios.
+- [x] Back up existing live state/code/build; confirm safe restart conditions.
+- [x] Deploy compatible backend/worker/frontend and versioned knowledge package.
+- [x] Verify authenticated public website, persisted state, no operational writes, and document exact entry points.
