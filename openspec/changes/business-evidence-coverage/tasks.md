@@ -1,0 +1,7 @@
+- [x] Audit and define typed case records, task contracts and reusable providers.
+- [x] Implement scoped immutable environments, release coverage manifests and revocation checks.
+- [x] Add connected-case preparation and backend terminal inspection.
+- [x] Integrate preflight, runtime revalidation and relevant reports with existing orchestration.
+- [x] Verify complete/negative/incomplete/conflicting backend scenarios and real bounded reads.
+- [x] Add UI context/recovery inputs and separate execution/decision/optional presentation.
+- [x] Run relevant regression, frontend and browser checks; document actual results and limits.

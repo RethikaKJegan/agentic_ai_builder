@@ -27,7 +27,8 @@ def main():
     p.add_argument('--database',type=Path,required=True);p.add_argument('--workspace',default='local-workspace');p.add_argument('--owner',default='local-builder');p.add_argument('--credentials-database',type=Path)
     actions=p.add_subparsers(dest='action',required=True)
     actions.add_parser('capabilities')
-    a=actions.add_parser('plan');a.add_argument('--objective',required=True);a.add_argument('--request-key',required=True);a.add_argument('--version');a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--planning-mode',choices=['model','offline'],default='model');a.add_argument('--analysis-mode',choices=['crewai','offline'],default='crewai');a.add_argument('--wait-for-information',action='store_true')
+    a=actions.add_parser('preflight');a.add_argument('--objective',required=True);a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--evidence-context');a.add_argument('--version')
+    a=actions.add_parser('plan');a.add_argument('--objective',required=True);a.add_argument('--request-key',required=True);a.add_argument('--version');a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--evidence-context');a.add_argument('--planning-mode',choices=['model','offline'],default='model');a.add_argument('--analysis-mode',choices=['crewai','offline'],default='crewai');a.add_argument('--wait-for-information',action='store_true')
     for name in ('graph','validate','run','requirements'):
         a=actions.add_parser(name);a.add_argument('--workflow-id',required=True)
         if name=='run':a.add_argument('--request-key',required=True)
@@ -39,10 +40,16 @@ def main():
     try:
         service,auth=build(args.database,(args.workspace,args.owner),args.credentials_database)
         if args.action=='capabilities':result=service.catalogue(auth)
+        elif args.action=='preflight':
+            body=dict(objective=args.objective,inputs=json.loads(args.inputs))
+            if args.evidence_context:body['evidence_context']=json.loads(args.evidence_context)
+            if args.version:body['version_id']=args.version
+            result=service.coverage.preflight(auth,body)
         elif args.action=='plan':
             body=dict(objective=args.objective,request_key=args.request_key,inputs=json.loads(args.inputs),planning_mode=args.planning_mode,analysis_mode=args.analysis_mode,wait_for_information=args.wait_for_information)
             if args.version:body['version_id']=args.version
-            result=service.plan(auth,body)
+            if args.evidence_context:body['evidence_context']=json.loads(args.evidence_context)
+            result=service.coverage.prepare_plan(auth,body)
         elif args.action=='graph':result=service.get_plan(auth,args.workflow_id)
         elif args.action=='requirements':
             saved=service.get_plan(auth,args.workflow_id)

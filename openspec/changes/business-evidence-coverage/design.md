@@ -1,0 +1,7 @@
+# Design
+
+Use the existing task registry as the base contract and add versioned deterministic coverage providers for identity, invoice selection, policy applicability, technical disposition, authorization and exclusions. Provider inputs are typed, source-qualified case records, never client asserted verified facts. Negative decisions establish known outcomes; unknown/conflicting records remain explicit.
+
+Immutable scoped environment releases contain captured authorized evidence, detailed generated supplemental events only where required facts are unavailable, mapping/provider/policy fingerprints and per-case/task validation. Release rejects unexpected mandatory gaps in designated complete cases and records expected gaps for negative tests. Explicit environment selection is pinned to new workflows. Original company observations remain unmodified and distinguishable.
+
+New preparation endpoints/terminal/UI use read-only preflight before graph generation and pass coverage into the existing planner. Existing service plan compatibility is retained for historical/direct integrations. Runtime reads remain authorized; scenario snapshots are labeled and immutable, with separately stored revocations. Decision agents receive validated evidence or a deterministic needs-evidence result, preserving unrelated comparison/report execution. UI uses structured coverage/gap levels instead of a single warning list.

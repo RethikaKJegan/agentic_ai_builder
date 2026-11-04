@@ -43,6 +43,15 @@ describe('investigation presentation',()=>{
   render(<InvestigationReportView report={report} plan={plan}/>);
   expect(screen.getByText('Investigation completed — additional evidence required')).toBeVisible();
   expect(screen.getByText('policy applicable — missing')).toBeVisible();
-  expect(screen.getByText(/Readiness does not approve/)).toBeVisible();
+  expect(screen.getByText('Evidence needed for the requested decision')).toBeVisible();
+  expect(screen.getByText('Optional evidence limitations')).toBeVisible();
+ });
+ it('keeps optional limitations separate from mandatory evidence and shows scenario provenance',()=>{
+  const report={completion_status:'completed',execution_status:'completed',decision_readiness:{inspection:{state:'ready_with_limitations',business_outcomes:{},provenance:'scenario',official_approval:false}},scenario_context:{dataset_id:'dataset_fixture'},source_records:[],agent_interpretations:[],missing_information:[{fact_id:'symptom_description',reason:'Catalogue entry not found',impact:'optional_supporting_evidence'}],configured_rule_outcomes:[],ambiguous_associations:[],conversion_issues:[],qualification:'Scenario observations preserve their origin.',physical_engine_identity:'unresolved',warranty_approval:'not_performed'};
+  render(<InvestigationReportView report={report} plan={plan}/>);
+  expect(screen.getByText('Investigation completed',{exact:true})).toBeVisible();
+  expect(screen.getByText(/No additional mandatory evidence/)).toBeVisible();
+  expect(screen.getByText(/Generated supplemental evidence/)).toBeVisible();
+  expect(screen.getByText(/Ready with optional limitations/)).toBeVisible();
  });
 });

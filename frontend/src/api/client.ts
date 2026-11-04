@@ -148,6 +148,8 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async investigationEnvironments() {return z.object({items:z.array(z.object({dataset_id:z.string(),cases:z.array(z.object({case_id:z.string(),label:z.string(),source_identifiers:z.record(z.string()),inputs:z.record(z.string()).optional(),policy_candidates:z.array(z.object({policy_id:z.string(),title:z.string()})).optional()}))}))}).parse(await this.read('business-ontology/v1/investigations/environments'));}
+  async investigationPreflight(body:Record<string,unknown>) {return z.object({preflight_id:z.string(),coverage:z.record(z.object({state:z.string()}))}).parse(await this.read('business-ontology/v1/investigations/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}
   async renameInvestigation(id:string,display_name:string) {return z.object({workflow_id:z.string(),display_name:z.string()}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name})}));}
   async deleteInvestigation(id:string) {return z.object({workflow_id:z.string(),deleted:z.literal(true)}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'DELETE'}));}

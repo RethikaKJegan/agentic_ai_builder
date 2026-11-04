@@ -135,7 +135,13 @@ def install(app, service, auth, reference, env=None):
     async def investigation_job_status(job_id:str):return await call(investigation_jobs.get,job_id)
 
     @app.post('/business-ontology/v1/investigations/plan')
-    async def investigation_plan(request:Request):return await call(investigations.plan,await body(request))
+    async def investigation_plan(request:Request):return await call(investigations.coverage.prepare_plan,await body(request))
+
+    @app.post('/business-ontology/v1/investigations/preflight')
+    async def investigation_preflight(request:Request):return await call(investigations.coverage.preflight,await body(request))
+
+    @app.get('/business-ontology/v1/investigations/environments')
+    async def evidence_environments():return await call(investigations.coverage.environments.list)
 
     @app.get('/business-ontology/v1/investigations/plans/{workflow_id}')
     async def investigation_get_plan(workflow_id:str):return await call(investigations.get_plan,workflow_id)

@@ -14,6 +14,7 @@ import { hasWorkflowEdits } from "@/api/mapping";
 import { useRef } from "react";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import {isInvestigationPrompt} from '@/api/investigations';
+import {InvestigationContext,type InvestigationContextValue} from '@/features/investigations/InvestigationContext';
 import {InvestigationList} from '@/features/investigations/InvestigationList';
 
 export default function Overview() {
@@ -22,6 +23,7 @@ export default function Overview() {
   const [description, setDescription] = useState("");
   const [workflowMode,setWorkflowMode]=useState('auto');
   const [optionsOpen,setOptionsOpen]=useState(false);
+  const [evidenceContext,setEvidenceContext]=useState<InvestigationContextValue>({});
   const investigationKey=useRef<{prompt:string;key:string}|null>(null);
   const generationLock = useRef(false);
   const [planning, setPlanning] = useState(false);
@@ -53,9 +55,10 @@ export default function Overview() {
       if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
       if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
       if(isInvestigationPrompt(prompt,workflowMode)) {
-        if(investigationKey.current?.prompt!==prompt)investigationKey.current={prompt,key:crypto.randomUUID()};
+        const contextKey=prompt+JSON.stringify(evidenceContext);
+        if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
         const key=investigationKey.current.key;
-        const job=await api.submitInvestigation('plan',{objective:prompt,request_key:key,planning_mode:'model',analysis_mode:'crewai'},key);
+        const job=await api.submitInvestigation('plan',{objective:prompt,request_key:key,planning_mode:'model',analysis_mode:'crewai',...evidenceContext},key);
         navigate({to:'/app/workflows/investigate',search:{job:job.job_id}});
         return;
       }
@@ -74,7 +77,7 @@ export default function Overview() {
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
           <textarea value={description} disabled={planning} onChange={(e) => setDescription(e.target.value)} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
       <p className="mt-4 text-sm text-muted-foreground">Describe what you need. Supported engine, complaint, inspection and warranty investigations generate a branching workflow you can run and inspect. Other automation requests use the existing workflow builder.</p>
-      <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}</details>
+      <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}{optionsOpen&&<InvestigationContext value={evidenceContext} onChange={setEvidenceContext} objective={description}/>}</details>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}

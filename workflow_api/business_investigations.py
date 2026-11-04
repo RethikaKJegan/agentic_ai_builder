@@ -36,6 +36,8 @@ class BusinessInvestigations:
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_metadata (workspace TEXT NOT NULL,owner TEXT NOT NULL,workflow_id TEXT NOT NULL,display_name TEXT,deleted_at TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(workspace,owner,workflow_id))')
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_plans (workspace TEXT NOT NULL,owner TEXT NOT NULL,workflow_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,workflow_id),UNIQUE(workspace,owner,request_key))')
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_runs (workspace TEXT NOT NULL,owner TEXT NOT NULL,run_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,lease_owner TEXT,lease_until REAL NOT NULL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,run_id),UNIQUE(workspace,owner,request_key))')
+        from .investigation_coverage import InvestigationCoverage
+        self.coverage=InvestigationCoverage(self)
 
     def authorize(self,auth,execute=False):
         current,scope=self.retrieval.sources.authorize(auth)
@@ -94,6 +96,9 @@ class BusinessInvestigations:
 
     def check_plan(self,auth,p):
         self.authorize(auth)
+        if p.get('evidence_context'):
+            pin=p['evidence_context'];release,_=self.coverage.environments.selected(auth,{k:pin[k] for k in ('dataset_id','case_id')})
+            if release['sha256']!=pin['sha256']:fail('Evidence environment changed.','EVIDENCE_ENVIRONMENT_CHANGED',409)
         if digest({k:v for k,v in p.items() if k!='plan_sha256'})!=p['plan_sha256']:fail('Saved workflow plan was modified.','INVESTIGATION_PLAN_CHANGED',409)
         if p['catalogue_sha256']!=CATALOGUE_HASH or p['limits']!=LIMITS:fail('Capability catalogue or limits changed; create a new plan.','INVESTIGATION_CATALOGUE_CHANGED',409)
         validation=validate_graph(p['graph'],p['requirements'])
@@ -119,9 +124,16 @@ class BusinessInvestigations:
 
     def plan(self,auth,body):
         auth,scope=self.authorize(auth)
-        if not isinstance(body,dict) or set(body)-{'objective','request_key','version_id','inputs','planning_mode','analysis_mode','wait_for_information'} or not {'objective','request_key'}<=set(body):fail('Provide objective and request_key; executable graph payloads are not accepted.')
+        if not isinstance(body,dict) or set(body)-{'objective','request_key','version_id','inputs','planning_mode','analysis_mode','wait_for_information','evidence_context','preflight_id'} or not {'objective','request_key'}<=set(body):fail('Provide objective and request_key; executable graph payloads are not accepted.')
         key=self.key(body);required=requirements(body['objective']);reject_secrets(body)
+        preflight=self.coverage.get(auth,body['preflight_id']) if body.get('preflight_id') else None
+        if body.get('evidence_context') and not preflight:fail('Select scenario context through preflight preparation.','EVIDENCE_PREFLIGHT_REQUIRED',422)
+        if preflight and preflight['objective']!=body['objective']:fail('Preflight objective differs from the request.','EVIDENCE_PREFLIGHT_MISMATCH',422)
+        if preflight and body.get('evidence_context'):
+            pin=preflight.get('evidence_context') or {}
+            if body['evidence_context']!={k:pin.get(k) for k in ('dataset_id','case_id')}:fail('Preflight case differs from the request.','EVIDENCE_PREFLIGHT_MISMATCH',422)
         context=body.get('inputs',{'identifiers':{}})
+        if preflight:context=deepcopy(preflight['inputs'])
         if list(Draft202012Validator(CONTEXT_SCHEMA).iter_errors(context)):fail('Inputs must contain typed identifiers and optional ISO assessment date/pinned policy ID.')
         if context.get('assessment_date'):
             from datetime import date
@@ -136,7 +148,8 @@ class BusinessInvestigations:
         if old:
             if old[0]!=fingerprint:fail('Request key already belongs to another objective.','INVESTIGATION_CONFLICT',409)
             p=json.loads(old[1]);self.check_plan(auth,p);return p
-        vid=body.get('version_id') or self.retrieval.latest(auth);v=self.ontology.version(auth,vid)
+        vid=(preflight['version_id'] if preflight else None) or body.get('version_id') or self.retrieval.latest(auth);v=self.ontology.version(auth,vid)
+        if preflight and body.get('version_id') not in (None,vid):fail('Preflight knowledge differs from the request.','EVIDENCE_PREFLIGHT_MISMATCH',422)
         if not v.get('knowledge'):fail('This version has no Phase 1 knowledge.','INVESTIGATION_KNOWLEDGE_REQUIRED',409)
         parsed=interpret(body['objective'],v,context['identifiers'])
         context=deepcopy(context);context['identifiers']=parsed['identifiers']
@@ -144,18 +157,23 @@ class BusinessInvestigations:
         previews={};stamps={}
         tasks=['complaints']+[t for t in ('inspection','warranty','replacement','history','recurrence') if required.get(t)]
         for task in tasks:
-            preview=self.retrieval.prepare(auth,v,self.question(task,context),dict(context['identifiers'],**{k:context[k] for k in ('assessment_date','policy_id') if k in context}))
+            prepared_inputs=dict(context['identifiers'],**{k:context[k] for k in ('assessment_date','policy_id') if k in context and not (preflight and preflight.get('evidence_context') and k=='policy_id')})
+            preview=self.retrieval.prepare(auth,v,self.question(task,context),prepared_inputs)
             previews[task]=preview
             for m in preview['mappings']:
                 b=self.retrieval.binding(auth,m['source_role'],m['collection'],[])
                 stamps[(m['source_role'],m['collection'])]=dict(source_role=m['source_role'],collection=m['collection'],connection_id=b['connection_id'],stamp=b['stamp'])
         knowledge=dict(version_id=vid,knowledge_sha256=v['knowledge_sha256'],tasks={name:dict(intent=p['intent'],concepts=p['concepts'],dependencies=p['dependency_resolution'],mappings=p['mappings'],rules=p['rules'],missing=p['missing'],evidence_requirements=p['evidence_requirements']) for name,p in previews.items()})
+        if preflight:
+            for task,result in preflight['coverage'].items():
+                if task in knowledge['tasks']:knowledge['tasks'][task]['coverage']=dict(state=result['state'],required_facts=[r['fact_id'] for r in result['requirements']],available_facts=[r['fact_id'] for r in result['available_evidence']],available_evidence=[dict(fact_id=r['fact_id'],source_record_ids=[ref.get('record_id',ref.get('policy_id')) for ref in r['source_references']]) for r in result['available_evidence']],provider_fingerprint=result['provider_fingerprint'],blocking_requirements=[dict(fact_id=g['fact_id'],state=g['state'],impact=g['impact']) for g in result['blocking_requirements']],optional_limitations=[g['fact_id'] for g in result['optional_limitations']],business_outcomes=result['business_outcomes'],provenance=result['provenance'])
         graph,planning=self.planner.plan(body['objective'],required,knowledge,body.get('planning_mode','model'))
         if not validate_graph(graph,required)['valid']:fail('The proposed graph is invalid.','INVESTIGATION_GRAPH_REJECTED')
         p=dict(schema_version=VERSION,workflow_id='investigation_'+secrets.token_hex(12),revision=1,objective=body['objective'],requirements=required,
                version_id=vid,knowledge_sha256=v['knowledge_sha256'],catalogue_sha256=CATALOGUE_HASH,graph=graph,planning=planning,
                inputs=context,analysis_mode=mode,wait_for_information=body.get('wait_for_information',False),
                ontology_context=knowledge,source_stamps=list(stamps.values()),limits=deepcopy(LIMITS),created_at=now(),read_only=True,company_reads=0)
+        if preflight:p.update(preflight=preflight,evidence_context=preflight.get('evidence_context'),company_reads=preflight.get('source_retrieval_calls',0),preparation_fingerprint=digest({k:v for k,v in body.items() if k!='preflight_id'}))
         p['plan_sha256']=digest(p)
         self.check_plan(auth,p)
         with self.store.transaction() as db:
@@ -245,17 +263,35 @@ class BusinessInvestigations:
 
     @staticmethod
     def evidence(run):
-        return [o for o in run['outputs'].values() if isinstance(o,dict) and isinstance(o.get('records'),list) and 'request_id' in o]
+        result=[]
+        for output in run['outputs'].values():
+            if not isinstance(output,dict):continue
+            for o in (output,output.get('fresh_source_evidence')):
+                if isinstance(o,dict) and isinstance(o.get('records'),list) and 'request_id' in o:result.append(o)
+        return result
 
     def analysis_context(self,run,node):
         if node['capability']!='prepare_summary':
             e=run['outputs'][next(b['source'] for b in node['inputs'] if b['name']=='evidence')]
             return packet([e],assertions=run['assertions'])
-        analyses=[o for o in run['outputs'].values() if o.get('classification')=='agent_interpretation']
+        analyses=[{k:v for k,v in o.items() if k!='fresh_source_evidence'} for o in run['outputs'].values() if o.get('classification')=='agent_interpretation']
         return packet(self.evidence(run),analyses,run['assertions'])
 
     def report(self,p,run):
-        evidence=self.evidence(run);analyses=[o for o in run['outputs'].values() if o.get('classification')=='agent_interpretation']
+        evidence=self.evidence(run);analyses=[deepcopy({k:v for k,v in o.items() if k!='fresh_source_evidence'}) for o in run['outputs'].values() if o.get('classification')=='agent_interpretation']
+        previous=[]
+        if p.get('preflight'):
+            latest={}
+            for e in evidence:
+                task=e['intent']['task']
+                if task in latest:previous.append(latest[task])
+                latest[task]=e
+            evidence=list(latest.values())
+        def observed_values(e):return digest([(r['record_id'],r['fields'],r['values']) for r in e.get('records',[])])
+        source_changes=[dict(task=e['intent']['task'],previous_request=e['request_id'],current_request=current['request_id']) for e in previous for current in evidence if e['intent']['task']==current['intent']['task'] and observed_values(e)!=observed_values(current)]
+        if source_changes:
+            for analysis in analyses:
+                for finding in analysis.get('findings',[]):finding['qualification']='Sources changed during execution. This interpretation may refer to a prior observation; inspect retained observation history.'
         records=[];seen=set()
         for e in evidence:
             for r in e['records']:
@@ -279,11 +315,16 @@ class BusinessInvestigations:
         analyses=[dict(a,missing_information=[]) for a in analyses]
         candidates=[c for e in evidence for c in e.get('ambiguous_associations',[])]
         recovery=next((o for o in run['outputs'].values() if o.get('classification')=='backend_evidence_compilation'),None)
-        incomplete=bool(missing or run['node_errors']) or any(not e.get('record_reads_complete',False) for e in evidence)
+        coverage_results=[e['coverage'] for e in evidence if 'coverage' in e and e['intent']['task'] in requested]
+        mandatory=[g for g in missing if g['impact']!='optional_supporting_evidence']
+        incomplete=bool(mandatory or run['node_errors']) or (not p.get('preflight') and any(not e.get('record_reads_complete',False) for e in evidence))
         return dict(objective=p['objective'],workflow_id=p['workflow_id'],workflow_revision=p['revision'],run_id=run['run_id'],version_id=p['version_id'],knowledge_sha256=p['knowledge_sha256'],
                     completion_status='completed_with_gaps' if incomplete else 'completed',source_records=records,
+                    execution_status='completed',decision_readiness={r['task']:dict(state=r['state'],business_outcomes=r['business_outcomes'],provenance=r['provenance'],official_approval=False) for r in coverage_results},scenario_context=p.get('evidence_context'),
                     model_usage_policy=deepcopy(MODEL_USAGE_POLICY),report_generation=dict(mode='evidence_only' if recovery else 'standard',narrative_status='unavailable' if recovery else 'available',reason_code=recovery.get('reason_code') if recovery else None),
                     retrieved_facts=[dict(evidence_id=e['request_id'],**f) for e in evidence for f in e['findings']],
+                    prior_source_observations=[dict(request_id=e['request_id'],records=e['records']) for e in previous],
+                    source_changes=source_changes,
                     configured_rule_outcomes=[r for e in evidence for r in e.get('rule_results',[])],agent_interpretations=analyses,
                     missing_information=missing,normalized_gaps=missing,task_evidence=task_results,
                     requirement_registry_sha256=REGISTRY_SHA256,
@@ -297,7 +338,7 @@ class BusinessInvestigations:
                     executed_nodes={k:v for k,v in run['node_states'].items() if v!='pending'},branch_decisions=run['branches'],execution_errors=run['node_errors'],
                     user_assertions=dict(values=run['assertions'],verification='unverified_user_input'),
                     physical_engine_identity='unresolved',warranty_approval='not_performed',company_writes=0,
-                    qualification=('Model-written final narrative was unavailable; the report was compiled from retrieved evidence, prior validated interpretations and registered gaps without another model call. ' if recovery else '')+'Source observations, configured rule outcomes and agent interpretations remain separate. No official eligibility, confirmed diagnosis or operational authorization is inferred.')
+                    qualification=('Sources changed during execution; prior interpretations may describe earlier observations. ' if source_changes else '')+('Model-written final narrative was unavailable; the report was compiled from retrieved evidence, prior validated interpretations and registered gaps without another model call. ' if recovery else '')+'Source observations, configured rule outcomes and agent interpretations remain separate. No official eligibility, confirmed diagnosis or operational authorization is inferred.')
 
     def invoke(self,auth,p,run,node):
         self.authorize(auth,True);nid=node['id'];kind=node['type'];cap=CATALOGUE.get(node['capability'])
@@ -316,13 +357,28 @@ class BusinessInvestigations:
             return deepcopy(run['inputs']),None,{}
         if kind=='retrieval':
             task=cap['retrieval_task'];context=bound['context'];inputs=dict(context['identifiers'],**{k:context[k] for k in ('assessment_date','policy_id') if k in context})
+            if p.get('evidence_context'):
+                result=self.coverage.scenario_evidence(auth,p,task)
+                return result,None,dict(retrieval_calls=1)
             preview=self.retrieval.preview(auth,dict(question=self.question(task,context),inputs=inputs,version_id=p['version_id'],request_key=run['run_id']+'_'+nid))
             result=self.retrieval.execute(auth,preview['request_id'],{})
+            if p.get('preflight'):
+                result['coverage']=self.coverage.runtime_coverage(auth,p,task,result);result['requirement_results']=result['coverage'];result['normalized_gaps']=result['coverage']['gaps']
             if result['version_id']!=p['version_id'] or result['knowledge_sha256']!=p['knowledge_sha256']:fail('Retrieval returned foreign knowledge.')
             return result,None,dict(retrieval_calls=1)
         if kind=='agent':
+            fresh=None
+            if p.get('preflight') and node['capability']!='prepare_summary':
+                selected=bound.get('evidence',{});task='inspection' if node['capability']=='compare_inspection' else 'warranty'
+                fresh=self.coverage.refresh(auth,p,task);selected=fresh
+                checked=self.coverage.runtime_coverage(auth,p,task,selected)
+                if not checked['task_executable'] or node['capability']=='warranty_readiness' and not checked['conclusion_ready']:
+                    return dict(summary='This requested assessment needs the registered supporting evidence or inputs. Other investigation activities can continue.',findings=[],missing_information=[],classification='backend_coverage_check',coverage=checked,mode='deterministic',fresh_source_evidence=fresh),None,dict(coverage_retrieval_calls=0 if p.get('evidence_context') else 1)
+                run=deepcopy(run)
+                binding=next(b['source'] for b in node['inputs'] if b['name']=='evidence');run['outputs'][binding]=fresh
             result,usage=self.agents.run(node['capability'],self.analysis_context(run,node),p['analysis_mode'])
-            return result,None,dict(model_calls=usage['llm_calls'],tokens=usage['tokens'],estimated_cost_usd=usage['estimated_cost_usd'])
+            if fresh:result['fresh_source_evidence']=fresh
+            return result,None,dict(model_calls=usage['llm_calls'],tokens=usage['tokens'],estimated_cost_usd=usage['estimated_cost_usd'],coverage_retrieval_calls=1 if fresh and not p.get('evidence_context') else 0)
         if kind=='condition':
             outcome=predicate(node['predicate'],bound['evidence'])
             return dict(predicate=node['predicate'],outcome=outcome,classification='deterministic_backend_check'),outcome,{}
@@ -332,10 +388,14 @@ class BusinessInvestigations:
             msg='No matching complaint record was retrieved.' if nid=='not_found' else 'Inspection evidence is missing.' if nid=='no_inspection' else 'The branch condition could not be established.' if nid in ('uncertain_complaint','unknown_inspection') else 'Required facts remain listed in retrieved evidence.'
             return dict(missing_information=[msg],classification='deterministic_gap'),None,{}
         if kind=='end':
+            if p.get('preflight'):
+                run=deepcopy(run)
+                for task in p['ontology_context']['tasks']:run['outputs']['coverage_refresh_'+task]=self.coverage.refresh(auth,p,task)
             report=self.report(p,run)
             if p['wait_for_information'] and report['missing_information'] and not run.get('information_acknowledged'):
+                report['execution_status']='waiting_for_input'
                 return dict(waiting=True,requested=['acknowledge_gaps','notes'],reason='Review the explicit evidence gaps before finalizing the report.',partial_report=report),None,{}
-            return report,None,{}
+            return report,None,dict(coverage_retrieval_calls=len(p['ontology_context']['tasks']) if p.get('preflight') and not p.get('evidence_context') else 0)
         fail('Unsupported node implementation.')
 
     def invoke_timed(self,auth,p,run,node):
@@ -429,7 +489,7 @@ class BusinessInvestigations:
                                     current['pending_inputs']=[dict(node_id=nid,**output)];self.event(current,'run.waiting_for_input',node_id=nid)
                                 else:
                                     self.transition(current,nid,'succeeded');current['outputs'][nid]=output;current['node_errors'].pop(nid,None)
-                                    for counter,value in usage.items():current['usage'][counter]+=value
+                                    for counter,value in usage.items():current['usage'][counter]=current['usage'].get(counter,0)+value
                                     if outcome is not None:current['branches'][nid]=outcome
                                     for e in p['graph']['edges']:
                                         if e['source']==nid:current['edge_states'][e['id']]='selected' if outcome is None or e['outcome']==outcome else 'skipped'

@@ -29,7 +29,7 @@ def test_durable_plan_job_and_scoped_listing(jobs):
  j=x.jobs.get(x.a,j['job_id']);assert j['state']=='succeeded'
  p=x.service.get_plan(x.a,j['workflow_id']);assert p['planning']['mode']=='model'
  assert x.jobs.list(x.a)['items'][0]['workflow_id']==p['workflow_id']
- assert not x.reader.calls
+ assert x.reader.calls and p['preflight']['coverage']
  with pytest.raises(ApiFailure):x.jobs.get(auth(owner='bob'),j['job_id'])
  bad=body();bad['payload']['objective']='Show complaints for engine E123.'
  with pytest.raises(ApiFailure):x.jobs.submit(x.a,bad)

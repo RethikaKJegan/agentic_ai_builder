@@ -24,7 +24,7 @@ class InvestigationJobs:
         if body['kind']=='plan':
             if 'workflow.plan' not in auth.get('permissions',[]):fail('Workflow planning permission is required.','INVESTIGATION_DENIED',403)
             payload=body['payload']
-            if not isinstance(payload,dict) or set(payload)-{'objective','request_key','inputs','version_id','planning_mode','analysis_mode','wait_for_information'}:fail('Invalid planning payload.')
+            if not isinstance(payload,dict) or set(payload)-{'objective','request_key','inputs','version_id','planning_mode','analysis_mode','wait_for_information','evidence_context'}:fail('Invalid planning payload.')
             from .investigation_graph import requirements
             requirements(payload.get('objective'))
             if payload.get('planning_mode','model')!='model' or payload.get('analysis_mode','crewai')!='crewai':fail('Website jobs use the configured model and CrewAI.')
@@ -82,7 +82,7 @@ class InvestigationJobs:
             self.service.authorize(auth,d['kind']!='plan')
             if d['kind']=='plan':
                 if 'workflow.plan' not in auth.get('permissions',[]):fail('Workflow planning permission was revoked.','INVESTIGATION_DENIED',403)
-                result=self.service.plan(auth,d['payload']);d['workflow_id']=result['workflow_id']
+                result=self.service.coverage.prepare_plan(auth,d['payload']);d['workflow_id']=result['workflow_id']
             else:
                 result=self.service.execute(auth,d['run_id'],{},d['kind']=='resume');d['workflow_id']=result['workflow_id']
             d.update(state='succeeded',error=None)
