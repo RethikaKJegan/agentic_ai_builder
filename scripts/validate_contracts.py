@@ -124,7 +124,10 @@ def main() -> None:
     validate_api_and_control_contracts()
     process = validator(CONTRACTS / 'business-lifecycle-v1.json')
     assert_valid(process, EXAMPLES / 'business-lifecycle-v1.json')
+    assert_valid(process, ROOT / 'ontology/business-processes/simpson-warranty-v1.json')
     validator(CONTRACTS / 'business-case-v1.json')
+    validator(CONTRACTS / 'business-case-driver-v1.json')
+    validator(CONTRACTS / 'business-lifecycle-report-v1.json')
     print("Shared contract schemas and fixtures are valid.")
 
 

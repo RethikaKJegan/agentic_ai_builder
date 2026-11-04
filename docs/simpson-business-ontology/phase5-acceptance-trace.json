@@ -1,0 +1,2963 @@
+{
+  "schema_version": "business-lifecycle-report-v1",
+  "case_id": "case_0c3ededc6c7b54490baa8247",
+  "process_definition_id": "simpson_warranty_lifecycle",
+  "process_definition_version": 1,
+  "case_status": "COMPLETED_PROVISIONALLY",
+  "execution_status": "COMPLETED",
+  "business_outcome_status": "PROVISIONAL",
+  "observed_revision": 47,
+  "ontology_version": "bov_bbe6a22b9e219a25ff5f3b3107392ca4",
+  "mapping_version": "250bbf7e570f3885568ad611ad290bd118e0bf4a8daf60163e76da88fd3e9b45",
+  "qualification": "Analytical execution only. Source reports, derived values, hypotheses and synthetic assumptions retain their provenance. Proposed repair, replacement, shipment, QA, engineering and monitoring artifacts do not grant commercial authority or prove physical completion or effectiveness.",
+  "pending_real_world_waits": [
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "field_diagnosis",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:13.744631+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793807593.7446377,
+      "event_type": "inspection_findings",
+      "expected_source": "simpson.field_service",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 300
+      },
+      "stage_instance_id": "field_diagnosis",
+      "wait_id": "wait_0726ba26bebff421696c8b9d"
+    },
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "qa_investigation",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:29.758802+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793893709.7588089,
+      "event_type": "qa_results",
+      "expected_source": "simpson.quality",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 86400
+      },
+      "stage_instance_id": "qa_investigation",
+      "wait_id": "wait_6effb07a790e2a5b20f8f27d"
+    },
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "corrective_engineering",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:31.745255+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793893711.7452607,
+      "event_type": "engineering_change_evidence",
+      "expected_source": "simpson.engineering",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 86400
+      },
+      "stage_instance_id": "corrective_engineering",
+      "wait_id": "wait_887c1e8a8ed59f9a846bc1e7"
+    },
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "commercial_decision",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:26.095918+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793893706.095923,
+      "event_type": "commercial_authorization",
+      "expected_source": "simpson.commercial",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 86400
+      },
+      "stage_instance_id": "commercial_decision",
+      "wait_id": "wait_9c1063422f95fbee0ea7a2e5"
+    },
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "post_change_monitoring",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:33.539550+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793807613.5395548,
+      "event_type": "monitoring_observations",
+      "expected_source": "simpson.reliability",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 300
+      },
+      "stage_instance_id": "post_change_monitoring",
+      "wait_id": "wait_a09f1a8f90439bf559ecf128"
+    },
+    {
+      "blocking": false,
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "continuation_target": "replacement_logistics",
+      "correlation_keys": {
+        "complaint_id": "C123"
+      },
+      "created_at": "2026-11-04T15:48:27.963077+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793893707.9630845,
+      "event_type": "shipment_confirmation",
+      "expected_source": "simpson.logistics",
+      "retry_or_escalation_policy": {
+        "action": "escalate",
+        "seconds": 86400
+      },
+      "stage_instance_id": "replacement_logistics",
+      "wait_id": "wait_d5b2c1dba76494ec983c7424"
+    }
+  ],
+  "evidence_references": [
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "task": "complaints"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "task": "inspection"
+    },
+    {
+      "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+      "task": "inspection"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "task": "warranty"
+    },
+    {
+      "record_id": "8916c5d9ee5130146a730b8d50fdc09cbb56fd5793bffa83f171f5af53e076e8",
+      "task": "warranty"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_a5e856a8cc124b1594b5ce0bc91fdabf",
+      "task": "task_1"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_a5e856a8cc124b1594b5ce0bc91fdabf",
+      "task": "task_2"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469",
+      "task": "task_2"
+    },
+    {
+      "record_id": "8916c5d9ee5130146a730b8d50fdc09cbb56fd5793bffa83f171f5af53e076e8",
+      "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469",
+      "task": "task_2"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469",
+      "task": "task_3"
+    },
+    {
+      "record_id": "8916c5d9ee5130146a730b8d50fdc09cbb56fd5793bffa83f171f5af53e076e8",
+      "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469",
+      "task": "task_3"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_3"
+    },
+    {
+      "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_3"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_2"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_1"
+    },
+    {
+      "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_1"
+    },
+    {
+      "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_4"
+    },
+    {
+      "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "task": "task_4"
+    }
+  ],
+  "generated_assumptions": {
+    "commercial_decision:authorization_state": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:26.095633+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "not_granted_by_analysis"
+    },
+    "commercial_decision:commercial_proposal": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:27.062032+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "origin": "user",
+          "path": "resolution_path"
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Submit the analytical disposition for actual commercial authorization; this recommendation grants no authority."
+    },
+    "corrective_engineering:engineering_proposal": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:32.659750+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "collection": "jointinspectionreports",
+          "mapping_id": "mapping:inspection_potential_cause",
+          "read_at": "2026-11-04T15:48:02.195748+00:00",
+          "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "J1"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Review the available diagnosis and investigate a corrective engineering proposal; no change is implemented by this analysis."
+    },
+    "inspection_scheduling:scheduling_proposal": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:13.017581+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "No appointment is confirmed. Obtain actual engineer, account, recipient, calendar, slot and action authorization before sending or booking."
+    },
+    "investigation_initiation:engineer_reference": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "null",
+      "generated_at": "2026-11-04T15:48:12.211364+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": null
+    },
+    "investigation_initiation:investigation_plan": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:12.635158+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "collection": "tickets",
+          "mapping_id": "mapping:complaint_symptom",
+          "read_at": "2026-11-04T15:48:02.037898+00:00",
+          "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "C123"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Review reported complaint observations and obtain independent field evidence; investigation activities are proposed only."
+    },
+    "post_change_monitoring:effectiveness_status": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:33.539285+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "unverified"
+    },
+    "post_change_monitoring:monitoring_plan": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:33.539285+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Monitoring plan only: obtain actual eligible population, exposure and recurrence observations before assessing effectiveness."
+    },
+    "qa_investigation:qa_analysis": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:30.820020+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "collection": "jointinspectionreports",
+          "mapping_id": "mapping:inspection_potential_cause",
+          "read_at": "2026-11-04T15:48:02.195748+00:00",
+          "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "J1"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Use the reported diagnosis to propose QA examination; laboratory findings and root cause remain unconfirmed."
+    },
+    "replacement_logistics:replacement_proposal": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:27.962732+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Replacement and logistics proposal only. No authorization, dispatch, shipment, receipt, installation or source update is confirmed."
+    },
+    "technical_disposition:technical_proposal": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:25.143357+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "collection": "jointinspectionreports",
+          "mapping_id": "mapping:inspection_potential_cause",
+          "read_at": "2026-11-04T15:48:02.195748+00:00",
+          "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "J1"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Review the reported diagnosis and chosen analytical route; neither repair nor replacement is authorized by this proposal."
+    },
+    "ticket_validation:registration_analysis": {
+      "assumptions": [
+        "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:06.245347+00:00",
+      "generation_method": "configured_evidence_grounded_rule",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "INFERRED",
+      "source_references": [
+        {
+          "collection": "tickets",
+          "mapping_id": "mapping:ticket_id",
+          "read_at": "2026-11-04T15:48:02.037898+00:00",
+          "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "C123"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "Existing mapped ticket observed; analytical validation does not create or modify a source ticket."
+    },
+    "ticket_validation:ticket_reference": {
+      "assumptions": [],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:06.245347+00:00",
+      "generation_method": "copy",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "DERIVED",
+      "source_references": [
+        {
+          "collection": "tickets",
+          "mapping_id": "mapping:ticket_id",
+          "read_at": "2026-11-04T15:48:02.037898+00:00",
+          "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+          "source_reference": {
+            "field": "_id",
+            "native_value": "C123"
+          }
+        }
+      ],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "C123"
+    },
+    "warranty_assessment:assessment": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "confidence": null,
+      "data_type": "string",
+      "generated_at": "2026-11-04T15:48:06.393033+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": "undetermined"
+    },
+    "warranty_assessment:policy_assumption": {
+      "assumptions": [
+        "Missing evidence; case-local analytical assumption."
+      ],
+      "authoritative": false,
+      "commercial_authorization": false,
+      "confidence": null,
+      "data_type": "object",
+      "generated_at": "2026-11-04T15:48:06.393033+00:00",
+      "generation_method": "schema_seeded_fallback_v1",
+      "limitations": [
+        "Does not grant commercial authorization or verify physical activity.",
+        "Excluded from authoritative policy publication."
+      ],
+      "permitted_uses": [
+        "analytical_continuation"
+      ],
+      "policy_version": "case-policy-v1",
+      "provenance_type": "SYNTHETIC",
+      "source_references": [],
+      "validity_scope": "case_0c3ededc6c7b54490baa8247",
+      "value": {
+        "statement": "Authoritative warranty policy is unavailable. Case-local analytical continuation grants no eligibility, payment or replacement authorization."
+      }
+    }
+  },
+  "conflicts": [
+    {
+      "event": {
+        "correlation_keys": {
+          "complaint_id": "C123"
+        },
+        "event_id": "schedule_fixture_1",
+        "event_type": "inspection_schedule_confirmation",
+        "payload": {
+          "confirmation_reference": "explicit-test-transport-report"
+        },
+        "source": "simpson.field_service"
+      },
+      "reason": "late_event_requires_downstream_reassessment",
+      "stage": "inspection_scheduling"
+    }
+  ],
+  "timeline": [
+    {
+      "event_type": "case.created",
+      "sequence": 1,
+      "timestamp": "2026-11-04T15:48:01.630885+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 2,
+      "stage_instance_id": "oem_complaint",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:02.518343+00:00"
+    },
+    {
+      "event_type": "case.prepared",
+      "sequence": 3,
+      "timestamp": "2026-11-04T15:48:02.518706+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 4,
+      "stage_instance_id": "oem_complaint",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:02.624724+00:00"
+    },
+    {
+      "event_type": "case.start",
+      "sequence": 5,
+      "timestamp": "2026-11-04T15:48:02.624742+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 6,
+      "stage_instance_id": "oem_complaint",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T15:48:02.969395+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 7,
+      "stage_instance_id": "oem_complaint",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:03.326090+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 8,
+      "stage_instance_id": "oem_complaint",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:03.326113+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 9,
+      "timestamp": "2026-11-04T15:48:03.326129+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 10,
+      "stage_instance_id": "oem_complaint",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:06.038515+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 11,
+      "stage_instance_id": "ticket_validation",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:06.038541+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 12,
+      "stage_instance_id": "ticket_validation",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:06.245634+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 13,
+      "timestamp": "2026-11-04T15:48:06.245650+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 14,
+      "stage_instance_id": "ticket_validation",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:06.393006+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 15,
+      "stage_instance_id": "warranty_assessment",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:06.393030+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 16,
+      "stage_instance_id": "warranty_assessment",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:06.584754+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 17,
+      "timestamp": "2026-11-04T15:48:06.584768+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 18,
+      "stage_instance_id": "warranty_assessment",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T15:48:07.172246+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 19,
+      "stage_instance_id": "warranty_assessment",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:07.792930+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 20,
+      "stage_instance_id": "warranty_assessment",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:07.792949+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 21,
+      "timestamp": "2026-11-04T15:48:07.792962+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 22,
+      "stage_instance_id": "warranty_assessment",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:12.211333+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 23,
+      "stage_instance_id": "investigation_initiation",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:12.211361+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 24,
+      "stage_instance_id": "investigation_initiation",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:12.635523+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 25,
+      "timestamp": "2026-11-04T15:48:12.635543+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 26,
+      "stage_instance_id": "investigation_initiation",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:13.017548+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 27,
+      "stage_instance_id": "inspection_scheduling",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:13.017578+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 28,
+      "stage_instance_id": "inspection_scheduling",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:13.409274+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 29,
+      "timestamp": "2026-11-04T15:48:13.409290+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 30,
+      "stage_instance_id": "inspection_scheduling",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:13.744287+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 31,
+      "stage_instance_id": "field_diagnosis",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:13.744315+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 32,
+      "stage_instance_id": "field_diagnosis",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:14.188538+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 33,
+      "timestamp": "2026-11-04T15:48:14.188555+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 34,
+      "stage_instance_id": "field_diagnosis",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T15:48:15.213141+00:00"
+    },
+    {
+      "event_id": "schedule_fixture_1",
+      "event_type": "event.received",
+      "sequence": 35,
+      "timestamp": "2026-11-04T15:48:15.985833+00:00",
+      "wait_id": "wait_a87f1a960c58e7c5f91cffd7"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 36,
+      "stage_instance_id": "field_diagnosis",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:17.158071+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 37,
+      "stage_instance_id": "field_diagnosis",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:17.158141+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 38,
+      "timestamp": "2026-11-04T15:48:17.158156+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 39,
+      "stage_instance_id": "field_diagnosis",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:24.292657+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 40,
+      "stage_instance_id": "technical_disposition",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:24.292688+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 41,
+      "stage_instance_id": "technical_disposition",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:25.143765+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 42,
+      "timestamp": "2026-11-04T15:48:25.143783+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 43,
+      "stage_instance_id": "technical_disposition",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:26.095597+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 44,
+      "stage_instance_id": "commercial_decision",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:26.095629+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 45,
+      "stage_instance_id": "commercial_decision",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:27.062415+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 46,
+      "timestamp": "2026-11-04T15:48:27.062435+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 47,
+      "stage_instance_id": "commercial_decision",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:27.962695+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 48,
+      "stage_instance_id": "replacement_logistics",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:27.962727+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 49,
+      "stage_instance_id": "replacement_logistics",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:28.872600+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 50,
+      "timestamp": "2026-11-04T15:48:28.872618+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 51,
+      "stage_instance_id": "replacement_logistics",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:29.758391+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 52,
+      "stage_instance_id": "qa_investigation",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:29.758434+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 53,
+      "stage_instance_id": "qa_investigation",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:30.820394+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 54,
+      "timestamp": "2026-11-04T15:48:30.820413+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 55,
+      "stage_instance_id": "qa_investigation",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:31.744905+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 56,
+      "stage_instance_id": "corrective_engineering",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:31.744943+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 57,
+      "stage_instance_id": "corrective_engineering",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:32.660036+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 58,
+      "timestamp": "2026-11-04T15:48:32.660053+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 59,
+      "stage_instance_id": "corrective_engineering",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:33.539251+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 60,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:33.539282+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 61,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:34.598905+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 62,
+      "timestamp": "2026-11-04T15:48:34.598924+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 63,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T15:48:36.500529+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 64,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "READY",
+      "timestamp": "2026-11-04T15:48:38.634399+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 65,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T15:48:38.634472+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 66,
+      "timestamp": "2026-11-04T15:48:38.634489+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 67,
+      "stage_instance_id": "post_change_monitoring",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T15:48:41.167055+00:00"
+    }
+  ],
+  "artifact_kind": "projection_of_executed_acceptance_report",
+  "test": "tests/test_simpson_lifecycle.py::test_twelve_stage_end_to_end_actual_crewai_event_restart_and_report",
+  "source_artifact_sha256": {
+    "phase5-report.json": "f1df60c454924c09cf7b759afb5a39bb920f0814a23cec31f2c1478d36fb8aa7",
+    "phase5-driver-receipts.json": "3644d55358506f9fbfbba1aa8483eaf9edc1f2ed80a6cff873220093bb650292",
+    "phase5-timeline.json": "da5a18c0b17db38ae8065e67672ba12b1caa7eb0d5c378e0be468be783e593fc",
+    "phase5-case.json": "46ccccac2abe3f4792fea4939a28eb369b40225501053eb760ef131144928261"
+  },
+  "process_sha256": "23bdd0f02c8e5f5d25347ff0758bbd50f6f168b5d4af7fb6267d690fd92ce03a",
+  "stages": [
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.read.complaints"
+      ],
+      "composition_id": "composition_5f1022d26ce19fa8914cba75",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:03.325718+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        },
+        "reported_symptom": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:03.325718+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:complaint_symptom",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Cooling water leak"
+        }
+      },
+      "name": "OEM complaint initiation",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.033406+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_a5e856a8cc124b1594b5ce0bc91fdabf"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Prepared investigation completed."
+        },
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:03.325718+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        },
+        "reported_symptom": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:03.325718+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:complaint_symptom",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Cooling water leak"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_a5e856a8cc124b1594b5ce0bc91fdabf",
+      "stage_instance_id": "oem_complaint",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "business_retrieve_evidence",
+          "inputs": {
+            "preparation_id": "preflight_43ab3a254e57cde4263da265",
+            "task": "complaints"
+          },
+          "output_sha256": "5eb15fdf8f1776fef27c440c8349b1df7e661ccb323b42dd8e5917aaf4ffdc83"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "registration_analysis": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Existing mapped ticket observed; analytical validation does not create or modify a source ticket."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Ticket registration and validation",
+      "outputs": {
+        "registration_analysis": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Existing mapped ticket observed; analytical validation does not create or modify a source ticket."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "ticket_validation",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.assess_warranty"
+      ],
+      "composition_id": "composition_b2026a6c2a60c753bc1e1d0b",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "assessment": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.393033+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "undetermined"
+        },
+        "policy_assumption": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "authoritative": false,
+          "commercial_authorization": false,
+          "confidence": null,
+          "data_type": "object",
+          "generated_at": "2026-11-04T15:48:06.393033+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity.",
+            "Excluded from authoritative policy publication."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "policy_version": "case-policy-v1",
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": {
+            "statement": "Authoritative warranty policy is unavailable. Case-local analytical continuation grants no eligibility, payment or replacement authorization."
+          }
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Warranty assessment",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:12.200429+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Prepared investigation completed."
+        },
+        "assessment": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.393033+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "undetermined"
+        },
+        "policy_assumption": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "authoritative": false,
+          "commercial_authorization": false,
+          "confidence": null,
+          "data_type": "object",
+          "generated_at": "2026-11-04T15:48:06.393033+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity.",
+            "Excluded from authoritative policy publication."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "policy_version": "case-policy-v1",
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": {
+            "statement": "Authoritative warranty policy is unavailable. Case-local analytical continuation grants no eligibility, payment or replacement authorization."
+          }
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_9f0d54797d4a4a7d8cc94658dd816469",
+      "stage_instance_id": "warranty_assessment",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "business_retrieve_evidence",
+          "inputs": {
+            "preparation_id": "preflight_43ab3a254e57cde4263da265",
+            "task": "warranty"
+          },
+          "output_sha256": "133a3eb26ab9e37153aaad65484e252d7d3adf128f46a8ecf98400ee2565f1fe"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "engineer_reference": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "null",
+          "generated_at": "2026-11-04T15:48:12.211364+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": null
+        },
+        "investigation_plan": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:12.635158+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:complaint_symptom",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review reported complaint observations and obtain independent field evidence; investigation activities are proposed only."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Investigation initiation",
+      "outputs": {
+        "engineer_reference": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "null",
+          "generated_at": "2026-11-04T15:48:12.211364+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": null
+        },
+        "investigation_plan": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:12.635158+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:complaint_symptom",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review reported complaint observations and obtain independent field evidence; investigation activities are proposed only."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "investigation_initiation",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "scheduling_proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:13.017581+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "No appointment is confirmed. Obtain actual engineer, account, recipient, calendar, slot and action authorization before sending or booking."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Joint inspection scheduling",
+      "outputs": {
+        "scheduling_proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:13.017581+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "No appointment is confirmed. Obtain actual engineer, account, recipient, calendar, slot and action authorization before sending or booking."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "REPORTED_BY_AUTHENTICATED_SOURCE",
+      "run_id": null,
+      "stage_instance_id": "inspection_scheduling",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.compare"
+      ],
+      "composition_id": "composition_77faabaf6c5676e5806da41c",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "reported_diagnosis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:17.157782+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Hose connection"
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Field inspection and diagnosis",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:24.264160+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Prepared investigation completed."
+        },
+        "reported_diagnosis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:17.157782+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Hose connection"
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": "run_bb40504574ba4f4d84f540ba6d89e0a8",
+      "stage_instance_id": "field_diagnosis",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "business_retrieve_evidence",
+          "inputs": {
+            "preparation_id": "preflight_43ab3a254e57cde4263da265",
+            "task": "inspection"
+          },
+          "output_sha256": "0a20a9a2e6f47174fe90669be0a18611fcdded32b80acc30a8fa263a092c8480"
+        },
+        {
+          "tool_id": "business_retrieve_evidence",
+          "inputs": {
+            "preparation_id": "preflight_43ab3a254e57cde4263da265",
+            "task": "complaints"
+          },
+          "output_sha256": "73c83131940b6201a695d801648e6a131e72a921d155d4c26539726a80985a8f"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "capa_required": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "capa_required"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": true
+        },
+        "monitoring_required": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "monitoring_required"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": true
+        },
+        "resolution_path": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution_path"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "replacement"
+        },
+        "technical_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review the reported diagnosis and chosen analytical route; neither repair nor replacement is authorized by this proposal."
+        }
+      },
+      "name": "Technical disposition",
+      "outputs": {
+        "capa_required": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "capa_required"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": true
+        },
+        "monitoring_required": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "monitoring_required"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": true
+        },
+        "resolution_path": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution_path"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "replacement"
+        },
+        "technical_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:25.143357+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review the reported diagnosis and chosen analytical route; neither repair nor replacement is authorized by this proposal."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "technical_disposition",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "authorization_state": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:26.095633+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "not_granted_by_analysis"
+        },
+        "commercial_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:27.062032+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution_path"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Submit the analytical disposition for actual commercial authorization; this recommendation grants no authority."
+        }
+      },
+      "name": "Commercial and authorization decision",
+      "outputs": {
+        "authorization_state": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:26.095633+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "not_granted_by_analysis"
+        },
+        "commercial_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:27.062032+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution_path"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Submit the analytical disposition for actual commercial authorization; this recommendation grants no authority."
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": null,
+      "stage_instance_id": "commercial_decision",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "replacement_proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:27.962732+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Replacement and logistics proposal only. No authorization, dispatch, shipment, receipt, installation or source update is confirmed."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "name": "Replacement and logistics",
+      "outputs": {
+        "replacement_proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:27.962732+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Replacement and logistics proposal only. No authorization, dispatch, shipment, receipt, installation or source update is confirmed."
+        },
+        "ticket_reference": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:06.245347+00:00",
+          "generation_method": "copy",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "DERIVED",
+          "source_references": [
+            {
+              "collection": "tickets",
+              "mapping_id": "mapping:ticket_id",
+              "read_at": "2026-11-04T15:48:02.037898+00:00",
+              "record_id": "d6f36a3846c08c540d47f293abb53407b2efb34c8eeb4a9524358e59acb15796",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "C123"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "C123"
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": null,
+      "stage_instance_id": "replacement_logistics",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "qa_analysis": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:30.820020+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Use the reported diagnosis to propose QA examination; laboratory findings and root cause remain unconfirmed."
+        }
+      },
+      "name": "QA investigation",
+      "outputs": {
+        "qa_analysis": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:30.820020+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Use the reported diagnosis to propose QA examination; laboratory findings and root cause remain unconfirmed."
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": null,
+      "stage_instance_id": "qa_investigation",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "engineering_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:32.659750+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review the available diagnosis and investigate a corrective engineering proposal; no change is implemented by this analysis."
+        }
+      },
+      "name": "Corrective engineering action",
+      "outputs": {
+        "engineering_proposal": {
+          "assumptions": [
+            "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:32.659750+00:00",
+          "generation_method": "configured_evidence_grounded_rule",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "collection": "jointinspectionreports",
+              "mapping_id": "mapping:inspection_potential_cause",
+              "read_at": "2026-11-04T15:48:02.195748+00:00",
+              "record_id": "1fc9e86dc2962578a599f07126e3088d81b44d08655ba06b57315271eaad9d6b",
+              "source_reference": {
+                "field": "_id",
+                "native_value": "J1"
+              }
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Review the available diagnosis and investigate a corrective engineering proposal; no change is implemented by this analysis."
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": null,
+      "stage_instance_id": "corrective_engineering",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.report"
+      ],
+      "composition_id": "composition_864d343df3cf82ff2e2d58a1",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "effectiveness_status": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:33.539285+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "unverified"
+        },
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:33.539285+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Monitoring plan only: obtain actual eligible population, exposure and recurrence observations before assessing effectiveness."
+        }
+      },
+      "name": "Post-change monitoring",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:41.121391+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_d8d9876e84334be29c8d9408539c7c6f"
+            }
+          ],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Prepared investigation completed."
+        },
+        "effectiveness_status": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:33.539285+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "unverified"
+        },
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T15:48:33.539285+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_0c3ededc6c7b54490baa8247",
+          "value": "Monitoring plan only: obtain actual eligible population, exposure and recurrence observations before assessing effectiveness."
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": "run_d8d9876e84334be29c8d9408539c7c6f",
+      "stage_instance_id": "post_change_monitoring",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    }
+  ],
+  "driver_invocations": [
+    {
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "revision": 6,
+      "stop_reason": "external_or_input_wait",
+      "commands_used": 2,
+      "stage_executions_reserved": 4
+    },
+    {
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "revision": 15,
+      "stop_reason": "external_or_input_wait",
+      "commands_used": 3,
+      "stage_executions_reserved": 12
+    },
+    {
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "revision": 26,
+      "stop_reason": "external_or_input_wait",
+      "commands_used": 4,
+      "stage_executions_reserved": 16
+    },
+    {
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "revision": 44,
+      "stop_reason": "external_or_input_wait",
+      "commands_used": 7,
+      "stage_executions_reserved": 28
+    },
+    {
+      "case_id": "case_0c3ededc6c7b54490baa8247",
+      "revision": 48,
+      "stop_reason": "terminal",
+      "commands_used": 1,
+      "stage_executions_reserved": 4
+    }
+  ],
+  "branches": [
+    {
+      "case_id": "case_4ba37e2e77d256c800d2acf9",
+      "case_status": "COMPLETED_PROVISIONALLY",
+      "stages": [
+        {
+          "stage_instance_id": "commercial_decision",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "corrective_engineering",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "field_diagnosis",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "inspection_scheduling",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "investigation_initiation",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "oem_complaint",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "post_change_monitoring",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "qa_investigation",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "replacement_logistics",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "technical_disposition",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "ticket_validation",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "warranty_assessment",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        }
+      ]
+    },
+    {
+      "case_id": "case_7cbc264dc661768da8db730f",
+      "case_status": "COMPLETED_PROVISIONALLY",
+      "stages": [
+        {
+          "stage_instance_id": "commercial_decision",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "corrective_engineering",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "field_diagnosis",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "inspection_scheduling",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "investigation_initiation",
+          "status": "SKIPPED",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "oem_complaint",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "post_change_monitoring",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "qa_investigation",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "replacement_logistics",
+          "status": "SKIPPED",
+          "real_world_status": "UNVERIFIED"
+        },
+        {
+          "stage_instance_id": "technical_disposition",
+          "status": "SKIPPED",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "ticket_validation",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        },
+        {
+          "stage_instance_id": "warranty_assessment",
+          "status": "COMPLETED_PROVISIONALLY",
+          "real_world_status": "NOT_APPLICABLE"
+        }
+      ]
+    }
+  ]
+}

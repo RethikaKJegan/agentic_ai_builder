@@ -1,0 +1,7 @@
+- [x] Verify installed Simpson mappings and configure all twelve executable stages.
+- [x] Add backward-compatible nonblocking analytical waits and branch conjunction handling.
+- [x] Implement bounded, restart-safe command driving and persisted analytical reporting.
+- [x] Expose existing CLI/API entry points without new permission grants.
+- [x] Execute twelve-stage, repair-only and warranty-rejected acceptance with real Phase 4 components and controlled transports.
+- [x] Verify Phase 4 / investigation regressions, contracts, OpenSpec and capture real execution artifacts.
+- [x] Document per-stage behavior, exact commands, pending waits, final outcomes and limitations.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Qualified analytical lifecycle report v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "case_id", "process_definition_id", "process_definition_version", "case_status", "execution_status", "business_outcome_status", "observed_revision", "ontology_version", "mapping_version", "stages", "pending_real_world_waits", "evidence_references", "generated_assumptions", "conflicts", "timeline", "qualification"],
+  "properties": {
+    "schema_version": {"const": "business-lifecycle-report-v1"}, "case_id": {"type": "string"},
+    "process_definition_id": {"type": "string"}, "process_definition_version": {"type": "integer", "minimum": 1},
+    "case_status": {"type": "string"}, "execution_status": {"type": "string"}, "business_outcome_status": {"type": "string"},
+    "observed_revision": {"type": "integer", "minimum": 1}, "ontology_version": {"type": ["string", "null"]}, "mapping_version": {"type": ["string", "null"]},
+    "stages": {"type": "array", "minItems": 1, "maxItems": 64, "items": {
+      "type": "object", "required": ["stage_instance_id", "name", "status", "execution_status", "business_outcome_status", "real_world_status", "capabilities", "run_id", "composition_id", "inputs", "outputs", "errors", "tool_execution_records"],
+      "properties": {
+        "status": {"enum": ["WAITING", "RUNNING", "COMPLETED", "COMPLETED_PROVISIONALLY", "SKIPPED", "BLOCKED", "FAILED", "CANCELLED"]},
+        "inputs": {"type": "object"}, "outputs": {"type": "object"}, "errors": {"type": "array"}, "tool_execution_records": {"type": "array"}
+      }
+    }},
+    "pending_real_world_waits": {"type": "array", "items": {"type": "object"}},
+    "evidence_references": {"type": "array"}, "generated_assumptions": {"type": "object"},
+    "conflicts": {"type": "array"}, "timeline": {"type": "array"}, "qualification": {"type": "string", "minLength": 1}
+  }
+}

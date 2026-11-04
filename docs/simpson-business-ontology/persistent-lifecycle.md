@@ -1,5 +1,10 @@
 # Phase 4 persistent business lifecycle
 
+Phase 5 builds on this implementation: see [Simpson lifecycle](simpson-lifecycle.md)
+for the twelve-stage definition, bounded driver, executed evidence and backend
+commands. Existing event waits remain blocking by default; Phase 5 adds an explicit
+nonblocking option for provisional analytical/read stages.
+
 Implemented locally, backend only. Business cases now outlive agent runs and pin
 immutable process definitions, ontology/mapping context, capability contracts and
 secret-free operator configuration. Execution completion and business outcome are

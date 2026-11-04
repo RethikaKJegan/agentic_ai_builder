@@ -1,0 +1,1774 @@
+{
+  "process_definition_id": "simpson_warranty_lifecycle",
+  "version": 1,
+  "client_id": "simpson",
+  "domain_id": "manufacturing",
+  "description": "Twelve-stage analytical lifecycle requested for Phase 5. Reuses mapped source evidence and case-local qualified assumptions; this is not an official Simpson policy or authorization instrument. Physical and commercial event waits remain independently pending.",
+  "stages": [
+    {
+      "stage_definition_id": "simpson.oem_complaint",
+      "stage_instance_id": "oem_complaint",
+      "version": 1,
+      "name": "OEM complaint initiation",
+      "description": "Retrieve the existing mapped OEM complaint. This does not create or alter an authoritative complaint record.",
+      "domain": "manufacturing",
+      "required_capabilities": [
+        "business.read.complaints"
+      ],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "complaint_id": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "evidence_mapping": "mapping:ticket_id",
+          "binding": {
+            "source": "user",
+            "path": "complaint_id"
+          }
+        },
+        "reported_symptom": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "evidence_mapping": "mapping:complaint_symptom",
+          "synthetic_fallback": true,
+          "fallback_value": "OEM symptom evidence is unavailable; obtain the actual complaint report."
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "reported_symptom",
+          "agent_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "reported_symptom": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "agent_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "complaint_id": {
+          "source": "input",
+          "path": "complaint_id"
+        },
+        "reported_symptom": {
+          "source": "input",
+          "path": "reported_symptom"
+        },
+        "agent_analysis": {
+          "source": "runtime",
+          "path": "master_orchestrator.summary"
+        }
+      },
+      "dependency_definitions": [],
+      "preconditions": [],
+      "allowed_tools": [
+        "business_retrieve_evidence"
+      ],
+      "side_effect_classification": "read",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "complaint_id",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "reported_symptom",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "agent_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [],
+      "timeout_policy": {
+        "seconds": 300,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.ticket_validation",
+      "stage_instance_id": "ticket_validation",
+      "version": 1,
+      "name": "Ticket registration and validation",
+      "description": "Ticket registration and validation \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "derivation": {
+            "operation": "copy",
+            "inputs": [
+              {
+                "source": "stage:oem_complaint",
+                "path": "complaint_id"
+              }
+            ]
+          }
+        },
+        "registration_analysis": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Ticket registration cannot be verified from available source evidence.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:oem_complaint",
+                "path": "complaint_id"
+              }
+            ],
+            "value": "Existing mapped ticket observed; analytical validation does not create or modify a source ticket.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "registration_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "registration_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "registration_analysis": {
+          "source": "input",
+          "path": "registration_analysis"
+        }
+      },
+      "dependency_definitions": [
+        "oem_complaint"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "registration_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.warranty_assessment",
+      "stage_instance_id": "warranty_assessment",
+      "version": 1,
+      "name": "Warranty assessment",
+      "description": "Warranty assessment \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [
+        "business.assess_warranty"
+      ],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "binding": {
+            "source": "stage:ticket_validation",
+            "path": "ticket_reference"
+          }
+        },
+        "assessment": {
+          "schema": {
+            "type": "string",
+            "enum": [
+              "undetermined",
+              "provisionally_supported",
+              "rejected"
+            ]
+          },
+          "binding": {
+            "source": "user",
+            "path": "warranty_assessment"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "undetermined"
+        },
+        "policy_assumption": {
+          "schema": {
+            "type": "object",
+            "required": [
+              "statement"
+            ],
+            "properties": {
+              "statement": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "policy": true,
+          "binding": {
+            "source": "config",
+            "path": "warranty_policy"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": {
+            "statement": "Authoritative warranty policy is unavailable. Case-local analytical continuation grants no eligibility, payment or replacement authorization."
+          }
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "assessment",
+          "policy_assumption",
+          "agent_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "assessment": {
+            "type": "string",
+            "enum": [
+              "undetermined",
+              "provisionally_supported",
+              "rejected"
+            ]
+          },
+          "policy_assumption": {
+            "type": "object",
+            "required": [
+              "statement"
+            ],
+            "properties": {
+              "statement": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "agent_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "assessment": {
+          "source": "input",
+          "path": "assessment"
+        },
+        "policy_assumption": {
+          "source": "input",
+          "path": "policy_assumption"
+        },
+        "agent_analysis": {
+          "source": "runtime",
+          "path": "master_orchestrator.summary"
+        }
+      },
+      "dependency_definitions": [
+        "ticket_validation"
+      ],
+      "preconditions": [],
+      "allowed_tools": [
+        "business_retrieve_evidence"
+      ],
+      "side_effect_classification": "read",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "assessment",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "policy_assumption",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "agent_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [],
+      "timeout_policy": {
+        "seconds": 300,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.investigation_initiation",
+      "stage_instance_id": "investigation_initiation",
+      "version": 1,
+      "name": "Investigation initiation",
+      "description": "Investigation initiation \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "binding": {
+            "source": "stage:ticket_validation",
+            "path": "ticket_reference"
+          }
+        },
+        "investigation_plan": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Proposed investigation only; no engineer assignment or contact is confirmed.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:oem_complaint",
+                "path": "reported_symptom"
+              }
+            ],
+            "value": "Review reported complaint observations and obtain independent field evidence; investigation activities are proposed only.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        },
+        "engineer_reference": {
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "binding": {
+            "source": "user",
+            "path": "engineer_reference"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": null
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "investigation_plan",
+          "engineer_reference"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "investigation_plan": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "engineer_reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "investigation_plan": {
+          "source": "input",
+          "path": "investigation_plan"
+        },
+        "engineer_reference": {
+          "source": "input",
+          "path": "engineer_reference"
+        }
+      },
+      "dependency_definitions": [
+        "warranty_assessment"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "investigation_plan",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "engineer_reference",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.inspection_scheduling",
+      "stage_instance_id": "inspection_scheduling",
+      "version": 1,
+      "name": "Joint inspection scheduling",
+      "description": "Joint inspection scheduling \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "binding": {
+            "source": "stage:ticket_validation",
+            "path": "ticket_reference"
+          }
+        },
+        "scheduling_proposal": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "No appointment is confirmed. Obtain actual engineer, account, recipient, calendar, slot and action authorization before sending or booking."
+        }
+      },
+      "optional_inputs": {
+        "actual_calendar_receipt": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "confirmation_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "scheduling_proposal"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "scheduling_proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "scheduling_proposal": {
+          "source": "input",
+          "path": "scheduling_proposal"
+        }
+      },
+      "dependency_definitions": [
+        "investigation_initiation"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "scheduling_proposal",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "inspection_schedule_confirmation",
+          "expected_source": "simpson.field_service",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "confirmation_reference"
+            ],
+            "properties": {
+              "confirmation_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.field_diagnosis",
+      "stage_instance_id": "field_diagnosis",
+      "version": 1,
+      "name": "Field inspection and diagnosis",
+      "description": "Field inspection and diagnosis \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [
+        "business.compare"
+      ],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "binding": {
+            "source": "stage:ticket_validation",
+            "path": "ticket_reference"
+          }
+        },
+        "reported_diagnosis": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "evidence_mapping": "mapping:inspection_potential_cause",
+          "synthetic_fallback": true,
+          "fallback_value": "No inspection evidence is available. Diagnostic hypothesis only; a physical inspection and root cause are unverified.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:oem_complaint",
+                "path": "reported_symptom"
+              }
+            ],
+            "value": "Available complaint observations justify field investigation; root cause remains unconfirmed.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        }
+      },
+      "optional_inputs": {
+        "actual_inspection_report": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "report_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "reported_diagnosis",
+          "agent_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "reported_diagnosis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "agent_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "reported_diagnosis": {
+          "source": "input",
+          "path": "reported_diagnosis"
+        },
+        "agent_analysis": {
+          "source": "runtime",
+          "path": "master_orchestrator.summary"
+        }
+      },
+      "dependency_definitions": [
+        "inspection_scheduling"
+      ],
+      "preconditions": [],
+      "allowed_tools": [
+        "business_retrieve_evidence"
+      ],
+      "side_effect_classification": "read",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "reported_diagnosis",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "agent_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 300,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "inspection_findings",
+          "expected_source": "simpson.field_service",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "report_reference",
+              "findings"
+            ],
+            "properties": {
+              "report_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "findings": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.technical_disposition",
+      "stage_instance_id": "technical_disposition",
+      "version": 1,
+      "name": "Technical disposition",
+      "description": "Technical disposition \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "resolution_path": {
+          "schema": {
+            "type": "string",
+            "enum": [
+              "undetermined",
+              "repair_only",
+              "replacement"
+            ]
+          },
+          "binding": {
+            "source": "user",
+            "path": "resolution_path"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "undetermined"
+        },
+        "technical_proposal": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Insufficient evidence for a confirmed technical disposition; analytical proposal only.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:field_diagnosis",
+                "path": "reported_diagnosis"
+              }
+            ],
+            "value": "Review the reported diagnosis and chosen analytical route; neither repair nor replacement is authorized by this proposal.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        },
+        "capa_required": {
+          "schema": {
+            "type": "boolean"
+          },
+          "binding": {
+            "source": "user",
+            "path": "capa_required"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": false
+        },
+        "monitoring_required": {
+          "schema": {
+            "type": "boolean"
+          },
+          "binding": {
+            "source": "user",
+            "path": "monitoring_required"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": false
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "resolution_path",
+          "technical_proposal",
+          "capa_required",
+          "monitoring_required"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "resolution_path": {
+            "type": "string",
+            "enum": [
+              "undetermined",
+              "repair_only",
+              "replacement"
+            ]
+          },
+          "technical_proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "capa_required": {
+            "type": "boolean"
+          },
+          "monitoring_required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output_bindings": {
+        "resolution_path": {
+          "source": "input",
+          "path": "resolution_path"
+        },
+        "technical_proposal": {
+          "source": "input",
+          "path": "technical_proposal"
+        },
+        "capa_required": {
+          "source": "input",
+          "path": "capa_required"
+        },
+        "monitoring_required": {
+          "source": "input",
+          "path": "monitoring_required"
+        }
+      },
+      "dependency_definitions": [
+        "field_diagnosis"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "resolution_path",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "technical_proposal",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "capa_required",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "monitoring_required",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.commercial_decision",
+      "stage_instance_id": "commercial_decision",
+      "version": 1,
+      "name": "Commercial and authorization decision",
+      "description": "Commercial and authorization decision \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "commercial_proposal": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Commercial review remains pending. No commercial authorization is granted.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:technical_disposition",
+                "path": "resolution_path"
+              }
+            ],
+            "value": "Submit the analytical disposition for actual commercial authorization; this recommendation grants no authority.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        },
+        "authorization_state": {
+          "schema": {
+            "const": "not_granted_by_analysis",
+            "type": "string"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "not_granted_by_analysis"
+        }
+      },
+      "optional_inputs": {
+        "actual_business_approval": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "authorization_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "commercial_proposal",
+          "authorization_state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "commercial_proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "authorization_state": {
+            "const": "not_granted_by_analysis",
+            "type": "string"
+          }
+        }
+      },
+      "output_bindings": {
+        "commercial_proposal": {
+          "source": "input",
+          "path": "commercial_proposal"
+        },
+        "authorization_state": {
+          "source": "input",
+          "path": "authorization_state"
+        }
+      },
+      "dependency_definitions": [
+        "technical_disposition"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "commercial_proposal",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "authorization_state",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "commercial_authorization",
+          "expected_source": "simpson.commercial",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "decision",
+              "authorization_reference"
+            ],
+            "properties": {
+              "decision": {
+                "enum": [
+                  "approved",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              "authorization_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": true,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.replacement_logistics",
+      "stage_instance_id": "replacement_logistics",
+      "version": 1,
+      "name": "Replacement and logistics",
+      "description": "Replacement and logistics \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "ticket_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "binding": {
+            "source": "stage:ticket_validation",
+            "path": "ticket_reference"
+          }
+        },
+        "replacement_proposal": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Replacement and logistics proposal only. No authorization, dispatch, shipment, receipt, installation or source update is confirmed."
+        }
+      },
+      "optional_inputs": {
+        "actual_shipment_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "shipment_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ticket_reference",
+          "replacement_proposal"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ticket_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "replacement_proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "ticket_reference": {
+          "source": "input",
+          "path": "ticket_reference"
+        },
+        "replacement_proposal": {
+          "source": "input",
+          "path": "replacement_proposal"
+        }
+      },
+      "dependency_definitions": [
+        "commercial_decision"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "ticket_reference",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "replacement_proposal",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        },
+        {
+          "source": "stage:technical_disposition",
+          "path": "resolution_path",
+          "operator": "eq",
+          "value": "replacement"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "shipment_confirmation",
+          "expected_source": "simpson.logistics",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "shipment_reference"
+            ],
+            "properties": {
+              "shipment_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.qa_investigation",
+      "stage_instance_id": "qa_investigation",
+      "version": 1,
+      "name": "QA investigation",
+      "description": "QA investigation \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "qa_analysis": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "evidence_mapping": "mapping:qa_defect",
+          "synthetic_fallback": true,
+          "fallback_value": "QA evidence is unavailable. No physical test, confirmed root cause or QA approval is claimed.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:field_diagnosis",
+                "path": "reported_diagnosis"
+              }
+            ],
+            "value": "Use the reported diagnosis to propose QA examination; laboratory findings and root cause remain unconfirmed.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        }
+      },
+      "optional_inputs": {
+        "actual_qa_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "qa_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "qa_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "qa_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "qa_analysis": {
+          "source": "input",
+          "path": "qa_analysis"
+        }
+      },
+      "dependency_definitions": [
+        "replacement_logistics"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "qa_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        },
+        {
+          "source": "stage:technical_disposition",
+          "path": "resolution_path",
+          "operator": "eq",
+          "value": "replacement"
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "qa_results",
+          "expected_source": "simpson.quality",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "qa_reference",
+              "findings"
+            ],
+            "properties": {
+              "qa_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "findings": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.corrective_engineering",
+      "stage_instance_id": "corrective_engineering",
+      "version": 1,
+      "name": "Corrective engineering action",
+      "description": "Corrective engineering action \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "engineering_proposal": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Corrective engineering proposal only. No approved change, incorporation or implementation is confirmed.",
+          "inference": {
+            "basis": [
+              {
+                "source": "stage:field_diagnosis",
+                "path": "reported_diagnosis"
+              }
+            ],
+            "value": "Review the available diagnosis and investigate a corrective engineering proposal; no change is implemented by this analysis.",
+            "explanation": "Configured provisional interpretation of the cited observations; no physical completion or authority is inferred."
+          }
+        }
+      },
+      "optional_inputs": {
+        "actual_change_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "change_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "engineering_proposal"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "engineering_proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "engineering_proposal": {
+          "source": "input",
+          "path": "engineering_proposal"
+        }
+      },
+      "dependency_definitions": [
+        "qa_investigation"
+      ],
+      "preconditions": [],
+      "allowed_tools": [],
+      "side_effect_classification": "none",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "engineering_proposal",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        },
+        {
+          "source": "stage:technical_disposition",
+          "path": "capa_required",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 86400,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "engineering_change_evidence",
+          "expected_source": "simpson.engineering",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "change_reference"
+            ],
+            "properties": {
+              "change_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    },
+    {
+      "stage_definition_id": "simpson.post_change_monitoring",
+      "stage_instance_id": "post_change_monitoring",
+      "version": 1,
+      "name": "Post-change monitoring",
+      "description": "Post-change monitoring \u2014 analytical execution; real-world activities require their own evidence.",
+      "domain": "manufacturing",
+      "required_capabilities": [
+        "business.report"
+      ],
+      "required_ontology_concepts": [],
+      "required_inputs": {
+        "monitoring_plan": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "Monitoring plan only: obtain actual eligible population, exposure and recurrence observations before assessing effectiveness."
+        },
+        "effectiveness_status": {
+          "schema": {
+            "type": "string",
+            "const": "unverified"
+          },
+          "synthetic_fallback": true,
+          "fallback_value": "unverified"
+        }
+      },
+      "optional_inputs": {
+        "actual_monitoring_reference": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "protected_activity": true,
+          "binding": {
+            "source": "event",
+            "path": "observation_reference"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "monitoring_plan",
+          "effectiveness_status",
+          "agent_analysis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "monitoring_plan": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "effectiveness_status": {
+            "type": "string",
+            "const": "unverified"
+          },
+          "agent_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "output_bindings": {
+        "monitoring_plan": {
+          "source": "input",
+          "path": "monitoring_plan"
+        },
+        "effectiveness_status": {
+          "source": "input",
+          "path": "effectiveness_status"
+        },
+        "agent_analysis": {
+          "source": "runtime",
+          "path": "master_orchestrator.summary"
+        }
+      },
+      "dependency_definitions": [
+        "corrective_engineering"
+      ],
+      "preconditions": [],
+      "allowed_tools": [
+        "business_retrieve_evidence"
+      ],
+      "side_effect_classification": "read",
+      "completion_criteria": [
+        {
+          "source": "output",
+          "path": "monitoring_plan",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "effectiveness_status",
+          "operator": "exists"
+        },
+        {
+          "source": "output",
+          "path": "agent_analysis",
+          "operator": "exists"
+        }
+      ],
+      "transition_rules": [
+        {
+          "source": "stage:warranty_assessment",
+          "path": "assessment",
+          "operator": "ne",
+          "value": "rejected"
+        },
+        {
+          "source": "stage:technical_disposition",
+          "path": "monitoring_required",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "timeout_policy": {
+        "seconds": 300,
+        "action": "escalate"
+      },
+      "retry_policy": {
+        "max_retries": 1,
+        "backoff_seconds": 1
+      },
+      "external_event_requirements": [
+        {
+          "event_type": "monitoring_observations",
+          "expected_source": "simpson.reliability",
+          "correlation_keys": {
+            "complaint_id": {
+              "source": "stage:oem_complaint",
+              "path": "complaint_id"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "observation_reference"
+            ],
+            "properties": {
+              "observation_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "additionalProperties": false
+          },
+          "requires_authorization": false,
+          "blocking": false
+        }
+      ],
+      "evidence_requirements": [],
+      "provisional_continuation_policy": {
+        "allowed": true
+      }
+    }
+  ]
+}

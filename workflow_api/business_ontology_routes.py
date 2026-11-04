@@ -83,6 +83,10 @@ def install(app, service, auth, reference, env=None):
     from .business_cases import BusinessCases
     service.business_cases=BusinessCases(service)
     app.state.business_cases=service.business_cases
+    from .simpson_lifecycle import SimpsonLifecycle, definition as simpson_process
+    from .lifecycle_driver import LifecycleDriver
+    simpson_lifecycle=SimpsonLifecycle(service.business_cases)
+    lifecycle_driver=LifecycleDriver(service.business_cases)
 
     async def call(fn, *args):
         try:
@@ -106,6 +110,21 @@ def install(app, service, auth, reference, env=None):
     @app.post('/business-ontology/v1/cases')
     async def create_business_case(request:Request):
         return await call(service.business_cases.create,await body(request))
+
+    @app.get('/business-ontology/v1/simpson-lifecycle/process')
+    async def get_simpson_process():
+        def read(current):
+            service.business_cases.scope(current)
+            return simpson_process()
+        return await call(read)
+
+    @app.post('/business-ontology/v1/simpson-lifecycle/cases')
+    async def create_simpson_case(request:Request):
+        return await call(simpson_lifecycle.create,await body(request))
+
+    @app.post('/business-ontology/v1/cases/{case_id}/drive')
+    async def drive_business_case(case_id:str,request:Request):
+        return await call(lifecycle_driver.drive,case_id,await body(request))
 
     @app.get('/business-ontology/v1/cases/{case_id}')
     async def get_business_case(case_id:str):

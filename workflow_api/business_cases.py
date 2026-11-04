@@ -113,7 +113,10 @@ class BusinessCases:
             validate_schema(stage['output_schema'])
             if stage['output_schema'].get('type') != 'object':fail('Stage outputs must be objects.')
             for spec in list(stage['required_inputs'].values()) + list(stage['optional_inputs'].values()):validate_schema(spec['schema'])
-            for wait in stage['external_event_requirements']:validate_schema(wait['schema'])
+            for wait in stage['external_event_requirements']:
+                validate_schema(wait['schema'])
+                if not wait.get('blocking', True) and (not stage['provisional_continuation_policy']['allowed'] or stage['side_effect_classification'] in ('draft','write')):
+                    fail('Nonblocking event waits require a provisional analytical/read stage.')
             if stage['side_effect_classification'] in ('draft', 'write') and not stage['required_capabilities']:
                 fail('External actions require registered capabilities through the existing runtime.')
             dependencies = set(stage['dependency_definitions'])
@@ -159,6 +162,9 @@ class BusinessCases:
 
     def section(self, auth, case_id, name):
         case = self.get(auth, case_id)
+        if name == 'report':
+            from .lifecycle_driver import analytical_report
+            return case.get('analytical_report') or analytical_report(case)
         if name == 'outcomes':
             return {k:case[k] for k in ('execution_status','business_outcome_status','case_status','completed_at')} | {'stages':{sid:{k:s[k] for k in ('execution_status','business_outcome_status','real_world_status','outputs')} for sid,s in case['stages'].items()}}
         if name in ('agents','tools'):
@@ -266,7 +272,9 @@ class BusinessCases:
 
     def command(self, auth, case_id, operation, body):
         scope = self.scope(auth, True, execute=operation in ('start', 'advance', 'resume', 'cancel'))
-        self.body(body, ('request_key', 'expected_revision'), ('inputs',) if operation == 'input' else ())
+        self.body(body, ('request_key', 'expected_revision'), ('inputs',) if operation == 'input' else ('max_stage_executions',) if operation in ('start','advance','resume') else ())
+        stage_limit = body.get('max_stage_executions', 64)
+        if type(stage_limit) is not int or not 1 <= stage_limit <= 64:fail('Stage dispatch limit must be between one and 64.')
         if type(body['expected_revision']) is not int:fail('An integer expected_revision is required.')
         if operation not in ('prepare', 'start', 'advance', 'resume', 'cancel', 'input'):fail('Unknown case command.')
         if operation == 'prepare':return self.prepare(auth, case_id, body)
@@ -299,6 +307,7 @@ class BusinessCases:
                     if operation == 'resume' and stage['execution_status'] in ('RUNNING', 'FAILED', 'BLOCKED'):
                         self.recoverable(case, stage)
                     if operation != 'input' and stage['execution_status'] == 'READY':
+                        if len(claimed) >= stage_limit:break
                         self.transition(case, stage, 'RUNNING')
                         token = secrets.token_hex(16);stage['claim'] = token
                         stage['deadline'] = self.clock() + stage['definition']['timeout_policy']['seconds']
@@ -399,7 +408,15 @@ class BusinessCases:
         except TypeError:return None
 
     def refresh(self, case, scope, wake_authorization=False):
-        for stage in case['stages'].values():
+        # Persisted canonical JSON sorts keys. Evaluate dependencies before children
+        # so a skipped branch can settle without a redundant execution command.
+        ordered=[];seen=set()
+        def visit(sid):
+            if sid in seen:return
+            for dependency in case['stages'][sid]['definition']['dependency_definitions']:visit(dependency)
+            seen.add(sid);ordered.append(case['stages'][sid])
+        for sid in case['stages']:visit(sid)
+        for stage in ordered:
             status = stage['execution_status'];definition = stage['definition']
             if status in TERMINAL | {'RUNNING', 'FAILED', 'BLOCKED'}:continue
             if status == 'WAITING_FOR_AUTHORIZATION' and stage.get('composition_id') and not wake_authorization:continue
@@ -431,7 +448,7 @@ class BusinessCases:
             if branches and not all(branches):
                 if stage['execution_status'] != 'READY':self.transition(case, stage, 'READY')
                 self.transition(case, stage, 'RUNNING')
-                if any(b is None for b in branches):
+                if not any(b is False for b in branches):
                     self.transition(case, stage, 'WAITING_FOR_INPUT', 'conditional_input_unavailable')
                 else:
                     stage['business_outcome_status'] = 'SKIPPED'
@@ -459,8 +476,14 @@ class BusinessCases:
                         event_type=requirement['event_type'], expected_source=requirement['expected_source'],
                         correlation_keys={k:e['value'] for k,e in keys.items()}, created_at=self.timestamp(),
                         deadline=self.clock()+definition['timeout_policy']['seconds'], current_status='PENDING',
-                        continuation_target=stage['stage_instance_id'], retry_or_escalation_policy=deepcopy(definition['timeout_policy']))
+                        continuation_target=stage['stage_instance_id'], retry_or_escalation_policy=deepcopy(definition['timeout_policy']),blocking=requirement.get('blocking', True))
                 wait = case['waits'][wid]
+                if not requirement.get('blocking', True):
+                    stage['pending_real_world_event'] = True
+                    stage['business_outcome_status'] = 'PROVISIONAL'
+                    if event_missing:
+                        self.transition(case, stage, 'RUNNING');self.transition(case, stage, 'WAITING_FOR_INPUT', 'protected_event_input_required')
+                    continue
                 if wait['current_status'] == 'PENDING' and wait['deadline'] <= self.clock():
                     wait['current_status'] = 'TIMED_OUT'
                     policy = definition['provisional_continuation_policy']
@@ -522,7 +545,7 @@ class BusinessCases:
             if not conforms(raw, definition['output_schema']):fail('Stage output does not satisfy its pinned schema.', 'CASE_OUTPUT_INVALID')
             if not all(self.predicate(p, resolver, raw, stage.get('runtime_result', {})) for p in definition['completion_criteria']):
                 fail('Stage completion criteria are not satisfied.', 'CASE_COMPLETION_UNVERIFIED')
-            provisional = (stage.get('event_timeout_provisional') or stage.get('deadline_exceeded') or bool(stage.get('missing_evidence')) or stage.get('analytical_runtime_result', False) or any(e['provenance_type'] in ('INFERRED', 'SYNTHETIC') for e in list(outputs.values())+list(stage['resolved_inputs'].values())))
+            provisional = (stage.get('pending_real_world_event') or stage.get('event_timeout_provisional') or stage.get('deadline_exceeded') or bool(stage.get('missing_evidence')) or stage.get('analytical_runtime_result', False) or any(e['provenance_type'] in ('INFERRED', 'SYNTHETIC') for e in list(outputs.values())+list(stage['resolved_inputs'].values())))
             if provisional and not definition['provisional_continuation_policy']['allowed']:fail('This stage requires verified evidence.', 'CASE_EVIDENCE_REQUIRED')
             stage['outputs'] = outputs;stage['business_outcome_status'] = 'PROVISIONAL' if provisional else 'EVIDENCE_COMPLETE'
             stage['execution_status'] = 'COMPLETED_PROVISIONALLY' if provisional else 'COMPLETED'

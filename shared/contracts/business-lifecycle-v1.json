@@ -55,7 +55,8 @@
       "properties": {
         "event_type": {"$ref": "#/$defs/id"}, "expected_source": {"$ref": "#/$defs/id"},
         "correlation_keys": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/binding"}},
-        "schema": {"type": "object"}, "requires_authorization": {"type": "boolean"}
+        "schema": {"type": "object"}, "requires_authorization": {"type": "boolean"},
+        "blocking": {"type": "boolean", "default": true, "description": "False permits qualified analytical completion while the real event remains pending; never grants action authorization."}
       }
     },
     "stage": {

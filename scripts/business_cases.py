@@ -32,6 +32,7 @@ def remote(args, body):
     base=args.api_url.rstrip('/')+'/business-ontology/v1'
     if args.operation=='publish':path='/process-definitions'
     elif args.operation=='create':path='/cases'
+    elif args.operation=='simpson-create':path='/simpson-lifecycle/cases'
     else:
         path='/cases/'+quote(args.case_id,safe='')
         if args.operation=='inspect':
@@ -59,11 +60,11 @@ def main():
     parser.add_argument('--workspace',default='local-workspace')
     parser.add_argument('--owner',default='local-builder')
     commands=parser.add_subparsers(dest='operation',required=True)
-    for name in ('publish','create','prepare','start','advance','resume','cancel','input','event','inspect'):
+    for name in ('publish','create','simpson-create','prepare','start','advance','resume','cancel','input','event','inspect','drive'):
         sub=commands.add_parser(name)
-        if name not in ('publish','create'):sub.add_argument('--case-id',required=True)
+        if name not in ('publish','create','simpson-create'):sub.add_argument('--case-id',required=True)
         if name!='inspect':sub.add_argument('--json',type=Path,required=True)
-        else:sub.add_argument('--section',choices=['all','stages','assumptions','conflicts','waits','execution_history','timeline','source_evidence','evidence','agents','tools','outcomes'],default='all')
+        else:sub.add_argument('--section',choices=['all','stages','assumptions','conflicts','waits','execution_history','timeline','source_evidence','evidence','agents','tools','outcomes','report'],default='all')
     args=parser.parse_args()
     try:
         body=json.loads(args.json.read_text()) if args.operation!='inspect' else None
@@ -79,6 +80,12 @@ def main():
         auth['scopes']=sorted(set(auth['scopes'])|{'workspace:write'})
         service=BusinessCases(composition.service)
         if args.operation in ('publish','create'):result=getattr(service,args.operation)(auth,body)
+        elif args.operation=='simpson-create':
+            from workflow_api.simpson_lifecycle import SimpsonLifecycle
+            result=SimpsonLifecycle(service).create(auth,body)
+        elif args.operation=='drive':
+            from workflow_api.lifecycle_driver import LifecycleDriver
+            result=LifecycleDriver(service).drive(auth,args.case_id,body)
         elif args.operation=='event':result=service.event(auth,args.case_id,body)
         elif args.operation=='inspect':
             result=service.get(auth,args.case_id)
