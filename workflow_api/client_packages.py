@@ -15,6 +15,7 @@ from .investigation_graph import fail
 
 PACKAGE_KEYS={'package_id','revision','client_id','domain','ontology_version','concepts','relationships',
               'source_mappings','evidence_requirements','capability_contracts','rules','resource_bindings','validation_requirements'}
+PACKAGE_OPTIONAL={'process_definitions','memory_policy'}
 PACKAGE_INPUT={'type':'object','additionalProperties':False,'required':['package_id','revision','capability_id'],
  'properties':{'package_id':{'type':'string'},'revision':{'type':'integer','minimum':1},'capability_id':{'type':'string'}}}
 PACKAGE_OUTPUT={'type':'object','required':['version_id','knowledge_sha256','records','coverage'],
@@ -24,19 +25,8 @@ PACKAGE_OUTPUT={'type':'object','required':['version_id','knowledge_sha256','rec
 def object_schema(required, properties):
     return dict(type='object',required=required,properties=properties)
 
-STR={'type':'string','minLength':1,'maxLength':256}
-PACKAGE_SCHEMA=dict(type='object',additionalProperties=False,required=sorted(PACKAGE_KEYS),properties={
-    **{k:STR for k in ('package_id','client_id','domain','ontology_version')},
-    'revision':{'type':'integer','minimum':1},
-    'concepts':{'type':'array','minItems':1,'items':object_schema(['id'],{'id':STR,'parent':STR})},
-    'relationships':{'type':'array','items':object_schema(['source','target','predicate'],{k:STR for k in ('source','target','predicate')})},
-    'source_mappings':{'type':'array','items':object_schema(['id','concept','source','field'],{k:STR for k in ('id','concept','source','field')})},
-    'evidence_requirements':{'type':'array','items':object_schema(['capability_id','mapping_id'],{k:STR for k in ('capability_id','mapping_id')})},
-    'capability_contracts':{'type':'object','minProperties':1,'additionalProperties':SCHEMA},
-    'rules':{'type':'array','items':object_schema(['id','operator','left_mapping','right_mapping'],{k:STR for k in ('id','operator','left_mapping','right_mapping')})},
-    'resource_bindings':{'type':'object','additionalProperties':object_schema(['source_id','mapping_ids'],{'source_id':STR,'mapping_ids':{'type':'array','minItems':1,'items':STR}})},
-    'validation_requirements':{'type':'array','items':{'enum':['acyclic_dependencies','mapped_evidence','current_source_authority']}}
-})
+from pathlib import Path
+PACKAGE_SCHEMA=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/client-knowledge-package-v1.json').read_text())
 
 
 class ClientPackages:
@@ -59,7 +49,7 @@ class ClientPackages:
 
     def publish(self,auth,body):
         scope=self.scope(auth,True)
-        if not isinstance(body,dict) or set(body)!=PACKAGE_KEYS:fail('Supply the complete client knowledge manifest.','CLIENT_PACKAGE_INVALID',422)
+        if not isinstance(body,dict) or not PACKAGE_KEYS<=set(body) or set(body)-(PACKAGE_KEYS|PACKAGE_OPTIONAL):fail('Supply the complete client knowledge manifest.','CLIENT_PACKAGE_INVALID',422)
         if list(Draft202012Validator(PACKAGE_SCHEMA).iter_errors(body)):fail('Client package does not satisfy its schema.','CLIENT_PACKAGE_INVALID',422)
         reject_secrets(body)
         if len(canonical(body).encode())>100000:fail('Client package is too large.','CLIENT_PACKAGE_INVALID',422)
@@ -97,6 +87,18 @@ class ClientPackages:
                 if r['operator'] not in ('lt','lte','eq','gt','gte') or r['left_mapping'] not in mids or r['right_mapping'] not in mids:raise ValueError()
             for r in body['evidence_requirements']:
                 if r['capability_id'] not in body['capability_contracts'] or r['mapping_id'] not in mids:raise ValueError()
+            process_ids=set()
+            for process in body.get('process_definitions',[]):
+                from .business_cases import BusinessCases
+                BusinessCases.validate_definition(process)
+                identity=(process['process_definition_id'],process['version'])
+                if identity in process_ids or process['client_id']!=body['client_id'] or process['domain_id']!=body['domain']:raise ValueError()
+                process_ids.add(identity)
+                for stage in process['stages']:
+                    if set(stage['required_capabilities'])-(set(body['capability_contracts'])|{'business.report'}):raise ValueError()
+                    if set(stage['required_ontology_concepts'])-set(ids):raise ValueError()
+                    for spec in list(stage['required_inputs'].values())+list(stage['optional_inputs'].values()):
+                        if spec.get('evidence_mapping') and spec['evidence_mapping'] not in mids:raise ValueError()
             from .capability_contracts import validate_tasks
             validate_tasks([dict(task_id=k,capability_id=k,depends_on=c['preconditions']) for k,c in body['capability_contracts'].items()],body['capability_contracts'])
         except (KeyError,TypeError,ValueError,StopIteration):fail('Package references, schemas or dependencies are invalid.','CLIENT_PACKAGE_INVALID',422)
@@ -106,6 +108,10 @@ class ClientPackages:
             if row and json.loads(row[0])!=document:fail('Package revisions are immutable.','CLIENT_PACKAGE_CONFLICT',409)
             if not row:db.execute('INSERT INTO client_knowledge_packages VALUES (?,?,?,?,?)',(*scope,body['package_id'],body['revision'],canonical(document)))
         return document
+
+    def install_processes(self,auth,package_id,revision,cases):
+        package=self.get(auth,package_id,revision)
+        return [cases.publish(auth,p) for p in package.get('process_definitions',[])]
 
     def listing(self,auth):
         scope=self.scope(auth)
@@ -151,6 +157,7 @@ class ClientPackages:
         if not isinstance(rows,list) or len(rows)>1000:fail('Source read exceeded its configured bound.','CLIENT_SOURCE_INVALID',422)
         mappings=[m for m in p['source_mappings'] if m['id'] in binding['mapping_ids']]
         records=[];missing=[];outcomes=[];seen={};conflicting=False
+        if not rows:missing=[r['mapping_id'] for r in p['evidence_requirements'] if r['capability_id']==inputs['capability_id']]
         stamp=datetime.now(timezone.utc).isoformat()
         for row in rows:
             if not isinstance(row,dict) or not isinstance(row.get('id'),str):fail('Source rows require stable identifiers.','CLIENT_SOURCE_INVALID',422)

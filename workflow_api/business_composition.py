@@ -58,7 +58,7 @@ class BusinessComposition:
     def match(self,auth,c,tools,inputs,destination=None):
         adapter=self.service.registry_adapter;policy=adapter.service._policy;reasons=[]
         connectors=self.connectors if self.connectors is not None else getattr(getattr(self.service,'runtime_runner',None),'connectors',{})
-        for item in sorted(tools,key=lambda x:x['tool_id']):
+        for item in tools:
             d=item['definition']
             if d['capability'] not in c['allowed_tool_operations'] or c['capability_id'].startswith('tool.') and d['tool_id']!=c['capability_id'].removeprefix('tool.'):continue
             if not compatible(d,c['input_schema'],c['output_schema']):reasons.append('SCHEMA_INCOMPATIBLE');continue
@@ -105,10 +105,20 @@ class BusinessComposition:
             contracts=deepcopy(package_context['package']['capability_contracts'])
             contracts['business.report']=catalogue(None,[])['business.report']
             dependencies={cid:c['preconditions'] for cid,c in contracts.items()}
+        hints=[]
+        runtime=getattr(getattr(self.service,'runtime_runner',None),'runtime',None)
+        memory_policy=(package_context or {}).get('package',{}).get('memory_policy',{'enabled':True,'max_recommendations':8})
+        pins=package_context['pins'] if package_context else prepared['pins'] if prepared else {}
+        if runtime and 'runs.view' in auth.get('permissions',[]) and memory_policy.get('enabled',True):
+            hints=runtime.experience_memory.ranked(auth,domain=package_context['package']['domain'] if package_context else 'configured_business_ontology',
+                pins=pins,contracts=contracts,tool_references=[t['definition'] for t in tools],limit=memory_policy.get('max_recommendations',8))
+        scores={h['tool_id']:h['score'] for h in hints if h['tool_id']}
+        tools=sorted(tools,key=lambda t:(-scores.get(t['tool_id'],0),t['tool_id']))
         if mode not in ('model','offline'):fail('Select model or explicit offline capability planning.')
         if mode=='model':
             provider=self.service.planner.provider
             selection_context=dict(generation_mode='hierarchy',capability_composition_catalog=contracts,business_preparation=package_context if package_context else self.preparation.context(prepared) if prepared else {},composition_resources=body.get('resources',{}),requested_operations=body.get('operations',[]))
+            selection_context['verified_experience_recommendations']=deepcopy(hints)
             selector=getattr(provider,'select_capabilities',None)
             if callable(selector):
                 selected=selector(body['objective'],selection_context)
@@ -211,6 +221,7 @@ class BusinessComposition:
             factory=AgentConfigurationFactory(self.service.registry_adapter,self.model_id)
             for task in tasks:
                 c=factory.create(auth,composition_id,task,contracts[task['capability_id']],chosen.get(task['task_id']),recovery_retries)
+                c['memory_recommendations']=[deepcopy(h) for h in hints if h['capability_id']==task['capability_id']]
                 c['required_evidence_facts']=deepcopy(c['evidence_references']);c['evidence_references']=[]
                 if prepared:
                     c['knowledge_pin']=deepcopy(prepared['pins'])
@@ -230,6 +241,8 @@ class BusinessComposition:
         document=dict(schema_version='business-composition-v1',composition_id=composition_id,scope=dict(workspace=scope[0],owner=scope[1]),objective=body['objective'],state=state,gaps=gaps,tasks=tasks,contracts={cid:contracts[cid] for cid in selected},configurations=configs,master=master,selected_tools={t:{k:deepcopy(r[k]) for k in ('tool_id','version','definition')} for t,r in chosen.items()},resources=resources,google_connection_id=body.get('google_connection_id'),preparation_id=prepared['preflight_id'] if prepared else None,preparation_sha256=prepared['sha256'] if prepared else None,planning=dict(mode=mode,model_calls=planning_calls),created_at=now())
         if isinstance(planning_usage,dict):document['planning']['usage']=deepcopy(planning_usage)
         document['runtime_features_version']=1
+        document['learning_features_version']=1
+        document['memory_recommendations']=deepcopy(hints)
         if lifecycle_context is not None:
             # Server-only argument, outside client/model payload fields and signed with the composition.
             from runtime.memory import bounded_context
@@ -328,6 +341,11 @@ def compile_workflow(doc):
     for field in ('max_llm_calls','max_tool_calls','max_tokens','max_estimated_cost_usd'):limits[field]=sum(a['limits'].get(field,0) for a in agents)
     limits['max_retries']=doc.get('recovery_max_retries',0);limits['timeout_seconds']=max(a['limits']['timeout_seconds'] for a in agents)
     metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=cid,composition_sha256=doc['sha256'],composition_tasks=child_tasks,composition_action_verifiers=actions,dynamic_delegation={'master_orchestrator':dict(max_rounds=master['limits']['max_llm_calls'],max_tasks=len(child_tasks))},unresolved_requirements=[],composition_preparation_id=doc['preparation_id'])
+    if doc.get('learning_features_version'):
+        from runtime.service import digest as runtime_digest
+        metadata.update(composition_contracts=deepcopy(doc['contracts']),
+            composition_tool_fingerprints={t['tool_id']:runtime_digest(t['definition']) for t in doc['selected_tools'].values()},
+            memory_recommendations=deepcopy(doc.get('memory_recommendations',[])))
     if 'lifecycle_context' in doc:metadata['lifecycle_context']=deepcopy(doc['lifecycle_context'])
     if doc.get('client_package_context'):
         context=doc['client_package_context']
@@ -357,7 +375,7 @@ def verify_composition(db,auth,workflow):
     doc['sha256']=sha;expected=compile_workflow(doc)
     for key in ('nodes','edges','conditions','tools','approval_gates','execution_policy'):
         if workflow[key]!=expected[key]:fail('Regenerate a composition to change its execution contract.','CAPABILITY_CHANGED',409)
-    for key in ('composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context'):
+    for key in ('composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
         if metadata.get(key)!=expected['metadata'].get(key):fail('Composition control metadata changed.','CAPABILITY_CHANGED',409)
     if len(workflow['agents'])!=len(expected['agents']):fail('Composition agents changed.','CAPABILITY_CHANGED',409)
     by_id={a['agent_id']:a for a in expected['agents']}

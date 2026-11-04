@@ -25,7 +25,7 @@ def analytical_report(case):
             capabilities=stage['definition']['required_capabilities'],run_id=stage.get('run_id'),composition_id=stage.get('composition_id'),
             inputs=deepcopy(stage['resolved_inputs']),outputs=deepcopy(stage['outputs']),errors=deepcopy(stage['errors']),
             tool_execution_records=deepcopy(stage.get('tool_execution_records',[]))))
-    return dict(schema_version='business-lifecycle-report-v1',case_id=case['case_id'],process_definition_id=case['process_definition_id'],
+    report=dict(schema_version='business-lifecycle-report-v1',case_id=case['case_id'],process_definition_id=case['process_definition_id'],
         process_definition_version=case['process_definition_version'],execution_status=case['execution_status'],
         business_outcome_status=case['business_outcome_status'],case_status=case['case_status'],observed_revision=case['revision'],
         ontology_version=case['ontology_version'],mapping_version=case['mapping_version'],stages=stages,
@@ -33,7 +33,9 @@ def analytical_report(case):
         evidence_references=deepcopy(case['evidence_references']),generated_assumptions=deepcopy(case['assumptions']),
         conflicts=deepcopy(case['conflicts']),timeline=deepcopy(case['execution_history']),
         qualification='Analytical execution only. Source reports, derived values, hypotheses and synthetic assumptions retain their provenance. '
-        'Proposed repair, replacement, shipment, QA, engineering and monitoring artifacts do not grant commercial authority or prove physical completion or effectiveness.')
+        'Analytical artifacts do not grant business authority or prove physical activity or business effectiveness.')
+    if case.get('reassessments'):report['reassessments']=deepcopy(case['reassessments'])
+    return report
 
 
 class LifecycleDriver:
@@ -81,6 +83,8 @@ class LifecycleDriver:
         with self.store.transaction() as db:
             doc=self._owned(db,scope,key,token)
             case=self.cases._load(db,scope,doc['case_id'])
+            from .lifecycle_learning import LifecycleLearning
+            LifecycleLearning(self.cases).record(db,auth,case)
             report=analytical_report(case)
             REPORT_VALIDATOR.validate(report)
             case['analytical_report']=report

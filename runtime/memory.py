@@ -32,12 +32,42 @@ class WorkingMemory:
     def __init__(self, runtime):
         self.runtime = runtime
 
+    @staticmethod
+    def case_view(case,stage=None):
+        """Durable case state is the store; this is its bounded task-specific projection."""
+        sid=stage['stage_instance_id'] if stage else None
+        dependencies=stage['definition']['dependency_definitions'] if stage else []
+        def brief(value):
+            if isinstance(value,str):return value[:512]
+            if isinstance(value,dict):return {k:brief(v) for k,v in list(value.items())[:12]}
+            if isinstance(value,list):return [brief(v) for v in value[:8]]
+            return value
+        selected={k:v for k,v in case['stages'].items() if k in dependencies}
+        view=dict(case_id=case['case_id'],goal=case['original_user_goal'],stage_instance_id=sid,
+            pins={k:case.get(k) for k in ('ontology_version','mapping_version','capability_registry_version','configuration_version')},
+            resolved_evidence=brief(stage.get('resolved_inputs',{})) if stage else {},
+            prior_conclusions={k:brief(v['outputs']) for k,v in list(selected.items())[:8]},
+            pending_waits=[{k:w[k] for k in ('wait_id','stage_instance_id','event_type','current_status')} for w in case['waits'].values() if (not sid or w['stage_instance_id'] in [sid,*dependencies]) and w['current_status'] in ('PENDING','TIMED_OUT')][:16],
+            failures=brief(stage.get('errors',[])[-4:]) if stage else [],
+            recovery_history=brief(stage.get('retry_history',[])[-4:]) if stage else [],
+            assignments=brief(stage.get('agent_configurations',[])) if stage else [],
+            tool_receipts=brief(stage.get('tool_execution_records',[])[-4:]) if stage else [],
+            budgets={'execution_deadline':stage.get('deadline'),'retry_limit':stage['definition']['retry_policy']['max_retries']} if stage else {},
+            qualification='Bounded projection; complete evidence, outputs, receipts and history remain in scoped case/run storage. Memory grants no authority.')
+        # Avoid duplicating full agent definitions in model context.
+        view['assignments']=[{k:a.get(k) for k in ('configuration_id','assigned_task','permitted_tools')} for a in (stage or {}).get('agent_configurations',[])][:8]
+        return bounded_context(view)
+
     def view(self, run, workflow, *, task=None, dependencies=None, permitted_tools=()):
         checkpoints = run.get('task_checkpoints', {})
         graph = workflow.get('metadata', {}).get('composition_tasks', {})
         failures = run.get('classified_failures', [])
         common = dict(knowledge_pin=knowledge_pin(workflow),
                       authority='Reference context only; current source and Registry checks remain mandatory.')
+        common['verified_execution_recommendations']=[deepcopy(h) for h in workflow.get('metadata',{}).get('memory_recommendations',[])
+                                                      if task is None or h['capability_id']==task['capability_id']][:8]
+        if workflow.get('metadata',{}).get('lifecycle_context',{}).get('working_memory'):
+            common['business_lifecycle']=deepcopy(workflow['metadata']['lifecycle_context']['working_memory'])
         if task is None:
             common.update(objective=workflow.get('description', ''),
                           task_graph={t['task_id']:dict(capability_id=t['capability_id'], depends_on=t['depends_on']) for t in graph.values()},
@@ -66,6 +96,62 @@ class ExperienceMemory:
         self.runtime.authorize(auth, permission, {'admin', 'approver'} if validate else {'admin', 'builder'} if write else {'admin','builder','viewer','approver'})
         return auth['subject']['workspace_id'], auth['subject']['subject_id']
 
+    def observe_execution(self,db,auth,run,workflow,*,retention_seconds=2592000):
+        """Trusted lifecycle hook: learn execution metadata, never model/business facts."""
+        scope=self.scope(auth,write=True)
+        if (run['workspace_id'],run['subject_id'])!=scope or run['status']!='completed':return
+        if run.get('workflow_digest')!=digest(workflow):return
+        existing=db.execute('SELECT experience_id,document FROM runtime_experiences WHERE workspace=? AND owner=? ORDER BY experience_id LIMIT 2049',scope).fetchall()
+        active=len(existing)
+        for row in existing:
+            entry=json.loads(row[1])
+            if entry.get('schema_version')!='operational-experience-v1':continue
+            if entry['expires_at']<=self.runtime.clock():
+                db.execute('DELETE FROM runtime_experiences WHERE workspace=? AND owner=? AND experience_id=?',(*scope,row[0]))
+                active-=1
+        metadata=workflow.get('metadata',{});pins=knowledge_pin(workflow)
+        for task in metadata.get('composition_tasks',{}).values():
+            checkpoint=run.get('task_checkpoints',{}).get(task['task_id'],{})
+            result=checkpoint.get('result',{})
+            if result.get('state')!='completed':continue
+            tool=task.get('selected_tool_id')
+            if tool and not any(t.get('tool_id')==tool and t.get('inputs')==task['operation_inputs'] for t in result.get('tool_results',[])):continue
+            cid=task['capability_id'];contract=metadata.get('composition_contracts',{}).get(cid)
+            # Older workflows without explicit contracts are not compatibility-ranked.
+            if not contract:continue
+            if active>=2048:break
+            eid='op_'+digest([run['run_id'],task['task_id']])[:40]
+            entry=dict(experience_id=eid,schema_version='operational-experience-v1',workspace=scope[0],owner=scope[1],
+                domain=metadata.get('client_domain','configured_business_ontology'),capability=cid,tool_id=tool,
+                contract_sha256=digest(contract),tool_reference_sha256=metadata.get('composition_tool_fingerprints',{}).get(tool),pins=pins,
+                category='verified_operational_execution',strategy='reuse_verified_configuration',
+                validation_status='validated',created_at=self.runtime.clock(),expires_at=self.runtime.clock()+retention_seconds,
+                evidence_references=[{'run_id':run['run_id'],'task_id':task['task_id'],'checkpoint_sha256':digest(checkpoint)}],
+                verified_outcome={'execution_completed':True,'business_outcome_verified':False},
+                recovered=bool(run.get('outcome_evaluation',{}).get('recovery_success')),
+                retry_count=len(run.get('recovery_history',[])),
+                authority='Execution metadata only; excludes source values, human outcomes, inferred conclusions and synthetic assumptions.')
+            cursor=db.execute('INSERT INTO runtime_experiences VALUES (?,?,?,?) ON CONFLICT DO NOTHING',(*scope,eid,json.dumps(entry)))
+            active+=int(cursor.rowcount==1)
+
+    def ranked(self,auth,*,domain,pins,contracts,tool_references=(),limit=8):
+        """Deterministic compatible verified successes; no mutation of historical pins."""
+        scope=self.scope(auth);groups={}
+        tool_hashes={t['tool_id']:digest(t) for t in tool_references}
+        with self.store.transaction(write=False) as db:
+            rows=db.execute('SELECT document FROM runtime_experiences WHERE workspace=? AND owner=? ORDER BY experience_id LIMIT 2048',scope).fetchall()
+        for row in rows:
+            e=json.loads(row[0]);cid=e.get('capability');tool=e.get('tool_id')
+            if (e.get('schema_version')!='operational-experience-v1' or e.get('validation_status')!='validated'
+                or e['expires_at']<=self.runtime.clock() or e['domain']!=domain or cid not in contracts
+                or e['contract_sha256']!=digest(contracts[cid]) or any(e['pins'].get(k)!=pins.get(k) for k in PIN_KEYS)
+                or tool and tool_hashes.get(tool)!=e['tool_reference_sha256']):continue
+            key=(cid,tool or '');g=groups.setdefault(key,dict(capability_id=cid,tool_id=tool,verified_successes=0,recovery_successes=0,retries=0,experience_references=[]))
+            g['verified_successes']+=1;g['recovery_successes']+=int(e.get('recovered',False));g['retries']+=e.get('retry_count',0)
+            if len(g['experience_references'])<4:g['experience_references'].append(e['experience_id'])
+        for g in groups.values():g['score']=g['verified_successes']*10+g['recovery_successes']*2-g['retries']
+        return sorted(groups.values(),key=lambda g:(-g['score'],g['capability_id'],g['tool_id'] or ''))[:min(8,limit)]
+
     def candidate(self, auth, *, domain, capability, category, strategy, evidence_references, pins, expires_at, agent_id=None):
         scope=self.scope(auth,write=True)
         from .recovery import CATEGORIES
@@ -80,7 +166,10 @@ class ExperienceMemory:
                    invalidation_conditions=['expiry','knowledge_version_changed','contradicted_outcome'],agent_id=agent_id,verified_outcome=None)
         reject_secrets(entry)
         if len(json.dumps(entry).encode())>12000:raise RuntimeFailure('EXPERIENCE_INVALID','Experience is too large.',422)
-        with self.store.transaction() as db:db.execute('INSERT INTO runtime_experiences VALUES (?,?,?,?)',(*scope,entry['experience_id'],json.dumps(entry)))
+        with self.store.transaction() as db:
+            if db.execute('SELECT COUNT(*) FROM runtime_experiences WHERE workspace=? AND owner=?',scope).fetchone()[0]>=2048:
+                raise RuntimeFailure('EXPERIENCE_LIMIT','Scoped experience capacity reached; invalidate or archive expired entries.',422)
+            db.execute('INSERT INTO runtime_experiences VALUES (?,?,?,?)',(*scope,entry['experience_id'],json.dumps(entry)))
         return entry
 
     def validate(self, auth, experience_id, *, run_id):
@@ -108,13 +197,14 @@ class ExperienceMemory:
     def relevant(self, auth, *, domain, capability, category, pins, agent_id=None):
         scope=self.scope(auth);result=[]
         with self.store.transaction() as db:
-            rows=db.execute('SELECT document FROM runtime_experiences WHERE workspace=? AND owner=?',scope).fetchall()
+            rows=db.execute('SELECT document FROM runtime_experiences WHERE workspace=? AND owner=? ORDER BY experience_id LIMIT 2048',scope).fetchall()
             for row in rows:
                 entry=json.loads(row[0])
+                if entry.get('schema_version')=='operational-experience-v1':continue
                 if entry['validation_status']!='validated':continue
                 stale=entry['expires_at']<=self.runtime.clock()
                 # Invalidate only entries in the requested domain, never unrelated client versions.
-                same=entry['domain']==domain
+                same=entry['domain']==domain and entry['pins'].get('package_id')==pins.get('package_id')
                 changed=same and any(entry['pins'].get(k)!=pins.get(k) for k in PIN_KEYS)
                 if stale or changed:
                     entry.update(validation_status='invalidated',invalidated_at=self.runtime.clock(),invalidation_reason='expiry' if stale else 'knowledge_version_changed')

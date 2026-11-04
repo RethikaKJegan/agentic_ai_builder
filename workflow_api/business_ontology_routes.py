@@ -103,6 +103,14 @@ def install(app, service, auth, reference, env=None):
     async def publish_process_definition(request:Request):
         return await call(service.business_cases.publish,await body(request))
 
+    @app.get('/business-ontology/v1/process-definitions')
+    async def list_business_processes():
+        return await call(service.business_cases.process_listing)
+
+    @app.get('/business-ontology/v1/cases')
+    async def list_business_cases(before:int|None=None):
+        return await call(service.business_cases.listing,before)
+
     @app.get('/business-ontology/v1/process-definitions/{process_id}/{version}')
     async def get_process_definition(process_id:str,version:int):
         return await call(service.business_cases.process,process_id,version)
@@ -125,6 +133,16 @@ def install(app, service, auth, reference, env=None):
     @app.post('/business-ontology/v1/cases/{case_id}/drive')
     async def drive_business_case(case_id:str,request:Request):
         return await call(lifecycle_driver.drive,case_id,await body(request))
+
+    @app.post('/business-ontology/v1/cases/{case_id}/reassess')
+    async def reassess_business_case(case_id:str,request:Request):
+        from .lifecycle_reassessment import LifecycleReassessment
+        return await call(LifecycleReassessment(service.business_cases).reassess,case_id,await body(request))
+
+    @app.get('/business-ontology/v1/cases/{case_id}/revisions/{revision}')
+    async def archived_business_case(case_id:str,revision:int):
+        from .lifecycle_reassessment import LifecycleReassessment
+        return await call(LifecycleReassessment(service.business_cases).revision,case_id,revision)
 
     @app.get('/business-ontology/v1/cases/{case_id}')
     async def get_business_case(case_id:str):

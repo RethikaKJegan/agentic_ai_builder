@@ -1,0 +1,972 @@
+{
+  "package_id": "retail_complaint_fixture",
+  "revision": 1,
+  "client_id": "retail_fixture_only",
+  "domain": "retail_food_service",
+  "ontology_version": "retail_complaint_ontology_v1",
+  "concepts": [
+    {
+      "id": "CustomerComplaint"
+    },
+    {
+      "id": "SaleOrder"
+    },
+    {
+      "id": "Purchase"
+    },
+    {
+      "id": "FoodProduct"
+    },
+    {
+      "id": "QualityIncident"
+    },
+    {
+      "id": "ResolutionProposal"
+    }
+  ],
+  "relationships": [
+    {
+      "source": "CustomerComplaint",
+      "target": "SaleOrder",
+      "predicate": "concerns_order"
+    },
+    {
+      "source": "Purchase",
+      "target": "FoodProduct",
+      "predicate": "contains_product"
+    }
+  ],
+  "source_mappings": [
+    {
+      "id": "mapping:retail_complaint",
+      "concept": "CustomerComplaint",
+      "field": "complaint_id",
+      "source": "retail_orders_fixture"
+    },
+    {
+      "id": "mapping:retail_order",
+      "concept": "SaleOrder",
+      "field": "order_id",
+      "source": "retail_orders_fixture"
+    },
+    {
+      "id": "mapping:retail_purchase",
+      "concept": "Purchase",
+      "field": "purchase_verified",
+      "source": "retail_orders_fixture"
+    },
+    {
+      "id": "mapping:retail_observation",
+      "concept": "QualityIncident",
+      "field": "product_observation",
+      "source": "retail_orders_fixture"
+    }
+  ],
+  "evidence_requirements": [
+    {
+      "capability_id": "retail.complaint.read",
+      "mapping_id": "mapping:retail_complaint"
+    },
+    {
+      "capability_id": "retail.complaint.read",
+      "mapping_id": "mapping:retail_order"
+    },
+    {
+      "capability_id": "retail.complaint.read",
+      "mapping_id": "mapping:retail_purchase"
+    }
+  ],
+  "capability_contracts": {
+    "retail.complaint.read": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "retail.complaint.read",
+      "supported_operation": "retrieve_mapped_evidence",
+      "business_purpose": "Read retail fixture complaint and purchase evidence",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "CustomerComplaint",
+        "SaleOrder",
+        "Purchase"
+      ],
+      "required_evidence": [
+        "mapping:retail_complaint",
+        "mapping:retail_order",
+        "mapping:retail_purchase"
+      ],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "retail_food_service"
+      ],
+      "retrieval_task": null
+    },
+    "retail.product.review": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "retail.product.review",
+      "supported_operation": "interpret_supported_evidence",
+      "business_purpose": "Analyse retail product observations without asserting defect or refund authority",
+      "kind": "model",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "summary": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "findings": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "agreement",
+                    "discrepancy",
+                    "observation",
+                    "limitation",
+                    "unverified"
+                  ]
+                },
+                "statement": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1500
+                },
+                "references": {
+                  "type": "array",
+                  "maxItems": 12,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "record_id": {
+                        "type": "string"
+                      },
+                      "mapping_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "record_id",
+                      "mapping_id"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "statement",
+                "references"
+              ]
+            }
+          },
+          "missing_information": {
+            "type": "array",
+            "maxItems": 24,
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "state": {
+            "enum": [
+              "completed",
+              "needs_input",
+              "insufficient_evidence",
+              "conflicting_evidence",
+              "unsupported"
+            ]
+          },
+          "classification": {
+            "type": "string"
+          },
+          "source_evidence": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object"
+          },
+          "tool_results": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "findings",
+          "missing_information"
+        ]
+      },
+      "required_ontology": [
+        "FoodProduct",
+        "QualityIncident"
+      ],
+      "required_evidence": [],
+      "preconditions": [
+        "retail.complaint.read"
+      ],
+      "allowed_tool_operations": [],
+      "side_effect": "none",
+      "verification_method": "cited_interpretation",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "retail_food_service"
+      ],
+      "retrieval_task": null
+    }
+  },
+  "rules": [],
+  "resource_bindings": {
+    "retail.complaint.read": {
+      "source_id": "retail_orders_fixture",
+      "mapping_ids": [
+        "mapping:retail_complaint",
+        "mapping:retail_order",
+        "mapping:retail_purchase",
+        "mapping:retail_observation"
+      ]
+    }
+  },
+  "validation_requirements": [
+    "acyclic_dependencies",
+    "mapped_evidence",
+    "current_source_authority"
+  ],
+  "process_definitions": [
+    {
+      "process_definition_id": "retail_complaint_fixture",
+      "version": 1,
+      "client_id": "retail_fixture_only",
+      "domain_id": "retail_food_service",
+      "description": "Clearly identified retail test fixtures; not Subway records, policy or real operational fulfillment.",
+      "stages": [
+        {
+          "stage_definition_id": "retail.complaint",
+          "stage_instance_id": "complaint",
+          "version": 1,
+          "name": "Customer complaint",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [
+            "retail.complaint.read"
+          ],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "complaint_id": {
+              "schema": {
+                "type": "string"
+              },
+              "binding": {
+                "source": "user",
+                "path": "complaint_id"
+              },
+              "evidence_mapping": "mapping:retail_complaint"
+            },
+            "description": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "Unspecified product complaint; obtain actual observations."
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "complaint_id",
+              "description",
+              "agent_analysis"
+            ],
+            "properties": {
+              "complaint_id": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "agent_analysis": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "complaint_id": {
+              "source": "input",
+              "path": "complaint_id"
+            },
+            "description": {
+              "source": "input",
+              "path": "description"
+            },
+            "agent_analysis": {
+              "source": "runtime",
+              "path": "master_orchestrator.summary"
+            }
+          },
+          "dependency_definitions": [],
+          "preconditions": [],
+          "allowed_tools": [
+            "client_package_read"
+          ],
+          "side_effect_classification": "read",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.order",
+          "stage_instance_id": "order",
+          "version": 1,
+          "name": "Order identification",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "order_id": {
+              "schema": {
+                "type": "string"
+              },
+              "evidence_mapping": "mapping:retail_order"
+            },
+            "complaint_id": {
+              "schema": {
+                "type": "string"
+              },
+              "binding": {
+                "source": "stage:complaint",
+                "path": "complaint_id"
+              }
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "order_id",
+              "complaint_id"
+            ],
+            "properties": {
+              "order_id": {
+                "type": "string"
+              },
+              "complaint_id": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "order_id": {
+              "source": "input",
+              "path": "order_id"
+            },
+            "complaint_id": {
+              "source": "input",
+              "path": "complaint_id"
+            }
+          },
+          "dependency_definitions": [
+            "complaint"
+          ],
+          "preconditions": [],
+          "allowed_tools": [],
+          "side_effect_classification": "none",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.purchase",
+          "stage_instance_id": "purchase",
+          "version": 1,
+          "name": "Purchase verification",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "purchase_verified": {
+              "schema": {
+                "type": "boolean"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": false,
+              "evidence_mapping": "mapping:retail_purchase"
+            },
+            "order_id": {
+              "schema": {
+                "type": "string"
+              },
+              "binding": {
+                "source": "stage:order",
+                "path": "order_id"
+              }
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "purchase_verified",
+              "order_id"
+            ],
+            "properties": {
+              "purchase_verified": {
+                "type": "boolean"
+              },
+              "order_id": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "purchase_verified": {
+              "source": "input",
+              "path": "purchase_verified"
+            },
+            "order_id": {
+              "source": "input",
+              "path": "order_id"
+            }
+          },
+          "dependency_definitions": [
+            "order"
+          ],
+          "preconditions": [],
+          "allowed_tools": [],
+          "side_effect_classification": "none",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.product",
+          "stage_instance_id": "product",
+          "version": 1,
+          "name": "Product investigation",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [
+            "retail.product.review"
+          ],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "product_observation": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "No independently confirmed product defect.",
+              "evidence_mapping": "mapping:retail_observation"
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "product_observation",
+              "agent_analysis"
+            ],
+            "properties": {
+              "product_observation": {
+                "type": "string"
+              },
+              "agent_analysis": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "product_observation": {
+              "source": "input",
+              "path": "product_observation"
+            },
+            "agent_analysis": {
+              "source": "runtime",
+              "path": "master_orchestrator.summary"
+            }
+          },
+          "dependency_definitions": [
+            "purchase"
+          ],
+          "preconditions": [],
+          "allowed_tools": [
+            "client_package_read"
+          ],
+          "side_effect_classification": "read",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.resolution",
+          "stage_instance_id": "resolution",
+          "version": 1,
+          "name": "Resolution assessment",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "resolution": {
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "refund_proposal",
+                  "replacement_proposal",
+                  "information"
+                ]
+              },
+              "binding": {
+                "source": "user",
+                "path": "resolution"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "information"
+            },
+            "proposal": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "Review evidence and request normal authorization; no refund or replacement is approved."
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "resolution",
+              "proposal"
+            ],
+            "properties": {
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "refund_proposal",
+                  "replacement_proposal",
+                  "information"
+                ]
+              },
+              "proposal": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "resolution": {
+              "source": "input",
+              "path": "resolution"
+            },
+            "proposal": {
+              "source": "input",
+              "path": "proposal"
+            }
+          },
+          "dependency_definitions": [
+            "product"
+          ],
+          "preconditions": [],
+          "allowed_tools": [],
+          "side_effect_classification": "none",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.fulfillment",
+          "stage_instance_id": "fulfillment",
+          "version": 1,
+          "name": "Fulfillment proposal",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "proposal": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "Proposed fulfillment only; no payment, refund or product delivery occurred."
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "proposal"
+            ],
+            "properties": {
+              "proposal": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "proposal": {
+              "source": "input",
+              "path": "proposal"
+            }
+          },
+          "dependency_definitions": [
+            "resolution",
+            "purchase"
+          ],
+          "preconditions": [],
+          "allowed_tools": [],
+          "side_effect_classification": "none",
+          "completion_criteria": [],
+          "transition_rules": [
+            {
+              "source": "stage:purchase",
+              "path": "purchase_verified",
+              "operator": "eq",
+              "value": true
+            },
+            {
+              "source": "stage:resolution",
+              "path": "resolution",
+              "operator": "ne",
+              "value": "information"
+            }
+          ],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.quality",
+          "stage_instance_id": "quality",
+          "version": 1,
+          "name": "Quality feedback",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "quality_observation": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "Quality feedback proposal; store findings are unconfirmed."
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "quality_observation"
+            ],
+            "properties": {
+              "quality_observation": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "quality_observation": {
+              "source": "input",
+              "path": "quality_observation"
+            }
+          },
+          "dependency_definitions": [
+            "resolution"
+          ],
+          "preconditions": [],
+          "allowed_tools": [],
+          "side_effect_classification": "none",
+          "completion_criteria": [],
+          "transition_rules": [],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [
+            {
+              "event_type": "retail_quality_report",
+              "expected_source": "fixture.retail_quality",
+              "correlation_keys": {
+                "complaint_id": {
+                  "source": "stage:complaint",
+                  "path": "complaint_id"
+                }
+              },
+              "schema": {
+                "type": "object",
+                "required": [
+                  "observation"
+                ],
+                "properties": {
+                  "observation": {
+                    "type": "string"
+                  }
+                }
+              },
+              "requires_authorization": false,
+              "blocking": false
+            }
+          ],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        },
+        {
+          "stage_definition_id": "retail.monitoring",
+          "stage_instance_id": "monitoring",
+          "version": 1,
+          "name": "Recurrence monitoring",
+          "description": "Test fixture retail analysis; no official Subway data or policy.",
+          "domain": "retail_food_service",
+          "required_capabilities": [
+            "business.report"
+          ],
+          "required_ontology_concepts": [],
+          "required_inputs": {
+            "monitoring_plan": {
+              "schema": {
+                "type": "string"
+              },
+              "synthetic_fallback": true,
+              "fallback_value": "Collect actual recurrence observations before assessing effectiveness."
+            }
+          },
+          "optional_inputs": {},
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "monitoring_plan",
+              "agent_analysis"
+            ],
+            "properties": {
+              "monitoring_plan": {
+                "type": "string"
+              },
+              "agent_analysis": {
+                "type": "string"
+              }
+            }
+          },
+          "output_bindings": {
+            "monitoring_plan": {
+              "source": "input",
+              "path": "monitoring_plan"
+            },
+            "agent_analysis": {
+              "source": "runtime",
+              "path": "master_orchestrator.summary"
+            }
+          },
+          "dependency_definitions": [
+            "quality"
+          ],
+          "preconditions": [],
+          "allowed_tools": [
+            "client_package_read"
+          ],
+          "side_effect_classification": "read",
+          "completion_criteria": [],
+          "transition_rules": [
+            {
+              "source": "user",
+              "path": "monitoring_required",
+              "operator": "eq",
+              "value": true
+            }
+          ],
+          "timeout_policy": {
+            "seconds": 300,
+            "action": "block"
+          },
+          "retry_policy": {
+            "max_retries": 1,
+            "backoff_seconds": 0
+          },
+          "external_event_requirements": [],
+          "evidence_requirements": [],
+          "provisional_continuation_policy": {
+            "allowed": true
+          }
+        }
+      ]
+    }
+  ],
+  "memory_policy": {
+    "enabled": true,
+    "max_recommendations": 4,
+    "retention_seconds": 86400
+  }
+}

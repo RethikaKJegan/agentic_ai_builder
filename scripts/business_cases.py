@@ -60,11 +60,11 @@ def main():
     parser.add_argument('--workspace',default='local-workspace')
     parser.add_argument('--owner',default='local-builder')
     commands=parser.add_subparsers(dest='operation',required=True)
-    for name in ('publish','create','simpson-create','prepare','start','advance','resume','cancel','input','event','inspect','drive'):
+    for name in ('publish','create','simpson-create','prepare','start','advance','resume','cancel','input','event','inspect','drive','reassess'):
         sub=commands.add_parser(name)
         if name not in ('publish','create','simpson-create'):sub.add_argument('--case-id',required=True)
         if name!='inspect':sub.add_argument('--json',type=Path,required=True)
-        else:sub.add_argument('--section',choices=['all','stages','assumptions','conflicts','waits','execution_history','timeline','source_evidence','evidence','agents','tools','outcomes','report'],default='all')
+        else:sub.add_argument('--section',choices=['all','stages','assumptions','conflicts','waits','execution_history','timeline','source_evidence','evidence','agents','tools','outcomes','report','history','reassessments','memory','learning','recovery'],default='all')
     args=parser.parse_args()
     try:
         body=json.loads(args.json.read_text()) if args.operation!='inspect' else None
@@ -86,6 +86,9 @@ def main():
         elif args.operation=='drive':
             from workflow_api.lifecycle_driver import LifecycleDriver
             result=LifecycleDriver(service).drive(auth,args.case_id,body)
+        elif args.operation=='reassess':
+            from workflow_api.lifecycle_reassessment import LifecycleReassessment
+            result=LifecycleReassessment(service).reassess(auth,args.case_id,body)
         elif args.operation=='event':result=service.event(auth,args.case_id,body)
         elif args.operation=='inspect':
             result=service.get(auth,args.case_id)

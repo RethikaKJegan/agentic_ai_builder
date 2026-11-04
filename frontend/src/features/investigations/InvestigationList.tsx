@@ -1,4 +1,5 @@
 'use client';
+import BusinessLifecycle from './BusinessLifecycle';
 import {useEffect,useRef,useState} from 'react';
 import {api} from '@/api/client';
 import {stateLabels,type InvestigationJob} from '@/api/investigations';
@@ -8,7 +9,7 @@ import {GitBranch,ArrowRight,MoreHorizontal,Pencil,Trash2} from 'lucide-react';
 import {DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger} from '@/components/ui/dropdown-menu';
 import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
 type Item={composition_id?:string;workflow_id:string;display_name?:string|undefined;objective:string;created_at:string;node_count:number;run_id:string|null;status:string};
-export function InvestigationList() {
+export function InvestigationList({lifecycle=false}:{lifecycle?:boolean}={}) {
  const [items,setItems]=useState<Item[]>([]);const [jobs,setJobs]=useState<InvestigationJob[]>([]);const [error,setError]=useState<Error|null>(null);const [attempt,setAttempt]=useState(0);const status=useBackend(s=>s.status);
  const dynamicAvailable=useBackend(s=>s.session?.dynamic_composition_available===true);
  const canEdit=useBackend(s=>s.can('workflow.edit'));const canDelete=useBackend(s=>s.can('workflow.delete'));
@@ -26,6 +27,7 @@ export function InvestigationList() {
   finally{pending.current=false;setBusy(false);}
  }
  return <section className="mt-8"><div className="mb-3 flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary"/><h2 className="text-lg font-medium">Business investigations</h2></div>
+ {lifecycle&&<BusinessLifecycle/>}
  {error&&<p role="status" className="mb-3 text-sm text-muted-foreground">Saved investigations could not be loaded. <button className="text-primary underline" onClick={()=>setAttempt(n=>n+1)}>Retry investigation list</button></p>}
  {jobs.map(j=><Link key={j.job_id} to="/app/workflows/investigate" search={{job:j.job_id,...(j.kind==='compose'?{dynamic:'1'}:{})}} className="mb-2 block rounded-lg border p-3 text-sm">Workflow generation {j.state} · Open progress</Link>)}
  {items.length===0&&!error?<p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Generate an investigation from the overview to inspect its workflow, evidence and report here.</p>:<div className="divide-y rounded-xl border">{items.map(i=><div key={i.workflow_id} className="flex items-center gap-1 pr-2 hover:bg-canvas sm:pr-3">

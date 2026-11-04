@@ -141,6 +141,11 @@ class EvidenceCompletion:
 
     def resolve(self, name, spec):
         schema = spec['schema']
+        reviewed=self.stage.get('reassessment_inputs',{}).get(name)
+        if reviewed:
+            if reviewed['provenance_type']!='ACTUAL' or reviewed['generation_method']!='authenticated_event_assertion' or not conforms(reviewed['value'],schema):
+                invalid('Reviewed event evidence violates the pinned input schema.')
+            return deepcopy(reviewed)
         candidates = self.evidence(spec['evidence_mapping']) if spec.get('evidence_mapping') else []
         if spec.get('binding'):
             bound = self.binding(spec['binding'])

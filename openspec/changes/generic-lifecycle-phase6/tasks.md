@@ -1,0 +1,8 @@
+- [x] Audit existing lifecycle, packages, memory, recovery, storage and API integration.
+- [x] Extend immutable client packages with scoped processes and memory boundaries.
+- [x] Integrate bounded lifecycle working memory and verified experience guidance.
+- [x] Persist versioned execution feedback and deterministic advisory ranks.
+- [x] Add dependency-aware late-event reassessment with history and write barriers.
+- [x] Execute second-domain, memory, reassessment, concurrency and API acceptance.
+- [x] Run Phase 4/5 and affected regressions, contracts and disposable PostgreSQL checks.
+- [x] Record exact evidence, UI-facing backend APIs, limitations and deployment prerequisites.

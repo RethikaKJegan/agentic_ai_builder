@@ -1,0 +1,7 @@
+- [x] Audit current UI, transport, permissions, approvals and deployment conventions.
+- [x] Add bounded scoped case/process list reads and typed frontend transport.
+- [x] Integrate create/reopen/commands and dynamic pinned stage presentation in the existing investigation section.
+- [x] Integrate evidence, agents/tools, waits, report, memory/recovery and reviewed reassessment.
+- [x] Verify retry keys, revisions, permissions, scope changes, failures and legacy navigation.
+- [x] Run frontend lint/types/tests/build, desktop/mobile acceptance and Phase 4–6 backend regressions.
+- [x] Inspect deployment prerequisites, deploy if authorized/available, and record exact verification or blockers.

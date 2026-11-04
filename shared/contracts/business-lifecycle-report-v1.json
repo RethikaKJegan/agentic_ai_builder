@@ -4,6 +4,7 @@
   "type": "object", "additionalProperties": false,
   "required": ["schema_version", "case_id", "process_definition_id", "process_definition_version", "case_status", "execution_status", "business_outcome_status", "observed_revision", "ontology_version", "mapping_version", "stages", "pending_real_world_waits", "evidence_references", "generated_assumptions", "conflicts", "timeline", "qualification"],
   "properties": {
+    "reassessments": {"type":"array","maxItems":16,"items":{"type":"object"}},
     "schema_version": {"const": "business-lifecycle-report-v1"}, "case_id": {"type": "string"},
     "process_definition_id": {"type": "string"}, "process_definition_version": {"type": "integer", "minimum": 1},
     "case_status": {"type": "string"}, "execution_status": {"type": "string"}, "business_outcome_status": {"type": "string"},

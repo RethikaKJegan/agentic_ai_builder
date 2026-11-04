@@ -1,4 +1,5 @@
 import {compositionViewSchema,compositionListSchema} from './compositions';
+import {caseSchema,caseIndexSchema,processDefinitionSchema,processIndexSchema,packageDetailsSchema,driveResultSchema,type CaseOperation} from './business-lifecycle';
 import {businessSourcesSchema,businessSourceRecordsSchema,businessSourceProfileSchema,type BusinessRecordRequest} from './business-sources';
 import {businessRuleExecutionCatalogueSchema,businessRuleEvidenceSchema,businessRuleExecutionResultSchema,type BusinessRuleExecuteRequest,type BusinessRuleEvidenceRequest} from './business-ontology';
 import {businessMonitoringSchema,type BusinessMonitoringRequest} from './business-ontology';
@@ -149,6 +150,19 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async businessCases(before?:number) {return caseIndexSchema.parse(await this.read('business-ontology/v1/cases'+(before?`?before=${before}`:'')));}
+  async businessProcesses() {return processIndexSchema.parse(await this.read('business-ontology/v1/process-definitions'));}
+  async businessProcess(id:string,version:number) {return processDefinitionSchema.parse(await this.read(`business-ontology/v1/process-definitions/${encodeURIComponent(id)}/${version}`));}
+  async simpsonProcess() {return processDefinitionSchema.parse(await this.read('business-ontology/v1/simpson-lifecycle/process'));}
+  async clientPackage(id:string,revision:number) {return packageDetailsSchema.parse(await this.read(`business-ontology/v1/client-packages/${encodeURIComponent(id)}/${revision}`));}
+  async businessCase(id:string) {return caseSchema.parse(await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}`));}
+  async createBusinessCase(body:Record<string,unknown>,simpson=false) {return caseSchema.parse(await this.read(`business-ontology/v1/${simpson?'simpson-lifecycle/cases':'cases'}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async businessCaseCommand(id:string,operation:CaseOperation,body:Record<string,unknown>) {
+    const result=await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}/${operation}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return operation==='drive'?driveResultSchema.parse(result):caseSchema.parse(result);
+  }
+  async businessCaseSection(id:string,section:string) {return z.record(z.unknown()).parse(await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}/sections/${encodeURIComponent(section)}`));}
+  async businessCaseRevision(id:string,revision:number) {return caseSchema.parse(await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}/revisions/${revision}`));}
   async investigationEnvironments() {return z.object({items:z.array(z.object({dataset_id:z.string(),cases:z.array(z.object({case_id:z.string(),label:z.string(),source_identifiers:z.record(z.string()),inputs:z.record(z.string()).optional(),policy_candidates:z.array(z.object({policy_id:z.string(),title:z.string()})).optional()}))}))}).parse(await this.read('business-ontology/v1/investigations/environments'));}
   async investigationPreflight(body:Record<string,unknown>) {return z.object({preflight_id:z.string(),coverage:z.record(z.object({state:z.string()}))}).parse(await this.read('business-ontology/v1/investigations/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}

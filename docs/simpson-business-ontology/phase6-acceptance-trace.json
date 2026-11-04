@@ -1,0 +1,2690 @@
+{
+  "artifact_kind": "projection_of_executed_phase6_acceptance",
+  "test": "tests/test_generic_lifecycle_phase6.py::test_second_domain_actual_crewai_persistence_feedback_and_memory",
+  "source_artifact_sha256": {
+    "phase6-retail-feedback.json": "a25962a63a63cdd05542f66e29fa3e0b588a8d428349d84e012f4c7cf5e91f3c",
+    "phase6-retail-reassessed-report.json": "12e5bbad55e2d27ef107034d27ef3c01bad621281289f1d3e4398278214a99aa",
+    "phase6-retail-report.json": "a1934cb6f6067f9d36fc5087f6449bcb0479ab3fb710b554b435639def438dec"
+  },
+  "case_id": "case_7824909f7a056c5e589f35e9",
+  "process_definition_id": "retail_complaint_fixture",
+  "process_definition_version": 1,
+  "case_status": "COMPLETED_PROVISIONALLY",
+  "execution_status": "COMPLETED",
+  "business_outcome_status": "PROVISIONAL",
+  "ontology_version": "retail_complaint_ontology_v1",
+  "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+  "qualification": "Analytical execution only. Source reports, derived values, hypotheses and synthetic assumptions retain their provenance. Analytical artifacts do not grant business authority or prove physical activity or business effectiveness.",
+  "pending_real_world_waits": [
+    {
+      "blocking": false,
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "continuation_target": "quality",
+      "correlation_keys": {
+        "complaint_id": "RETAIL-C1"
+      },
+      "created_at": "2026-11-04T16:27:08.437757+00:00",
+      "current_status": "PENDING",
+      "deadline": 1793809928.4377613,
+      "event_type": "retail_quality_report",
+      "expected_source": "fixture.retail_quality",
+      "retry_or_escalation_policy": {
+        "action": "block",
+        "seconds": 300
+      },
+      "stage_instance_id": "quality",
+      "wait_id": "wait_49b43550800ad5f4d01a360f"
+    }
+  ],
+  "timeline": [
+    {
+      "event_type": "case.created",
+      "sequence": 1,
+      "timestamp": "2026-11-04T16:27:00.168645+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 2,
+      "stage_instance_id": "complaint",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:00.272804+00:00"
+    },
+    {
+      "event_type": "case.prepared",
+      "sequence": 3,
+      "timestamp": "2026-11-04T16:27:00.273123+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 4,
+      "stage_instance_id": "complaint",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:01.004494+00:00"
+    },
+    {
+      "event_type": "case.start",
+      "sequence": 5,
+      "timestamp": "2026-11-04T16:27:01.004518+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 6,
+      "stage_instance_id": "complaint",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T16:27:01.351986+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 7,
+      "stage_instance_id": "complaint",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:01.709462+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 8,
+      "stage_instance_id": "complaint",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:01.709489+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 9,
+      "timestamp": "2026-11-04T16:27:01.709509+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 10,
+      "stage_instance_id": "complaint",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:04.121717+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 11,
+      "stage_instance_id": "order",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:04.121744+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 12,
+      "stage_instance_id": "order",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:04.285970+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 13,
+      "timestamp": "2026-11-04T16:27:04.285986+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 14,
+      "stage_instance_id": "order",
+      "target": "COMPLETED",
+      "timestamp": "2026-11-04T16:27:04.332734+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 15,
+      "stage_instance_id": "purchase",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:04.332756+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 16,
+      "stage_instance_id": "purchase",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:04.415380+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 17,
+      "timestamp": "2026-11-04T16:27:04.415395+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 18,
+      "stage_instance_id": "purchase",
+      "target": "COMPLETED",
+      "timestamp": "2026-11-04T16:27:04.536419+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 19,
+      "stage_instance_id": "product",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:04.536441+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 20,
+      "stage_instance_id": "product",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:04.689111+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 21,
+      "timestamp": "2026-11-04T16:27:04.689132+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 22,
+      "stage_instance_id": "product",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T16:27:05.071074+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 23,
+      "stage_instance_id": "product",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:05.659396+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 24,
+      "stage_instance_id": "product",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:05.659414+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 25,
+      "timestamp": "2026-11-04T16:27:05.659428+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 26,
+      "stage_instance_id": "product",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:08.231917+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 27,
+      "stage_instance_id": "resolution",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:08.231942+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 28,
+      "stage_instance_id": "resolution",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:08.361459+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 29,
+      "timestamp": "2026-11-04T16:27:08.361479+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 30,
+      "stage_instance_id": "resolution",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:08.437487+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 31,
+      "stage_instance_id": "fulfillment",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:08.437510+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 32,
+      "stage_instance_id": "quality",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:08.437651+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 33,
+      "stage_instance_id": "fulfillment",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:08.579982+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 34,
+      "stage_instance_id": "quality",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:08.580011+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 35,
+      "timestamp": "2026-11-04T16:27:08.580022+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 36,
+      "stage_instance_id": "quality",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:08.676565+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "CREATED",
+      "reason": null,
+      "sequence": 37,
+      "stage_instance_id": "monitoring",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:08.676599+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 38,
+      "stage_instance_id": "fulfillment",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:08.742357+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 39,
+      "stage_instance_id": "monitoring",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:08.860584+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 40,
+      "timestamp": "2026-11-04T16:27:08.860603+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 41,
+      "stage_instance_id": "monitoring",
+      "target": "WAITING_FOR_AUTHORIZATION",
+      "timestamp": "2026-11-04T16:27:09.092666+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "WAITING_FOR_AUTHORIZATION",
+      "reason": null,
+      "sequence": 42,
+      "stage_instance_id": "monitoring",
+      "target": "READY",
+      "timestamp": "2026-11-04T16:27:09.394287+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "READY",
+      "reason": null,
+      "sequence": 43,
+      "stage_instance_id": "monitoring",
+      "target": "RUNNING",
+      "timestamp": "2026-11-04T16:27:09.394297+00:00"
+    },
+    {
+      "event_type": "case.advance",
+      "sequence": 44,
+      "timestamp": "2026-11-04T16:27:09.394312+00:00"
+    },
+    {
+      "event_type": "stage.transition",
+      "previous": "RUNNING",
+      "reason": null,
+      "sequence": 45,
+      "stage_instance_id": "monitoring",
+      "target": "COMPLETED_PROVISIONALLY",
+      "timestamp": "2026-11-04T16:27:10.292274+00:00"
+    }
+  ],
+  "reassessments": [
+    {
+      "affected_stage_ids": [
+        "monitoring",
+        "quality"
+      ],
+      "comparisons": [
+        {
+          "actual": {
+            "assumptions": [],
+            "confidence": null,
+            "data_type": "string",
+            "generated_at": "2026-11-04T16:27:10.744564+00:00",
+            "generation_method": "authenticated_event_assertion",
+            "limitations": [
+              "Does not grant commercial authorization or verify physical activity."
+            ],
+            "permitted_uses": [
+              "analytical_continuation",
+              "workflow_input",
+              "event_correlation"
+            ],
+            "provenance_type": "ACTUAL",
+            "source_references": [
+              {
+                "event_id": "quality_report_1",
+                "path": "observation",
+                "source": "fixture.retail_quality",
+                "submitted_by": {
+                  "subject_id": "alice",
+                  "workspace_id": "one"
+                }
+              }
+            ],
+            "validity_scope": "case_7824909f7a056c5e589f35e9",
+            "value": "Authenticated test source reports the item mismatch; physical cause remains unconfirmed."
+          },
+          "changed": true,
+          "input": "quality_observation",
+          "previous": {
+            "assumptions": [
+              "Missing evidence; case-local analytical assumption."
+            ],
+            "confidence": null,
+            "data_type": "string",
+            "generated_at": "2026-11-04T16:27:08.437659+00:00",
+            "generation_method": "schema_seeded_fallback_v1",
+            "limitations": [
+              "Does not grant commercial authorization or verify physical activity."
+            ],
+            "permitted_uses": [
+              "analytical_continuation"
+            ],
+            "provenance_type": "SYNTHETIC",
+            "source_references": [],
+            "validity_scope": "case_7824909f7a056c5e589f35e9",
+            "value": "Quality feedback proposal; store findings are unconfirmed."
+          }
+        }
+      ],
+      "created_at": "2026-11-04T16:27:10.752675+00:00",
+      "event_id": "quality_report_1",
+      "original_revision": 34,
+      "preserved_write_stage_ids": [],
+      "reassessment_id": "reassessment_8034d2985679bda0e1def5ba",
+      "reexecute_stage_ids": [
+        "monitoring",
+        "quality"
+      ],
+      "source": "fixture.retail_quality",
+      "status": "COMPLETED"
+    }
+  ],
+  "feedback": [
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 0,
+        "synthetic_assumptions": 2
+      },
+      "created_at": "2026-11-04T16:27:09.193548+00:00",
+      "feedback_id": "feedback_115ba981d3c451ecf3f2a9da13eabbfd3f2c380c",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "resolution",
+          "stage_sha256": "5d9f139dec8263c966179292fe63ab1a2cc683ae275576ea75a16ec548b60c8e"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 2,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 2
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "resolution"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 0,
+        "synthetic_assumptions": 2
+      },
+      "created_at": "2026-11-04T16:27:09.189692+00:00",
+      "feedback_id": "feedback_11c5c31409e5999fe1036ac13f20e4c9ebf52a65",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "fulfillment",
+          "stage_sha256": "3d25b603b68654503ac1db09985525f051286394a4d86524e79f3adeb638426c"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 0,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 2
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "fulfillment"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 1,
+        "operational_execution": true,
+        "source_evidence": 0,
+        "synthetic_assumptions": 2
+      },
+      "created_at": "2026-11-04T16:27:10.439309+00:00",
+      "feedback_id": "feedback_48dc8cd444e4d346b54d5444ade7613cc6897d04",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": "run_9a8b58946819446eb25dc0d203c3ac6a",
+          "stage_instance_id": "monitoring",
+          "stage_sha256": "bfc1a1b95bd980adae59977bfc5d90cf2bd62057d3836186236ac371e4bb3339"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": "run_9a8b58946819446eb25dc0d203c3ac6a",
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": 0,
+        "evidence_coverage": null,
+        "latency_seconds": 0.7681334018707275,
+        "provenance_counts": {
+          "ACTUAL": 0,
+          "DERIVED": 0,
+          "INFERRED": 1,
+          "SYNTHETIC": 2
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {
+          "estimated_cost_usd": 0,
+          "llm_calls": 3,
+          "tokens": 33
+        },
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "monitoring"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 1,
+        "synthetic_assumptions": 1
+      },
+      "created_at": "2026-11-04T16:27:01.439018+00:00",
+      "feedback_id": "feedback_4972798218efefbba61362e56de3c63ac86cc1cc",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "complaint",
+          "stage_sha256": "4227e1f4573a70ddaa1e3c098d29a167def470c8fd7b55031545880312659657"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 1,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 1
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": false,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": false,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "complaint"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 0,
+        "synthetic_assumptions": 1
+      },
+      "created_at": "2026-11-04T16:27:09.190123+00:00",
+      "feedback_id": "feedback_4a3287086b1ec9174a79270456f65dad0956a5c9",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "monitoring",
+          "stage_sha256": "b78750fb2cde1d5709c0790a0d8426c24b5faa99ed574413699106993c47359d"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 0,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 1
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": false,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": false,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "monitoring"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 0,
+        "synthetic_assumptions": 2
+      },
+      "created_at": "2026-11-04T16:27:09.193254+00:00",
+      "feedback_id": "feedback_4cf08fa500098789c8afa483fc083d20548ee2a1",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "quality",
+          "stage_sha256": "747044a32d13116022248a7d9a5704f68ba07ab9934bfed85891bcd3ddcebfee"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 0,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 2
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "quality"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 1,
+        "synthetic_assumptions": 0
+      },
+      "created_at": "2026-11-04T16:27:05.243977+00:00",
+      "feedback_id": "feedback_4ef2a9ff04e631984aec86ef27736573b97df7e7",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "product",
+          "stage_sha256": "bb05bffad2bf5b8f316d79f7b2ea7e1f9e86ad8b27d215d6f4115ee68e2ea60b"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 0,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 1,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 0
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": false,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": false,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "product"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 4,
+        "synthetic_assumptions": 0
+      },
+      "created_at": "2026-11-04T16:27:05.244356+00:00",
+      "feedback_id": "feedback_72056535071b4d6db6b5e4aec2052d3e5fd0ea9d",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "purchase",
+          "stage_sha256": "a89cb90524f83399c671afb510490fcd2310afc7e7b1c6cfedb65fc7673e0508"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 1,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 4,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 0
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "purchase"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 1,
+        "operational_execution": true,
+        "source_evidence": 2,
+        "synthetic_assumptions": 2
+      },
+      "created_at": "2026-11-04T16:27:05.241514+00:00",
+      "feedback_id": "feedback_8c483472ccf8bc2e92fa30fea4bf27eb0ca44d83",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": "run_08dea6d64639445f9f345d9db38c4a12",
+          "stage_instance_id": "complaint",
+          "stage_sha256": "ddae34eda611a9b52feac90563fe35a4c95704dc6bcdce0e6a823702a33da847"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 1,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": "run_08dea6d64639445f9f345d9db38c4a12",
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": 0,
+        "evidence_coverage": true,
+        "latency_seconds": 2.3075785636901855,
+        "provenance_counts": {
+          "ACTUAL": 2,
+          "DERIVED": 0,
+          "INFERRED": 1,
+          "SYNTHETIC": 2
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 1,
+        "unnecessary_tool_calls": null,
+        "usage": {
+          "estimated_cost_usd": 0,
+          "llm_calls": 6,
+          "tokens": 66,
+          "tool_calls": 1
+        },
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "complaint"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 1,
+        "operational_execution": true,
+        "source_evidence": 2,
+        "synthetic_assumptions": 0
+      },
+      "created_at": "2026-11-04T16:27:09.191840+00:00",
+      "feedback_id": "feedback_ba6f8aafb526ed0bcc4a9d64969ea82c00f75849",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": "run_56ddb88c96654382a091f7f8662aa34b",
+          "stage_instance_id": "product",
+          "stage_sha256": "7386b94bbfad2f7312a914a9cde6bb6a2c1a866fc2e8787ebb1fb1fcd1229ec9"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 1,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": "run_56ddb88c96654382a091f7f8662aa34b",
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": 0,
+        "evidence_coverage": true,
+        "latency_seconds": 2.4441256523132324,
+        "provenance_counts": {
+          "ACTUAL": 2,
+          "DERIVED": 0,
+          "INFERRED": 1,
+          "SYNTHETIC": 0
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 1,
+        "unnecessary_tool_calls": null,
+        "usage": {
+          "estimated_cost_usd": 0,
+          "llm_calls": 8,
+          "tokens": 88,
+          "tool_calls": 1
+        },
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "product"
+    },
+    {
+      "authority": "Offline feedback only. No source values or generated policies are promoted; no model weights or authority change.",
+      "case_id": "case_7824909f7a056c5e589f35e9",
+      "categories": {
+        "human_reported_outcomes": 0,
+        "inferred_conclusions": 0,
+        "operational_execution": false,
+        "source_evidence": 4,
+        "synthetic_assumptions": 0
+      },
+      "created_at": "2026-11-04T16:27:05.242972+00:00",
+      "feedback_id": "feedback_dde41ed0a33dfa103d5de235ced9fc02bf5ebb39",
+      "pins": {
+        "capability_registry_version": "46549b3cbacab573a2b65e2838853f0d75ec3f89f2c14e84b41995693ae41e0e",
+        "mapping_version": "c78d12422990f98c93e54158291b103a613087ad5587a485f17beb6b73ef5dca",
+        "ontology_version": "retail_complaint_ontology_v1"
+      },
+      "provenance": [
+        {
+          "case_id": "case_7824909f7a056c5e589f35e9",
+          "run_id": null,
+          "stage_instance_id": "order",
+          "stage_sha256": "ca416358401b43eb30881cb8193d3332bfc441b43f89abea29bf49b746d9709c"
+        }
+      ],
+      "rewards": {
+        "execution_quality": 1,
+        "independently_verified_business_outcome": null
+      },
+      "run_id": null,
+      "schema_version": "lifecycle-feedback-v1",
+      "signals": {
+        "contradictions": 0,
+        "estimated_cost_usd": null,
+        "evidence_coverage": null,
+        "latency_seconds": null,
+        "provenance_counts": {
+          "ACTUAL": 4,
+          "DERIVED": 0,
+          "INFERRED": 0,
+          "SYNTHETIC": 0
+        },
+        "recovery_success": false,
+        "rejected_actions": 0,
+        "retry_count": 0,
+        "task_completed": true,
+        "tool_failures": 0,
+        "tool_successes": 0,
+        "unnecessary_tool_calls": null,
+        "usage": {},
+        "validated_output_schema": true,
+        "verified_receipts": 0
+      },
+      "stage_instance_id": "order"
+    }
+  ],
+  "original_stages": [
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "retail.complaint.read"
+      ],
+      "composition_id": "composition_8459fe574ae2024e3e554c41",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "description": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:00.272814+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Unspecified product complaint; obtain actual observations."
+        }
+      },
+      "name": "Customer complaint",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.119645+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_08dea6d64639445f9f345d9db38c4a12"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "description": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:00.272814+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Unspecified product complaint; obtain actual observations."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_08dea6d64639445f9f345d9db38c4a12",
+      "stage_instance_id": "complaint",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "client_package_read",
+          "inputs": {
+            "capability_id": "retail.complaint.read",
+            "package_id": "retail_complaint_fixture",
+            "revision": 1
+          },
+          "output_sha256": "acf4c40d7e9017182d6d48b08ce970634a347e7e353a1d21cf9d2277dbe3f96d"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "EVIDENCE_COMPLETE",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED",
+      "inputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        }
+      },
+      "name": "Order identification",
+      "outputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "order",
+      "status": "COMPLETED",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "EVIDENCE_COMPLETE",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED",
+      "inputs": {
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        },
+        "purchase_verified": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T16:27:04.415088+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_purchase",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": true
+        }
+      },
+      "name": "Purchase verification",
+      "outputs": {
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        },
+        "purchase_verified": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T16:27:04.415088+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_purchase",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": true
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "purchase",
+      "status": "COMPLETED",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "retail.product.review"
+      ],
+      "composition_id": "composition_ba20a56cb005767dbc4f348a",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "product_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:05.659163+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_observation",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Customer reported an incorrect item; defect unconfirmed."
+        }
+      },
+      "name": "Product investigation",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.229028+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_56ddb88c96654382a091f7f8662aa34b"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "product_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:05.659163+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_observation",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Customer reported an incorrect item; defect unconfirmed."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_56ddb88c96654382a091f7f8662aa34b",
+      "stage_instance_id": "product",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "client_package_read",
+          "inputs": {
+            "capability_id": "retail.complaint.read",
+            "package_id": "retail_complaint_fixture",
+            "revision": 1
+          },
+          "output_sha256": "de8532bba1c422212c62967c80cb8e8c218ca66eb01f6ca5891fd332b4d16a30"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.231946+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Review evidence and request normal authorization; no refund or replacement is approved."
+        },
+        "resolution": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.361188+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "replacement_proposal"
+        }
+      },
+      "name": "Resolution assessment",
+      "outputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.231946+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Review evidence and request normal authorization; no refund or replacement is approved."
+        },
+        "resolution": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.361188+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "replacement_proposal"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "resolution",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437514+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Proposed fulfillment only; no payment, refund or product delivery occurred."
+        }
+      },
+      "name": "Fulfillment proposal",
+      "outputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437514+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Proposed fulfillment only; no payment, refund or product delivery occurred."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "fulfillment",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "quality_observation": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437659+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Quality feedback proposal; store findings are unconfirmed."
+        }
+      },
+      "name": "Quality feedback",
+      "outputs": {
+        "quality_observation": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437659+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Quality feedback proposal; store findings are unconfirmed."
+        }
+      },
+      "real_world_status": "UNVERIFIED",
+      "run_id": null,
+      "stage_instance_id": "quality",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.report"
+      ],
+      "composition_id": "composition_2a2500f9ae1738ef5bd12544",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.676604+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Collect actual recurrence observations before assessing effectiveness."
+        }
+      },
+      "name": "Recurrence monitoring",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:10.287314+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_9a8b58946819446eb25dc0d203c3ac6a"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.676604+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Collect actual recurrence observations before assessing effectiveness."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_9a8b58946819446eb25dc0d203c3ac6a",
+      "stage_instance_id": "monitoring",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    }
+  ],
+  "reassessed_stages": [
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "retail.complaint.read"
+      ],
+      "composition_id": "composition_8459fe574ae2024e3e554c41",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "description": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:00.272814+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Unspecified product complaint; obtain actual observations."
+        }
+      },
+      "name": "Customer complaint",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.119645+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_08dea6d64639445f9f345d9db38c4a12"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "description": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:00.272814+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Unspecified product complaint; obtain actual observations."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_08dea6d64639445f9f345d9db38c4a12",
+      "stage_instance_id": "complaint",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "client_package_read",
+          "inputs": {
+            "capability_id": "retail.complaint.read",
+            "package_id": "retail_complaint_fixture",
+            "revision": 1
+          },
+          "output_sha256": "acf4c40d7e9017182d6d48b08ce970634a347e7e353a1d21cf9d2277dbe3f96d"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "EVIDENCE_COMPLETE",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED",
+      "inputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        }
+      },
+      "name": "Order identification",
+      "outputs": {
+        "complaint_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:01.709166+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_complaint",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "RETAIL-C1"
+        },
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "order",
+      "status": "COMPLETED",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "EVIDENCE_COMPLETE",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED",
+      "inputs": {
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        },
+        "purchase_verified": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T16:27:04.415088+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_purchase",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": true
+        }
+      },
+      "name": "Purchase verification",
+      "outputs": {
+        "order_id": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:04.285708+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_order",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "ORDER-1"
+        },
+        "purchase_verified": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "boolean",
+          "generated_at": "2026-11-04T16:27:04.415088+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_purchase",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": true
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "purchase",
+      "status": "COMPLETED",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "retail.product.review"
+      ],
+      "composition_id": "composition_ba20a56cb005767dbc4f348a",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "product_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:05.659163+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_observation",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Customer reported an incorrect item; defect unconfirmed."
+        }
+      },
+      "name": "Product investigation",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.229028+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_56ddb88c96654382a091f7f8662aa34b"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "product_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:05.659163+00:00",
+          "generation_method": "authorized_mapped_source",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "collection": "retail_orders_fixture",
+              "mapping_id": "mapping:retail_observation",
+              "read_at": "2026-11-04T16:27:00.270350+00:00",
+              "record_id": "fixture_order_1",
+              "source_reference": "retail_orders_fixture"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Customer reported an incorrect item; defect unconfirmed."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_56ddb88c96654382a091f7f8662aa34b",
+      "stage_instance_id": "product",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": [
+        {
+          "tool_id": "client_package_read",
+          "inputs": {
+            "capability_id": "retail.complaint.read",
+            "package_id": "retail_complaint_fixture",
+            "revision": 1
+          },
+          "output_sha256": "de8532bba1c422212c62967c80cb8e8c218ca66eb01f6ca5891fd332b4d16a30"
+        }
+      ]
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.231946+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Review evidence and request normal authorization; no refund or replacement is approved."
+        },
+        "resolution": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.361188+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "replacement_proposal"
+        }
+      },
+      "name": "Resolution assessment",
+      "outputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.231946+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Review evidence and request normal authorization; no refund or replacement is approved."
+        },
+        "resolution": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.361188+00:00",
+          "generation_method": "user_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "origin": "user",
+              "path": "resolution"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "replacement_proposal"
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "resolution",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437514+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Proposed fulfillment only; no payment, refund or product delivery occurred."
+        }
+      },
+      "name": "Fulfillment proposal",
+      "outputs": {
+        "proposal": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:08.437514+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Proposed fulfillment only; no payment, refund or product delivery occurred."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": null,
+      "stage_instance_id": "fulfillment",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "EVIDENCE_COMPLETE",
+      "capabilities": [],
+      "composition_id": null,
+      "errors": [],
+      "execution_status": "COMPLETED",
+      "inputs": {
+        "quality_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:10.744564+00:00",
+          "generation_method": "authenticated_event_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "event_id": "quality_report_1",
+              "path": "observation",
+              "source": "fixture.retail_quality",
+              "submitted_by": {
+                "subject_id": "alice",
+                "workspace_id": "one"
+              }
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Authenticated test source reports the item mismatch; physical cause remains unconfirmed."
+        }
+      },
+      "name": "Quality feedback",
+      "outputs": {
+        "quality_observation": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:10.744564+00:00",
+          "generation_method": "authenticated_event_assertion",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation",
+            "workflow_input",
+            "event_correlation"
+          ],
+          "provenance_type": "ACTUAL",
+          "source_references": [
+            {
+              "event_id": "quality_report_1",
+              "path": "observation",
+              "source": "fixture.retail_quality",
+              "submitted_by": {
+                "subject_id": "alice",
+                "workspace_id": "one"
+              }
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Authenticated test source reports the item mismatch; physical cause remains unconfirmed."
+        }
+      },
+      "real_world_status": "REPORTED_BY_AUTHENTICATED_SOURCE",
+      "run_id": null,
+      "stage_instance_id": "quality",
+      "status": "COMPLETED",
+      "tool_execution_records": []
+    },
+    {
+      "business_outcome_status": "PROVISIONAL",
+      "capabilities": [
+        "business.report"
+      ],
+      "composition_id": "composition_5e770d158daefabe67e53cbb",
+      "errors": [],
+      "execution_status": "COMPLETED_PROVISIONALLY",
+      "inputs": {
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:11.021556+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Collect actual recurrence observations before assessing effectiveness."
+        }
+      },
+      "name": "Recurrence monitoring",
+      "outputs": {
+        "agent_analysis": {
+          "assumptions": [],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:12.751194+00:00",
+          "generation_method": "verified_runtime_result",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "INFERRED",
+          "source_references": [
+            {
+              "run_id": "run_591eea2ad6f14ac2a655cfdfa53bc97d"
+            }
+          ],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Prepared investigation completed."
+        },
+        "monitoring_plan": {
+          "assumptions": [
+            "Missing evidence; case-local analytical assumption."
+          ],
+          "confidence": null,
+          "data_type": "string",
+          "generated_at": "2026-11-04T16:27:11.021556+00:00",
+          "generation_method": "schema_seeded_fallback_v1",
+          "limitations": [
+            "Does not grant commercial authorization or verify physical activity."
+          ],
+          "permitted_uses": [
+            "analytical_continuation"
+          ],
+          "provenance_type": "SYNTHETIC",
+          "source_references": [],
+          "validity_scope": "case_7824909f7a056c5e589f35e9",
+          "value": "Collect actual recurrence observations before assessing effectiveness."
+        }
+      },
+      "real_world_status": "NOT_APPLICABLE",
+      "run_id": "run_591eea2ad6f14ac2a655cfdfa53bc97d",
+      "stage_instance_id": "monitoring",
+      "status": "COMPLETED_PROVISIONALLY",
+      "tool_execution_records": []
+    }
+  ]
+}

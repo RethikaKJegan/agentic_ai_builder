@@ -11,9 +11,11 @@ import {InvestigationCanvas} from './InvestigationCanvas';
 import {getReport,InvestigationReportView,InvestigationEvidence,InvestigationNodePanel} from './InvestigationPanels';
 import {Link} from '@/lib/navigation';
 import DynamicInvestigationWorkspace from './DynamicInvestigationWorkspace';
+import BusinessLifecycle from './BusinessLifecycle';
 
 export default function InvestigationWorkspace() {
  const search=useSearchParams();
+ if(search.has('case'))return <div className="h-full overflow-auto p-4"><Link to="/app/workflows" className="text-sm text-primary">Back to workflows</Link><BusinessLifecycle initialCaseId={search.get('case')??undefined}/></div>;
  return search.has('composition')||search.get('dynamic')==='1'?<DynamicInvestigationWorkspace/>:<LegacyInvestigationWorkspace/>;
 }
 function LegacyInvestigationWorkspace() {

@@ -1,5 +1,9 @@
 # Phase 5 Simpson lifecycle
 
+Phase 6 extends these same backend components with generic packages, memory,
+feedback and reviewed reassessment: see [Phase 6](generic-lifecycle-phase6.md).
+The Simpson process definition below remains version 1 and unchanged.
+
 Implemented locally on the Phase 4 backend. No deployment or frontend change is
 included. The process is `simpson_warranty_lifecycle`, version **1**, defined in
 `ontology/business-processes/simpson-warranty-v1.json`. Every case pins its complete
@@ -161,3 +165,8 @@ writes were not exercised. Tests use real local stores and existing runtime code
 with controlled external transports. No authoritative Simpson policy, completed
 physical activity, approval or corrective-action effectiveness is asserted.
 No Phase 6 feature, deployment or frontend change is included.
+
+
+The existing Workflow → Business Investigation interface now exposes these
+persistent cases, pinned stages, approval gates, evidence, waits, memory and
+reports. See [UI integration and verification](business-lifecycle-ui.md).

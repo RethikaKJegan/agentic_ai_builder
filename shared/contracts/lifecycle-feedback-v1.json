@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"Lifecycle execution feedback v1",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","feedback_id","case_id","stage_instance_id","run_id","pins","signals","rewards","categories","provenance","created_at","authority"],
+  "properties":{
+    "schema_version":{"const":"lifecycle-feedback-v1"},
+    "feedback_id":{"type":"string"},"case_id":{"type":"string"},"stage_instance_id":{"type":"string"},"run_id":{"type":["string","null"]},
+    "pins":{"type":"object"},"created_at":{"type":"string"},"authority":{"type":"string"},
+    "provenance":{"type":"array","minItems":1,"items":{"type":"object"}},
+    "categories":{"type":"object","required":["operational_execution","source_evidence","human_reported_outcomes","inferred_conclusions","synthetic_assumptions"]},
+    "signals":{"type":"object","required":["task_completed","validated_output_schema","tool_successes","tool_failures","verified_receipts","evidence_coverage","provenance_counts","retry_count","recovery_success","latency_seconds","usage","estimated_cost_usd","unnecessary_tool_calls","contradictions","rejected_actions"]},
+    "rewards":{"type":"object","additionalProperties":false,"required":["execution_quality","independently_verified_business_outcome"],"properties":{"execution_quality":{"type":"number"},"independently_verified_business_outcome":{"type":"null"}}}
+  }
+}

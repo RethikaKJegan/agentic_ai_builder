@@ -64,6 +64,9 @@ class BusinessCases:
             db.execute('CREATE TABLE IF NOT EXISTS business_cases (workspace TEXT NOT NULL, owner TEXT NOT NULL, case_id TEXT NOT NULL, revision INTEGER NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,owner,case_id))')
             db.execute('CREATE TABLE IF NOT EXISTS business_case_commands (workspace TEXT NOT NULL, owner TEXT NOT NULL, request_key TEXT NOT NULL, fingerprint TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,owner,request_key))')
             db.execute('INSERT INTO business_case_migrations VALUES (1) ON CONFLICT DO NOTHING')
+            db.execute('CREATE TABLE IF NOT EXISTS business_case_revisions (workspace TEXT NOT NULL, owner TEXT NOT NULL, case_id TEXT NOT NULL, revision INTEGER NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,owner,case_id,revision))')
+            db.execute('CREATE TABLE IF NOT EXISTS business_lifecycle_feedback (workspace TEXT NOT NULL, owner TEXT NOT NULL, case_id TEXT NOT NULL, feedback_id TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,owner,feedback_id))')
+            db.execute('INSERT INTO business_case_migrations VALUES (2) ON CONFLICT DO NOTHING')
 
     def timestamp(self):
         return datetime.fromtimestamp(self.clock(), timezone.utc).isoformat()
@@ -90,8 +93,8 @@ class BusinessCases:
             fail('Use an explicit request_key of 8 to 128 characters.')
         return key
 
-    def publish(self, auth, body):
-        scope = self.scope(auth, True)
+    @staticmethod
+    def validate_definition(body):
         if len(canonical(body).encode()) > 100000 or list(Draft202012Validator(CONTRACT).iter_errors(body)):
             fail('Process definition does not satisfy business-lifecycle-v1.')
         reject_secrets(body)
@@ -137,6 +140,9 @@ class BusinessCases:
                 elif isinstance(value, list):
                     for item in value:check_bindings(item)
             check_bindings(stage)
+    def publish(self, auth, body):
+        scope = self.scope(auth, True)
+        self.validate_definition(body)
         fingerprint = digest(body)
         with self.store.transaction() as db:
             db.execute('INSERT INTO business_process_definitions VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING', (*scope, body['process_definition_id'], body['version'], fingerprint, canonical(body)))
@@ -151,6 +157,21 @@ class BusinessCases:
         if not row:fail('Process version not found.', 'CASE_NOT_FOUND', 404)
         return json.loads(row[0])
 
+    def process_listing(self,auth):
+        scope=self.scope(auth)
+        with self.store.transaction(write=False) as db:
+            rows=db.execute('SELECT document FROM business_process_definitions WHERE workspace=? AND owner=? ORDER BY process_id,version DESC LIMIT 100',scope).fetchall()
+        return {'items':[{k:p[k] for k in ('process_definition_id','version','client_id','domain_id')} for p in (json.loads(r[0]) for r in rows)]}
+
+    def listing(self,auth,before=None):
+        scope=self.scope(auth)
+        if before is not None and (type(before) is not int or before<1):fail('Use a positive case page cursor.')
+        clause=' AND rowid<?' if before is not None else ''
+        with self.store.transaction(write=False) as db:
+            rows=db.execute('SELECT rowid,document FROM business_cases WHERE workspace=? AND owner=?'+clause+' ORDER BY rowid DESC LIMIT 51',(*scope,*([before] if before is not None else []))).fetchall()
+        keys=('case_id','client_id','process_definition_id','process_definition_version','original_user_goal','case_status','execution_status','business_outcome_status','revision','updated_at')
+        return dict(items=[{k:c[k] for k in keys} for c in (json.loads(r[1]) for r in rows[:50])],next_cursor=rows[49][0] if len(rows)>50 else None)
+
     def _load(self, db, scope, case_id):
         row = db.execute('SELECT document FROM business_cases WHERE workspace=? AND owner=? AND case_id=?', (*scope, case_id)).fetchone()
         if not row:fail('Business case not found.', 'CASE_NOT_FOUND', 404)
@@ -162,9 +183,19 @@ class BusinessCases:
 
     def section(self, auth, case_id, name):
         case = self.get(auth, case_id)
+        if name in ('history','reassessments'):
+            from .lifecycle_reassessment import LifecycleReassessment
+            return LifecycleReassessment(self).history(auth,case_id) if name=='history' else {'items':case.get('reassessments',[])}
+        if name=='learning':
+            from .lifecycle_learning import LifecycleLearning
+            return LifecycleLearning(self).metrics(auth,case_id)
+        if name=='memory':
+            from runtime.memory import WorkingMemory
+            return dict(working=WorkingMemory.case_view(case),recommendations={sid:s.get('memory_recommendations',[]) for sid,s in case['stages'].items()})
+        if name=='recovery':return {'stages':{sid:dict(errors=s['errors'],attempts=s['retry_history']) for sid,s in case['stages'].items()}}
         if name == 'report':
             from .lifecycle_driver import analytical_report
-            return case.get('analytical_report') or analytical_report(case)
+            return analytical_report(case)
         if name == 'outcomes':
             return {k:case[k] for k in ('execution_status','business_outcome_status','case_status','completed_at')} | {'stages':{sid:{k:s[k] for k in ('execution_status','business_outcome_status','real_world_status','outputs')} for sid,s in case['stages'].items()}}
         if name in ('agents','tools'):
@@ -205,6 +236,8 @@ class BusinessCases:
             case['case_status'] = next(s for s in priority if s in statuses)
             case['execution_status'] = case['case_status']
         case['generated_assumption_references'] = list(case['assumptions'])
+        for item in case.get('reassessments',[]):
+            if item['status']=='PENDING' and all(case['stages'][sid]['execution_status'] in DONE for sid in item['reexecute_stage_ids']):item['status']='COMPLETED'
 
     def _save(self, db, scope, case):
         revision = case['revision']
@@ -236,7 +269,14 @@ class BusinessCases:
         if not isinstance(body['original_user_goal'], str) or not 1 <= len(body['original_user_goal'].strip()) <= 4000:fail('Supply a bounded business goal.')
         for key in ('inputs', 'business_request', 'resources'):
             if not isinstance(body.get(key, {}), dict):fail('Case inputs and resources must be objects.')
+        package=None
+        if body.get('client_package_id'):
+            packages=self.service.business_composition.packages
+            package=packages.get(auth,body['client_package_id'],body.get('client_package_revision'))
+            packages.install_processes(auth,body['client_package_id'],body['client_package_revision'],self)
         process = self.process(auth, body['process_definition_id'], body['process_definition_version'])
+        if package and (process['client_id']!=package['client_id'] or process['domain_id']!=package['domain']):fail('Process is outside the client package.','CLIENT_PACKAGE_INVALID')
+        if package and package.get('process_definitions') and process not in package['process_definitions']:fail('Process is not pinned by this package.','CLIENT_PACKAGE_INVALID')
         fingerprint = digest(['create', body]);timestamp = self.timestamp()
         with self.store.transaction() as db:
             old = self._receipt(db, scope, body, fingerprint)
@@ -257,6 +297,7 @@ class BusinessCases:
                         configuration_snapshot=deepcopy(self.configuration.get(scope, {})),configuration_version=digest(self.configuration.get(scope, {})))
             for key in ('client_package_id', 'client_package_revision', 'google_connection_id'):
                 if key in body:case[key] = body[key]
+            if package:case['memory_policy']=deepcopy(package.get('memory_policy',{'enabled':True,'max_recommendations':8,'retention_seconds':2592000}))
             for definition in process['stages']:
                 sid = definition['stage_instance_id']
                 case['stages'][sid] = dict(stage_instance_id=sid, definition=deepcopy(definition), execution_status='CREATED',
@@ -479,8 +520,8 @@ class BusinessCases:
                         continuation_target=stage['stage_instance_id'], retry_or_escalation_policy=deepcopy(definition['timeout_policy']),blocking=requirement.get('blocking', True))
                 wait = case['waits'][wid]
                 if not requirement.get('blocking', True):
-                    stage['pending_real_world_event'] = True
-                    stage['business_outcome_status'] = 'PROVISIONAL'
+                    stage['pending_real_world_event'] = wait['current_status'] in ('PENDING','TIMED_OUT')
+                    if stage['pending_real_world_event']:stage['business_outcome_status'] = 'PROVISIONAL'
                     if event_missing:
                         self.transition(case, stage, 'RUNNING');self.transition(case, stage, 'WAITING_FOR_INPUT', 'protected_event_input_required')
                     continue
@@ -574,17 +615,20 @@ class BusinessCases:
         if definition['side_effect_classification'] in ('draft', 'write') and any(e['provenance_type'] != 'ACTUAL' for e in stage['resolved_inputs'].values()):
             fail('Generated inputs cannot authorize an external action.', 'CASE_PROVISIONAL_ACTION_DENIED', 403)
         if not stage['composition_id']:
+            execution_identity=[case['case_id'],sid]+([stage['reassessment_generation']] if stage.get('reassessment_generation') else [])
             operations = [dict(capability_id=cid, inputs=deepcopy(stage['inputs'])) for cid in definition['required_capabilities']]
-            request = dict(objective=case['original_user_goal'], request_key='lifecycle_'+digest([case['case_id'],sid])[:32],
+            request = dict(objective=case['original_user_goal'], request_key='lifecycle_'+digest(execution_identity)[:32],
                            operations=operations, resources=deepcopy(case['resources']),recovery_max_retries=definition['retry_policy']['max_retries'])
             if case.get('preparation_id'):request['preparation_id'] = case['preparation_id']
             elif case.get('client_package_id'):
                 request.update(client_package_id=case['client_package_id'], client_package_revision=case['client_package_revision'])
             elif case['business_request']:request['business_request'] = case['business_request']
             if case.get('google_connection_id'):request['google_connection_id'] = case['google_connection_id']
-            context = dict(case_id=case['case_id'], stage_instance_id=sid, inputs=deepcopy(stage['resolved_inputs']),
+            from runtime.memory import WorkingMemory
+            context = dict(case_id=case['case_id'], stage_instance_id=sid, inputs=deepcopy(stage['resolved_inputs']),working_memory=WorkingMemory.case_view(case,stage),
                            qualification='Generated assumptions are analytical only; source citations and real activities require actual evidence.')
             doc = composition.prepare(auth, request, lifecycle_context=context)
+            stage['memory_recommendations']=deepcopy(doc.get('memory_recommendations',[]))
             stage['capability_plan_reference'] = doc['composition_id']
             stage['capability_gaps'] = deepcopy(doc['gaps'])
             if doc['state'] != 'ready':fail('Resolve registered capability and resource gaps.', 'CASE_CAPABILITY_NOT_READY')
@@ -599,6 +643,7 @@ class BusinessCases:
             self.checkpoint(auth, case['case_id'], sid, token, {k:stage[k] for k in ('composition_id','agent_configurations','workflow')})
         # Save a normal draft; stable commands also cover interruption before saving.
         workflow = stage['workflow']
+        execution_identity=[case['case_id'],sid]+([stage['reassessment_generation']] if stage.get('reassessment_generation') else [])
         pinned_inputs = workflow['metadata'].get('lifecycle_context', {}).get('inputs', {})
         def stable_inputs(values):
             return {name:{k:v for k,v in entry.items() if k != 'generated_at'} for name,entry in values.items()}
@@ -608,7 +653,7 @@ class BusinessCases:
             existing = self.store.get(db, scope_workspace(auth), workflow['workflow_id'], workflow['version'])
         if not existing:
             response = self.service.handle(dict(request_id='lifecycle_save', operation='save_workflow_version',
-                idempotency_key='lifecycle_save_'+digest([case['case_id'],sid])[:32], payload=dict(workflow_id=workflow['workflow_id'],workflow_version=1,base_version=0,workflow=workflow)), auth)
+                idempotency_key='lifecycle_save_'+digest(execution_identity)[:32], payload=dict(workflow_id=workflow['workflow_id'],workflow_version=1,base_version=0,workflow=workflow)), auth)
             if response['status'] >= 400:
                 error = response['data']['error'];fail(error['message'], error['error_code'], response['status'])
         rt = runner.runtime
@@ -622,7 +667,7 @@ class BusinessCases:
                         fail('Case was cancelled or its stage claim changed.', 'CASE_CLAIM_LOST', 409)
                     target['run_id'] = created['run_id']
                     self._save(db, self.scope(auth, True, True), current)
-                run = rt.create_run(dict(request_id='lifecycle_run', idempotency_key='lifecycle_run_'+digest([case['case_id'],sid])[:32],
+                run = rt.create_run(dict(request_id='lifecycle_run', idempotency_key='lifecycle_run_'+digest(execution_identity)[:32],
                     payload=dict(workflow_id=workflow['workflow_id'],workflow_version=workflow['version'],inputs={})), auth, on_created=attach)
             except RuntimeFailure as exc:
                 if exc.code in ('REVISION_NOT_APPROVED', 'WORKFLOW_NOT_FOUND'):

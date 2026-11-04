@@ -137,7 +137,7 @@ export default function WorkflowsPage() {
           })}
         </div>
       )}
-      <InvestigationList/>
+      <InvestigationList lifecycle/>
     </div>
   );
 }

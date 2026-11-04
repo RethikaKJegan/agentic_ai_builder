@@ -1,5 +1,21 @@
 # Handoff — Rethika
 
+## Generic lifecycle Phase 6 — 4 November 2026, local only
+
+Extended the existing package/case/memory/runtime components with configurable
+client processes and memory limits, verified operational experience guidance,
+immutable execution feedback, and reviewed late-event dependency reassessment.
+Historical executions and unrelated work are retained; writes/approvals are never
+replayed or granted by reassessment. Simpson version 1 remains unchanged.
+The eight-stage retail fixture executed with actual CrewAI and controlled source/
+model transports, then reassessed only quality and monitoring after an actual
+authenticated test event. Case remains analytically qualified, not physical success.
+See `docs/simpson-business-ontology/generic-lifecycle-phase6.md`, its Phase 6 trace
+and `openspec/changes/generic-lifecycle-phase6/verification.md` for exact evidence,
+backend APIs and deployment prerequisites. No frontend, live provider, production
+database migration or deployment. Repository handoff only; no external notification
+or downstream owner acceptance is claimed.
+
 ## Simpson lifecycle Phase 5 — 4 November 2026, local only
 
 Implemented the versioned twelve-stage Simpson process on Phase 4, bounded durable
@@ -880,3 +896,32 @@ workflow/run/ontology/composition fingerprints preserved. No live model replay.
 See `docs/simpson-business-ontology/investigation-recovery-details.md` and
 `openspec/changes/investigation-recovery-details/verification.md`. Private backups
 and public checks: `.local/investigation-recovery-release/`.
+
+
+## Persistent lifecycle UI — 4 November 2026
+
+Integrated Phase 4–6 cases within existing Workflow → Business Investigation and
+existing investigate route. Pinned stages, real compositions/receipts, provenance,
+waits, memory/recovery/reassessment and qualified reports use backend authority.
+Normal workflow/action approvals remain required. Explicit uncertain retries keep
+identical request keys; revisions and tenant/owner isolation are enforced.
+
+480 frontend tests, types/lint, production build, 12 desktop/mobile browser tests,
+79 Phase 4–6 backend regressions plus two scoped-index tests passed. The actual
+browser lifecycle checks used disposable storage and bounded deterministic model/
+evidence transports with real CrewAI/Registry/runtime, with no live effects.
+
+File inventory, API mapping and acceptance/deployment details:
+`docs/simpson-business-ontology/business-lifecycle-ui.md` and
+`openspec/changes/business-lifecycle-ui/verification.md`.
+Deployment status is recorded in that verification file. Internal repository
+handoff only; no external contributor messages were sent.
+
+Final lifecycle UI deployment verified: build `RUVN4lBRiT8k8fJPZK96M` at
+https://praxi.bellcorpstudio.com/app. All existing services active; normal public
+login, case/create/reopen/report/cancel, twelve stages, memory/recovery, existing
+navigation/composition and desktop/mobile passed with zero browser/asset errors.
+170,531 original rows across 32 tables matched before intentional labelled smoke
+cases; both smoke cases were cancelled without execution. Lifecycle migrations
+1/2 verified. No paid calls or live connector effects. Private rollback artifacts
+and receipts: `.local/business-lifecycle-ui-release-20261104/`.
