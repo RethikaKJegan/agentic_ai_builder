@@ -126,14 +126,15 @@ class RuntimeService:
             raise RuntimeFailure('INVALID_INPUT', 'Execution inputs do not satisfy workflow fields.', 400)
         reject_secrets(inputs)
 
-    def create_run(self, request, auth):
-        return self._create_run(request, auth, allow_superseded=False)
+    def create_run(self, request, auth, *, on_created=None):
+        # Trusted in-process persistence hook; never accepted from an API payload.
+        return self._create_run(request, auth, allow_superseded=False, on_created=on_created)
 
     def create_automation_run(self, request, auth):
         """Trusted lifecycle entry point for a job pinned to an immutable release."""
         return self._create_run(request, auth, allow_superseded=True)
 
-    def _create_run(self, request, auth, allow_superseded):
+    def _create_run(self, request, auth, allow_superseded, on_created=None):
         self.authorize(auth, 'workflow.execute', {'admin', 'builder'})
         key = request.get('idempotency_key')
         if not isinstance(key, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{8,128}', key):
@@ -151,7 +152,9 @@ class RuntimeService:
             if row:
                 if row[0] != fingerprint:
                     raise RuntimeFailure('IDEMPOTENCY_KEY_REUSED', 'The retry key identifies different execution inputs.')
-                return self.public(json.loads(row[1]))
+                existing = json.loads(row[1])
+                if on_created is not None:on_created(db, deepcopy(existing))
+                return self.public(existing)
             if validator := getattr(self, 'execution_validator', None):
                 validator(workflow, auth, db)
             run = dict(run_id='run_' + uuid4().hex, workflow_id=workflow['workflow_id'], workflow_version=workflow['version'],
@@ -171,6 +174,7 @@ class RuntimeService:
             db.execute('INSERT INTO runtime_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                        (workspace, run['run_id'], run['workflow_id'], run['workflow_version'], subject, digest(key), fingerprint, json.dumps(run)))
             self.event(db, run, 'run.queued', {'status': 'queued'})
+            if on_created is not None:on_created(db, deepcopy(run))
             return self.public(run)
 
     @staticmethod

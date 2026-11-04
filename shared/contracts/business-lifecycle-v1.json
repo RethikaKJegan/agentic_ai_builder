@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:builder:business-lifecycle:v1",
+  "title": "Versioned business process definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["process_definition_id", "version", "client_id", "domain_id", "stages"],
+  "properties": {
+    "process_definition_id": {"$ref": "#/$defs/id"},
+    "version": {"type": "integer", "minimum": 1},
+    "client_id": {"$ref": "#/$defs/id"},
+    "domain_id": {"$ref": "#/$defs/id"},
+    "description": {"type": "string", "maxLength": 4000},
+    "stages": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/stage"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$"},
+    "predicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "path", "operator"],
+      "properties": {
+        "source": {"type": "string"}, "path": {"type": "string"},
+        "operator": {"enum": ["eq", "ne", "exists", "gt", "lt", "in"]}, "value": {}
+      }
+    },
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "path"],
+      "properties": {
+        "source": {"type": "string", "description": "user, config, evidence, event or stage:<instance_id>"},
+        "path": {"type": "string", "maxLength": 512}
+      }
+    },
+    "input": {
+      "type": "object", "additionalProperties": false, "required": ["schema"],
+      "properties": {
+        "schema": {"type": "object"}, "binding": {"$ref": "#/$defs/binding"},
+        "evidence_mapping": {"type": "string"},
+        "derivation": {
+          "type": "object", "additionalProperties": false, "required": ["operation", "inputs"],
+          "properties": {"operation": {"enum": ["copy", "sum", "difference", "concat", "days_between"]}, "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}}
+        },
+        "inference": {
+          "type": "object", "additionalProperties": false, "required": ["basis", "value", "explanation"],
+          "properties": {"basis": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}, "value": {}, "explanation": {"type": "string", "minLength": 1}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}}
+        },
+        "synthetic_fallback": {"type": "boolean"}, "fallback_value": {},
+        "protected_activity": {"type": "boolean", "description": "Approvals, physical activities and connector receipts cannot be generated."},
+        "policy": {"type": "boolean"}
+      }
+    },
+    "wait": {
+      "type": "object", "additionalProperties": false,
+      "required": ["event_type", "expected_source", "correlation_keys", "schema", "requires_authorization"],
+      "properties": {
+        "event_type": {"$ref": "#/$defs/id"}, "expected_source": {"$ref": "#/$defs/id"},
+        "correlation_keys": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/binding"}},
+        "schema": {"type": "object"}, "requires_authorization": {"type": "boolean"}
+      }
+    },
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage_definition_id", "stage_instance_id", "version", "name", "description", "domain", "required_capabilities", "required_ontology_concepts", "required_inputs", "optional_inputs", "output_schema", "output_bindings", "dependency_definitions", "preconditions", "allowed_tools", "side_effect_classification", "completion_criteria", "transition_rules", "timeout_policy", "retry_policy", "external_event_requirements", "evidence_requirements", "provisional_continuation_policy"],
+      "properties": {
+        "stage_definition_id": {"$ref": "#/$defs/id"}, "stage_instance_id": {"$ref": "#/$defs/id"},
+        "version": {"type": "integer", "minimum": 1}, "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"}, "domain": {"type": "string"},
+        "required_capabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "required_ontology_concepts": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "required_inputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/input"}},
+        "optional_inputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/input"}},
+        "output_schema": {"type": "object"},
+        "output_bindings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/binding"}},
+        "dependency_definitions": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "preconditions": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
+        "allowed_tools": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "side_effect_classification": {"enum": ["none", "read", "draft", "write"]},
+        "completion_criteria": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
+        "transition_rules": {"type": "array", "items": {"$ref": "#/$defs/predicate"}, "description": "All predicates must hold; false skips this branch."},
+        "timeout_policy": {"type": "object", "additionalProperties": false, "required": ["seconds", "action"], "properties": {"seconds": {"type": "integer", "minimum": 1, "maximum": 31536000}, "action": {"enum": ["block", "fail", "escalate", "continue_provisionally"]}}},
+        "retry_policy": {"type": "object", "additionalProperties": false, "required": ["max_retries", "backoff_seconds"], "properties": {"max_retries": {"type": "integer", "minimum": 0, "maximum": 3}, "backoff_seconds": {"type": "integer", "minimum": 0, "maximum": 86400}}},
+        "external_event_requirements": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/wait"}},
+        "evidence_requirements": {"type": "array", "items": {"type": "string"}},
+        "provisional_continuation_policy": {"type": "object", "additionalProperties": false, "required": ["allowed"], "properties": {"allowed": {"type": "boolean"}, "allow_event_timeout": {"type": "boolean"}}}
+      }
+    }
+  }
+}

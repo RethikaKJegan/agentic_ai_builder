@@ -1,0 +1,46 @@
+{
+  "process_definition_id": "inspection_analysis_example",
+  "version": 1,
+  "client_id": "example-client",
+  "domain_id": "field-service",
+  "description": "Illustrative analytical continuation, not an official client process or policy. Real activity remains unverified without an external report.",
+  "stages": [
+    {
+      "stage_definition_id": "policy_analysis", "stage_instance_id": "policy", "version": 1,
+      "name": "Resolve analytical policy context", "description": "Use authorized configuration or an explicit case-local policy assumption.", "domain": "field-service",
+      "required_capabilities": [], "required_ontology_concepts": [],
+      "required_inputs": {
+        "policy": {
+          "schema": {"type": "object", "required": ["statement"], "properties": {"statement": {"type": "string"}}},
+          "binding": {"source": "config", "path": "analytical_policy"}, "policy": true,
+          "synthetic_fallback": true,
+          "fallback_value": {"statement": "No authoritative policy is available. This assumption supports analysis only and grants no commercial authorization."}
+        }
+      },
+      "optional_inputs": {},
+      "output_schema": {"type": "object", "required": ["policy"], "properties": {"policy": {"type": "object"}}},
+      "output_bindings": {"policy": {"source": "input", "path": "policy"}},
+      "dependency_definitions": [], "preconditions": [], "allowed_tools": [], "side_effect_classification": "none",
+      "completion_criteria": [], "transition_rules": [],
+      "timeout_policy": {"seconds": 60, "action": "block"}, "retry_policy": {"max_retries": 0, "backoff_seconds": 0},
+      "external_event_requirements": [], "evidence_requirements": [], "provisional_continuation_policy": {"allowed": true}
+    },
+    {
+      "stage_definition_id": "inspection_analysis", "stage_instance_id": "inspection", "version": 1,
+      "name": "Await inspection report or qualify analytical continuation", "description": "An analytical placeholder never records that a physical inspection occurred.", "domain": "field-service",
+      "required_capabilities": [], "required_ontology_concepts": [],
+      "required_inputs": {
+        "policy": {"schema": {"type": "object"}, "binding": {"source": "stage:policy", "path": "policy"}},
+        "findings": {"schema": {"type": "string"}, "binding": {"source": "event", "path": "findings"}, "synthetic_fallback": true, "fallback_value": "Inspection findings unavailable; analytical placeholder only."}
+      },
+      "optional_inputs": {},
+      "output_schema": {"type": "object", "required": ["policy", "findings"], "properties": {"policy": {"type": "object"}, "findings": {"type": "string"}}},
+      "output_bindings": {"policy": {"source": "input", "path": "policy"}, "findings": {"source": "input", "path": "findings"}},
+      "dependency_definitions": ["policy"], "preconditions": [], "allowed_tools": [], "side_effect_classification": "none",
+      "completion_criteria": [], "transition_rules": [],
+      "timeout_policy": {"seconds": 86400, "action": "continue_provisionally"}, "retry_policy": {"max_retries": 0, "backoff_seconds": 0},
+      "external_event_requirements": [{"event_type": "inspection_report", "expected_source": "field_service", "correlation_keys": {"complaint_id": {"source": "user", "path": "complaint_id"}}, "schema": {"type": "object", "required": ["findings"], "properties": {"findings": {"type": "string"}}}, "requires_authorization": false}],
+      "evidence_requirements": [], "provisional_continuation_policy": {"allowed": true, "allow_event_timeout": true}
+    }
+  ]
+}

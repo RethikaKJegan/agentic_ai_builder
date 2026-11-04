@@ -122,6 +122,9 @@ def main() -> None:
     validate_agents()
     validate_tools()
     validate_api_and_control_contracts()
+    process = validator(CONTRACTS / 'business-lifecycle-v1.json')
+    assert_valid(process, EXAMPLES / 'business-lifecycle-v1.json')
+    validator(CONTRACTS / 'business-case-v1.json')
     print("Shared contract schemas and fixtures are valid.")
 
 

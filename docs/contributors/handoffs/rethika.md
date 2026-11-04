@@ -1,5 +1,35 @@
 # Handoff — Rethika
 
+## Persistent business lifecycle Phase 4 — 4 November 2026, local only
+
+Ready for repository handoff; downstream acceptance and deployment are not claimed.
+Durable scoped cases now pin configurable process/stage contracts and reuse shared
+evidence, capability planning/factory, Registry, master-child/CrewAI, runtime memory
+and guarded recovery. Typed bindings preserve ACTUAL/DERIVED/INFERRED/SYNTHETIC
+provenance, retained conflicts and case-local policy assumptions. Durable correlated
+events, parallel stages, deadlines, retries and atomic case/run cancellation retain
+separate execution, analytical and real-world statuses. Actual email receipts can
+feed reply waits through the existing connector and normal approvals. Backend APIs
+and isolated/authenticated-backend CLI are available; no simulation execution mode
+or new agent engine was added.
+
+Final Phase 4 suite: 51 passed. Focused composition/tool integration: 89 passed.
+Broader runs: 168 passed and 246 passed plus 34 subtests; these counts overlap with
+follow-ups and must not be summed. Contracts, strict scoped OpenSpec and whitespace
+checks passed. Actual CrewAI uses fake models and external actions use fake
+transports, including zero fake SMTP calls before action approval. Eight separate
+CLI processes establish restart persistence. No frontend edits, deployment,
+service restart, company/source writes or live paid/external calls occurred.
+
+Provider-specific event delivery/advancement remains explicit trusted infrastructure
+or backend commands; uncertain writes need existing provider/journal reconciliation.
+Live provider quality, PostgreSQL rollout and official customer process acceptance
+remain unverified. No official Simpson twelve-stage definition or policy was invented.
+Files, migration, contracts, API/CLI, test commands and operational limits:
+`docs/simpson-business-ontology/persistent-lifecycle.md` and
+`openspec/changes/persistent-business-lifecycle/verification.md`.
+This is an internal repository handoff, not an external contributor notification.
+
 ## Investigation provider token policy — 3 November 2026
 
 Live, explicitly approved: server-owned provider token mode for investigation planning/analysis, no application token/cost ceiling, actual failed/success usage accounting and final-summary truncation recovery with visible qualification. Generic bounded model mode and call/time/schema/authorization checks remain. 130 tests plus 28 subtests and 7 focused checks passed with overlap; saved real evidence replay used local fixtures only. Public policy/worker/session and preservation checks passed. No automatic paid replay or company writes. Original plans/run documents and frontend remain unchanged. Details: `openspec/changes/investigation-provider-token-policy/verification.md`.

@@ -74,7 +74,7 @@ class BusinessComposition:
             if c['supported_operation'].startswith('calendar.') and not inputs.get('calendar_id'):reasons.append('CALENDAR_ID_REQUIRED');continue
             return item,[]
         return None,sorted(set(reasons or ['REGISTERED_TOOL_REQUIRED']))
-    def prepare(self,auth,body):
+    def prepare(self,auth,body,*,lifecycle_context=None):
         auth,scope=self.authorize(auth)
         allowed={'objective','request_key','preparation_id','business_request','planning_mode','operations','resources','google_connection_id','client_package_id','client_package_revision','recovery_max_retries'}
         if not isinstance(body,dict) or set(body)-allowed or not isinstance(body.get('objective'),str) or not 1<=len(body['objective'])<=4000:fail('Supply a bounded objective and supported composition inputs.')
@@ -82,7 +82,7 @@ class BusinessComposition:
         if not isinstance(body.get('resources',{}),dict) or not isinstance(body.get('resources',{}).get('operation_inputs',{}),dict):fail('Resources and explicit operation inputs must be typed objects.')
         recovery_retries=body.get('recovery_max_retries',0)
         if type(recovery_retries) is not int or not 0<=recovery_retries<=min(3,self.service.registry_adapter.service._policy.agent_limits['max_retries']):fail('Recovery must fit the reviewed Registry retry allowance.','CAPABILITY_AGENT_LIMIT',422)
-        reject_secrets(body);key=self.preparation.service.key(body);fingerprint=digest(body)
+        reject_secrets(body);key=self.preparation.service.key(body);fingerprint=digest([body,lifecycle_context]) if lifecycle_context is not None else digest(body)
         with self.store.transaction(write=False) as db:old=db.execute('SELECT fingerprint,document FROM business_compositions WHERE workspace=? AND owner=? AND request_key=?',(*scope,key)).fetchone()
         if old:
             if old[0]!=fingerprint:fail('Composition request key was reused.','CAPABILITY_CONFLICT',409)
@@ -230,6 +230,10 @@ class BusinessComposition:
         document=dict(schema_version='business-composition-v1',composition_id=composition_id,scope=dict(workspace=scope[0],owner=scope[1]),objective=body['objective'],state=state,gaps=gaps,tasks=tasks,contracts={cid:contracts[cid] for cid in selected},configurations=configs,master=master,selected_tools={t:{k:deepcopy(r[k]) for k in ('tool_id','version','definition')} for t,r in chosen.items()},resources=resources,google_connection_id=body.get('google_connection_id'),preparation_id=prepared['preflight_id'] if prepared else None,preparation_sha256=prepared['sha256'] if prepared else None,planning=dict(mode=mode,model_calls=planning_calls),created_at=now())
         if isinstance(planning_usage,dict):document['planning']['usage']=deepcopy(planning_usage)
         document['runtime_features_version']=1
+        if lifecycle_context is not None:
+            # Server-only argument, outside client/model payload fields and signed with the composition.
+            from runtime.memory import bounded_context
+            document['lifecycle_context']=bounded_context(deepcopy(lifecycle_context))
         if recovery_retries:document['recovery_max_retries']=recovery_retries
         if package_context:
             document['client_package_context']=package_context
@@ -324,6 +328,7 @@ def compile_workflow(doc):
     for field in ('max_llm_calls','max_tool_calls','max_tokens','max_estimated_cost_usd'):limits[field]=sum(a['limits'].get(field,0) for a in agents)
     limits['max_retries']=doc.get('recovery_max_retries',0);limits['timeout_seconds']=max(a['limits']['timeout_seconds'] for a in agents)
     metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=cid,composition_sha256=doc['sha256'],composition_tasks=child_tasks,composition_action_verifiers=actions,dynamic_delegation={'master_orchestrator':dict(max_rounds=master['limits']['max_llm_calls'],max_tasks=len(child_tasks))},unresolved_requirements=[],composition_preparation_id=doc['preparation_id'])
+    if 'lifecycle_context' in doc:metadata['lifecycle_context']=deepcopy(doc['lifecycle_context'])
     if doc.get('client_package_context'):
         context=doc['client_package_context']
         metadata.update(client_package_pin=deepcopy(context['pins']),client_domain=context['package']['domain'],client_package_context=deepcopy(context['tasks']))
@@ -352,7 +357,7 @@ def verify_composition(db,auth,workflow):
     doc['sha256']=sha;expected=compile_workflow(doc)
     for key in ('nodes','edges','conditions','tools','approval_gates','execution_policy'):
         if workflow[key]!=expected[key]:fail('Regenerate a composition to change its execution contract.','CAPABILITY_CHANGED',409)
-    for key in ('composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain'):
+    for key in ('composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context'):
         if metadata.get(key)!=expected['metadata'].get(key):fail('Composition control metadata changed.','CAPABILITY_CHANGED',409)
     if len(workflow['agents'])!=len(expected['agents']):fail('Composition agents changed.','CAPABILITY_CHANGED',409)
     by_id={a['agent_id']:a for a in expected['agents']}

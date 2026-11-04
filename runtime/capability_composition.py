@@ -25,7 +25,7 @@ def verify_action(method,output,inputs=None):
     if not isinstance(output,dict):fail('CAPABILITY_RESULT_INVALID','Expected a typed tool receipt.')
     if output.get('status') in ('failed','error','rejected'):fail('CAPABILITY_RESULT_UNVERIFIED','The provider reported an unsuccessful action.')
     if method=='cancelled_event' and output.get('status')!='cancelled':fail('CAPABILITY_RESULT_UNVERIFIED','Cancellation was not confirmed.')
-    if method in ('event_id','draft_id','spreadsheet_id') and not output.get(method):fail('CAPABILITY_RESULT_UNVERIFIED','The action returned no required provider identifier.')
+    if method in ('event_id','draft_id','spreadsheet_id','message_id') and not output.get(method):fail('CAPABILITY_RESULT_UNVERIFIED','The action returned no required provider identifier.')
     for key in ('event_id','spreadsheet_id'):
         if inputs and inputs.get(key) and output.get(key) and inputs[key]!=output[key]:fail('CAPABILITY_RESULT_UNVERIFIED','Provider receipt identifies a different resource.')
     if method=='event_id' and output.get('status') in ('cancelled','failed','error'):fail('CAPABILITY_RESULT_UNVERIFIED','The event was not created or updated successfully.')
@@ -70,6 +70,8 @@ class CompositionGuard:
         memory=self.session.runtime.working_memory.view(memory_run,self.session.workflow,task=task,dependencies=context['dependency_results'],permitted_tools=[task['selected_tool_id']] if task['selected_tool_id'] else [])
         memory.pop('dependency_outputs',None)  # Already supplied exactly once above.
         context['working_memory']=bounded_context(memory)
+        if 'lifecycle_context' in self.session.workflow['metadata']:
+            context['business_case']=bounded_context(deepcopy(self.session.workflow['metadata']['lifecycle_context']))
         failures=[f for f in memory_run.get('classified_failures',[]) if f.get('affected_task')==task['task_id']]
         context['previous_failure_feedback']=[deepcopy(f) for f in memory_run.get('previous_failure_feedback',[]) if f.get('affected_task')==task['task_id']]
         context['validated_strategy_hints']=self.session.runtime.experience_memory.relevant(self.session.auth,domain=self.session.workflow['metadata'].get('client_domain','configured_business_ontology'),capability=task['capability_id'],category=failures[-1]['category'] if failures else None,pins=knowledge_pin(self.session.workflow),agent_id=agent_id)

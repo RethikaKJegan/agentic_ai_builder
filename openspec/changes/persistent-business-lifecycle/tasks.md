@@ -1,0 +1,7 @@
+- [x] Add versioned process/stage, evidence and case contracts.
+- [x] Implement additive durable storage, commands and scoped state transitions.
+- [x] Implement typed bindings and unified provenance-preserving completion.
+- [x] Add event waits, correlation, deadlines and guarded recovery.
+- [x] Connect existing composition, Registry and runtime without granting approvals.
+- [x] Add authenticated backend routes and isolated/configured-backend CLI.
+- [x] Verify acceptance cases and relevant backend regressions; document limits.

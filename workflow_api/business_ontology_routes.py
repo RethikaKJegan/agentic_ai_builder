@@ -80,6 +80,9 @@ def install(app, service, auth, reference, env=None):
     from .composition_presentation import CompositionPresentation
     presentation=CompositionPresentation(service.business_composition)
     app.state.composition_presentation=presentation
+    from .business_cases import BusinessCases
+    service.business_cases=BusinessCases(service)
+    app.state.business_cases=service.business_cases
 
     async def call(fn, *args):
         try:
@@ -91,6 +94,34 @@ def install(app, service, auth, reference, env=None):
         except Exception:
             exc = ApiFailure('BUSINESS_ONTOLOGY_UNAVAILABLE','Business ontology is unavailable. Refresh before retrying.',503)
             return JSONResponse(service.failure(reference(),exc),status_code=503,headers={'Cache-Control':'no-store'})
+
+    @app.post('/business-ontology/v1/process-definitions')
+    async def publish_process_definition(request:Request):
+        return await call(service.business_cases.publish,await body(request))
+
+    @app.get('/business-ontology/v1/process-definitions/{process_id}/{version}')
+    async def get_process_definition(process_id:str,version:int):
+        return await call(service.business_cases.process,process_id,version)
+
+    @app.post('/business-ontology/v1/cases')
+    async def create_business_case(request:Request):
+        return await call(service.business_cases.create,await body(request))
+
+    @app.get('/business-ontology/v1/cases/{case_id}')
+    async def get_business_case(case_id:str):
+        return await call(service.business_cases.get,case_id)
+
+    @app.get('/business-ontology/v1/cases/{case_id}/sections/{section}')
+    async def business_case_section(case_id:str,section:str):
+        return await call(service.business_cases.section,case_id,section)
+
+    @app.post('/business-ontology/v1/cases/{case_id}/events')
+    async def business_case_event(case_id:str,request:Request):
+        return await call(service.business_cases.event,case_id,await body(request))
+
+    @app.post('/business-ontology/v1/cases/{case_id}/{operation}')
+    async def business_case_command(case_id:str,operation:str,request:Request):
+        return await call(service.business_cases.command,case_id,operation,await body(request))
 
     @app.get('/business-ontology/v1/client-packages')
     async def list_client_packages():return await call(service.business_composition.packages.listing)

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:builder:business-case:v1",
+  "title": "Durable business case and evidence provenance",
+  "type": "object",
+  "required": ["schema_version", "case_id", "tenant_id", "workspace_id", "owner_id", "client_id", "domain_id", "process_definition_id", "process_definition_version", "original_user_goal", "normalized_goal", "case_status", "execution_status", "business_outcome_status", "revision", "created_at", "updated_at", "started_at", "completed_at", "ontology_version", "mapping_version", "capability_registry_version", "active_stage_ids", "completed_stage_ids", "pending_stage_ids", "blocked_stage_ids", "evidence_references", "generated_assumption_references", "execution_history", "external_action_references", "stages", "assumptions", "conflicts", "waits"],
+  "properties": {
+    "schema_version": {"const": "business-case-v1"},
+    "case_id": {"type": "string"}, "tenant_id": {"type": "string"}, "workspace_id": {"type": "string"},
+    "owner_id": {"type": "string"}, "client_id": {"type": "string"}, "domain_id": {"type": "string"},
+    "process_definition_id": {"type": "string"}, "process_definition_version": {"type": "integer", "minimum": 1},
+    "original_user_goal": {"type": "string"}, "normalized_goal": {"type": "string"},
+    "case_status": {"$ref": "#/$defs/status"}, "execution_status": {"$ref": "#/$defs/status"},
+    "business_outcome_status": {"enum": ["PENDING", "PROVISIONAL", "EVIDENCE_COMPLETE"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"},
+    "started_at": {"type": ["string", "null"]}, "completed_at": {"type": ["string", "null"]},
+    "ontology_version": {"type": ["string", "null"]}, "mapping_version": {"type": ["string", "null"]},
+    "capability_registry_version": {"type": ["string", "null"]},
+    "active_stage_ids": {"$ref": "#/$defs/ids"}, "completed_stage_ids": {"$ref": "#/$defs/ids"},
+    "pending_stage_ids": {"$ref": "#/$defs/ids"}, "blocked_stage_ids": {"$ref": "#/$defs/ids"},
+    "evidence_references": {"type": "array"}, "generated_assumption_references": {"$ref": "#/$defs/ids"},
+    "external_action_references": {"$ref": "#/$defs/ids"}, "execution_history": {"type": "array", "items": {"type": "object"}},
+    "assumptions": {"type": "object", "additionalProperties": {"$ref": "#/$defs/evidence_value"}},
+    "conflicts": {"type": "array", "items": {"type": "object"}}, "waits": {"type": "object"},
+    "stages": {"type": "object", "minProperties": 1, "additionalProperties": {
+      "type": "object", "required": ["stage_instance_id", "definition", "execution_status", "business_outcome_status", "real_world_status", "resolved_inputs", "outputs", "errors", "retry_history"],
+      "properties": {
+        "execution_status": {"$ref": "#/$defs/status"},
+        "business_outcome_status": {"enum": ["PENDING", "PROVISIONAL", "EVIDENCE_COMPLETE", "SKIPPED"]},
+        "real_world_status": {"enum": ["UNVERIFIED", "NOT_APPLICABLE", "REPORTED_BY_AUTHENTICATED_SOURCE", "CONNECTOR_CONFIRMED"]},
+        "resolved_inputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/evidence_value"}},
+        "outputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/evidence_value"}},
+        "errors": {"type": "array"}, "retry_history": {"type": "array"}
+      }
+    }}
+  },
+  "$defs": {
+    "status": {"enum": ["CREATED", "READY", "RUNNING", "WAITING_FOR_INPUT", "WAITING_FOR_EVENT", "WAITING_FOR_AUTHORIZATION", "COMPLETED", "COMPLETED_PROVISIONALLY", "BLOCKED", "FAILED", "CANCELLED"]},
+    "ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "evidence_value": {
+      "type": "object",
+      "required": ["value", "data_type", "provenance_type", "source_references", "generation_method", "confidence", "assumptions", "generated_at", "validity_scope", "permitted_uses", "limitations"],
+      "properties": {
+        "value": {}, "data_type": {"enum": ["object", "array", "string", "integer", "number", "boolean", "null"]},
+        "provenance_type": {"enum": ["ACTUAL", "DERIVED", "INFERRED", "SYNTHETIC"]},
+        "source_references": {"type": "array", "items": {"type": "object"}}, "generation_method": {"type": "string"},
+        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "assumptions": {"type": "array", "items": {"type": "string"}},
+        "generated_at": {"type": "string", "format": "date-time"}, "validity_scope": {"type": "string"},
+        "permitted_uses": {"type": "array", "items": {"type": "string"}}, "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
