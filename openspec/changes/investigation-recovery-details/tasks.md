@@ -1,0 +1,5 @@
+- [x] Cross-check report and identify/reproduce the failed complex run's cause.
+- [x] Fix confirmed failure paths, typed diagnostics and controlled feedback/recovery.
+- [x] Add Workflow details with request/context/account settings and compact toolbar.
+- [x] Verify backend and frontend, desktop/mobile and relevant saved/live cases.
+- [x] Deploy the verified fix and record evidence/limits; provide a read-only tools prompt.

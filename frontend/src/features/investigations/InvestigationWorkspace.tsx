@@ -10,8 +10,13 @@ import {ApiFeedback} from '@/features/workflows/ApiFeedback';
 import {InvestigationCanvas} from './InvestigationCanvas';
 import {getReport,InvestigationReportView,InvestigationEvidence,InvestigationNodePanel} from './InvestigationPanels';
 import {Link} from '@/lib/navigation';
+import DynamicInvestigationWorkspace from './DynamicInvestigationWorkspace';
 
 export default function InvestigationWorkspace() {
+ const search=useSearchParams();
+ return search.has('composition')||search.get('dynamic')==='1'?<DynamicInvestigationWorkspace/>:<LegacyInvestigationWorkspace/>;
+}
+function LegacyInvestigationWorkspace() {
  const search=useSearchParams();const router=useRouter();const workflowId=search.get('workflow');const runId=search.get('run');const jobId=search.get('job');
  const [plan,setPlan]=useState<InvestigationPlan|null>(null);const [run,setRun]=useState<InvestigationRun|null>(null);const [job,setJob]=useState<InvestigationJob|null>(null);
  const [error,setError]=useState<Error|null>(null);const [attempt,setAttempt]=useState(0);const [busy,setBusy]=useState(false);const [view,setView]=useState<'canvas'|'steps'|'report'>('canvas');

@@ -254,7 +254,12 @@ class WorkflowApiTests(unittest.TestCase):
         self.assertNotIn('do_not_echo_this', secret.text)
         result = self.client.get('/runs/run_missing')
         self.assertEqual(result.status_code, 503)
-        self.assertEqual(self.client.get('/tools').json()['data']['items'], [])
+        # The default application registers its four built-in database tools.
+        # No custom connector should appear in this unconfigured runtime.
+        from workflow_api.database_workflows import TOOLS
+        items=self.client.get('/tools').json()['data']['items']
+        self.assertEqual({item['tool_id'] for item in items},set(TOOLS))
+        self.assertTrue(all(item['definition']['provider_id']=='builder_database' for item in items))
         self.assertTrue(self.client.get('/agents/capabilities').json()['data']['items'])
 
     def test_hierarchy_semantics_fail_validation_until_review(self):

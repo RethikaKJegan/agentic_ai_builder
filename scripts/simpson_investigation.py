@@ -27,7 +27,9 @@ def main():
     p.add_argument('--database',type=Path,required=True);p.add_argument('--workspace',default='local-workspace');p.add_argument('--owner',default='local-builder');p.add_argument('--credentials-database',type=Path)
     actions=p.add_subparsers(dest='action',required=True)
     actions.add_parser('capabilities')
-    a=actions.add_parser('preflight');a.add_argument('--objective',required=True);a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--evidence-context');a.add_argument('--version')
+    a=actions.add_parser('preflight');a.add_argument('--objective',required=True);a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--evidence-context');a.add_argument('--version');a.add_argument('--section',choices=['all','concepts','facts','mappings','evidence','gaps','capabilities','tools','pins'],default='all')
+    a=actions.add_parser('preparation');a.add_argument('--preparation-id',required=True);a.add_argument('--section',choices=['all','concepts','facts','mappings','evidence','gaps','capabilities','tools','pins'],default='all')
+    a=actions.add_parser('retrieve');a.add_argument('--preparation-id',required=True);a.add_argument('--task',required=True,choices=['complaints','inspection','warranty','replacement','history','recurrence'])
     a=actions.add_parser('plan');a.add_argument('--objective',required=True);a.add_argument('--request-key',required=True);a.add_argument('--version');a.add_argument('--inputs',default='{"identifiers":{}}');a.add_argument('--evidence-context');a.add_argument('--planning-mode',choices=['model','offline'],default='model');a.add_argument('--analysis-mode',choices=['crewai','offline'],default='crewai');a.add_argument('--wait-for-information',action='store_true')
     for name in ('graph','validate','run','requirements'):
         a=actions.add_parser(name);a.add_argument('--workflow-id',required=True)
@@ -40,6 +42,10 @@ def main():
     try:
         service,auth=build(args.database,(args.workspace,args.owner),args.credentials_database)
         if args.action=='capabilities':result=service.catalogue(auth)
+        elif args.action=='retrieve':
+            from workflow_api.business_preparation import BusinessEvidenceAdapter
+            result=BusinessEvidenceAdapter(service.coverage.preparation).invoke(auth,dict(preparation_id=args.preparation_id,task=args.task))
+        elif args.action=='preparation':result=service.coverage.preparation.checked(auth,args.preparation_id)
         elif args.action=='preflight':
             body=dict(objective=args.objective,inputs=json.loads(args.inputs))
             if args.evidence_context:body['evidence_context']=json.loads(args.evidence_context)
@@ -67,6 +73,10 @@ def main():
                 if section!='all':
                     key={'requirements':'task_evidence','gaps':'normalized_gaps','recovery':'recovery_actions','resolutions':'resolved_references','associations':'ambiguous_associations','findings':'unverified_findings'}.get(section)
                     result=([dict(record_id=r['record_id'],mapping_id=mid,**v) for r in result.get('source_records',[]) for mid,v in r['values'].items() if v.get('precision')=='calendar_day'] if section=='dates' else result.get(key,[]))
+        if args.action in ('preflight','preparation') and args.section!='all':
+            if args.section in ('concepts','mappings'):result={t:p[args.section] for t,p in result['tasks'].items()}
+            elif args.section=='facts':result={t:c['requirements'] for t,c in result['coverage'].items()}
+            else:result=result[{'evidence':'available_evidence','tools':'tool_candidates'}.get(args.section,args.section)]
         print(json.dumps(result,indent=2,allow_nan=False));return 0
     except (ApiFailure,ValueError,json.JSONDecodeError) as e:
         print(json.dumps(dict(error=getattr(e,'code','INVESTIGATION_INPUT'),message=str(e))));return 1

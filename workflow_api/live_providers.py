@@ -73,6 +73,13 @@ def registry_configuration(env):
     config['policy']['remaining_quota']['google_sheets_upsert_record'] = 10000
     config['subject_permissions'].append('data.write')
     config['subject_scopes'] += ['data.write', 'spreadsheets']
+    from .business_preparation import retrieval_tool_definition
+    config['tools'].append({'definition':retrieval_tool_definition()})
+    config['policy']['approved_providers']=sorted(set(config['policy']['approved_providers'])|{'builder_business'})
+    config['policy']['agent_permissions']=sorted(set(config['policy']['agent_permissions'])|{'tools.read'})
+    config['policy']['remaining_quota']['business_retrieve_evidence']=10000
+    config['subject_permissions']=sorted(set(config['subject_permissions'])|{'tools.read'})
+    config['subject_scopes']=sorted(set(config['subject_scopes'])|{'tools.read'})
     return config
 
 
@@ -133,7 +140,18 @@ class LivePlannerProvider:
             for tool,filename in [('smtp_send_email','smtp-send-email.json'),('google_sheets_read_rows','google-sheets-read.json')]}
         self.context['tool_output_schemas']['google_sheets_upsert_record'] = definition['output_schema']
 
+    def select_capabilities(self,objective,context):
+        return self.provider.select_capabilities(objective,context)
+
     def generate(self, objective, context):
+        if context.get('capability_composition_catalog'):
+            # This proposal selects registered operations. The composition factory,
+            # not legacy Sheets/procurement compilation, owns executable definitions.
+            from planner.validation import validate_workflow
+            from registry.safety import reject_secrets
+            proposal=self.provider.generate(objective,{**self.context,**context})
+            reject_secrets(proposal)
+            return validate_workflow(proposal)
         from .service import WorkflowService
         from planner.errors import PlannerFailure
         from planner.validation import mark_automatic_inputs
@@ -350,6 +368,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False, google_oauth_config=env)
     service = app.state.workflow_service
     service.background_execution=process_role=='api'
+    service.business_composition.model_id=model
     from .integration_checks import smtp_probe
     service.integration_probes={'smtp':smtp_probe(env)}
     service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
@@ -386,8 +405,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         raise ValueError('Unknown provider credential reference.')
     runner = service.runtime_runner
     runner.runtime.enforce_usage_budgets = enforce_usage_budgets
-    runner.connectors = {'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),
-                         'smtp_send_email': SMTPConnector(resolve, recipients(env), ['smtp.gmail.com'], timeout=15, require_approval=not direct_send)}
+    runner.connectors.update({'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),
+                         'smtp_send_email': SMTPConnector(resolve, recipients(env), ['smtp.gmail.com'], timeout=15, require_approval=not direct_send)})
     runner.direct_write_tools = frozenset({'smtp_send_email'} if direct_send else ())
     runner.connectors['google_sheets_upsert_record'] = GoogleSheetsRecordConnector(
         resolve, ROOT / env['GOOGLE_TOKEN_FILE'], targets, timeout=15, require_approval=not direct_write)
@@ -396,7 +415,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
     from .source_context import knowledge_documents
     runner.agents = CrewExecutor(service.registry_adapter, model_factory or OpenAIModelFactory(
-                                    rates, client, tokenizers, enforce_usage_budgets=enforce_usage_budgets),
+                                    rates, client, tokenizers, enforce_usage_budgets=enforce_usage_budgets,
+                                    token_policy='bounded' if enforce_usage_budgets else 'provider'),
                                 knowledge_loader=lambda workspace: knowledge_documents(service.store, workspace))
     source = ProviderTriggerSource(service, runner.connectors)
     service.trigger_poller = source.poll

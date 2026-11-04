@@ -76,7 +76,12 @@ class WorkflowStore:
             db.rollback()
             code = getattr(exc, 'sqlite_errorcode', 0) & 255
             category = sqlite_category(exc) if isinstance(exc,sqlite3.DatabaseError) else None
-            logging.getLogger(__name__).warning('Database transaction failed', extra={
+            if category == 'contention':
+                # Keep infrastructure failures typed across worker/model wrappers.
+                # Do not attach SQL, database paths or provider/source values.
+                exc.code = 'DATABASE_BUSY'
+                exc.retryable = True
+            logging.getLogger(__name__).warning('Database transaction failed (category=%s, code=%s, write=%s)', category, code, write, extra={
                 'database_category': category, 'database_code': code, 'transaction_write': write,
                 'transaction_seconds': round(time.monotonic() - started, 4)})
             raise

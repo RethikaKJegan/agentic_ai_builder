@@ -319,3 +319,14 @@ The original backend-only acceptance did not deploy or import live knowledge. Th
 
 
 The local [connected evidence coverage extension](evidence-coverage.md) adds validated scenario environments, typed business-record providers, pre-run coverage and runtime revalidation. Its local UI separates execution, mandatory decision evidence and optional limitations. This extension has not been deployed or imported into the live application.
+
+
+The backend-only [shared preparation Phase 1](shared-preparation.md) now connects investigation preflight and general dynamic planning to one scoped preparation service, with pinned evidence and a read-only runtime adapter. Implemented locally; no frontend/deployment or next-phase agent factory changes.
+
+
+The backend-only [dynamic capability composition Phase 2](dynamic-composition.md) adds registered capability/task planning, task-specific configurations, Registry matching and guarded existing master-child/CrewAI execution. Local implementation only; existing investigation/UI behavior remains. Memory/recovery Phase 3 has not started.
+
+
+## Dynamic platform memory and recovery — 4 November 2026
+
+Backend memory/recovery and immutable client packages build on the shared preparation/composition path. See [memory and recovery](agent-memory-recovery.md) for scoped checkpoints, validated experience, guarded resume, retail acceptance and exact local tests. This is separate from the earlier Simpson investigation phase numbering; no deployment or frontend change.

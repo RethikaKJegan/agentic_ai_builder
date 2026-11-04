@@ -1,10 +1,10 @@
 """Preparation and runtime coverage integration for existing investigations."""
 from copy import deepcopy
 import secrets
-from .business_coverage import coverage,TASKS
+from .business_coverage import coverage
 from .business_environments import BusinessEnvironments,case_coverage
-from .business_knowledge_model import canonical,digest
-from .investigation_graph import requirements,fail
+from .business_knowledge_model import digest
+from .investigation_graph import fail
 from .google_connections import now
 
 
@@ -12,47 +12,11 @@ class InvestigationCoverage:
     def __init__(self,service):
         self.service,self.store=service,service.store
         self.environments=BusinessEnvironments(service)
+        from .business_preparation import SharedBusinessPreparation
+        self.preparation=SharedBusinessPreparation(self)
         with self.store.transaction() as db:db.execute('CREATE TABLE IF NOT EXISTS business_evidence_preflights (workspace TEXT NOT NULL,owner TEXT NOT NULL,preflight_id TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,preflight_id))')
     def preflight(self,auth,body):
-        from jsonschema import Draft202012Validator
-        from .investigation_graph import CONTEXT_SCHEMA
-        if not isinstance(body,dict) or list(Draft202012Validator(CONTEXT_SCHEMA).iter_errors(body.get('inputs',{'identifiers':{}}))):fail('Provide typed identifiers and optional assessment_date/policy_id inputs.')
-        auth,scope=self.service.authorize(auth);required=requirements(body.get('objective'));context=deepcopy(body.get('inputs',{'identifiers':{}}));selection=body.get('evidence_context');snapshot=None;case=None
-        if context.get('assessment_date'):
-            from datetime import date
-            try:date.fromisoformat(context['assessment_date'])
-            except ValueError:fail('Use an ISO calendar assessment date.')
-        if selection:
-            release,case=self.environments.selected(auth,selection)
-            requested=context.get('identifiers',{})
-            if requested and requested!=case['source_identifiers']:fail('Selected case and explicit identifiers disagree.','EVIDENCE_CASE_MISMATCH',422)
-            # An explicit prompt identifier must agree as well.
-            from .business_resolution import interpret
-            v=self.service.ontology.version(auth,release['manifest']['ontology_version'])
-            parsed=interpret(body['objective'],v)
-            if parsed['identifiers'] and parsed['identifiers']!=case['source_identifiers']:fail('Prompt identifier is outside the selected case.','EVIDENCE_CASE_MISMATCH',422)
-            context={'identifiers':case['source_identifiers'],**case['inputs'],**{k:v for k,v in context.items() if k!='identifiers'}}
-            vid=release['manifest']['ontology_version'];snapshot=dict(**selection,sha256=release['sha256'])
-        else:vid=body.get('version_id') or self.service.retrieval.latest(auth)
-        version=self.service.ontology.version(auth,vid)
-        from .business_resolution import interpret
-        parsed=interpret(body['objective'],version,context.get('identifiers',{}));context['identifiers']=parsed['identifiers']
-        if parsed['ambiguities']:fail('Resolve ambiguous source identifiers before preflight.','EVIDENCE_INPUT_AMBIGUOUS',422)
-        results={};observations={};reads=0;tasks=['complaints']+[t for t in ('inspection','warranty','replacement','history','recurrence') if required.get(t)]
-        for task in tasks:
-            if case:
-                result=case_coverage(case,task,context,self.environments.revoked(auth,selection['dataset_id']));evidence=deepcopy(case['evidence'])
-            else:
-                inputs={**context['identifiers'],**{k:context[k] for k in ('assessment_date','policy_id') if k in context}}
-                preview=self.service.retrieval.preview(auth,dict(question=self.service.question(task,context),inputs=inputs,version_id=vid,request_key='coverage_'+secrets.token_hex(12)))
-                evidence=self.service.retrieval.execute(auth,preview['request_id'],{}) if preview['ready'] and context['identifiers'] else dict(records=[],reference_edges=[],selected_mappings=preview['mappings'])
-                if preview['ready'] and context['identifiers']:reads+=1
-                result=coverage(task,evidence,context,policies=preview['policies'])
-            results[task]=result;observations[task]=dict(record_count=len(evidence.get('records',[])),read_at=[r.get('read_at') for r in evidence.get('records',[])],evidence_sha256=digest(evidence))
-        doc=dict(preflight_id='preflight_'+secrets.token_hex(12),objective=body['objective'],inputs=context,version_id=vid,evidence_context=snapshot,coverage=results,observations=observations,created_at=now(),source_retrieval_calls=reads,company_writes=0)
-        doc['sha256']=digest(doc)
-        with self.store.transaction() as db:db.execute('INSERT INTO business_evidence_preflights VALUES (?,?,?,?)',(*scope,doc['preflight_id'],canonical(doc)))
-        return doc
+        return self.preparation.prepare(auth,body)
     def get(self,auth,pid):
         _,scope=self.service.authorize(auth)
         with self.store.transaction(write=False) as db:row=db.execute('SELECT document FROM business_evidence_preflights WHERE workspace=? AND owner=? AND preflight_id=?',(*scope,pid)).fetchone()

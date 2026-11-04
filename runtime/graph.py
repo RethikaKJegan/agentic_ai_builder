@@ -125,6 +125,10 @@ class GraphRunner:
     def fail(self, db, run, code, blocked=False):
         run['error_code'] = code
         node_id = run.get('current_node_id')
+        from .recovery import classify
+        workflow = self.runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}
+        node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), {})
+        run.setdefault('classified_failures', []).append(classify(code, task=node_id, source=node.get('tool_id'), external_write=node.get('kind') == 'tool' and workflow['execution_policy'].get('allow_external_writes', False)))
         if node_id:
             run['node_states'][node_id] = 'blocked' if blocked else 'failed'
             self.runtime.event(db, run, 'node.failed', {'node_id': node_id, 'invocation_id': run.get('node_invocations', {}).get(node_id), 'error_code': code, 'status': 'blocked' if blocked else 'failed'})
@@ -386,6 +390,10 @@ class GraphRunner:
                         raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
                     if kind == 'tool' and list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
                         raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'Tool output failed validation.')
+                    method=workflow.get('metadata',{}).get('composition_action_verifiers',{}).get(node['node_id'])
+                    if method:
+                        from .capability_composition import verify_action
+                        verify_action(method,output,params)
                     reject_secrets(output)
                     code = None
                 except RetryableInvocation:

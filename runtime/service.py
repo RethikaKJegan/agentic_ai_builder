@@ -44,6 +44,11 @@ class RuntimeService:
             db.execute('CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))')
             db.execute('CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)')
             db.execute('CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)')
+        from .memory import WorkingMemory, ExperienceMemory
+        from .recovery import RecoveryService
+        self.working_memory = WorkingMemory(self)
+        self.experience_memory = ExperienceMemory(self)
+        self.recovery = RecoveryService(self)
 
     @staticmethod
     def authorize(auth, permission, roles):
@@ -60,6 +65,8 @@ class RuntimeService:
         workspace = auth['subject']['workspace_id']
         if not isinstance(workflow_id, str) or type(version) is not int or version < 1:
             raise RuntimeFailure('INVALID_REVISION', 'An exact workflow ID and version are required.', 400)
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle_tombstones'").fetchone() and db.execute('SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',(workspace,workflow_id)).fetchone():
+            raise RuntimeFailure('WORKFLOW_DELETED','Deleted workflows cannot execute.',410)
         document = self.store.get(db, workspace, workflow_id, version)
         if document is None:
             raise RuntimeFailure('WORKFLOW_NOT_FOUND', 'The workflow revision was not found.', 404)
@@ -82,6 +89,13 @@ class RuntimeService:
                 from workflow_api.service import ApiFailure
                 if isinstance(exc,ApiFailure):raise RuntimeFailure(exc.code,str(exc),exc.status) from None
                 raise
+        from workflow_api.business_preparation import verify_workflow_pin
+        from workflow_api.service import ApiFailure
+        try:
+            verify_workflow_pin(db,auth,document)
+            from workflow_api.business_composition import verify_composition
+            verify_composition(db,auth,document)
+        except ApiFailure as exc:raise RuntimeFailure(exc.code,str(exc),exc.status) from None
         self.workflows.validate_document(document)
         reject_secrets(document)
         grants = self.workflows.registry_adapter.execution_assignments(document, auth)
@@ -145,6 +159,11 @@ class RuntimeService:
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
                        request_id=request['request_id'], release_bound=allow_superseded)
+            previous=db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? AND version=? AND json_extract(document,'$.status') IN ('failed','blocked') ORDER BY rowid DESC LIMIT 1",(workspace,subject,workflow['workflow_id'],workflow['version'])).fetchone()
+            if previous:
+                from .recovery import failure_feedback
+                hints=failure_feedback(json.loads(previous[0]))
+                if hints:run['previous_failure_feedback']=hints
             selection=workflow.get('metadata',{}).get('ontology_selection_id')
             if selection:
                 ontology=self.workflows.database_workflows.manager.ontology_foundation
@@ -178,6 +197,10 @@ class RuntimeService:
         if target not in TRANSITIONS[run['status']]:
             raise RuntimeFailure('INVALID_RUN_TRANSITION', 'The requested run transition is not legal.')
         run['status'] = target
+        if target in {'completed','failed','blocked','cancelled','rejected'}:
+            from .recovery import evaluate_run
+            workflow = self.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}
+            run['outcome_evaluation'] = evaluate_run(run, workflow, self.clock())
         self.event(db, run, 'run.' + target, {'status': target})
         self.save(db, run)
 

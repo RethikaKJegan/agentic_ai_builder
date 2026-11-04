@@ -1,0 +1,5 @@
+- [x] Inspect reusable preparation, planner, Registry and persistence interfaces.
+- [x] Extract shared typed preparation and scoped read-only task adapters.
+- [x] Integrate both planners and pin server-owned preparation context.
+- [x] Extend terminal inspection and add backend regression tests.
+- [x] Verify and document commands, results and remaining limits.

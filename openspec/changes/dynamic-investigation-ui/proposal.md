@@ -1,0 +1,3 @@
+# Interactive dynamic business investigations
+
+Connect the current Business Investigation prompt/workspace/list to shared preparation, dynamic composition and persisted runtime/memory/recovery. Keep historical investigation navigation intact. Reuse durable jobs, canonical validation/approval/execution and exact-action gates. Render actual delegated task dependencies, scoped source/knowledge/agent/tool details, durable progress, reports and explicit recovery. Test UI/backend integration and disclose live-provider/deployment checks separately. Do not fabricate state, evidence or execution authority.

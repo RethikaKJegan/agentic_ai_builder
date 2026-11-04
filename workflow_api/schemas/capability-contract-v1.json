@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capability_id",
+    "supported_operation",
+    "business_purpose",
+    "kind",
+    "input_schema",
+    "output_schema",
+    "required_ontology",
+    "required_evidence",
+    "preconditions",
+    "allowed_tool_operations",
+    "side_effect",
+    "verification_method",
+    "completion_criteria",
+    "domain_scope",
+    "retrieval_task"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "capability-contract-v1"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "supported_operation": {
+      "type": "string"
+    },
+    "business_purpose": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "model",
+        "tool"
+      ]
+    },
+    "input_schema": {
+      "type": "object"
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "required_ontology": {
+      "type": "array"
+    },
+    "required_evidence": {
+      "type": "array"
+    },
+    "preconditions": {
+      "type": "array"
+    },
+    "allowed_tool_operations": {
+      "type": "array"
+    },
+    "side_effect": {
+      "type": "string",
+      "enum": [
+        "none",
+        "read",
+        "draft",
+        "write"
+      ]
+    },
+    "verification_method": {
+      "type": "string"
+    },
+    "completion_criteria": {
+      "type": "array"
+    },
+    "domain_scope": {
+      "type": "array"
+    },
+    "retrieval_task": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

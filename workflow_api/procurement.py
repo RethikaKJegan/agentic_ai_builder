@@ -218,6 +218,10 @@ class ProcurementPlanner:
     def __init__(self, fallback, client, model, discoverer):
         self.fallback,self.client,self.model,self.discoverer=fallback,client,model,discoverer
 
+    def select_capabilities(self, objective, context):
+        """Preserve the registered-composition protocol through this decorator."""
+        return self.fallback.select_capabilities(objective, context)
+
     def generate(self, objective, context):
         if not re.search(r'\b(procurement|rfqs?|boq|bill of quantities)\b', objective,re.I):
             return self.fallback.generate(objective,context)

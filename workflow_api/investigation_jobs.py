@@ -9,8 +9,9 @@ from .google_connections import now
 
 
 class InvestigationJobs:
-    def __init__(self,service,resolve,clock=time.time):
+    def __init__(self,service,resolve,clock=time.time,composition=None):
         self.service,self.store,self.resolve,self.clock=service,service.store,resolve,clock
+        self.composition=composition
         self.stop_event=Event();self.thread=None;self.health=dict(state='starting',last_success=None,last_error=None)
         with self.store.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS business_investigation_jobs (workspace TEXT NOT NULL,owner TEXT NOT NULL,job_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,state TEXT NOT NULL,claim TEXT,deadline REAL,document TEXT NOT NULL,PRIMARY KEY(workspace,owner,job_id),UNIQUE(workspace,owner,request_key))')
@@ -19,9 +20,25 @@ class InvestigationJobs:
     def public(doc):return {k:v for k,v in doc.items() if k!='payload'}
 
     def submit(self,auth,body):
-        if not isinstance(body,dict) or set(body)!={'request_key','kind','payload'} or body['kind'] not in ('plan','execute','resume'):fail('Choose plan, execute or resume with an explicit request key.')
-        auth,scope=self.service.authorize(auth,body['kind']!='plan');key=self.service.key(body)
-        if body['kind']=='plan':
+        if not isinstance(body,dict) or set(body)!={'request_key','kind','payload'} or body['kind'] not in ('plan','execute','resume','compose','recover'):fail('Choose plan, execute or resume with an explicit request key.')
+        from registry.safety import reject_secrets
+        reject_secrets(body)
+        auth,scope=self.service.authorize(auth,body['kind'] not in ('plan','compose'));key=self.service.key(body)
+        if body['kind']=='compose':
+            if self.composition is None:fail('Dynamic composition is unavailable.','SERVICE_UNAVAILABLE',503)
+            self.composition.authorize(auth)
+            payload=body['payload']
+            if not isinstance(payload,dict) or set(payload)-{'objective','request_key','business_request','planning_mode','operations','resources','google_connection_id','client_package_id','client_package_revision','recovery_max_retries'} or payload.get('planning_mode','model')!='model':fail('Use configured-model composition with typed inputs.')
+            if not isinstance(payload.get('objective'),str) or not 1<=len(payload['objective'].strip())<=4000:fail('Supply a business objective.')
+            self.service.key(payload)
+        elif body['kind']=='recover':
+            if self.composition is None or not self.composition.service.runtime_runner:fail('Runtime recovery is unavailable.','SERVICE_UNAVAILABLE',503)
+            if not isinstance(body['payload'],dict) or set(body['payload'])!={'run_id'}:fail('Supply a saved run ID only.')
+            runtime=self.composition.service.runtime_runner.runtime
+            with self.store.transaction(write=False) as db:
+                run=runtime.load(db,body['payload']['run_id'],auth,'workflow.execute')
+                if run['subject_id']!=scope[1]:fail('Run is outside this owner.','RUN_NOT_FOUND',404)
+        elif body['kind']=='plan':
             if 'workflow.plan' not in auth.get('permissions',[]):fail('Workflow planning permission is required.','INVESTIGATION_DENIED',403)
             payload=body['payload']
             if not isinstance(payload,dict) or set(payload)-{'objective','request_key','inputs','version_id','planning_mode','analysis_mode','wait_for_information','evidence_context'}:fail('Invalid planning payload.')
@@ -46,8 +63,14 @@ class InvestigationJobs:
             row=db.execute('SELECT document FROM business_investigation_jobs WHERE workspace=? AND owner=? AND job_id=?',(*scope,job_id)).fetchone()
         if not row:fail('Investigation job not found.','INVESTIGATION_NOT_FOUND',404)
         d=json.loads(row[0])
-        if d['workflow_id']:self.service.get_plan(auth,d['workflow_id'])
-        if d['run_id']:self.service.get_run(auth,d['run_id'])
+        if d['kind']=='compose' and d.get('composition_id'):self.composition.get(auth,d['composition_id'],revalidate=False)
+        elif d['kind']=='recover':
+            with self.store.transaction(write=False) as db:
+                run=self.composition.service.runtime_runner.runtime.load(db,d['run_id'],auth)
+                if run['subject_id']!=scope[1]:fail('Run is outside this owner.','RUN_NOT_FOUND',404)
+        else:
+            if d['workflow_id']:self.service.get_plan(auth,d['workflow_id'])
+            if d['run_id']:self.service.get_run(auth,d['run_id'])
         return self.public(d)
 
     def list(self,auth):
@@ -79,15 +102,27 @@ class InvestigationJobs:
         try:
             auth=self.resolve(w,o)
             if not auth or auth['subject']!={'workspace_id':w,'subject_id':o}:fail('Current job authority is unavailable.','INVESTIGATION_DENIED',403)
-            self.service.authorize(auth,d['kind']!='plan')
-            if d['kind']=='plan':
+            self.service.authorize(auth,d['kind'] not in ('plan','compose'))
+            if d['kind']=='compose':
+                result=self.composition.prepare(auth,d['payload']);d['composition_id']=result['composition_id']
+                if result['state']=='ready':
+                    workflow=self.composition.workflow(auth,result['composition_id']);wid=workflow['workflow_id']
+                    with self.store.transaction(write=False) as db:existing=self.store.get(db,w, wid)
+                    if not existing:
+                        response=self.composition.service.handle(dict(request_id=j,operation='save_workflow_version',idempotency_key=j+'_save',payload=dict(workflow_id=wid,workflow_version=1,base_version=0,workflow=workflow)),auth)
+                        if response['status']>=400:
+                            error=response['data']['error'];fail(error['message'],error['error_code'],response['status'])
+                    d['workflow_id']=wid
+            elif d['kind']=='recover':
+                result=self.composition.service.runtime_runner.runtime.recovery.resume(d['run_id'],auth);d['workflow_id']=result['workflow_id']
+            elif d['kind']=='plan':
                 if 'workflow.plan' not in auth.get('permissions',[]):fail('Workflow planning permission was revoked.','INVESTIGATION_DENIED',403)
                 result=self.service.coverage.prepare_plan(auth,d['payload']);d['workflow_id']=result['workflow_id']
             else:
                 result=self.service.execute(auth,d['run_id'],{},d['kind']=='resume');d['workflow_id']=result['workflow_id']
             d.update(state='succeeded',error=None)
         except Exception as exc:
-            d.update(state='failed',error=dict(code=getattr(exc,'code','INVESTIGATION_JOB_FAILED'),message=str(exc)[:700] if getattr(exc,'code',None) else 'Investigation work failed. Inspect the saved run and current source/model configuration.'))
+            d.update(state='failed',error=dict(code=getattr(exc,'code','INVESTIGATION_JOB_FAILED'),message=getattr(exc,'message',str(exc))[:700] if getattr(exc,'code',None) else 'Investigation work failed. Inspect the saved run and current source/model configuration.'))
         d['updated_at']=now()
         with self.store.transaction() as db:
             db.execute('UPDATE business_investigation_jobs SET state=?,document=?,claim=NULL,deadline=NULL WHERE workspace=? AND owner=? AND job_id=? AND claim=?',(d['state'],canonical(d),w,o,j,token))

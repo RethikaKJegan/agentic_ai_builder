@@ -1,0 +1,237 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope",
+    "domain_context",
+    "goal",
+    "tasks",
+    "available_evidence",
+    "gaps",
+    "capabilities",
+    "tool_candidates",
+    "pins",
+    "provenance",
+    "preflight_id",
+    "objective",
+    "inputs",
+    "version_id",
+    "coverage",
+    "observations",
+    "created_at",
+    "source_retrieval_calls",
+    "company_writes",
+    "evidence_context"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "business-preparation-v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant_id",
+        "workspace_id",
+        "owner_id"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "domain_context": {
+      "type": "object"
+    },
+    "goal": {
+      "type": "object",
+      "required": [
+        "objective",
+        "interpretation",
+        "requested_outcomes"
+      ],
+      "properties": {
+        "objective": {
+          "type": "string"
+        },
+        "interpretation": {
+          "type": "string"
+        },
+        "requested_outcomes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "intent",
+          "concepts",
+          "relationships",
+          "dependency_resolution",
+          "fact_providers",
+          "mappings",
+          "steps",
+          "rules",
+          "missing",
+          "evidence_requirements"
+        ],
+        "properties": {
+          "intent": {
+            "type": "object"
+          },
+          "concepts": {
+            "type": "array"
+          },
+          "relationships": {
+            "type": "array"
+          },
+          "dependency_resolution": {
+            "type": "object"
+          },
+          "fact_providers": {
+            "type": "array"
+          },
+          "mappings": {
+            "type": "array"
+          },
+          "steps": {
+            "type": "array"
+          },
+          "rules": {
+            "type": "array"
+          },
+          "missing": {
+            "type": "array"
+          },
+          "evidence_requirements": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "available_evidence": {
+      "type": "object"
+    },
+    "gaps": {
+      "type": "array"
+    },
+    "capabilities": {
+      "type": "array"
+    },
+    "tool_candidates": {
+      "type": "array"
+    },
+    "pins": {
+      "type": "object",
+      "required": [
+        "ontology_version",
+        "knowledge_sha256",
+        "mapping_sha256",
+        "configuration_revision",
+        "provider_fingerprint",
+        "source_stamps"
+      ],
+      "properties": {
+        "ontology_version": {
+          "type": "string"
+        },
+        "knowledge_sha256": {
+          "type": "string"
+        },
+        "mapping_sha256": {
+          "type": "string"
+        },
+        "provider_fingerprint": {
+          "type": "string"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "preflight_id": {
+      "type": "string"
+    },
+    "objective": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "version_id": {
+      "type": "string"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "state",
+          "requirements",
+          "gaps",
+          "conclusion_ready"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "ready",
+              "ready_with_limitations",
+              "needs_input",
+              "insufficient_evidence",
+              "conflicting_evidence",
+              "unsupported"
+            ]
+          },
+          "requirements": {
+            "type": "array"
+          },
+          "gaps": {
+            "type": "array"
+          },
+          "conclusion_ready": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "source_retrieval_calls": {
+      "type": "integer"
+    },
+    "company_writes": {
+      "type": "integer"
+    },
+    "sha256": {
+      "type": "string"
+    },
+    "evidence_context": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

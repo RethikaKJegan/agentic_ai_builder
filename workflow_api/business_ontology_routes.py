@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from .business_ontology import BusinessOntology
 from .service import ApiFailure
+from runtime.service import RuntimeFailure
 
 
 def install(app, service, auth, reference, env=None):
@@ -59,19 +60,99 @@ def install(app, service, auth, reference, env=None):
     from .business_investigations import BusinessInvestigations
     investigations=BusinessInvestigations(retrieval,env=env)
     app.state.business_investigations=investigations
+    service.business_preparation=investigations.coverage.preparation
+    service.business_preparation.registry=service.registry_adapter
+    from .business_preparation import BusinessEvidenceAdapter
+    service.business_evidence_adapter=BusinessEvidenceAdapter(service.business_preparation)
+    if service.runtime_runner is not None:
+        from .business_preparation import BusinessEvidenceConnector
+        service.runtime_runner.connectors['business_retrieve_evidence']=BusinessEvidenceConnector(service.business_preparation)
+    from .business_composition import BusinessComposition
+    service.business_composition=BusinessComposition(service,service.business_preparation,model_id=(env or {}).get('OPENAI_MODEL','configured-model'))
+    app.state.business_composition=service.business_composition
+    app.state.client_packages=service.business_composition.packages
+    if service.runtime_runner is not None:
+        from .client_packages import PackageEvidenceConnector
+        service.runtime_runner.connectors['client_package_read']=PackageEvidenceConnector(service.business_composition.packages)
     from .investigation_jobs import InvestigationJobs
-    investigation_jobs=InvestigationJobs(investigations,current_authority)
+    investigation_jobs=InvestigationJobs(investigations,current_authority,composition=service.business_composition)
     app.state.investigation_jobs=investigation_jobs
+    from .composition_presentation import CompositionPresentation
+    presentation=CompositionPresentation(service.business_composition)
+    app.state.composition_presentation=presentation
 
     async def call(fn, *args):
         try:
             data = await run_in_threadpool(fn, getattr(app.state,'workflow_auth',auth), *args)
             return JSONResponse(service.envelope(reference(),200,data),headers={'Cache-Control':'no-store'})
-        except ApiFailure as exc:
+        except (ApiFailure, RuntimeFailure) as exc:
+            if isinstance(exc,RuntimeFailure):exc=ApiFailure(exc.code,str(exc),exc.status)
             return JSONResponse(service.failure(reference(),exc),status_code=exc.status,headers={'Cache-Control':'no-store'})
         except Exception:
             exc = ApiFailure('BUSINESS_ONTOLOGY_UNAVAILABLE','Business ontology is unavailable. Refresh before retrying.',503)
             return JSONResponse(service.failure(reference(),exc),status_code=503,headers={'Cache-Control':'no-store'})
+
+    @app.get('/business-ontology/v1/client-packages')
+    async def list_client_packages():return await call(service.business_composition.packages.listing)
+
+    @app.post('/business-ontology/v1/client-packages')
+    async def publish_client_package(request:Request):
+        return await call(service.business_composition.packages.publish,await body(request))
+
+    @app.get('/business-ontology/v1/client-packages/{package_id}/{revision}')
+    async def get_client_package(package_id:str,revision:int):
+        return await call(service.business_composition.packages.get,package_id,revision)
+
+    def memory_operation(current,operation,payload):
+        from runtime.service import RuntimeFailure
+        if service.runtime_runner is None:raise RuntimeFailure('RUNTIME_NOT_CONFIGURED','Configure the existing runtime.',503)
+        if not isinstance(payload,dict):raise RuntimeFailure('INVALID_INPUT','Supply a typed operation body.',422)
+        runtime=service.runtime_runner.runtime
+        fields={
+            'candidate':({'domain','capability','category','strategy','evidence_references','pins','expires_at'},{'agent_id'}),
+            'relevant':({'domain','capability','category','pins'},{'agent_id'}),
+            'validate':({'experience_id','run_id'},set()),
+            'invalidate':({'experience_id','reason'},set()),
+            'resume':({'run_id'},{'changed_dependencies'}),
+            'working':({'run_id'},set()),'outcome':({'run_id'},set())}
+        if operation not in fields:raise RuntimeFailure('INVALID_INPUT','Unknown memory operation.',422)
+        required,optional=fields[operation]
+        if not required<=set(payload) or set(payload)-(required|optional):raise RuntimeFailure('INVALID_INPUT','Missing or unsupported memory-operation fields.',422)
+        if operation=='candidate':return runtime.experience_memory.candidate(current,**payload)
+        if operation=='relevant':return runtime.experience_memory.relevant(current,**payload)
+        if operation=='validate':return runtime.experience_memory.validate(current,**payload)
+        if operation=='invalidate':return runtime.experience_memory.invalidate(current,**payload)
+        if operation=='resume':return runtime.recovery.resume(payload.pop('run_id'),current,**payload)
+        if operation in ('working','outcome'):
+            with runtime.store.transaction(write=False) as db:
+                run=runtime.load(db,payload['run_id'],current)
+                if run['subject_id']!=current['subject']['subject_id']:raise RuntimeFailure('SUBJECT_MISMATCH','Run context is owner-scoped.',403)
+                if operation=='outcome':return run.get('outcome_evaluation',{})
+                workflow=runtime.store.get(db,run['workspace_id'],run['workflow_id'],run['workflow_version'])
+                from runtime.memory import bounded_context
+                return bounded_context(runtime.working_memory.view(run,workflow))
+        raise RuntimeFailure('INVALID_INPUT','Unknown memory operation.',422)
+
+    @app.get('/business-ontology/v1/run-memory/{run_id}')
+    async def run_working_memory(run_id:str):
+        return await call(memory_operation,'working',{'run_id':run_id})
+
+    @app.get('/business-ontology/v1/run-outcomes/{run_id}')
+    async def run_outcomes(run_id:str):
+        return await call(memory_operation,'outcome',{'run_id':run_id})
+
+    @app.post('/business-ontology/v1/experiences/{operation}')
+    async def experience_operation(operation:str,request:Request):
+        if operation not in ('candidate','relevant','validate','invalidate'):
+            return await call(memory_operation,'invalid',{})
+        return await call(memory_operation,operation,await body(request))
+
+    @app.post('/business-ontology/v1/recovery/{run_id}/resume')
+    async def resume_composition(run_id:str,request:Request):
+        payload=await body(request)
+        if not isinstance(payload,dict) or set(payload)-{'changed_dependencies'}:
+            return await call(memory_operation,'resume',None)
+        return await call(memory_operation,'resume',dict(run_id=run_id,**payload))
 
     @app.get('/business-ontology/v1/sources')
     async def source_status():
@@ -139,6 +220,36 @@ def install(app, service, auth, reference, env=None):
 
     @app.post('/business-ontology/v1/investigations/preflight')
     async def investigation_preflight(request:Request):return await call(investigations.coverage.preflight,await body(request))
+
+    @app.post('/business-ontology/v1/compositions')
+    async def business_compose(request:Request):return await call(service.business_composition.prepare,await body(request))
+
+    @app.get('/business-ontology/v1/compositions')
+    async def list_compositions():return await call(lambda current:dict(items=presentation.listing(current)))
+
+    @app.get('/business-ontology/v1/compositions/{composition_id}/view')
+    async def composition_view(composition_id:str,run_id:str|None=None):return await call(presentation.view,composition_id,run_id)
+
+    @app.put('/business-ontology/v1/compositions/{composition_id}/display-name')
+    async def composition_rename(composition_id:str,request:Request):return await call(presentation.rename,composition_id,await body(request))
+
+    @app.delete('/business-ontology/v1/compositions/{composition_id}')
+    async def composition_delete(composition_id:str,request:Request):return await call(presentation.delete,composition_id,await body(request))
+
+    @app.post('/business-ontology/v1/compositions/{composition_id}/runs/{run_id}/cancel')
+    async def composition_cancel(composition_id:str,run_id:str,request:Request):return await call(presentation.cancel,composition_id,run_id,await body(request))
+
+    @app.get('/business-ontology/v1/compositions/{composition_id}')
+    async def business_composition_get(composition_id:str):return await call(service.business_composition.get,composition_id)
+
+    @app.post('/business-ontology/v1/compositions/{composition_id}/workflow')
+    async def business_composition_workflow(composition_id:str):return await call(service.business_composition.workflow,composition_id)
+
+    @app.get('/business-ontology/v1/preparations/{preparation_id}')
+    async def business_preparation_get(preparation_id:str):return await call(service.business_preparation.checked,preparation_id)
+
+    @app.post('/business-ontology/v1/preparations/retrieve')
+    async def business_preparation_retrieve(request:Request):return await call(service.business_evidence_adapter.invoke,await body(request))
 
     @app.get('/business-ontology/v1/investigations/environments')
     async def evidence_environments():return await call(investigations.coverage.environments.list)

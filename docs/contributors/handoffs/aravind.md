@@ -131,3 +131,106 @@ Verification: 183 backend/connector tests and 10 subtests passed; contracts, syn
 ## Manual worker assignment recovery — 18 October 2026
 
 Fixed fresh manual workers losing process-local tool approval evidence after API publication. Recovery requires the same currently authorized approver, exact workspace and validated published revision; current Registry scopes/policy and action approvals remain enforced. Fresh-service safety regression passed; 90 overlapping tests and 29 subtests passed. One unrelated empty-tool-list expectation fails unchanged against the original implementation. Real published revision preflight authorized all ten tools without running any workflow or external action. See openspec/changes/manual-worker-authorization/verification.md and its activation evidence. Existing terminal blocked runs require a new manual run; no draft rewrite or republish is needed.
+
+
+## Shared business preparation Phase 1 — 4 November 2026
+
+Ready for repository handoff; downstream acceptance not claimed. One shared service now prepares ontology dependencies/mappings, real/scenario evidence, task coverage, capabilities and current Registry candidates for investigations and general dynamic workflows. Server-owned pins survive persistence/retries and are checked at approved runtime load; a workflow-bound read-only connector rechecks current source authority. Existing graph contracts, planner, Registry and master-child/CrewAI runtime remain. The general path preserves unsupported/nonbusiness compatibility without inventing grounding.
+
+310 distinct backend tests and 34 subtests passed across final runs, plus 12 actual isolated CLI operations; contracts/drift/strict scoped OpenSpec/diff checks passed. Source observations and generated scenario events remain distinct. No frontend edits, deployment, service restart, live policy/knowledge import, company writes or paid model tests. The operator-registerable business retrieval tool still needs normal Registry enablement/assignment; the agent factory, new client onboarding, memory and learning are not implemented in this phase.
+
+Interfaces/schema, file inventory, exact commands, verification and limits: `docs/simpson-business-ontology/shared-preparation.md` and `openspec/changes/shared-business-preparation/verification.md`. This is an internal repository handoff, not an external notification.
+
+
+## Dynamic capability composition Phase 2 — 4 November 2026
+
+Ready for repository handoff; downstream acceptance not claimed. Added versioned executable capability contracts, constrained operation selection through the existing planner, deterministic task/agent configuration, semantic Registry matching, scoped immutable compositions and normal workflow drafts. Existing delegation/CrewAI/runtime now enforce prepared dependencies, isolated context, exact tool inputs and result/citation/receipt verification. Writes use normal deterministic tool nodes and existing action gates; model text cannot create capabilities, permissions or resource authority. Source coverage/pins and Phase 1 remain intact. Repeated generation preserves registered versions/grants.
+
+343 distinct relevant backend tests and 34 subtests passed across final runs; eight actual isolated CLI checks produced/validated four specialists plus a master. Actual CrewAI bridge uses a fake model; controlled Gmail/Calendar/Sheets effects use fake transports, with zero calls before approval where required. No configured live model acceptance, real external writes, company writes, frontend edits, deployment or service restart. Prior Phase 1 dirty work preserved. Phase 3 memory/recovery/learning not begun.
+
+Exact examples, commands, authorization results, tests, limitations and file inventory: `docs/simpson-business-ontology/dynamic-composition.md` and `openspec/changes/dynamic-capability-composition/verification.md`. Normal backend use requires actual enabled Registry/provider/connector/resource configuration; the CLI has an isolated read-only diagnostic Registry. This is an internal repository handoff, not an external notification.
+
+
+## Dynamic platform memory/recovery Phase 3 — 4 November 2026
+
+Ready for repository handoff, not downstream acceptance. Existing runtime persistence now supplies bounded scoped working views and durable specialist checkpoints. Validated owner/workspace experience, typed root-cause classification, source-revalidated dependency invalidation and guarded explicit recovery preserve original pins, usage, effects and audit. Missing input/knowledge fixes follow the existing immutable preparation/review lifecycle; uncertain writes require reconciliation. No new execution engine or automatic permission grant.
+
+Immutable client packages feed shared preparation, the existing compiler/agent factory/Registry/delegation/CrewAI path. An isolated retail threshold fixture and Simpson both execute through the same runtime; actual CrewAI uses fake models. Outcome evaluation is persisted; no RL or automatic ontology publication. Historical Phase 2 composition validated with the current CLI.
+
+316 distinct backend tests plus 34 subtests passed across the final suites, including 42 Phase 3 acceptance cases; follow-ups overlap. Contracts, strict scoped OpenSpec and diff checks pass. No frontend edits, deployment, service restart, real external/company writes or paid calls. Owner-scoped strategy sharing, new source adapter setup and write reconciliation boundaries are documented. See `docs/simpson-business-ontology/agent-memory-recovery.md` and `openspec/changes/agent-memory-recovery/verification.md` for files, schema, commands, evidence and limitations. This is an internal repository handoff, not an external notification.
+
+
+## Interactive dynamic investigation UI — 4 November 2026
+
+The existing overview/list/workspace now consume all three dynamic backend phases
+through durable jobs and canonical workflow/agent/tool v1 contracts. New graphs
+show actual task dependencies, action gates, checkpoints, source-backed reports,
+optional knowledge and scoped memory/outcome/recovery. Historical links and
+rename/delete remain compatible. No execution authority comes from presentation.
+
+Configured-provider acceptance exposed and fixed launcher adapter registration/
+preservation, procurement-decorator capability selection, protected delegation
+inputs, server-owned usage opt-out settlement and exact citation schema gaps.
+Actual OpenAI/CrewAI completed the previously authorized A-2022-12-013 read-only
+comparison: four completed task checkpoints, two source reads, verified report.
+This used a private application/registry copy and made no company writes.
+
+Broad backend checks: 222 passed plus 24 subtests. Follow-ups: 97 passed plus
+18 subtests and final 45 passed; overlapping suites, not additive. Frontend 464
+passed; desktop/mobile browser 12 passed; types/lint/build/contracts/drift/strict
+scoped OpenSpec/diff checks passed. Google identity, Gmail-profile and Calendar
+reads passed for two managed accounts; this does not prove external writes.
+
+Not deployed/restarted. Real Google write and Sheets resource acceptance remain
+pending explicit test targets requested from the operator. No real Google effects,
+live ontology import or automatic learning/publication. Prior dirty work preserved.
+User flow, file inventory, exact commands, real acceptance and limits:
+`docs/simpson-business-ontology/dynamic-investigation-ui.md` and
+`openspec/changes/dynamic-investigation-ui/verification.md`.
+Internal repository handoff only; no external contributor notification.
+
+
+## Website deployment — 4 November 2026, 17:58 IST
+
+Explicitly requested by the user after local acceptance. The tested frontend build
+`ZPSoHUNQ7-5xdtbM_S8Q9` and current backend/worker code are live at
+https://praxi.bellcorpstudio.com/app. All three systemd services are active.
+Public normal login, unauthenticated API rejection, dynamic composition/runtime
+capability flags, composition/package APIs, active worker heartbeat, connected-tool
+controls, desktop/mobile rendering and an existing investigation passed. Zero
+browser errors or missing frontend assets were observed. This rollout did not run
+paid model calls or send/change Google data. The earlier isolated configured-model
+acceptance remains separate evidence.
+
+Saved workflow revisions (85,163), runtime runs (85,166), investigation plans/runs
+(11/12), ontology versions/documents (8/24), and existing evidence environments
+were verified byte-equivalent by table fingerprints after restart. No ontology
+import, company-record update or scenario-data import was performed. Historical
+records remain accessible; generate a new investigation to use the dynamic path.
+
+Private database/build/source backups, public checks, screenshots and preservation
+receipts are in `.local/dynamic-investigation-rollout-20261104/`. Initial readiness
+correctly encountered authentication on OpenAPI; activation used authenticated
+checks through the normal public gateway instead. No access check was bypassed.
+Real Google write/resource acceptance still needs the requested test targets.
+
+
+## Investigation recovery/details — deployed 4 November 2026, 18:33 IST
+
+Build `4MoUMoCDpzd9kBBsOIA3I`: workflow question/account/resources moved to
+Workflow details, aligned action toolbar, source-record count deduplication and
+read-tool receipts. Read-only delegation no longer takes unnecessary writer locks;
+storage contention retains a typed code and unknown failures direct inspection.
+New runs receive only scoped sanitized prior-model-error hints, preserving evidence,
+permissions, budgets and approvals. Original historical exception was discarded;
+no definitive historical root cause beyond the reproduced locking flaw is claimed.
+
+88 backend tests plus 18 subtests, 466 frontend tests, 12 browser checks and build/
+types/lint/contracts/OpenSpec passed. Explicitly authorized actual OpenAI/CrewAI
+hard-goal check completed all eight tasks in an isolated copy (six completed, two
+qualified evidence gaps); four reads, no company/Google writes. Public login,
+details/account controls, toolbar, diagnostics and mobile checks passed. Existing
+workflow/run/ontology/composition fingerprints preserved. No live model replay.
+See `docs/simpson-business-ontology/investigation-recovery-details.md` and
+`openspec/changes/investigation-recovery-details/verification.md`. Private backups
+and public checks: `.local/investigation-recovery-release/`.

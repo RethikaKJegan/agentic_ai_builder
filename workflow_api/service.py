@@ -195,6 +195,12 @@ class WorkflowService:
                 return self.envelope(request_id, 200, self.runtime_runner.runtime.list_approvals(auth, payload.get('pending_only', False), payload.get('limit', 100)))
             if operation in {'list_tools', 'list_capabilities'}:
                 return self.registry.handle(request, auth)
+            if operation == 'plan_workflow' and isinstance(payload.get('context'),dict) and payload['context'].get('composition_id'):
+                composition=getattr(self,'business_composition',None)
+                if composition is None:raise ApiFailure('SERVICE_UNAVAILABLE','Capability composition is unavailable.',503)
+                doc=composition.get(auth,payload['context']['composition_id'])
+                if doc['objective']!=payload.get('objective',payload.get('requirement')):raise ApiFailure('CAPABILITY_OBJECTIVE_MISMATCH','Use the prepared composition objective.',422)
+                return self.envelope(request_id,200,dict(workflow=composition.workflow(auth,doc['composition_id'])))
             if operation == 'plan_workflow':
                 trusted = deepcopy(request)
                 trusted['payload']['auth_context'] = {
@@ -214,6 +220,16 @@ class WorkflowService:
                     result.pop('business_ontology_retrieval', None)
                     result['business_ontology_retrieval'] = retrieve_business(self.store, auth,
                         trusted['payload'].get('objective', trusted['payload'].get('requirement', '')))
+                    preparation=getattr(self,'business_preparation',None)
+                    result.pop('business_preparation',None)
+                    if preparation:
+                        result['business_preparation']=preparation.general_context(auth,
+                            trusted['payload'].get('objective',trusted['payload'].get('requirement','')),
+                            context.get('business_request') if isinstance(context,dict) else None)
+                        prepared=result['business_preparation']
+                        if prepared.get('schema_version')=='business-preparation-v1':
+                            result['business_ontology_retrieval']=retrieve_business(self.store,auth,
+                                trusted['payload'].get('objective',trusted['payload'].get('requirement','')),prepared['pins']['ontology_version'])
                     databases = getattr(self, 'database_workflows', None)
                     result.pop('ontology_retrieval',None)
                     required_sources=[]
@@ -226,6 +242,9 @@ class WorkflowService:
                         except ApiFailure as exc:
                             result['ontology_retrieval']={'state':'unavailable','code':exc.code,'company_reads':0}
                     result=databases.enrich(auth, result, trusted['payload'].get('objective', trusted['payload'].get('requirement', '')),required_source_ids=required_sources) if databases else result
+                    prepared=result.get('business_preparation',{})
+                    if prepared.get('schema_version')=='business-preparation-v1':
+                        result['ontology_retrieval']=dict(state='resolved',version_id=prepared['pins']['ontology_version'],knowledge_sha256=prepared['pins']['knowledge_sha256'],tasks=prepared['tasks'],company_reads=0,preparation_id=prepared['preflight_id'])
                     ontology_selection=result.get('ontology_selection')
                     return result
                 with scope as selected_google:
@@ -261,6 +280,8 @@ class WorkflowService:
                 reject_secrets(result)
                 from .business_planning import record as record_business
                 record_business(self.store, auth, result['data']['workflow'])
+                from .business_preparation import record_workflow_pin
+                record_workflow_pin(self.store,auth,result['data']['workflow'])
                 return self.envelope(result['request_id'], 200, result['data'])
             workspace = auth['subject']['workspace_id']
             if operation in {'get_workflow', 'list_workflows'}:
@@ -388,6 +409,10 @@ class WorkflowService:
             validate(workflow, 'workflow')
             from .business_planning import verify_saved as verify_business_trace
             verify_business_trace(db, auth, workflow)
+            from .business_composition import verify_composition
+            verify_composition(db,auth,workflow)
+            from .business_preparation import verify_workflow_pin
+            verify_workflow_pin(db,auth,workflow)
             # Canonical fields survive saving. Executable authority never comes from edits.
             if workflow['workflow_id'] != workflow_id or workflow['status'] != 'draft' or payload.get('workflow_version') != workflow['version']:
                 raise ApiFailure('INVALID_REVISION', 'Save an editable draft with the matching workflow ID.', field='workflow.status')

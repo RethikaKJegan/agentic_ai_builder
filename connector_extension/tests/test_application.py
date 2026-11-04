@@ -47,7 +47,7 @@ class ExtensionApplicationTests(unittest.TestCase):
     def test_registry_discovery_and_disabled_provider_readiness(self):
         response = self.client.get('/tools')
         self.assertEqual(response.status_code, 200)
-        items = response.json()['data']['items']; self.assertEqual(len(items), 19)
+        items = response.json()['data']['items']; self.assertEqual({item['tool_id'] for item in items},set(CATALOG))
         write = next(item for item in items if item['tool_id'] == 'google_sheets_upsert_record')
         self.assertEqual(write['definition']['availability'], 'enabled')
         response = self.client.post('/integrations/gmail/test').json()['data']

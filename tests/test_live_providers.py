@@ -112,6 +112,14 @@ class LiveProviderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.make_app(database=self.path / 'invalid.sqlite3')
 
+    def test_server_usage_opt_out_reaches_configured_model_factory(self):
+        self.env['BUILDER_ENFORCE_USAGE_BUDGETS']='0'
+        with patch('runtime.model.OpenAIModelFactory') as factory:
+            create_configured_app({**self.env,'BUILDER_ENVIRONMENT':'test','BUILDER_DEV_AUTH':'1'},
+                self.path/'provider-managed.sqlite3',client=SimpleNamespace())
+        self.assertFalse(factory.call_args.kwargs['enforce_usage_budgets'])
+        self.assertEqual(factory.call_args.kwargs['token_policy'],'provider')
+
     def test_google_sheet_url_reference_and_invalid_hosts(self):
         resource = 'https://docs.google.com/spreadsheets/d/spreadsheet_test_1234567890/edit?gid=0#gid=0'
         self.assertEqual(google_spreadsheet_id(resource), 'spreadsheet_test_1234567890')
@@ -317,6 +325,24 @@ class LiveProviderTests(unittest.TestCase):
         self.rows.append(['denied_high', 'High', 'Synthetic requirement']); self.tick()
         self.assertIn(self.runs()[0]['status'], {'failed', 'blocked'})
         self.assertEqual(FakeSMTP.messages, [])
+
+    def test_business_composition_is_registered_and_keeps_its_connector(self):
+        self.assertIn('business_retrieve_evidence',self.service.runtime_runner.connectors)
+        self.assertIn('business_retrieve_evidence',self.service.registry_adapter.service._tools)
+        self.assertEqual(self.service.business_composition.model_id,self.env['OPENAI_MODEL'])
+        self.assertFalse(self.service.runtime_runner.connectors['business_retrieve_evidence'].external_write)
+
+    def test_composition_selection_avoids_legacy_sheet_discovery(self):
+        def forbidden(resource):
+            raise AssertionError('Composition must not invoke legacy spreadsheet discovery.')
+        provider=LivePlannerProvider('gpt-5.6-luna',['owner@example.com'],SimpleNamespace(),sheet_discoverer=forbidden)
+        proposal=json.loads((ROOT/'shared/contracts/examples/workflows/support-triage.json').read_text())
+        proposal['metadata']['capability_requests']=[{'capability_id':'business.compare','inputs':{}}]
+        calls=[]
+        provider.provider=SimpleNamespace(generate=lambda objective,context:(calls.append(context) or deepcopy(proposal)))
+        result=provider.generate('Compare complaint C123 with inspection.',{'capability_composition_catalog':{'business.compare':{}},'business_preparation':{'preflight_id':'prepared'}})
+        self.assertEqual(result['metadata']['capability_requests'],proposal['metadata']['capability_requests'])
+        self.assertEqual(len(calls),1)
 
     def test_generic_launcher_does_not_create_workflows(self):
         app = create_configured_app({**self.env, 'BUILDER_ENVIRONMENT': 'test', 'BUILDER_DEV_AUTH': '1'}, self.path / 'empty.sqlite3', client=SimpleNamespace(), model_factory=lambda definition: None)

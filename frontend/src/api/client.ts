@@ -1,3 +1,4 @@
+import {compositionViewSchema,compositionListSchema} from './compositions';
 import {businessSourcesSchema,businessSourceRecordsSchema,businessSourceProfileSchema,type BusinessRecordRequest} from './business-sources';
 import {businessRuleExecutionCatalogueSchema,businessRuleEvidenceSchema,businessRuleExecutionResultSchema,type BusinessRuleExecuteRequest,type BusinessRuleEvidenceRequest} from './business-ontology';
 import {businessMonitoringSchema,type BusinessMonitoringRequest} from './business-ontology';
@@ -51,7 +52,7 @@ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.st
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
-const sessionData = z.object({ planning_jobs_available: z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+const sessionData = z.object({ planning_jobs_available: z.boolean().optional(), dynamic_composition_available:z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
 export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
   published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
@@ -151,12 +152,19 @@ export class WorkflowClient {
   async investigationEnvironments() {return z.object({items:z.array(z.object({dataset_id:z.string(),cases:z.array(z.object({case_id:z.string(),label:z.string(),source_identifiers:z.record(z.string()),inputs:z.record(z.string()).optional(),policy_candidates:z.array(z.object({policy_id:z.string(),title:z.string()})).optional()}))}))}).parse(await this.read('business-ontology/v1/investigations/environments'));}
   async investigationPreflight(body:Record<string,unknown>) {return z.object({preflight_id:z.string(),coverage:z.record(z.object({state:z.string()}))}).parse(await this.read('business-ontology/v1/investigations/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}
+  async clientPackages() {return z.object({items:z.array(z.object({package_id:z.string(),revision:z.number(),client_id:z.string(),domain:z.string(),ontology_version:z.string()}))}).parse(await this.read('business-ontology/v1/client-packages'));}
+  async compositionWorkflow(id:string) {return CanonicalWorkflowSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
+  async cancelComposition(id:string,runId:string) {return z.object({run_id:z.string(),status:z.string()}).passthrough().parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
+  async compositionView(id:string,runId?:string) {return compositionViewSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/view${runId?`?run_id=${encodeURIComponent(runId)}`:''}`));}
+  async compositions() {return compositionListSchema.parse(await this.read('business-ontology/v1/compositions'));}
+  async deleteComposition(id:string) {return z.object({workflow_id:z.string(),deleted:z.literal(true)}).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmed:true})}));}
+  async renameComposition(id:string,display_name:string) {return z.object({workflow_id:z.string(),display_name:z.string()}).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/display-name`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name})}));}
   async renameInvestigation(id:string,display_name:string) {return z.object({workflow_id:z.string(),display_name:z.string()}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name})}));}
   async deleteInvestigation(id:string) {return z.object({workflow_id:z.string(),deleted:z.literal(true)}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`,{method:'DELETE'}));}
   async investigationPlan(id:string) {return investigationPlanSchema.parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}`));}
   async investigationRun(id:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}`));}
   async investigationJob(id:string) {return investigationJobSchema.parse(await this.read(`business-ontology/v1/investigations/jobs/${encodeURIComponent(id)}`));}
-  async submitInvestigation(kind:'plan'|'execute'|'resume',payload:Record<string,unknown>,key:string) {return investigationJobSchema.parse(await this.read('business-ontology/v1/investigations/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,payload,request_key:key})}));}
+  async submitInvestigation(kind:'plan'|'execute'|'resume'|'compose'|'recover',payload:Record<string,unknown>,key:string) {return investigationJobSchema.parse(await this.read('business-ontology/v1/investigations/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,payload,request_key:key})}));}
   async createInvestigationRun(id:string,key:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}/runs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key:key})}));}
   async investigationInput(id:string,body:Record<string,unknown>) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}/input`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async cancelInvestigation(id:string) {return investigationRunSchema.parse(await this.read(`business-ontology/v1/investigations/runs/${encodeURIComponent(id)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}

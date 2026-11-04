@@ -36,7 +36,7 @@ def digest(value):
     return sha256(canonical(value).encode()).hexdigest()
 
 
-def retrieve(store, auth, objective):
+def retrieve(store, auth, objective, version_id=None):
     """No initialization, source DB calls, provider calls or writes."""
     result = dict(retrieval_version=VERSION, state='not_configured', version_id=None,
                   revision=None, definition_sha256=None, references=[], matched_modules=[],
@@ -54,8 +54,13 @@ def retrieve(store, auth, objective):
         row = db.execute("SELECT document FROM business_ontology_versions WHERE workspace=? AND owner=? ORDER BY CAST(json_extract(document,'$.revision') AS INTEGER) DESC LIMIT 1", scope).fetchone()
         if not row:
             return result
+        if version_id:
+            row=db.execute('SELECT document FROM business_ontology_versions WHERE workspace=? AND owner=? AND version_id=?',(*scope,version_id)).fetchone()
+            if not row:raise ApiFailure('BUSINESS_VERSION_NOT_FOUND','Pinned ontology not found.',404)
         snapshot = json.loads(row[0])
         policy_rows = db.execute('SELECT v.document FROM business_policy_versions v JOIN business_policy_heads h ON v.workspace=h.workspace AND v.owner=h.owner AND v.policy_key=h.policy_key AND v.revision=h.revision WHERE v.workspace=? AND v.owner=? ORDER BY v.policy_key LIMIT 40', scope).fetchall() if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", ('business_policy_heads',)).fetchone() else []
+    if version_id:
+        policy_rows=[(json.dumps(p),) for p in snapshot.get('knowledge',{}).get('manifest',{}).get('policy_snapshots',[])]
     result.update(state='no_match', version_id=snapshot['version_id'], revision=snapshot['revision'], definition_sha256=digest(snapshot))
     if not snapshot.get('concepts'):
         result['state'] = 'no_definitions'

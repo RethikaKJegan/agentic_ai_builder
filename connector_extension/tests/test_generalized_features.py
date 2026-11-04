@@ -39,8 +39,8 @@ class GeneralizedFeatureTests(unittest.TestCase):
         app=create_extension_app({'enabled_providers':['google_sheets','google_calendar','gmail','brave_search']},self.root,
             transport=FakeTransport(),token_supplier=lambda scopes,timeout:'offline',search_key='offline')
         items=app.state.workflow_service.registry.list_tools(app.state.extension_auth)['data']['items']
-        self.assertEqual(len(items),19)
-        existing=[item for item in items if item['tool_id'] not in {'extension_sheets_create','extension_sheets_add_tabs'}]
+        self.assertEqual({item['tool_id'] for item in items},set(CATALOG))
+        existing=[item for item in items if item['tool_id'] not in {'extension_sheets_create','extension_sheets_add_tabs','extension_sheets_create_report'}]
         self.assertTrue(all(item['definition']['availability']=='enabled' for item in existing))
         self.assertEqual(len(app.state.workflow_service.runtime_runner.connectors),17)
         self.assertIn(GOOGLE+'calendar.calendarlist.readonly',required_scopes(['google_calendar']))

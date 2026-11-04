@@ -124,7 +124,7 @@ class BusinessInvestigations:
 
     def plan(self,auth,body):
         auth,scope=self.authorize(auth)
-        if not isinstance(body,dict) or set(body)-{'objective','request_key','version_id','inputs','planning_mode','analysis_mode','wait_for_information','evidence_context','preflight_id'} or not {'objective','request_key'}<=set(body):fail('Provide objective and request_key; executable graph payloads are not accepted.')
+        if not isinstance(body,dict) or set(body)-{'objective','request_key','version_id','inputs','planning_mode','analysis_mode','wait_for_information','evidence_context','preflight_id','client_id','domain_id','workspace_id','tenant_id'} or not {'objective','request_key'}<=set(body):fail('Provide objective and request_key; executable graph payloads are not accepted.')
         key=self.key(body);required=requirements(body['objective']);reject_secrets(body)
         preflight=self.coverage.get(auth,body['preflight_id']) if body.get('preflight_id') else None
         if body.get('evidence_context') and not preflight:fail('Select scenario context through preflight preparation.','EVIDENCE_PREFLIGHT_REQUIRED',422)
@@ -133,6 +133,7 @@ class BusinessInvestigations:
             pin=preflight.get('evidence_context') or {}
             if body['evidence_context']!={k:pin.get(k) for k in ('dataset_id','case_id')}:fail('Preflight case differs from the request.','EVIDENCE_PREFLIGHT_MISMATCH',422)
         context=body.get('inputs',{'identifiers':{}})
+        if preflight and any(value and value!=preflight['inputs'].get(key) for key,value in context.items()):fail('Preflight inputs differ from the request.','EVIDENCE_PREFLIGHT_MISMATCH',422)
         if preflight:context=deepcopy(preflight['inputs'])
         if list(Draft202012Validator(CONTEXT_SCHEMA).iter_errors(context)):fail('Inputs must contain typed identifiers and optional ISO assessment date/pinned policy ID.')
         if context.get('assessment_date'):
@@ -167,7 +168,10 @@ class BusinessInvestigations:
         if preflight:
             for task,result in preflight['coverage'].items():
                 if task in knowledge['tasks']:knowledge['tasks'][task]['coverage']=dict(state=result['state'],required_facts=[r['fact_id'] for r in result['requirements']],available_facts=[r['fact_id'] for r in result['available_evidence']],available_evidence=[dict(fact_id=r['fact_id'],source_record_ids=[ref.get('record_id',ref.get('policy_id')) for ref in r['source_references']]) for r in result['available_evidence']],provider_fingerprint=result['provider_fingerprint'],blocking_requirements=[dict(fact_id=g['fact_id'],state=g['state'],impact=g['impact']) for g in result['blocking_requirements']],optional_limitations=[g['fact_id'] for g in result['optional_limitations']],business_outcomes=result['business_outcomes'],provenance=result['provenance'])
-        graph,planning=self.planner.plan(body['objective'],required,knowledge,body.get('planning_mode','model'))
+        if preflight and preflight.get('schema_version')=='business-preparation-v1':
+            knowledge['business_preparation']=self.coverage.preparation.context(preflight)
+        planning_knowledge=(dict(version_id=vid,knowledge_sha256=v['knowledge_sha256'],business_preparation=knowledge['business_preparation']) if 'business_preparation' in knowledge else knowledge)
+        graph,planning=self.planner.plan(body['objective'],required,planning_knowledge,body.get('planning_mode','model'))
         if not validate_graph(graph,required)['valid']:fail('The proposed graph is invalid.','INVESTIGATION_GRAPH_REJECTED')
         p=dict(schema_version=VERSION,workflow_id='investigation_'+secrets.token_hex(12),revision=1,objective=body['objective'],requirements=required,
                version_id=vid,knowledge_sha256=v['knowledge_sha256'],catalogue_sha256=CATALOGUE_HASH,graph=graph,planning=planning,

@@ -61,6 +61,8 @@ class PlannerService:
             separate_coverage_notes(workflow)
             from workflow_api.business_planning import bind as bind_business
             bind_business(workflow, {"business_ontology_retrieval": business_evidence} if business_evidence else {})
+            from workflow_api.business_preparation import bind_workflow
+            bind_workflow(workflow,context)
             reject_sensitive(workflow)
             mark_automatic_inputs(workflow, context)
             self._clear_proposed_assignments(workflow)
@@ -70,6 +72,8 @@ class PlannerService:
             retrieval = context.get('knowledge_graph_retrieval') if isinstance(context, dict) else None
             if retrieval:
                 identity_objective += '\n[knowledge-graph-retrieval-v1:' + retrieval['revision'] + ':' + ','.join(retrieval['source_ids']) + ']'
+            preparation_pin=workflow.get('metadata',{}).get('business_preparation')
+            if preparation_pin:identity_objective+='\n[business-preparation:'+preparation_pin['sha256']+']'
             if business_evidence:
                 from workflow_api.business_planning import digest as business_digest
                 identity_objective += '\n[business-ontology:' + business_digest(business_evidence) + ']'

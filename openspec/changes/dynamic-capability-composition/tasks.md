@@ -1,0 +1,6 @@
+- [x] Audit Phase 1 and current planner, Registry, connectors and delegation.
+- [x] Add capability contracts, task planning, semantic matching and agent factory.
+- [x] Persist scoped compositions and integrate normal workflow planning/lifecycle.
+- [x] Enforce dependencies, isolated context and verified results in existing delegation.
+- [x] Add backend/CLI tests including controlled fake external effects and regressions.
+- [x] Document commands, examples, evidence and remaining boundaries.

@@ -9,6 +9,12 @@ from registry.safety import reject_secrets
 from .service import RuntimeFailure
 
 
+def capability_context(inputs):
+    context=inputs.get('context') if isinstance(inputs,dict) else None
+    task=context.get('task') if isinstance(context,dict) else None
+    return context if isinstance(task,dict) and task.get('capability_id') else None
+
+
 class CrewAdapter:
     def __init__(self, llm_factory, knowledge_context=None):
         # Factory is server-owned and supplies a bounded BaseLLM implementation.
@@ -34,6 +40,7 @@ class CrewAdapter:
         os.environ['CREWAI_STORAGE_DIR'] = str(Path(__file__).resolve().parents[1] / '.local/crewai')
         from crewai import Agent, Task, Crew, Process
         from .model import BoundedLLM
+        from .model_protocol import closed_payload
         llm = self.llm_factory(deepcopy(definition))
         if not isinstance(llm, BoundedLLM):
             raise RuntimeFailure('BOUNDED_MODEL_REQUIRED', 'The trusted model factory must return a bounded CrewAI model.', 503)
@@ -41,6 +48,8 @@ class CrewAdapter:
             from .model_protocol import response_format
             llm.control_format = response_format(protocol, inputs)
             llm.control_context = deepcopy(inputs)
+        elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
+            llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'],
                       llm=llm, tools=[], allow_delegation=False, allow_code_execution=False,
                       max_iter=1, max_retry_limit=0, max_execution_time=definition['limits']['timeout_seconds'],
@@ -119,6 +128,9 @@ class CrewExecutor:
             definition['allowed_tool_ids'] = []
         else:
             definition['allowed_tool_ids'] = deepcopy(agent['allowed_tool_ids'])
+            if capability_context(inputs) is not None:
+                from .capability_composition import analysis_schema
+                definition['output_schema']=analysis_schema(inputs['context'].get('evidence',{}))
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         usage = []
         protocol = None if output_schema is None else ('master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool')
