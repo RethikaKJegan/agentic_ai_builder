@@ -188,7 +188,7 @@ class Connector:
         reject_secrets(inputs)
         tool = self.definition
         if (grant.get('tool_id') != tool['tool_id'] or grant.get('authorization_state') != 'authorized'
-                or not grant.get('authorization_reference') or grant.get('credential_reference') != 'cred_extension_' + tool['provider_id']
+                or not grant.get('authorization_reference') or grant.get('credential_reference') not in ({None, 'cred_extension_' + tool['provider_id']} if tool['authentication']['mode']=='none' and not tool['authentication']['credential_reference_required'] else {'cred_extension_' + tool['provider_id']})
                 or grant.get('input_schema') != tool['input_schema'] or grant.get('output_schema') != tool['output_schema']):
             denied('CONNECTOR_NOT_AUTHORIZED', 'Use an exact current Registry tool binding.')
         if self.external_write and (not grant.get('approval_reference') or

@@ -33,7 +33,7 @@ CODES = {
  'ASSIGNMENT_MISMATCH':'revoked_authorization','TOOL_ISOLATION_DENIED':'revoked_authorization',
  'EVIDENCE_CONFLICT':'conflicting_business_evidence','CAPABILITY_UNSUPPORTED':'unsupported_capability',
  'CAPABILITY_DEPENDENCY':'workflow_dependency','UNMATCHED_BRANCH':'workflow_dependency',
- 'UNKNOWN_INVOCATION_RESULT':'uncertain_external_write','SMTP_DELIVERY_UNCERTAIN':'uncertain_external_write',
+ 'ACTION_EFFECT_UNVERIFIED':'uncertain_external_write','UNKNOWN_INVOCATION_RESULT':'uncertain_external_write','SMTP_DELIVERY_UNCERTAIN':'uncertain_external_write',
  'DELEGATION_INTERRUPTED':'interrupted_read',
 }
 
@@ -93,7 +93,7 @@ class RecoveryService:
         if preparation_id:preparation=self.runtime.workflows.business_preparation.checked(auth,preparation_id)
         package_pin=workflow['metadata'].get('client_package_pin')
         changed=[];receipts=[]
-        tasks={t['task_id']:t for t in workflow['metadata'].get('composition_tasks',{}).values()}
+        tasks={t['task_id']:t for t in (workflow['metadata'].get('connected_tasks') or workflow['metadata'].get('composition_tasks',{})).values()}
         for tid,checkpoint in run.get('task_checkpoints',{}).items():
             task=tasks.get(tid,{})
             previous=checkpoint['result'].get('source_evidence',[])
@@ -140,7 +140,7 @@ class RecoveryService:
             if digest(workflow)!=run['workflow_digest']:raise RuntimeFailure('REVISION_CHANGED','Recovery cannot change the approved revision.')
             if rt.clock()-run['created_at']>=workflow['execution_policy']['limits']['timeout_seconds']:
                 raise RuntimeFailure('RUN_TIMEOUT','Recovery cannot reset the workflow deadline.')
-            tasks=list(workflow.get('metadata',{}).get('composition_tasks',{}).values())
+            tasks=list((workflow.get('metadata',{}).get('connected_tasks') or workflow.get('metadata',{}).get('composition_tasks',{})).values())
             if not tasks:raise RuntimeFailure('RECOVERY_UNSUPPORTED','Targeted resumption requires a prepared task composition.')
             preparation_id=workflow['metadata'].get('composition_preparation_id')
             package_pin=workflow['metadata'].get('client_package_pin')
@@ -153,8 +153,13 @@ class RecoveryService:
             node=next((n for n in workflow['nodes'] if n['node_id']==nid),None)
             # Node-level external effects, including downstream completed writes,
             # must never be repeated or silently left inconsistent after recompute.
-            writes={n['node_id'] for n in workflow['nodes'] if n['kind']=='tool'} if workflow['execution_policy'].get('allow_external_writes') else set()
-            if nid in writes or any(run['node_states'].get(w) in ('executing','completed') for w in writes):
+            connected=bool(workflow['metadata'].get('connected_action_plan'))
+            writes=({a['action_id'] for a in workflow['metadata']['connected_action_plan']['actions'] if a['required_approvals']} if connected else
+                    {n['node_id'] for n in workflow['nodes'] if n['kind']=='tool'} if workflow['execution_policy'].get('allow_external_writes') else set())
+            affected=affected_tasks(tasks,changed_dependencies)
+            if not affected:
+                affected=affected_tasks(tasks,{t['task_id'] for t in tasks if t['task_id'] not in run.get('task_checkpoints',{})})
+            if nid in writes or any(run['node_states'].get(w) in ('executing','completed') for w in (writes & affected if connected else writes)):
                 raise RuntimeFailure('RECOVERY_RECONCILIATION_REQUIRED','Reconcile external effects before preparing an explicit new action.')
             failure=classify(run.get('error_code','UNKNOWN_INVOCATION_RESULT'),task=nid)
             # An expired master read lease has an uncertain model/read result, but
@@ -183,8 +188,9 @@ class RecoveryService:
             # Invalidate the coordinator and graph descendants, retaining the trigger
             # and all independently completed graph branches and specialist checkpoints.
             graph_tasks=[dict(task_id=n['node_id'],depends_on=[e['source'] for e in workflow['edges'] if e['target']==n['node_id']]) for n in workflow['nodes']]
-            downstream=affected_tasks(graph_tasks,[nid]) if nid else set()
+            downstream=affected_tasks(graph_tasks,affected if connected else [nid]) if nid else set()
             for key in downstream:
+                if connected and key in run.get('action_instances',{}):run['action_instances'][key]=dict(state='pending',retry_decision='explicit_safe_retry',recovery_attempt=attempt['attempt'])
                 run['node_states'].pop(key,None);run['outputs'].pop(key,None)
             for edge in workflow['edges']:
                 if edge['source'] in downstream:run['edge_states'].pop(edge['edge_id'],None)

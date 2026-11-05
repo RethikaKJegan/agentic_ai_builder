@@ -78,6 +78,10 @@ class BusinessComposition:
             if c['supported_operation'].startswith('calendar.') and not inputs.get('calendar_id'):reasons.append('CALENDAR_ID_REQUIRED');continue
             return item,[]
         return None,sorted(set(reasons or ['REGISTERED_TOOL_REQUIRED']))
+    def prepare_actions(self,auth,body,*,lifecycle_context=None):
+        from .action_plans import prepare
+        return prepare(self,auth,body,lifecycle_context=lifecycle_context)
+
     def prepare(self,auth,body,*,lifecycle_context=None):
         auth,scope=self.authorize(auth)
         allowed={'objective','request_key','preparation_id','business_request','planning_mode','operations','resources','google_connection_id','client_package_id','client_package_revision','recovery_max_retries'}
@@ -289,6 +293,9 @@ class BusinessComposition:
         with self.store.transaction(write=False) as db:
             deleted=db.execute('SELECT 1 FROM business_investigation_metadata WHERE workspace=? AND owner=? AND workflow_id=? AND deleted_at IS NOT NULL',(doc['scope']['workspace'],doc['scope']['owner'],'cw_'+cid.removeprefix('composition_'))).fetchone()
             if deleted:fail('Workflow was deleted.','WORKFLOW_DELETED',410)
+        if doc.get('action_plan'):
+            from .action_plans import workflow
+            return workflow(self,auth,doc)
         if doc['state']!='ready':fail('Resolve composition capability gaps before generation.','CAPABILITY_PLAN_NOT_READY',422)
         current={t['tool_id']:t for t in self.tools(auth)}
         for task in doc['tasks']:
@@ -314,6 +321,9 @@ class BusinessComposition:
 
 def compile_workflow(doc):
     """Compile accepted tasks to the unchanged workflow graph contract."""
+    if doc.get('action_plan'):
+        from .action_plans import compile_workflow as compile_actions
+        return compile_actions(doc)
     cid=doc['composition_id'];master=doc['master'];agents=[master]+[c['definition'] for c in doc['configurations']]
     # Workflow agent references omit Registry-only properties.
     refs=[{k:deepcopy(v) for k,v in a.items() if k not in ('name','retry_policy','guardrails')} for a in agents]
@@ -379,7 +389,7 @@ def verify_composition(db,auth,workflow):
     doc['sha256']=sha;expected=compile_workflow(doc)
     for key in ('nodes','edges','conditions','tools','approval_gates','execution_policy'):
         if workflow[key]!=expected[key]:fail('Regenerate a composition to change its execution contract.','CAPABILITY_CHANGED',409)
-    for key in ('composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
+    for key in ('connected_action_plan','action_binding_context','connected_contracts','connected_tasks','composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
         if metadata.get(key)!=expected['metadata'].get(key):fail('Composition control metadata changed.','CAPABILITY_CHANGED',409)
     if len(workflow['agents'])!=len(expected['agents']):fail('Composition agents changed.','CAPABILITY_CHANGED',409)
     by_id={a['agent_id']:a for a in expected['agents']}

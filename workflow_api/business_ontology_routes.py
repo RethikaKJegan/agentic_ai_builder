@@ -99,6 +99,22 @@ def install(app, service, auth, reference, env=None):
             exc = ApiFailure('BUSINESS_ONTOLOGY_UNAVAILABLE','Business ontology is unavailable. Refresh before retrying.',503)
             return JSONResponse(service.failure(reference(),exc),status_code=503,headers={'Cache-Control':'no-store'})
 
+    @app.post('/business-ontology/v1/action-plans')
+    async def prepare_action_plan(request:Request):
+        return await call(service.business_composition.prepare_actions,await body(request))
+
+    @app.get('/business-ontology/v1/action-plans/{composition_id}')
+    async def get_action_plan(composition_id:str):
+        return await call(service.business_composition.get,composition_id,False)
+
+    @app.get('/business-ontology/v1/action-plans/{composition_id}/runs/{run_id}')
+    async def action_plan_run(composition_id:str,run_id:str):
+        return await call(presentation.view,composition_id,run_id)
+
+    @app.post('/business-ontology/v1/cases/{case_id}/action-plan')
+    async def attach_action_plan(case_id:str,request:Request):
+        return await call(service.business_cases.attach_action_plan,case_id,await body(request))
+
     @app.post('/business-ontology/v1/process-definitions')
     async def publish_process_definition(request:Request):
         return await call(service.business_cases.publish,await body(request))

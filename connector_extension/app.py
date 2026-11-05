@@ -87,6 +87,11 @@ class CatalogPlanner:
         self.sheet_discoverer = sheet_discoverer
         self.calendar_discoverer = calendar_discoverer
 
+    def plan_actions(self, objective, context):
+        if self.provider is None or not callable(getattr(self.provider,'plan_actions',None)):
+            raise PlannerFailure('PLANNER_NOT_CONFIGURED','Configure an action-plan provider.')
+        return self.provider.plan_actions(objective,context)
+
     def generate(self, objective, context):
         if self.provider is None:
             raise PlannerFailure('PLANNER_NOT_CONFIGURED', 'Configure an optional model for extension workflow generation.')

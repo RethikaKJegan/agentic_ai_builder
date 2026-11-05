@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-ai-builder.local/contracts/orchestration-plan-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "orchestration-plan-v1"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^plan_[a-f0-9]{24}$"
+    },
+    "revision": {
+      "const": 1
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "workspace_id",
+        "owner_id",
+        "client_id"
+      ]
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_actions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "max_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "max_llm_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 48
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "time_zone": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "max_actions",
+        "max_seconds",
+        "max_llm_calls",
+        "max_tool_calls"
+      ]
+    },
+    "completion_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,47}$"
+      }
+    },
+    "missing_inputs": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "provenance_references": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "account_reference": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "resource_references": {
+      "type": "object",
+      "maxProperties": 32,
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 2000
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "plan_id",
+    "revision",
+    "scope",
+    "goal",
+    "constraints",
+    "completion_criteria",
+    "missing_inputs",
+    "actions",
+    "provenance_references",
+    "fingerprint",
+    "account_reference",
+    "resource_references"
+  ],
+  "$defs": {
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "literal",
+                "context",
+                "evidence",
+                "configuration"
+              ]
+            },
+            "target": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+              },
+              "minItems": 1
+            },
+            "path": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 999
+                  }
+                ]
+              }
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "path",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "output",
+                "generated",
+                "receipt"
+              ]
+            },
+            "target": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+              },
+              "minItems": 1
+            },
+            "path": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 999
+                  }
+                ]
+              }
+            },
+            "action_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,47}$"
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "path",
+            "action_id"
+          ]
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,47}$"
+        },
+        "capability_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "depends_on": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,47}$"
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "expected_output_schema": {
+          "type": "object"
+        },
+        "instructions": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "evidence_references": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required_approvals": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 1,
+          "items": {
+            "const": "exact_payload"
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_llm_calls": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "max_tool_calls": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "max_retries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": [
+            "max_llm_calls",
+            "max_tool_calls",
+            "max_retries",
+            "timeout_seconds"
+          ]
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "when": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "binding": {
+                  "$ref": "#/$defs/binding"
+                },
+                "equals": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "binding",
+                "equals"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "action_id",
+        "capability_id",
+        "depends_on",
+        "bindings",
+        "expected_output_schema",
+        "instructions",
+        "evidence_references",
+        "required_approvals",
+        "budget",
+        "optional",
+        "when"
+      ]
+    }
+  }
+}

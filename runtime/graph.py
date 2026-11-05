@@ -87,6 +87,8 @@ class GraphRunner:
 
     def finish_node(self, db, run, workflow, node, output=None, outcome=None, evidence=None):
         node_id = node['node_id']
+        from .action_plans import completed as action_completed
+        action_completed(workflow,node,run,output)
         run['node_states'][node_id] = 'completed'
         if output is not None:
             reject_secrets(output)
@@ -115,6 +117,7 @@ class GraphRunner:
                         raise RuntimeFailure('UNREACHABLE_EXECUTION_NODE', 'Only trigger nodes may start a graph.')
                     return node
                 run['node_states'][node['node_id']] = 'skipped'
+                if node['node_id'] in run.get('action_instances',{}):run['action_instances'][node['node_id']]['state']='skipped'
                 for edge in self.outgoing(workflow, node['node_id']):
                     run['edge_states'][edge['edge_id']] = 'skipped'
                 self.runtime.event(db, run, 'node.skipped', {'node_id': node['node_id'], 'explanation': 'All incoming paths were skipped in this run.'})
@@ -130,13 +133,19 @@ class GraphRunner:
         node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), {})
         run.setdefault('classified_failures', []).append(classify(code, task=node_id, source=node.get('tool_id'), external_write=node.get('kind') == 'tool' and workflow['execution_policy'].get('allow_external_writes', False)))
         if node_id:
+            entry=run.get('action_instances',{}).get(node_id)
+            if entry is not None:entry.update(state='blocked' if blocked else 'failed',error_code=code,external_effect_status='requires_reconciliation' if code in {'UNKNOWN_INVOCATION_RESULT','SMTP_DELIVERY_UNCERTAIN','POST_INVOCATION_REVALIDATION_FAILED','ACTION_EFFECT_UNVERIFIED'} else 'failed',retry_decision='explicit_review_required')
             run['node_states'][node_id] = 'blocked' if blocked else 'failed'
             self.runtime.event(db, run, 'node.failed', {'node_id': node_id, 'invocation_id': run.get('node_invocations', {}).get(node_id), 'error_code': code, 'status': 'blocked' if blocked else 'failed'})
         self.runtime.event(db, run, 'runtime.denied', {'error_code': code})
         self.runtime.transition(db, run, 'blocked' if blocked else 'failed')
 
     @staticmethod
-    def params(node, run):
+    def params(node, run, workflow=None):
+        if workflow is not None:
+            from .action_plans import params as connected_params
+            resolved=connected_params(workflow,node,run)
+            if resolved is not None:return resolved
         configuration = node.get('configuration', {})
         if 'input' in configuration:
             result = deepcopy(configuration['input'])
@@ -149,10 +158,10 @@ class GraphRunner:
         reject_secrets(result)
         return result
 
-    def action_digest(self, node, run):
+    def action_digest(self, node, run, workflow=None):
         """Hash the exact approved action without persisting its input values."""
         return digest({'node_id': node['node_id'], 'kind': node['kind'], 'tool_id': node.get('tool_id'),
-                       'agent_id': node.get('agent_id'), 'params': self.params(node, run)})
+                       'agent_id': node.get('agent_id'), 'params': self.params(node, run, workflow)})
 
     def reserve(self, db, run, workflow, agent, amount):
         if set(amount) - {'llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd'}:
@@ -217,7 +226,7 @@ class GraphRunner:
         if connector.external_write and (not workflow['execution_policy'].get('allow_external_writes') or (not passed and not direct)):
             raise RuntimeFailure('APPROVAL_REQUIRED', 'External writes require workflow policy and run approval.', 403)
         expected_action = run.get('approval_context', {}).get('action_digest')
-        if connector.external_write and expected_action and expected_action != self.action_digest(node, run):
+        if connector.external_write and expected_action and expected_action != self.action_digest(node, run, workflow):
             raise RuntimeFailure('APPROVAL_ACTION_MISMATCH', 'The approved external action no longer matches the requested action.', 403)
         discovery_auth = {k: v for k, v in auth.items() if k not in
                           {'_registry_assignment_subject', '_registry_approval_auth'}}
@@ -230,9 +239,12 @@ class GraphRunner:
         remaining_agent = agent['limits']['timeout_seconds'] - (runtime.clock() - run.get('agent_started_at', {}).get(agent['agent_id'], runtime.clock()))
         if getattr(connector, 'timeout', float('inf')) > min(record['definition']['timeout_seconds'], remaining_agent, remaining_run):
             raise RuntimeFailure('TOOL_TIMEOUT_EXCEEDED', 'The connector timeout exceeds its accepted policy.', 403)
-        params = self.params(node, run)
+        params = self.params(node, run, workflow)
         if list(Draft202012Validator(grant['input_schema']).iter_errors(params)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
+        if workflow.get('metadata',{}).get('connected_action_plan'):
+            from .action_plans import preflight
+            preflight(connector,params)
         reservation = connector.reservation(grant)
         reservation['tool_calls'] = max(1, reservation.get('tool_calls', 0))
         reservation['estimated_cost_usd'] = max(record['definition']['estimated_cost']['per_call'], reservation.get('estimated_cost_usd', 0))
@@ -300,14 +312,16 @@ class GraphRunner:
                     config = node.get('configuration', {})
                     if set(config) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
                         raise RuntimeFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'The node contains execution configuration requiring review.')
-                    params = self.params(node, run)
+                    params = self.params(node, run, workflow)
+                    from .action_plans import observed as action_observed
+                    action_observed(workflow,node,run,params)
                     invocation_id = str(uuid4())
                     run.setdefault('node_invocations', {})[node['node_id']] = invocation_id
                     runtime.event(db, run, 'node.observed', {'node_id': node['node_id'], 'invocation_id': invocation_id, 'observation': snapshot({'inputs': run['inputs'], 'upstream_outputs': run['outputs']}) if kind == 'condition' else snapshot(params), 'kind': kind, 'agent_id': node.get('agent_id'), 'tool_id': node.get('tool_id'), 'policy': snapshot(next(({key: a[key] for key in ('role', 'goal', 'instructions', 'model')} for a in workflow['agents'] if a['agent_id'] == node.get('agent_id')), None))})
                     record_handoffs(runtime, db, run, workflow, node, params, invocation_id)
                     if kind == 'condition':
                         condition = next(c for c in workflow['conditions'] if c['condition_id'] == node['condition_id'])
-                        value = evaluate(condition['expression'], run['inputs'], run['outputs'])
+                        value = params['condition'] if workflow.get('metadata',{}).get('connected_action_plan') else evaluate(condition['expression'], run['inputs'], run['outputs'])
                         outcome = ('yes' if value else 'no') if type(value) is bool and set(condition['outcomes']) == {'yes', 'no'} else value
                         if not isinstance(outcome, str) or outcome not in condition['outcomes']:
                             raise RuntimeFailure('UNMATCHED_BRANCH', 'The condition did not produce a declared outcome.')
@@ -316,16 +330,19 @@ class GraphRunner:
                         gate = next(g for g in workflow['approval_gates'] if g['approval_gate_id'] == node['approval_gate_id'])
                         approved_edge = next((edge for edge in self.outgoing(workflow, node['node_id']) if edge.get('outcome') == 'approved'), None)
                         approved_node = next((candidate for candidate in workflow['nodes'] if approved_edge and candidate['node_id'] == approved_edge['target']), None)
-                        action_hash = self.action_digest(approved_node, run) if approved_node and approved_node.get('kind') == 'tool' else None
+                        action_hash = self.action_digest(approved_node, run, workflow) if approved_node and approved_node.get('kind') == 'tool' else None
                         email_preview = None
                         if approved_node and approved_node.get('tool_id') == 'smtp_send_email':
                             from .email_recipients import source_recipient
                             recipient = source_recipient(workflow, run['inputs'])
-                            email_preview = self.params(approved_node, run)
+                            email_preview = self.params(approved_node, run, workflow)
                             if recipient is not None and email_preview.get('to') != recipient:
                                 raise RuntimeFailure('DESTINATION_NOT_AUTHORIZED', 'Recipient must match the original review row.', 403)
                         approval = dict(approval_id='approval_' + uuid4().hex, workflow_id=run['workflow_id'], workflow_version=run['workflow_version'],
                                         status='pending', allowed_decisions=['approved', 'rejected'], action_digest=action_hash)
+                        if workflow.get('metadata',{}).get('connected_action_plan') and approved_node:
+                            approval['resolved_payload']=self.params(approved_node,run,workflow)
+                            run['action_instances'][approved_node['node_id']].update(state='waiting_for_approval',resolved_inputs=deepcopy(approval['resolved_payload']),input_fingerprint=digest(approval['resolved_payload']))
                         run['approvals'].append(approval)
                         run['approval_context'] = dict(node_id=node['node_id'], gate_id=gate['approval_gate_id'],
                                                        action_digest=action_hash,
@@ -333,7 +350,7 @@ class GraphRunner:
                         run['node_states'][node['node_id']] = 'paused'
                         run['lease_until'] = 0
                         runtime.event(db, run, 'approval.pending', {'approval_id': approval['approval_id'], 'node_id': node['node_id'],
-                                      **({'database_operation_id': self.params(approved_node, run).get('operation_id')} if approved_node and approved_node.get('tool_id') == 'database_execute_operation' else {}),
+                                      **({'database_operation_id': self.params(approved_node, run, workflow).get('operation_id')} if approved_node and approved_node.get('tool_id') == 'database_execute_operation' else {}),
                                       **({'email_preview': email_preview} if email_preview is not None else {})})
                         runtime.transition(db, run, 'paused_for_approval')
                         return runtime.public(run)
@@ -341,7 +358,7 @@ class GraphRunner:
                         if kind == 'trigger':
                             from .email_recipients import source_recipient
                             source_recipient(workflow, run['inputs'])
-                        output = self.params(node, run)
+                        output = self.params(node, run, workflow)
                         if kind == 'output':
                             fields = workflow['outputs']
                             contract = {'type': 'object', 'properties': {f['name']: {'type': f['type']} for f in fields},
@@ -357,7 +374,7 @@ class GraphRunner:
                                 raise RuntimeFailure('APPROVAL_REQUIRED', 'The agent requires an approved gate before model execution.', 403)
                             if self.agents is None:
                                 raise RuntimeFailure('MODEL_NOT_CONFIGURED', 'A bounded model adapter must be configured.', 503)
-                            invocation = (self.agents, agent, self.params(node, run))
+                            invocation = (self.agents, agent, self.params(node, run, workflow))
                             reservation = self.agents.reservation(agent)
                             reservation['llm_calls'] = max(1, reservation.get('llm_calls', 0))
                         else:
@@ -394,6 +411,8 @@ class GraphRunner:
                     if method:
                         from .capability_composition import verify_action
                         verify_action(method,output,params)
+                    from .action_plans import verify as verify_connected
+                    verify_connected(workflow,node,output,params)
                     reject_secrets(output)
                     code = None
                 except RetryableInvocation:
@@ -402,10 +421,16 @@ class GraphRunner:
                     output, code = None, failure.code
                 except Exception:
                     output, code = None, 'UNKNOWN_INVOCATION_RESULT' if getattr(adapter, 'external_write', False) else 'INVOCATION_FAILED'
+                if code and kind=='tool' and workflow.get('metadata',{}).get('connected_action_plan') and getattr(adapter,'external_write',False):
+                    original_code=code
+                    code='ACTION_EFFECT_UNVERIFIED'
+                else:original_code=None
                 with runtime.store.transaction() as db:
                     run = runtime.load(db, run_id, auth, 'workflow.execute')
                     if run.get('worker') != worker or run['status'] != 'running':
                         return runtime.public(run)
+                    if original_code:
+                        run['action_instances'][node['node_id']]['verification_error_code']=original_code
                     if (code == 'RETRYABLE_INVOCATION_FAILED' and
                             node['node_id'] not in workflow['metadata'].get('dynamic_delegation', {}) and
                             getattr(adapter, 'retry_safe', False) and not getattr(adapter, 'external_write', False) and
@@ -424,7 +449,7 @@ class GraphRunner:
                                 code = 'BUDGET_EXHAUSTED'
                         else:
                             code = 'RETRY_EXHAUSTED'
-                    if code and workflow['error_policy']['on_runtime_error'] == 'branch' and code not in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT'}:
+                    if code and workflow['error_policy']['on_runtime_error'] == 'branch' and code not in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'}:
                         outcome = node.get('configuration', {}).get('error_outcome')
                         if outcome and any(edge.get('outcome') == outcome for edge in self.outgoing(workflow, node['node_id'])):
                             self.finish_node(db, run, workflow, node, outcome=outcome)
@@ -433,7 +458,7 @@ class GraphRunner:
                             runtime.save(db, run)
                             continue
                     if code:
-                        self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT'})
+                        self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'})
                         return runtime.public(run)
                     try:
                         workflow, _ = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))

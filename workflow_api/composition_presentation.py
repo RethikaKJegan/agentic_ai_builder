@@ -83,7 +83,7 @@ class CompositionPresentation:
                 state={'executing':'running','failed':'failed'}.get(execution,state)
                 if run['status'] in ('failed','blocked','cancelled') and state=='running':state='interrupted'
             contract=doc['contracts'][task['capability_id']]
-            action_node=next((n for n in (workflow or {}).get('nodes',[]) if n['node_id']=='action_'+task['task_id']),None)
+            action_node=next((n for n in (workflow or {}).get('nodes',[]) if n['node_id']==(task['task_id'] if doc.get('action_plan') else 'action_'+task['task_id'])),None)
             gate=next((n for n in (workflow or {}).get('nodes',[]) if n['node_id']=='approve_'+task['task_id']),None)
             if run and action_node:
                 state=run['node_states'].get(action_node['node_id'],'pending')
@@ -100,13 +100,16 @@ class CompositionPresentation:
         public_run=None
         if run:
             public_run={k:deepcopy(run[k]) for k in ('run_id','status','approvals','created_at','usage')}
+            if doc.get('action_plan'):
+                public_run['action_plan_reference']=deepcopy(run.get('action_plan_reference'))
+                public_run['action_instances']=deepcopy(run.get('action_instances',{}))
             public_run['error_code']=run.get('error_code');public_run['failures']=deepcopy(failures)
             public_run['diagnostic_reference']=run.get('trace_reference')
             public_run['previous_failure_feedback']=deepcopy(run.get('previous_failure_feedback',[]))
             public_run['recovery_history']=[{k:deepcopy(h[k]) for k in ('attempt','timestamp','category','strategy','affected_tasks','verified_success','source_revalidations') if k in h} for h in run.get('recovery_history',[])]
             public_run['outcome']=deepcopy(run.get('outcome_evaluation'))
             public_run['approvals']=runtime.get_run(run_id,auth)['approvals']
-            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(n.get('configuration',{}).get('input',{})),receipt={k:deepcopy(run.get('outputs',{}).get(n['node_id'],{}).get(k)) for k in ('draft_id','event_id','spreadsheet_id','status') if k in run.get('outputs',{}).get(n['node_id'],{})}) for n in workflow['nodes'] if n['kind']=='tool']
+            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(run.get('action_instances',{}).get(n['node_id'],{}).get('resolved_inputs',n.get('configuration',{}).get('input',{}))),receipt={k:deepcopy(run.get('outputs',{}).get(n['node_id'],{}).get(k)) for k in ('draft_id','event_id','spreadsheet_id','status') if k in run.get('outputs',{}).get(n['node_id'],{})}) for n in workflow['nodes'] if n['kind']=='tool']
         request_context=dict(google_connection_id=doc.get('google_connection_id'),resources=deepcopy(doc['resources']))
         if doc.get('preparation_id'):
             request_context['business_request']=dict(inputs=deepcopy(prepared['inputs']))

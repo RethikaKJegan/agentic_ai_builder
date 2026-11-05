@@ -25,6 +25,13 @@ BUSINESS_BINDINGS={
 REVIEW_DEPENDENCIES={'business.compare':['business.read.complaints','business.read.inspection'],'business.assess_warranty':['business.read.warranty'],'business.review_replacement':['business.read.replacement'],'business.review_history':['business.read.history'],'business.review_recurrence':['business.read.recurrence']}
 # These semantics come from existing installed connector contracts, not name guessing.
 EXTERNAL={
+ 'mail_send':('mail.send','write','message_id'),
+ 'mail_reply':('mail.reply','write','message_id'),
+ 'mail_attachment':('mail.attachment','read','schema_and_tool_receipt'),
+ 'calendar_discover':('calendar.discover','read','schema_and_tool_receipt'),
+ 'mail_profile':('mail.profile','read','schema_and_tool_receipt'),
+ 'web_search':('research.search','read','schema_and_tool_receipt'),
+ 'read_public_page':('research.fetch','read','schema_and_tool_receipt'),
  'send_email':('mail.send','write','message_id'),
  'mail_search':('mail.search','read','schema_and_tool_receipt'),
  'mail_message':('mail.read','read','schema_and_tool_receipt'),

@@ -195,6 +195,12 @@ class WorkflowService:
                 return self.envelope(request_id, 200, self.runtime_runner.runtime.list_approvals(auth, payload.get('pending_only', False), payload.get('limit', 100)))
             if operation in {'list_tools', 'list_capabilities'}:
                 return self.registry.handle(request, auth)
+            if operation == 'plan_workflow' and isinstance(payload.get('context'),dict) and payload['context'].get('planning_mode')=='connected_actions':
+                composition=getattr(self,'business_composition',None)
+                if composition is None:raise ApiFailure('SERVICE_UNAVAILABLE','Capability composition is unavailable.',503)
+                context=deepcopy(payload['context']);context.pop('planning_mode')
+                doc=composition.prepare_actions(auth,dict(objective=payload.get('objective'),request_key=request.get('idempotency_key'),**context))
+                return self.envelope(request_id,200,dict(workflow=composition.workflow(auth,doc['composition_id']),plan=doc['action_plan'],composition_id=doc['composition_id']))
             if operation == 'plan_workflow' and isinstance(payload.get('context'),dict) and payload['context'].get('composition_id'):
                 composition=getattr(self,'business_composition',None)
                 if composition is None:raise ApiFailure('SERVICE_UNAVAILABLE','Capability composition is unavailable.',503)

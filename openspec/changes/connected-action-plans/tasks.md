@@ -1,0 +1,7 @@
+- [x] Audit existing contracts, compiler, runtime, cases and tools; record baseline.
+- [x] Add versioned plan contract and deterministic validation/bindings.
+- [x] Extend constrained provider planning and existing action-instance composition.
+- [x] Integrate runtime checkpoints, verification, content authority and case persistence.
+- [x] Verify/reuse connected tools and repair research fixture invariants.
+- [x] Add controlled acceptance, rejection, restart and compatibility tests.
+- [x] Run regressions/contracts/OpenSpec and record exact evidence and remaining limits.

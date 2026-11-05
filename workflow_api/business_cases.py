@@ -403,6 +403,18 @@ class BusinessCases:
             for cid in list(needed):capability_dependencies(cid)
             retrieval_tasks = {base_contracts[cid]['retrieval_task'] for cid in needed if cid in base_contracts and base_contracts[cid]['retrieval_task']}
             view = preparation.general_context(auth, case['original_user_goal'], case['business_request']) if preparation else {}
+            if preparation and retrieval_tasks and 'content.prepare' in needed and view.get('state')=='unsupported':
+                # Mixed action goals may be outside the analytical goal grammar. Use the
+                # selected registered read contracts, retaining the original goal on the case.
+                from .business_investigations import QUESTIONS
+                from .business_resolution import interpret
+                request=deepcopy(case['business_request'])
+                version=preparation.service.ontology.version(auth,request.get('version_id') or preparation.service.retrieval.latest(auth))
+                inputs=deepcopy(request.get('inputs',{'identifiers':{}}))
+                parsed=interpret(case['original_user_goal'],version,inputs.get('identifiers',{}))
+                inputs['identifiers']=parsed['identifiers']
+                request.update(objective='; '.join(QUESTIONS[t] for t in sorted(retrieval_tasks)),inputs=inputs,version_id=version['version_id'])
+                view=preparation.prepare(auth,request)
             if view.get('preflight_id'):
                 prepared = preparation.checked(auth, view['preflight_id'])
                 if retrieval_tasks - set(prepared['tasks']):
@@ -418,6 +430,9 @@ class BusinessCases:
                 if prepared.get('evidence_context'):fail('Business cases require company evidence or case-local assumptions; scenario evidence cannot be verified.', 'CASE_SCENARIO_DENIED')
                 case['evidence_references'] = [dict(record_id=r['record_id'], task=t) for t,e in case['source_evidence'].items() for r in e.get('records', [])]
             contracts = catalogue(prepared, tools)
+        if any('content.prepare' in stage['definition']['required_capabilities'] for stage in case['stages'].values()):
+            from .action_plans import content_contract
+            contracts['content.prepare']=content_contract()
         case['capability_registry_version'] = digest(contracts)
         case['capability_contracts'] = deepcopy(contracts)
         concepts = {c['id'] for c in package['concepts']} if package else {c['id'] for t in (prepared or {}).get('tasks', {}).values() for c in t['concepts']}
@@ -607,12 +622,57 @@ class BusinessCases:
             if stage.get('claim') != token or stage['execution_status'] != 'RUNNING':fail('Stage claim expired.', 'CASE_CLAIM_LOST', 409)
             stage.update(deepcopy(updates));self._save(db, scope, case)
 
+    def attach_action_plan(self, auth, case_id, body):
+        """Attach a reviewed immutable composition to an idle prepared stage using case CAS."""
+        scope=self.scope(auth,True,True)
+        self.body(body,('request_key','expected_revision','stage_instance_id','plan_request'))
+        fingerprint=digest(['attach_action_plan',case_id,body])
+        with self.store.transaction(write=False) as db:
+            old=self._receipt(db,scope,body,fingerprint)
+            if old:return old
+            case=deepcopy(self._load(db,scope,case_id))
+        if case['revision']!=body['expected_revision']:fail('Case changed; reload its revision.','CASE_CONFLICT',409)
+        stage=case['stages'].get(body['stage_instance_id'])
+        if not stage or stage['execution_status']!='READY' or stage.get('composition_id') or case['active_stage_ids']:
+            fail('Attach only to an idle ready stage before composition.','CASE_ACTION_PLAN_BUSY',409)
+        request=deepcopy(body['plan_request'])
+        if not isinstance(request,dict):fail('Supply an action plan request.')
+        if request.get('client_id',case['client_id'])!=case['client_id']:fail('Plan client differs from the case.','CASE_ACTION_PLAN_SCOPE',403)
+        request.update(objective=case['original_user_goal'],client_id=case['client_id'],request_key='caseplan_'+digest([case_id,body['request_key']])[:32])
+        if case.get('preparation_id'):
+            if request.get('preparation_id',case['preparation_id'])!=case['preparation_id']:fail('Keep the case preparation pin.','CASE_BINDING_CHANGED',409)
+            request['preparation_id']=case['preparation_id']
+        if case.get('google_connection_id'):
+            if request.get('google_connection_id',case['google_connection_id'])!=case['google_connection_id']:fail('Keep the pinned case account.','CASE_BINDING_CHANGED',409)
+            request['google_connection_id']=case['google_connection_id']
+        from runtime.memory import WorkingMemory
+        context=dict(case_id=case_id,stage_instance_id=stage['stage_instance_id'],inputs=deepcopy(stage['resolved_inputs']),working_memory=WorkingMemory.case_view(case,stage),qualification='Generated content is not business or resource authority.')
+        composition=self.service.business_composition
+        doc=composition.prepare_actions(auth,request,lifecycle_context=context)
+        definition=stage['definition']
+        if {v['tool_id'] for v in doc['selected_tools'].values()}-set(definition['allowed_tools']):fail('Action plan exceeds the pinned tool allowlist.','CASE_TOOL_DENIED',403)
+        planned={t['capability_id'] for t in doc['tasks']}
+        if planned!=set(definition['required_capabilities']):fail('Action plan differs from pinned stage capabilities.','CASE_CAPABILITY_STALE',409)
+        if any(t['side_effect'] in ('draft','write') for t in doc['tasks']) and definition['side_effect_classification'] not in ('draft','write'):fail('Action plan exceeds stage side effects.','CASE_TOOL_DENIED',403)
+        if any(doc['contracts'][cid]!=case['capability_contracts'].get(cid) for cid in planned):fail('Pinned capability contracts changed.','CASE_CAPABILITY_STALE',409)
+        workflow=composition.workflow(auth,doc['composition_id'])
+        with self.store.transaction() as db:
+            old=self._receipt(db,scope,body,fingerprint)
+            if old:return old
+            case=self._load(db,scope,case_id)
+            if case['revision']!=body['expected_revision']:fail('Case changed while planning.','CASE_CONFLICT',409)
+            stage=case['stages'][body['stage_instance_id']]
+            stage.update(composition_id=doc['composition_id'],workflow=workflow,agent_configurations=deepcopy(doc['configurations']),action_plan_reference=dict(plan_id=doc['action_plan']['plan_id'],revision=1,fingerprint=doc['action_plan']['fingerprint']))
+            self.record(case,'case.action_plan_attached',stage_instance_id=stage['stage_instance_id'],plan_id=doc['action_plan']['plan_id'])
+            self._save(db,scope,case);self._remember(db,scope,body,fingerprint,case)
+        return case
+
     def execute_capabilities(self, auth, case, stage, resume):
         definition = stage['definition'];sid = stage['stage_instance_id'];token = stage['claim']
         composition = getattr(self.service, 'business_composition', None)
         runner = self.service.runtime_runner
         if composition is None or runner is None:fail('Configure the existing composition and runtime.', 'CASE_RUNTIME_UNAVAILABLE', 503)
-        if definition['side_effect_classification'] in ('draft', 'write') and any(e['provenance_type'] != 'ACTUAL' for e in stage['resolved_inputs'].values()):
+        if not stage.get('action_plan_reference') and definition['side_effect_classification'] in ('draft', 'write') and any(e['provenance_type'] != 'ACTUAL' for e in stage['resolved_inputs'].values()):
             fail('Generated inputs cannot authorize an external action.', 'CASE_PROVISIONAL_ACTION_DENIED', 403)
         if not stage['composition_id']:
             execution_identity=[case['case_id'],sid]+([stage['reassessment_generation']] if stage.get('reassessment_generation') else [])
@@ -683,6 +743,8 @@ class BusinessCases:
         with self.store.transaction(write=False) as db:
             saved = deepcopy(rt.load(db, stage['run_id'], auth))
         stage['runtime_result'] = deepcopy(saved.get('outputs', {}))
+        if stage.get('action_plan_reference'):
+            stage['action_instances']=deepcopy(saved.get('action_instances',{}))
         stage['tool_execution_records'] = [deepcopy(t) for c in saved.get('task_checkpoints', {}).values() for t in c.get('result', {}).get('tool_results', [])]
         stage['tool_execution_records'] += [dict(node_id=node, output=deepcopy(saved.get('outputs', {}).get(node)), run_id=stage['run_id']) for node in workflow['metadata'].get('composition_action_verifiers', {}) if node in saved.get('outputs', {})]
         stage['runtime_checkpoints'] = deepcopy(saved.get('task_checkpoints', {}))

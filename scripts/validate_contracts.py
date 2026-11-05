@@ -122,6 +122,8 @@ def main() -> None:
     validate_agents()
     validate_tools()
     validate_api_and_control_contracts()
+    action_plan=validator(CONTRACTS / 'orchestration-plan-v1.json')
+    assert_valid(action_plan,EXAMPLES / 'orchestration-plan-v1.json')
     process = validator(CONTRACTS / 'business-lifecycle-v1.json')
     assert_valid(process, EXAMPLES / 'business-lifecycle-v1.json')
     assert_valid(process, ROOT / 'ontology/business-processes/simpson-warranty-v1.json')

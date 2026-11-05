@@ -157,7 +157,9 @@ def test_compiled_research_handoff_waits_and_validates_before_return(outcome):
     child={'agent_id':'research','role':'Research','goal':'Find public risks.',
            'input_schema':{'type':'object'},'output_schema':schema,
            'capabilities':['web_search','read_public_page'],'approval_requirements':[]}
-    session=DelegationSession.__new__(DelegationSession)
+    runtime=SimpleNamespace(store=SimpleNamespace(transaction=lambda **kw:nullcontext(None)),event=lambda *args,**kw:None,save=lambda *args:None)
+    workflow={'metadata':{'inventory_report_compiler':1,'dynamic_delegation':{'analyse_inventory':{'max_rounds':4,'max_tasks':12}}},'agents':[]}
+    session=DelegationSession(SimpleNamespace(runtime=runtime),'synthetic',{},'worker',workflow,{'node_id':'analyse_inventory'},{'agent_id':'master'}, {})
     session.master={'agent_id':'master','input_schema':{'type':'object'},'output_schema':schema}
     session.children={'research':child};session.inputs={'objective':'Find public risks.'}
     session.config={'max_rounds':4,'max_tasks':12}

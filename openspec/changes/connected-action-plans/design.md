@@ -1,0 +1,9 @@
+# Design
+
+Baseline: clean branch agentic_ai_builder at 13e3e37. Prior read-only audit: 230 tests and four subtests passed across planner/preparation/composition/memory/lifecycle and ontology/retrieval/planning. Shared contracts and three relevant OpenSpec changes validated.
+
+Reuse BusinessComposition persistence and AgentConfigurationFactory; compile action IDs into ordinary fixed graph agent/tool nodes so reasoning and effects may alternate. Add a shared orchestration-plan-v1 contract with discriminated, bounded path segments rather than expressions. The backend seals scope, plan fingerprint, approved context, source pins and capability schemas. Persist plans in existing composition records and action checkpoints in existing runtime runs; optional case attachment uses existing case revision CAS. Runtime bindings require completed upstream actions and verified receipts and validate the resolved payload immediately before execution. Approval nodes hash the resolved next action. Keep old compilation untouched when no action plan exists.
+
+Registry discovery supplies exact enabled tool schemas. Provider planning uses only that catalogue and trusted context; no model-supplied grants. Authority is classified per destination field; generated values cannot supply resource IDs, recipients, event times or approvals. Created artifact IDs/URLs may come only from matching verified connector receipts. Content preparation uses registered model agents with schema-validated output and source-reference checks. Research uses existing controlled public-fetch protections; constructor invariants are restored in research tests.
+
+Baseline extension tests will be run before edits. Acceptance uses actual CrewAI/GraphRunner with controlled model/connector transports, isolated stores, persisted plan/run/case traces, and no live external effects.

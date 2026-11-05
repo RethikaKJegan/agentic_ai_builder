@@ -87,8 +87,8 @@ class GeneralizedSheetsTests(unittest.TestCase):
         app=create_extension_app({'enabled_providers':['google_sheets']},self.root,transport=FakeTransport(),token_supplier=lambda scopes,timeout:'offline')
         tools=app.state.workflow_service.registry.list_tools(app.state.extension_auth)['data']['items']
         sheet_tools=[tool for tool in tools if tool['definition']['provider_id']=='google_sheets']
-        self.assertEqual(len(sheet_tools),5)
-        existing=[tool for tool in sheet_tools if tool['tool_id'] not in {'extension_sheets_create','extension_sheets_add_tabs'}]
+        self.assertEqual({tool['tool_id'] for tool in sheet_tools}, {'google_sheets_read_rows','google_sheets_upsert_record','extension_sheets_discover','extension_sheets_create','extension_sheets_add_tabs','extension_sheets_create_report'})
+        existing=[tool for tool in sheet_tools if tool['tool_id'] not in {'extension_sheets_create','extension_sheets_add_tabs','extension_sheets_create_report'}]
         self.assertTrue(all(tool['definition']['availability']=='enabled' for tool in existing))
 
     def test_planning_discovers_multiple_user_links_before_generation(self):
