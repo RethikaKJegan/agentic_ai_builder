@@ -37,6 +37,25 @@ def field_schema(schema,path):
     return schema
 
 
+def checked_field(schema,path,action_id,side):
+    try:return field_schema(schema,path)
+    except RuntimeFailure as exc:
+        exc.binding_issue=dict(action_id=action_id,side=side,path=deepcopy(path))
+        raise
+
+
+def declared_paths(schema):
+    """Only paths accepted by field_schema; opaque objects are whole values."""
+    result=[[]]
+    if schema.get('type')=='object':
+        for name,child in schema.get('properties',{}).items():
+            if not name.startswith('_'):
+                result.extend([[name,*p] for p in declared_paths(child) if len(p)<8])
+    elif schema.get('type')=='array' and isinstance(schema.get('items'),dict):
+        result.extend([[0,*p] for p in declared_paths(schema['items']) if len(p)<8])
+    return result
+
+
 def value_schema(value):
     if isinstance(value,dict):return {'type':'object','properties':{k:value_schema(v) for k,v in value.items()},'required':list(value),'additionalProperties':False}
     if isinstance(value,list):return {'type':'array','items':value_schema(value[0]) if value else {}}
@@ -49,6 +68,10 @@ def compatible(source,target):
     for union in ('oneOf','anyOf'):
         if union in target:return any(compatible(source,t) for t in target[union])
     a,b=types(source),types(target)
+    if a==b=={'array'} and isinstance(source.get('items'),dict) and isinstance(target.get('items'),dict):
+        return compatible(source['items'],target['items'])
+    if a==b=={'object'} and target.get('additionalProperties') is False:
+        if set(source.get('required',[]))-set(target.get('properties',{})):return False
     return bool(a and b and (a<=b or a=={'integer'} and 'number' in b)) or source==target
 
 
@@ -126,25 +149,38 @@ def validate_plan(plan,contracts,context,scope):
         bindings=action['bindings']+([action['when']['binding']] if action['when'] else [])
         for b in bindings:
             conditional=bool(action['when'] and b is action['when']['binding'])
-            target={'type':'boolean'} if conditional else field_schema(c['input_schema'],b['target'])
+            target={'type':'boolean'} if conditional else checked_field(c['input_schema'],b['target'],action['action_id'],'target')
             if not conditional:
                 t=b['target']
-                if any(t[:len(x)]==x or x[:len(t)]==t for x in targets):deny('Duplicate or overlapping binding targets.')
+                overlap=next((x for x in targets if t[:len(x)]==x or x[:len(t)]==t),None)
+                if overlap is not None:
+                    exc=RuntimeFailure('ACTION_BINDING_INVALID','Duplicate or overlapping binding targets.',422)
+                    exc.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(t),overlaps=deepcopy(overlap))
+                    raise exc
                 targets.append(t)
             if b['kind'] in REFERENCES:
-                if b['action_id'] not in action['depends_on']:deny('Output binding must name an explicit dependency.')
+                if b['action_id'] not in action['depends_on']:
+                    error=RuntimeFailure('ACTION_BINDING_INVALID','Output binding must name an explicit dependency.',422)
+                    error.binding_issue=dict(action_id=action['action_id'],side='source',source_action_id=b['action_id'],path=deepcopy(b['path']),required_dependency=b['action_id'])
+                    raise error
                 parent=actions[b['action_id']];pc=contracts[parent['capability_id']]
                 if parent['optional']:deny('Required data cannot depend on a conditionally skipped action.')
-                source=field_schema(pc['output_schema'],b['path'])
+                source=checked_field(pc['output_schema'],b['path'],action['action_id'],'source')
                 if b['kind']=='receipt' and pc['kind']!='tool':deny('Only connector results can supply receipts.')
                 if b['kind']=='generated' and parent['capability_id']!='content.prepare':deny('Generated binding requires content preparation.')
                 if not conditional and c['kind']=='tool' and not content_target(b['target']):
                     if not (b['kind']=='receipt' and c['supported_operation']=='research.fetch' and pc['supported_operation']=='research.search' and b['path']==['results',0,'url']) and (b['kind']!='receipt' or b['path'] not in (['spreadsheet_id'],['spreadsheet_url'],['event_id'],['message_id'],['draft_id'],['thread_id'],['artifact_id'])):
-                        deny('Generated or interpreted values cannot supply execution authority.','ACTION_AUTHORITY_DENIED')
+                        error=RuntimeFailure('ACTION_AUTHORITY_DENIED','Generated or interpreted values cannot supply execution authority.',422)
+                        error.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(b['target']),source_action_id=b['action_id'],source_path=deepcopy(b['path']),rule='explicit_authority_required')
+                        raise error
             else:
                 value=binding_value(b,context,actions)
                 source=value_schema(value)
-                if list(Draft202012Validator(target).iter_errors(value)):deny('Literal/context value violates its destination schema.')
+                violations=list(Draft202012Validator(target).iter_errors(value))
+                if violations:
+                    error=RuntimeFailure('ACTION_BINDING_INVALID','Literal/context value violates its destination schema.',422)
+                    error.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(b['target']),rule=violations[0].validator)
+                    raise error
                 if b['kind']=='evidence' and c['kind']=='tool' and not content_target(b['target']) and b['path'] not in context.get('authority_evidence_paths',{}).get(b['key'],[]):
                     deny('Mapped evidence is not approved as identity authority.','ACTION_AUTHORITY_DENIED')
             if not compatible(source,target):

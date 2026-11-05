@@ -45,6 +45,8 @@ class ReportSheetsSetup(SheetsSetup):
                 if any(type(cell) is float and not math.isfinite(cell) for cell in row):
                     denied('SHEETS_REPORT_INVALID', 'Report numbers must be finite.', 400)
                 cells += len(row)
+        if sum(len(tab['rows']) for tab in value['tabs']) > 1000:
+            denied('SHEETS_REPORT_TOO_LARGE', 'Report exceeds 1,000 data rows.', 400)
         if cells > 10000 or len(json.dumps(value, ensure_ascii=False).encode('utf-8')) > 256000:
             denied('SHEETS_REPORT_TOO_LARGE', 'Report exceeds 10,000 data cells or 256 KB.', 400)
         return value

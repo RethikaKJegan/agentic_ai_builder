@@ -53,6 +53,7 @@ if __name__=='__main__':
         f.cases=app.state.business_cases;f.cases.clock=lambda:f.now
         f.auto=app.state.automation;f.auto.clock=lambda:f.now
         f.general.worker_authenticate=lambda w,o:deepcopy(f.x.a) if (w,o)==('one','alice') else None
+        baseline_http_request=f.http.request
         scenario={'kind':'reply','asked':False,'revised':False}
         evaluator=Evaluator()
         def plan_actions(goal,ctx):
@@ -80,6 +81,7 @@ if __name__=='__main__':
         def configure(kind:str):
             assert kind in ('reply','missing','gather','daily')
             scenario.update(kind=kind,asked=False,revised=False)
+            f.http.request=baseline_http_request
             c=f.cases.create(f.x.a,dict(request_key='ui_case_'+uuid4().hex,process_definition_id=definition['process_definition_id'],process_definition_version=1,original_user_goal=f.request['objective'],google_connection_id=f.connection,business_request={'inputs':{'identifiers':{'complaint_id':'C123'}}}))
             c=f.cases.command(f.x.a,c['case_id'],'prepare',dict(request_key='ui_prepare_'+uuid4().hex,expected_revision=c['revision']))
             return dict(case_id=c['case_id'],connection_id=f.connection,values=f.request['user_values'])

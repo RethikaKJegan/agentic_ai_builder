@@ -78,7 +78,7 @@ def tools():
         deepcopy(setup_output), ['spreadsheets'], 'data.write', True, 'extension_sheet_setup'))
     report_properties = deepcopy(setup_properties)
     report_properties.pop('row_count')  # Report dimensions are derived from the approved content.
-    report_properties['tabs'] = {'type': 'array', 'minItems': 1, 'maxItems': 4, 'items': obj({
+    report_properties['tabs'] = {'type': 'array', 'minItems': 1, 'maxItems': 20, 'items': obj({
         'title': string(100), 'headers': {'type': 'array', 'minItems': 1, 'maxItems': 30,
             'items': string(200), 'uniqueItems': True},
         'rows': {'type': 'array', 'minItems': 1, 'maxItems': 250, 'items': {'type': 'array',

@@ -405,7 +405,7 @@ export class WorkflowClient {
       try{return await this.readOnce(path,options,recoverSession);}
       catch(error){
         if(!(error instanceof ApiError))throw error;
-        if(!mutation && attempt===0 && error.error.retryable && [502,503,504].includes(error.context.httpStatus??0) && ["DATABASE_BUSY","API_DATABASE_BUSY","API_DATABASE_SERIALIZATION_RETRY","API_DATABASE_DEADLOCK","API_DATABASE_UNAVAILABLE","API_TIMEOUT","API_UNAVAILABLE","UPSTREAM_UNAVAILABLE","BACKEND_UNAVAILABLE","PROXY_TIMEOUT","SERVICE_UNAVAILABLE"].includes(error.error.error_code)){
+        if(!mutation && attempt===0 && error.error.retryable && (error.error.error_code==="API_UNAVAILABLE"&&error.context.httpStatus===undefined||[502,503,504].includes(error.context.httpStatus??0)) && ["DATABASE_BUSY","API_DATABASE_BUSY","API_DATABASE_SERIALIZATION_RETRY","API_DATABASE_DEADLOCK","API_DATABASE_UNAVAILABLE","API_TIMEOUT","API_UNAVAILABLE","UPSTREAM_UNAVAILABLE","BACKEND_UNAVAILABLE","PROXY_TIMEOUT","SERVICE_UNAVAILABLE"].includes(error.error.error_code)){
           await new Promise(resolve=>setTimeout(resolve,200));continue;
         }
         if(mutation)throw new ApiError(error.error,error.correlationId,{...error.context,outcome:[400,401,403,404,409,422].includes(error.context.httpStatus??0)?"rejected":"unknown"});

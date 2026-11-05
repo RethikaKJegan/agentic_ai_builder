@@ -446,3 +446,11 @@ it("maps only the exact canonical input path into safe inline errors", () => {
   ).toEqual(["Enter a safe integer."]);
   expect(fieldMessages(new InputError("Other field.", "inputs.other"), "inputs.count")).toEqual([]);
 });
+
+it('recovers one network-disconnected GET with the same request reference',async()=>{
+ const transport=vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('network disconnected')).mockResolvedValueOnce(wrap({items:[],total:0,has_more:false,next_cursor:null}));
+ const result=await new WorkflowClient(transport).request('list_workflows',{});
+ expect(result.items).toEqual([]);
+ expect(transport).toHaveBeenCalledTimes(2);
+ expect(new Headers(transport.mock.calls[0]![1]?.headers).get('X-Request-ID')).toBe(new Headers(transport.mock.calls[1]![1]?.headers).get('X-Request-ID'));
+});

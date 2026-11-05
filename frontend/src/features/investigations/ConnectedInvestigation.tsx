@@ -39,14 +39,13 @@ function ConnectedWorkspace() {
     );
   return (
     <div className="h-full overflow-auto bg-background p-4 md:p-6">
-      <div className="mx-auto max-w-5xl space-y-5">
+      <div className={`mx-auto ${id?"max-w-none":"max-w-5xl"} space-y-5`}>
         <Link to="/app/workflows" className="text-sm text-primary">
           Back to workflows
         </Link>
         <h1 className="text-xl font-semibold">Business investigation</h1>
         <p className="text-sm text-muted-foreground">
-          Describe your goal. Review the connected plan before running it. For adaptive
-          continuation, open a prepared case below Workflow → Business investigations.
+          Review the workflow graph, inspect each step and open the investigation report.
         </p>
         {!id ? (
           <form

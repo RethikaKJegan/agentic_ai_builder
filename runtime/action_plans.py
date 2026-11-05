@@ -1,5 +1,6 @@
 """Connected-plan hooks for GraphRunner; execution and effect ownership stay there."""
 from copy import deepcopy
+import logging
 from jsonschema import Draft202012Validator,FormatChecker
 from workflow_api.action_bindings import resolve_inputs,binding_value,deny
 from .service import digest
@@ -28,12 +29,16 @@ def params(workflow,node,run):
     if not action:return None
     result=resolve_inputs(action,context,actions,run)
     if action['capability_id']=='content.prepare':
+        if metadata.get('goal_planning'):
+            upstream={aid:deepcopy(run['action_instances'][aid]['output']) for aid in action['depends_on'] if run['action_instances'][aid]['output']!=result.get('data')}
+            if upstream:result['data']={'primary':result['data'],'upstream_results':upstream}
         result['instructions']=action['instructions']
         result['source_references']=deepcopy(action['evidence_references'])
     if node['kind']=='agent' and action['capability_id']!='content.prepare':
         from workflow_api.investigation_agents import packet
         sources=[e for dep in action['depends_on'] for e in run.get('task_checkpoints',{}).get(dep,{}).get('result',{}).get('source_evidence',[])]
         result.setdefault('context',{})['evidence']=packet(sources)
+        result['context']['task']={'task_id':action['action_id'],'capability_id':action['capability_id']}
     agent=next(a for a in workflow['agents'] if a['agent_id']==node['agent_id'])
     if node['kind']=='tool':
         # Exact Registry schema will be checked again by prepare_tool immediately before dispatch.
@@ -43,12 +48,27 @@ def params(workflow,node,run):
     return result
 
 
+def validate_content_tables(workflow,node,output):
+    action=action_for(workflow,node['node_id'])
+    if not action or action['capability_id']!='content.prepare':return
+    for tab in output.get('tabs',[]):
+        if any(len(row)!=len(tab['headers']) for row in tab['rows']):
+            from .service import RuntimeFailure
+            error=RuntimeFailure('AGENT_OUTPUT_INVALID','Generated report rows must match their headers.')
+            error.invalid_model_output=True
+            error.validation_field='tabs/rows'
+            error.validation_hint='Every report row must contain exactly one cell for each header, in the same order. Use null for unavailable values, including missing middle columns. Preserve all source citations and evidence qualifications. Never drop a column or shift values.'
+            raise error
+
+
 def verify(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
     if not action:return
     if action['capability_id']=='content.prepare':
+        validate_content_tables(workflow,node,output)
         refs=output.get('source_references',[])
         if not set(refs)<=set(inputs['source_references']) or inputs['source_references'] and not refs:
+            logging.getLogger(__name__).warning('Connected content rejected: source_reference_tokens')
             deny('Content citations must identify supplied evidence.','ACTION_CONTENT_UNVERIFIED')
         # Artifact URLs are copied from verified inputs, never invented during generation.
         url=inputs.get('artifact_url')
@@ -57,7 +77,9 @@ def verify(workflow,node,output,inputs):
         import re,json
         allowed=set(re.findall(r'https?://[^\s<>"\)]+',json.dumps(inputs)))
         for text in (output.get('body',''),output.get('summary','')):
-            if set(re.findall(r'https?://[^\s<>"\)]+',text))-allowed:deny('Generated content invented an artifact/source URL.','ACTION_CONTENT_UNVERIFIED')
+            if set(re.findall(r'https?://[^\s<>"\)]+',text))-allowed:
+                logging.getLogger(__name__).warning('Connected content rejected: unprovided_url')
+                deny('Generated content invented an artifact/source URL.','ACTION_CONTENT_UNVERIFIED')
     if node['kind']=='agent' and action['capability_id']!='content.prepare':
         from workflow_api.investigation_agents import validate_analysis
         from workflow_api.service import ApiFailure

@@ -1,4 +1,4 @@
-"""Published manual assignments survive a fresh service without stored authority."""
+"""Approved and published manual assignments survive a fresh service without stored authority."""
 from copy import deepcopy
 import json
 import pytest
@@ -9,7 +9,8 @@ from workflow_api.inventory_report_planner import compile_inventory_report
 from tests.test_inventory_report_planner import PROMPT, proposal, source_catalog
 
 
-def test_fresh_manual_worker_recovers_only_current_original_approver():
+@pytest.mark.parametrize("revision_status", ["approved", "published"])
+def test_fresh_manual_worker_recovers_only_current_original_approver(revision_status):
     from tests.test_integrated_procurement import IntegratedTests
     case=IntegratedTests(methodName='test_native_prompt_to_approved_sends_and_tracking');case.setUp()
     try:
@@ -27,10 +28,11 @@ def test_fresh_manual_worker_recovers_only_current_original_approver():
         ref={'workflow_id':workflow['workflow_id'],'workflow_version':1}
         case.call('save_workflow_version',{**ref,'base_version':0,'workflow':workflow})
         case.call('validate_workflow',ref)
-        case.call('approve_workflow',{**ref,'action':'approve'})
-        published=case.call('approve_workflow',{**ref,'action':'publish'})['workflow']
+        published=case.call('approve_workflow',{**ref,'action':'approve'})['workflow']
+        if revision_status == 'published':
+            published=case.call('approve_workflow',{**ref,'action':'publish'})['workflow']
         expected=digest(published)
-        for mode in ('different_subject','no_approval_permission','no_approval_role','missing_scopes','draft','good'):
+        for mode in ('different_subject','no_approval_permission','no_approval_role','missing_scopes','draft','unvalidated','wrong_approver','good'):
             case.start()  # Independent Registry/approval memory, same persisted revision.
             service=case.service;adapter=service.registry_adapter;actor=deepcopy(case.auth);document=deepcopy(published)
             if mode=='different_subject':actor['subject']['subject_id']='another_executor'
@@ -38,6 +40,8 @@ def test_fresh_manual_worker_recovers_only_current_original_approver():
             if mode=='no_approval_role':actor['roles']=['builder']
             if mode=='missing_scopes':actor['scopes']=[]
             if mode=='draft':document['status']='draft'
+            if mode=='unvalidated':document['metadata']['validation_state']='invalid'
+            if mode=='wrong_approver':document['metadata']['approved_by']='another_approver'
             review=adapter.review(document,actor)
             assert not review['ready'],(mode,review)
             if mode!='good':

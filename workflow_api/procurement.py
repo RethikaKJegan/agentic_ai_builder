@@ -218,6 +218,10 @@ class ProcurementPlanner:
     def __init__(self, fallback, client, model, discoverer):
         self.fallback,self.client,self.model,self.discoverer=fallback,client,model,discoverer
 
+    def plan_actions(self, objective, context):
+        """Preserve connected planning through the production procurement wrapper."""
+        return self.fallback.plan_actions(objective, context)
+
     def select_capabilities(self, objective, context):
         """Preserve the registered-composition protocol through this decorator."""
         return self.fallback.select_capabilities(objective, context)

@@ -1,0 +1,18 @@
+# Visual investigation workspace restored — 5 November 2026
+
+The account-and-goal route keeps its working connected-action backend and now reuses the earlier Business Investigation visual components: `CompositionCanvas`, `CompositionInspector` and `CompositionReport`. Workflow opens as the default graph, with Workflow / Steps / Report tabs, node inspection, business knowledge, agents/tools and memory/recovery. Generated email/report text and verified artifact links remain available in Report; technical action details remain under Steps. Google account selection, workflow review and exact-payload approval controls are retained. The display no longer exposes the connection's technical ID next to status.
+
+The reported `API_UNAVAILABLE` request `fa0a9e2b-11d0-41b3-ae7b-5bda3ad0e9b7` originates in the browser fetch-failure path. The exact historical network cause was not retained; API and worker were active during inspection. Two recovery gaps were reproducible: network-level GET errors had no HTTP status and therefore missed the existing bounded read retry, and the connected-plan polling loop stopped after its first error. GETs now retry once with the same request reference, and polling resumes after failed reads while keeping writes disabled until state is fresh. Mutations are not automatically retried; uncertain writes retain their existing explicit recovery and idempotency behavior.
+
+## Verification and rollout
+
+Private evidence: `.local/visual-investigation-20261105/`.
+
+- **507 frontend tests in 75 files passed**, including network-disconnected GET recovery, preserved mutation non-retry, visual tabs/inspector and polling recovery without execution (`tests-final.log`). Typecheck, lint, shared contracts and diff checks passed.
+- Production build passed (`build-final.log`). The first staged build lacked imported test fixtures; copying the existing fixtures fixed the staging setup, with no product/schema assertion removed.
+- All eight controlled browser journeys were verified: **7 passed** in the first run, followed by **1 passed** for the updated adaptive-navigation test. That test originally searched for a technical action ID on the graph instead of switching to Steps; the corrected test retains its revision/checkpoint preservation assertions (`browser.log`, `browser-followup.log`). The main-prompt journey also deliberately interrupts one composition GET and verifies recovered graph/inspector/report plus exactly one controlled Sheet and email effect.
+- Deployed build **`X3dXzHzl5f9Khhf-ay-rm`**. Only the Builder frontend was restarted. API/worker were not restarted, no database migration was applied and deployment performed no database writes. The previous build and source are retained; previous hashed static assets remain available for already-open browser tabs. No Git commit or push was made.
+- Approved normal public sign-in, active worker, restored graph/inspector/Steps/Report, persisted email content, completed-run preservation and mobile width checks passed. One deliberately aborted public GET recovered successfully. **Zero browser errors and failed HTTP reads** were observed (`public-check.json`). Screenshots were retained; the desktop graph was visually inspected.
+- Public checks made **zero model calls and zero external writes**. The previously completed run `run_9926e6612bd64785b3c34de2c8f12595` was opened read-only; its verified email was not resent.
+
+Frontend rollback: stop only `agentic-builder-frontend`, preserve the current build, restore `previous-next` from the private evidence directory to `frontend/.next`, then start the frontend. Leave API/worker and application databases running and unchanged.

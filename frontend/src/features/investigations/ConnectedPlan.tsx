@@ -7,6 +7,8 @@ import { type ActionDocument, receiptLinks } from "@/api/orchestration";
 import { type CompositionView } from "@/api/compositions";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { SavedDetails, Outcome } from "./LifecyclePanels";
+import { CompositionCanvas } from './CompositionCanvas';
+import { CompositionInspector, CompositionReport } from './CompositionPanels';
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
 
 export const actionButton = "rounded-lg border px-3 py-2 text-sm disabled:opacity-40";
@@ -28,6 +30,8 @@ export function ConnectedPlan({
   const [error, setError] = useState<Error | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [stale, setStale] = useState(true);
+  const [tab,setTab]=useState<'workflow'|'steps'|'report'>('workflow');
+  const [panel,setPanel]=useState<string|null>(null);
   const scope = backend.session
     ? backend.session.auth.subject.workspace_id + ":" + backend.session.auth.subject.subject_id
     : "";
@@ -52,6 +56,7 @@ export function ConnectedPlan({
         if (live) {
           setError(e as Error);
           setStale(true);
+          timer=setTimeout(()=>void read(),3000);
         }
       }
     }
@@ -118,7 +123,7 @@ export function ConnectedPlan({
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold">Connected action plan</h2>
+        <h2 className="font-semibold">Investigation workflow</h2>
         <button className={actionButton} disabled={command.busy} onClick={update}>
           Refresh plan
         </button>
@@ -144,14 +149,21 @@ export function ConnectedPlan({
           <p className="break-words text-sm">{doc.action_plan.goal}</p>
           <p className="text-xs">
             Plan revision {doc.action_plan.revision} ·{" "}
-            {view.run?.status ?? view.workflow_status ?? "Not saved"} · Account:{" "}
-            {doc.google_connection_id ?? "Existing server connection"}
+            {view.run?.status ?? view.workflow_status ?? "Not saved"}
           </p>
           <GoogleAccountSelect
             value={doc.google_connection_id ?? ""}
             onChange={() => {}}
             disabled
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="tablist" aria-label="Investigation views" className="inline-flex rounded-lg border p-0.5">
+              {(['workflow','steps','report'] as const).map(value=><button key={value} role="tab" aria-selected={tab===value} disabled={value==='report'&&!view.run&&!view.tasks.some(t=>t.result)} onClick={()=>setTab(value)} className={`rounded-md px-3 py-1.5 text-sm capitalize disabled:opacity-40 ${tab===value?'bg-muted font-medium':''}`}>{value}</button>)}
+            </div>
+            <button className={actionButton} onClick={()=>setPanel('knowledge')}>Business knowledge</button>
+            <button className={actionButton} onClick={()=>setPanel('agents')}>Agents and tools</button>
+            <button className={actionButton} onClick={()=>setPanel('memory')}>Memory and recovery</button>
+          </div>
           <SavedDetails
             label="Completion criteria and missing inputs"
             value={{
@@ -283,7 +295,13 @@ export function ConnectedPlan({
                 ))}
               </article>
             ))}
-          <ol className="space-y-3">
+          {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={view} onSelect={setPanel}/></div>}
+          {tab==='report'&&<div role="tabpanel" aria-label="Investigation report">
+            <CompositionReport view={view}/>
+            {Object.values(view.run?.action_instances??{}).flatMap(instance=>receiptLinks(instance)).map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="mx-5 block break-all text-sm text-primary underline">Open verified artifact: {url}</a>)}
+            {doc.action_plan.actions.filter(a=>a.capability_id==='content.prepare').map(a=>{const output=view.run?.action_instances?.[a.action_id]?.output;return output&&typeof output['body']==='string'&&output['body']?<article key={a.action_id} className="mx-auto max-w-5xl space-y-3 p-5"><h3 className="font-semibold">Generated report content</h3><p className="whitespace-pre-wrap break-words text-sm">{output['body']}</p></article>:null;})}
+          </div>}
+          {tab==='steps'&&<ol className="space-y-3">
             {doc.action_plan.actions.map((a, i) => {
               const task = view.tasks.find((t) => t.id === a.action_id);
               const instance = view.run?.action_instances?.[a.action_id];
@@ -339,7 +357,8 @@ export function ConnectedPlan({
                 </li>
               );
             })}
-          </ol>
+          </ol>}
+          <CompositionInspector view={view} section={panel} onClose={()=>setPanel(null)}/>
           <p className="text-xs text-muted-foreground">
             ACTUAL source/provider reports, DERIVED values, INFERRED content and SYNTHETIC
             assumptions keep their provenance. Provider confirmation does not establish physical

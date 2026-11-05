@@ -95,7 +95,10 @@ class CompositionPresentation:
             if run and action_node:
                 state=run['node_states'].get(action_node['node_id'],'pending')
                 receipt=run['outputs'].get(action_node['node_id'])
-                if receipt is not None:output=dict(summary='Provider returned an action receipt.',findings=[],missing_information=[],records=[],rule_results=[],tool_receipts=[dict(tool_id=task.get('selected_tool_id'),receipt={k:receipt[k] for k in ('draft_id','event_id','spreadsheet_id','status') if k in receipt})])
+                if receipt is not None and task['capability_id']=='content.prepare':
+                    output=dict(summary=receipt.get('summary') or receipt.get('body') or '',findings=[],missing_information=deepcopy(receipt.get('questions',[])),records=[],rule_results=[],tool_receipts=[])
+                elif receipt is not None and contract['kind']=='model':output=result_view(receipt)
+                elif receipt is not None:output=dict(summary='Provider returned an action receipt.',findings=[],missing_information=[],records=[],rule_results=[],tool_receipts=[dict(tool_id=task.get('selected_tool_id'),receipt={k:receipt[k] for k in ('draft_id','event_id','spreadsheet_id','status') if k in receipt})])
             tasks.append(dict(id=task['task_id'],label=contract['business_purpose'],kind='action' if contract['side_effect'] in ('write','draft') else 'retrieval' if contract['kind']=='tool' else 'agent',state=state,depends_on=task['depends_on'],capability_id=task['capability_id'],agent_id=config['configuration_id'] if config else None,tools=[doc['selected_tools'][task['task_id']]['tool_id']] if task['task_id'] in doc['selected_tools'] else [],condition=task['condition'],result=output,errors=[f for f in failures if f.get('affected_task')==task['task_id']],required_evidence=config.get('required_evidence_facts',[]) if config else contract['required_evidence'],completion_criteria=contract['completion_criteria'],approval_gate=dict(id=gate['node_id'],label=gate['label'],state=(run or {}).get('node_states',{}).get(gate['node_id'],'pending')) if gate else None))
         knowledge={}
         if doc.get('preparation_id'):

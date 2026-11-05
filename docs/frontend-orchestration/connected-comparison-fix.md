@@ -1,0 +1,37 @@
+# Connected comparison and report preparation — 5 November 2026
+
+The failed comparison in `composition_344b1ec8d35e7bbc91e7895b`, run `run_c5ad560ed73e4e69adbd0f9b24853e7c`, retained both successful mapped-source reads. Its comparison failed with `INVESTIGATION_AGENT_OUTPUT`. The rejected raw model response was not retained, so its exact invalid field cannot be established.
+
+The connected analysis invocation lacked the server-owned task capability marker used to select the strict evidence-bound schema. Compiler instructions also requested fields outside the analysis validator’s three-field contract. Connected analysis now passes the capability marker and uses the existing citation-constrained schema through CrewAI. Content preparation keeps its distinct contract. Runtime citation validation remains enforced.
+
+Binding compatibility now checks array item shapes and required object properties. A report containing rows cannot bind to the header-only spreadsheet setup operation. Planner instructions identify the populated report operation for report creation; they do not discard rows to fit another tool.
+
+Manual approved revisions can restore process-local Registry assignment approval in a fresh worker only for the same original approver with current approval permission, approver role, matching workspace, validated revision and current tool scopes. Published automation behavior is retained. External payload approval remains separate and required.
+
+Regression tests cover actual CrewAI/Registry/runtime comparison with supplied citations, incompatible spreadsheet row binding, and fresh-worker restoration for approved and published revisions. Negative cases include a different subject, missing permission, missing role, missing scopes, draft status, invalid validation and a different recorded approver.
+
+The user separately authorized an initial live comparison and Sheet-payload preparation test using the configured model, then explicitly authorized one follow-up after its five-tab report hit the registered four-tab limit. Both tests stop before Sheet creation. The acceptance draft preserves the original plan and replaces its incompatible header-only Sheet tool with the registered populated-report tool. This is an explicitly reviewed draft, not evidence that a fresh live planner selected that tool. Original failures remain preserved. Private evidence and source rollback copies are in `.local/compare-fix-20261105/`.
+
+The initial configured model run completed comparison and content preparation. Approval preparation then rejected five generated tabs against the report tool’s four-tab input ceiling. The report input now matches the existing setup/output ceiling of 20 tabs; the adapter still enforces at most 1,000 total data rows, 10,000 data cells and 256 KB, alongside the existing per-tab bounds. Regression tests exercise all five sections and rejection of aggregate overflow before provider I/O.
+
+The visual inspector previously replaced model output with an empty action receipt. Model tasks now project their actual saved analysis summary, findings, citations and missing information. This changes only the read projection and preserves stored runs. A real CrewAI/runtime regression checks the projected findings.
+
+Validation: 117 initial related tests passed; 61 overlapping binding/connected tests passed; 63 overlapping worker/goal/connected tests passed. Final report/presentation suites: 34 passed plus 6 subtests. Final CrewAI/projection regression: 1 passed, 27 deselected. Counts overlap and are not summed. Shared contract and whitespace checks passed. Existing deprecation warnings remain.
+
+Follow-up live acceptance reached `paused_for_approval`: composition `composition_c9152dc3b494e554e382bef8`, run `run_2871b292d3b745c0a650e17c2143f49e`. Both mapped reads, actual model comparison and content generation completed. The exact five-tab payload is retained in approval `approval_9dd81fe166e546c38329e4b05fb910e7`. The create and verify actions remain pending, with no external write attempted.
+
+The first browser check caught a projection mismatch: generated content has string findings, while analysis findings are structured objects. Generated-content summaries/questions now use a separate display projection; full generated content and exact payload remain in the original action instance/approval. Public read-only checks are recorded after this correction.
+
+A final payload audit found one generated comparison row had seven cells under eight headers, with a missing middle value. That intermediate preview (`run_2871b292d3b745c0a650e17c2143f49e`) was cancelled through the normal API, preserving evidence and preventing approval of malformed content. It was not counted as a fully valid report.
+
+Generated report row widths are now checked inside the existing budgeted `correct_once` path before content is accepted or shown for approval. Feedback instructs the model to preserve column order and use null for unavailable middle values. No padding, column shifting or invented facts are applied by runtime. Correction is limited to one attempt and available call budget; insufficient budget or repeated invalid output still stops execution. The final acceptance draft explicitly allows two content calls. The user separately approved this final verification with normal API charges and no Sheet creation. A controlled regression verifies correction of a missing middle cell and rejection after a second malformed result. Final row/projection regressions: 2 passed, 82 deselected. Core runtime: 55 passed.
+
+## Final deployed verification
+
+The final expressly authorized configured-model run is `run_9920d54f935e4d8e91a4b3bc93e61285` in `composition_a37a0135cea8db8fd95e6c4e`. It is paused for exact Sheet-payload approval. Both actual mapped-source reads, the model comparison and generated content completed. All 10 comparison findings reference supplied citation pairs. The five tabs contain 1 complaint row, 1 inspection row, 5 comparison rows, 16 citation rows and 8 unresolved-question rows; every row matches its headers. Creation has not started and verification remains pending. No Sheet ID or URL is claimed.
+
+The final run reserved capacity for a second content call but recorded no `agent.correction` event. Usage reservations are not evidence of actual billed calls or prices. The one-correction behavior was exercised separately with controlled responses.
+
+Public normal-login checks passed for the visual workflow graph, comparison inspector, Steps, generated Report, pending exact approval, desktop/mobile and recovery from an injected failed GET. There were zero browser errors or failed HTTP reads. These public checks performed no model calls or external writes. The desktop screenshot was visually inspected. API, worker and frontend are active with zero automatic restarts; frontend build remains `X3dXzHzl5f9Khhf-ay-rm`. Only API/worker source changes were activated for this fix; no database migration, Git commit or push was made. Original failed comparison records were retained.
+
+[Open the verified workflow](https://praxi.bellcorpstudio.com/app/workflows/investigate?connected=1&composition=composition_a37a0135cea8db8fd95e6c4e&run=run_9920d54f935e4d8e91a4b3bc93e61285). Review the exact proposed payload before approving creation. This verifies the reviewed acceptance draft and its actual model/source execution; it does not establish that every future model-generated workflow or external provider action will succeed.

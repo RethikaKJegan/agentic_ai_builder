@@ -396,7 +396,8 @@ class RegistryAdapter:
                 'workflow.approve' in auth.get('permissions', []) and
                 bool(set(auth.get('roles', [])) & self.service._policy.approval_roles))
             if (not review['ready'] and (auth.get('_registry_assignment_subject') or manual_approver) and
-                    workflow.get('status') == 'published' and
+                    (workflow.get('status') == 'published' or
+                     workflow.get('status') == 'approved' and manual_approver) and
                     workflow.get('metadata', {}).get('validation_state') == 'validated' and
                     isinstance(approved_by, str) and
                     approved_by == assignment_auth.get('subject', {}).get('subject_id')):

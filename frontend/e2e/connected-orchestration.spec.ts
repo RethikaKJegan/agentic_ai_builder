@@ -125,6 +125,7 @@ for (const mobile of [false, true])
     expect(finished.adaptive.status).toBe("completed");
     await expect(page.getByText(/EVALUATE · completed/)).toBeVisible();
     expect(finished.adaptive.run_id).toBe(waiting.adaptive.run_id);
+    await page.getByRole("tab",{name:"steps",exact:true}).click();
     await expect(page.getByRole("link", { name: /Open verified artifact/ }).first()).toBeVisible();
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -156,6 +157,7 @@ test("D: evaluator adds retrieval, revises plan and preserves the completed read
   const done = await advanceCase(page, setup.case_id);
   expect(done.adaptive.plan_revision).toBe(2);
   expect(done.adaptive.revision_history).toHaveLength(2);
+  await page.getByRole("tab",{name:"steps",exact:true}).click();
   await expect(page.getByText(/more_evidence/).first()).toBeVisible();
   const run = (
     await (
@@ -183,9 +185,16 @@ test("B: prompt planning, reviewed recurring consent and two fresh occurrences",
   await expect(page.getByLabel("Explicit user values")).toHaveCount(0);
   await expect(page.getByLabel("Optional connected action")).toHaveCount(0);
   await page.getByRole("button", { name: "Propose connected plan" }).click();
-  await expect(page.getByRole("heading", { name: "Connected action plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation workflow" })).toBeVisible();
   await page.getByRole("button", { name: "Review plan", exact: true }).click();
   await page.getByRole("button", { name: "Approve workflow", exact: true }).click();
+  const currentPlanId=new URL(page.url()).searchParams.get('composition');
+  const planResponse=await page.request.get('/api/backend/business-ontology/v1/action-plans/'+currentPlanId);
+  expect(planResponse.ok()).toBe(true);const approvedPlan=(await planResponse.json()).data;
+  const reportAction=approvedPlan.action_plan.actions.find((action:{action_id:string})=>action.action_id==='sheet');
+  const projectBinding=reportAction.bindings.find((binding:{target:string[]})=>binding.target.join('.')==='project_id');
+  const reportProject=approvedPlan.binding_context.configuration[projectBinding.key];
+  expect(reportProject).toMatch(/^goal_/);
   const a = page.getByRole("region", { name: "Background automation" });
   await a.getByText("Configure reviewed automation").click();
   await a.getByLabel("Automation type").selectOption("authorizations");
@@ -201,7 +210,7 @@ test("B: prompt planning, reviewed recurring consent and two fresh occurrences",
         extension_sheets_create_report: {
           type: "object",
           required: ["project_id"],
-          properties: { project_id: { const: "complaint_report" } },
+          properties: { project_id: { const: reportProject } },
         },
         extension_mail_send: {
           type: "object",
@@ -281,6 +290,50 @@ test("E: refresh and worker reconstruction retain uncertain sends without replay
   expect(run.error_code).toBe("ACTION_EFFECT_UNVERIFIED");
 });
 
+test("Main prompt: account and goal produce a verified report/email without technical inputs",async({page})=>{
+  await login(page);
+  const setup=await control(page,'scenario/daily');
+  const before=await control(page,'state');
+  let interrupted=false;
+  await page.route('**/api/backend/business-ontology/v1/compositions/*/view*',async route=>{if(!interrupted){interrupted=true;await route.abort('failed');}else await route.continue();});
+  await page.goto('/app');
+  await page.getByLabel('Workflow Google account').first().selectOption(setup.connection_id);
+  await expect(page.getByLabel('Optional connected action')).toHaveCount(0);
+  await page.getByLabel('Process description').fill('Investigate complaint C123, create a Sheet of evidence-backed findings and email engineer@example.com the verified link.');
+  await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Investigation workflow',exact:true})).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('connected')).toBe('1');
+  await expect(page.getByLabel('Dynamic investigation workflow canvas')).toBeVisible();
+  expect(interrupted).toBe(true);
+  await page.getByRole('button',{name:'Agents and tools',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Agents and tools',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Review plan',exact:true}).click();
+  await page.getByRole('button',{name:'Approve workflow',exact:true}).click();
+  await page.getByRole('button',{name:'Run reviewed plan',exact:true}).click();
+  for(let i=0;i<2;i++){
+    await control(page,'tick');
+    await page.getByRole('button',{name:'Refresh plan',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Approve exact payload',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Approve exact payload',exact:true}).click();
+  }
+  await control(page,'tick');await page.getByRole('button',{name:'Refresh plan',exact:true}).click();
+  const url=new URL(page.url()),cid=url.searchParams.get('composition'),rid=url.searchParams.get('run');
+  const response=await page.request.get('/api/backend/business-ontology/v1/compositions/'+cid+'/view?run_id='+rid);
+  expect(response.ok()).toBe(true);const view=(await response.json()).data;
+  expect(view.run.status).toBe('completed');
+  expect(view.run.action_instances.sheet.resolved_inputs.project_id).toMatch(/^goal_/);
+  expect(view.run.action_instances.sheet.resolved_inputs.creation_key).toMatch(/^action_/);
+  expect(view.run.action_instances.sheet.verified_receipt).toBe(true);
+  expect(view.run.action_instances.send.resolved_inputs.body).toContain(view.run.action_instances.sheet.output.spreadsheet_url);
+  const after=await control(page,'state');expect(after.sheets-before.sheets).toBe(1);expect(after.sent-before.sent).toBe(1);
+  await page.getByRole('tab',{name:'report',exact:true}).click();
+  await expect(page.getByRole('tabpanel',{name:'Investigation report'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Open verified artifact: '+view.run.action_instances.sheet.output.spreadsheet_url,exact:true})).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
 test("E: revoked selected account blocks planning and never substitutes another account", async ({
   page,
 }) => {
@@ -297,7 +350,7 @@ test("E: revoked selected account blocks planning and never substitutes another 
   await control(page, "revoke-account");
   await page.getByRole("button", { name: "Propose connected plan" }).click();
   await expect(page.getByRole("alert").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Connected action plan" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Investigation workflow" })).toHaveCount(0);
   const after = await control(page, "state");
   expect(after.sent).toBe(before.sent);
   expect(after.sheets).toBe(before.sheets);

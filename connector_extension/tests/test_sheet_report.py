@@ -67,6 +67,20 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(rows[2]['values'][0], {'userEnteredValue': {'stringValue': '=literal'}})
         self.assertEqual(rows[1]['values'][2], {'userEnteredValue': {'boolValue': True}})
         self.assertEqual(rows[1]['values'][3], {})
+    def test_five_section_report_keeps_all_rows_and_verifies_receipt(self):
+        value=deepcopy(self.inputs)
+        value['tabs']=[{'title':title,'headers':['Finding'],'rows':[['Source-backed example']]} for title in ['Complaint','Inspection','Comparison','Citations','Questions']]
+        result=self.invoke(value)
+        self.assertEqual(len(result['tabs']),5)
+        self.assertEqual(result['written_rows'],5)
+        self.assertEqual(self.http.write_count,1)
+
+    def test_total_row_bound_remains_enforced_across_tabs(self):
+        value=deepcopy(self.inputs)
+        value['tabs']=[{'title':str(i),'headers':['Finding'],'rows':[['Example']]*250} for i in range(5)]
+        with self.assertRaises(RuntimeFailure):self.invoke(value)
+        self.assertEqual(self.http.calls,[])
+
     def test_repeated_action_does_not_duplicate_and_changed_data_is_denied(self):
         first = self.invoke(); second = self.invoke()
         self.assertEqual(first['spreadsheet_id'], second['spreadsheet_id']); self.assertTrue(second['reused'])

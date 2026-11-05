@@ -115,6 +115,8 @@ it("links only completed verified connector URLs, never generated or unsafe URLs
 });
 it("shows actual dependencies, agent assignments, provenance and verified artifacts", async () => {
   render(<ConnectedPlan id={doc().composition_id} />);
+  expect(await screen.findByLabelText('Dynamic investigation workflow canvas')).toBeVisible();
+  fireEvent.click(screen.getByRole('tab',{name:'steps'}));
   expect(await screen.findByText("1. read")).toBeVisible();
   expect(screen.getByText(/business.read.complaints · Agent: actual_agent/)).toBeVisible();
   expect(screen.getAllByText("INFERRED").length).toBeGreaterThan(0);
@@ -381,4 +383,40 @@ it("accepts actual occurrence records with canonical references and no duplicate
       run_id: "run_real",
     }).request,
   ).toEqual({});
+});
+
+it('prepares a goal-mode plan without approving or executing it automatically',async()=>{
+ const document={...doc(),interaction_mode:'goal'};
+ vi.mocked(api.actionPlan).mockResolvedValue(document);
+ vi.mocked(api.compositionView).mockResolvedValue({...view(),run:null,workflow_status:'draft'});
+ render(<ConnectedPlan id={document.composition_id}/>);
+ const review=await screen.findByRole('button',{name:/^Review plan$/});
+ expect(screen.queryByRole('button',{name:'Save workflow draft'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Validate workflow'})).not.toBeInTheDocument();
+ fireEvent.click(review);
+ await waitFor(()=>expect(api.request).toHaveBeenCalledWith('validate_workflow',expect.anything(),expect.stringContaining('_validate')));
+ expect(vi.mocked(api.request).mock.calls.some(([operation])=>operation==='approve_workflow'||operation==='execute_workflow')).toBe(false);
+});
+
+
+it('restores the visual graph, report tab and saved-context inspector',async()=>{
+ render(<ConnectedPlan id={doc().composition_id}/>);
+ expect(await screen.findByLabelText('Dynamic investigation workflow canvas')).toBeVisible();
+ expect(screen.getByRole('tab',{name:'workflow'})).toHaveAttribute('aria-selected','true');
+ fireEvent.click(screen.getByRole('button',{name:'Agents and tools'}));
+ expect(await screen.findByRole('heading',{name:'Agents and tools'})).toBeVisible();
+ fireEvent.keyDown(document,{key:'Escape'});
+ fireEvent.click(screen.getByRole('tab',{name:'report'}));
+ expect(await screen.findByRole('tabpanel',{name:'Investigation report'})).toBeVisible();
+});
+
+it('keeps polling after a transient read failure without executing a command',async()=>{
+ vi.useFakeTimers({shouldAdvanceTime:true});
+ try{
+  vi.mocked(api.actionPlan).mockRejectedValueOnce(new ApiError({error_code:'API_UNAVAILABLE',message:'Network interrupted',request_id:'read_disconnect',retryable:true})).mockResolvedValue(doc());
+  render(<ConnectedPlan id={doc().composition_id}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(3100);});
+  expect(await screen.findByLabelText('Dynamic investigation workflow canvas')).toBeVisible();
+  expect(api.request).not.toHaveBeenCalled();
+ }finally{vi.useRealTimers();}
 });

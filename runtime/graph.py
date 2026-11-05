@@ -53,6 +53,8 @@ class GraphRunner:
             output = adapter.invoke(agent, params, reference)
             if list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
+            from .action_plans import validate_content_tables
+            validate_content_tables(workflow,node,output)
             return output
         def prepare(item):
             if getattr(adapter, 'external_write', False):
