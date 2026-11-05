@@ -27,6 +27,7 @@ export function InvestigationList({lifecycle=false}:{lifecycle?:boolean}={}) {
   finally{pending.current=false;setBusy(false);}
  }
  return <section className="mt-8"><div className="mb-3 flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary"/><h2 className="text-lg font-medium">Business investigations</h2></div>
+ <Link to="/app/workflows/investigate" search={{connected:"1"}} className="mb-4 inline-block rounded-lg border px-3 py-2 text-sm text-primary">New connected investigation</Link>
  {lifecycle&&<BusinessLifecycle/>}
  {error&&<p role="status" className="mb-3 text-sm text-muted-foreground">Saved investigations could not be loaded. <button className="text-primary underline" onClick={()=>setAttempt(n=>n+1)}>Retry investigation list</button></p>}
  {jobs.map(j=><Link key={j.job_id} to="/app/workflows/investigate" search={{job:j.job_id,...(j.kind==='compose'?{dynamic:'1'}:{})}} className="mb-2 block rounded-lg border p-3 text-sm">Workflow generation {j.state} · Open progress</Link>)}

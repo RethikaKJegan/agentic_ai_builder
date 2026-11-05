@@ -26,7 +26,7 @@ export default function DynamicInvestigationWorkspace() {
   const read=async()=>{try{
    let resolved=cid;let pending=false;
    if(jobId){const job=await api.investigationJob(jobId);if(!active)return;pending=['queued','running'].includes(job.state);setPlanning(job.kind==='compose'&&pending);setJobError(job.state==='failed'?(job.error?.message??'Preparation failed. Inspect the saved state before retrying.'):null);if(job.composition_id)resolved=job.composition_id;}
-   if(resolved){const snapshot=await api.compositionView(resolved,runId??undefined);if(!active)return;setView(snapshot);if(!cid){location(resolved,runId??undefined);return;}pending=pending||!!snapshot.run&&['queued','running','paused_for_approval'].includes(snapshot.run.status);}
+   if(resolved){const snapshot=await api.compositionView(resolved,runId??undefined);if(!active)return;if(snapshot.planning.mode==='action_plan'){router.replace('/app/workflows/investigate?'+new URLSearchParams({connected:'1',composition:resolved,...(runId?{run:runId}:{})}));return;}setView(snapshot);if(!cid){location(resolved,runId??undefined);return;}pending=pending||!!snapshot.run&&['queued','running','paused_for_approval'].includes(snapshot.run.status);}
    if(active&&pending)timer=setTimeout(()=>void read(),1500);
   }catch(caught){if(active){setError(caught instanceof Error?caught:new InputError('Could not load the saved workflow.'));setPlanning(false);}}};
   setError(null);setView(null);void read();return()=>{active=false;if(timer)clearTimeout(timer);};

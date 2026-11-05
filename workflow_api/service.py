@@ -417,6 +417,8 @@ class WorkflowService:
             verify_business_trace(db, auth, workflow)
             from .business_composition import verify_composition
             verify_composition(db,auth,workflow)
+            if workflow.get('metadata', {}).get('connected_action_plan') and not workflow['metadata'].get('composition_id'):
+                raise ApiFailure('CAPABILITY_NOT_FOUND', 'Connected plans require an owned immutable composition.', 403)
             from .business_preparation import verify_workflow_pin
             verify_workflow_pin(db,auth,workflow)
             # Canonical fields survive saving. Executable authority never comes from edits.
@@ -426,7 +428,10 @@ class WorkflowService:
             expected = current['version'] if current else 0
             if type(base) is not int or base != expected or workflow['version'] != expected + 1:
                 raise ApiFailure('REVISION_CONFLICT', 'A newer revision exists. Reload it before saving.', 409, 'workflow.version')
-            workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
+            # Connected compositions already pin validated typed bindings and agents.
+            # Legacy input-map materialization would corrupt those immutable plans.
+            if not workflow.get('metadata', {}).get('connected_action_plan'):
+                workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
             if any(agent['allowed_tool_ids'] for agent in workflow['agents']) or any('configuration_reference' in tool for tool in workflow['tools']):
                 raise ApiFailure('UNTRUSTED_ASSIGNMENT', 'Executable assignments must be supplied by the trusted registry.', 403)
             workflow['metadata'].pop('validation_state', None)
@@ -485,7 +490,11 @@ class WorkflowService:
                 # registry before reviewing them. This lets an existing draft
                 # recover after a configured planner capability becomes
                 # resolvable, without accepting browser-supplied grants.
-                workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
+                if workflow.get('metadata', {}).get('connected_action_plan'):
+                    from .business_composition import verify_composition
+                    verify_composition(db, auth, workflow)
+                else:
+                    workflow, _ = self.registry_adapter.resolve_draft(workflow, auth)
                 self.validate_document(workflow)
                 self.registry_adapter.approve_pending(workflow, auth)
             review = self.registry_adapter.review(workflow, auth)

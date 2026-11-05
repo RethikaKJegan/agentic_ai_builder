@@ -1,3 +1,4 @@
+import {actionDocumentSchema,automationSchema,automationListSchema} from './orchestration';
 import {compositionViewSchema,compositionListSchema} from './compositions';
 import {caseSchema,caseIndexSchema,processDefinitionSchema,processIndexSchema,packageDetailsSchema,driveResultSchema,type CaseOperation} from './business-lifecycle';
 import {businessSourcesSchema,businessSourceRecordsSchema,businessSourceProfileSchema,type BusinessRecordRequest} from './business-sources';
@@ -150,6 +151,14 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 }
 
 export class WorkflowClient {
+  async createActionPlan(body:Record<string,unknown>) {return actionDocumentSchema.parse(await this.read('business-ontology/v1/action-plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async actionPlan(id:string) {return actionDocumentSchema.parse(await this.read(`business-ontology/v1/action-plans/${encodeURIComponent(id)}`));}
+  async adaptiveCommand(id:string,operation:'enable'|'supply'|'revise',body:Record<string,unknown>) {return caseSchema.parse(await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}/adaptive${operation==='enable'?'':'/'+operation}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async automationRecords(before?:string) {return automationListSchema.parse(await this.read('business-ontology/v1/automation'+queryString({before,limit:50})));}
+  async automationRecord(id:string) {return automationSchema.parse(await this.read(`business-ontology/v1/automation/${encodeURIComponent(id)}`));}
+  async createAutomation(kind:'subscriptions'|'authorizations'|'schedules'|'timers',body:Record<string,unknown>) {return automationSchema.parse(await this.read(`business-ontology/v1/automation/${kind}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async controlAutomation(id:string,body:Record<string,unknown>) {return automationSchema.parse(await this.read(`business-ontology/v1/automation/${encodeURIComponent(id)}/control`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+
   async businessCases(before?:number) {return caseIndexSchema.parse(await this.read('business-ontology/v1/cases'+(before?`?before=${before}`:'')));}
   async businessProcesses() {return processIndexSchema.parse(await this.read('business-ontology/v1/process-definitions'));}
   async businessProcess(id:string,version:number) {return processDefinitionSchema.parse(await this.read(`business-ontology/v1/process-definitions/${encodeURIComponent(id)}/${version}`));}
@@ -167,7 +176,7 @@ export class WorkflowClient {
   async investigationPreflight(body:Record<string,unknown>) {return z.object({preflight_id:z.string(),coverage:z.record(z.object({state:z.string()}))}).parse(await this.read('business-ontology/v1/investigations/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async investigations() {return investigationListSchema.parse(await this.read('business-ontology/v1/investigations'));}
   async clientPackages() {return z.object({items:z.array(z.object({package_id:z.string(),revision:z.number(),client_id:z.string(),domain:z.string(),ontology_version:z.string()}))}).parse(await this.read('business-ontology/v1/client-packages'));}
-  async compositionWorkflow(id:string) {return CanonicalWorkflowSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
+  async compositionWorkflow(id:string) {const {correlation_id:_correlation,contract_versions:_versions,...workflow}=z.record(z.unknown()).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));return CanonicalWorkflowSchema.parse(workflow);}
   async cancelComposition(id:string,runId:string) {return z.object({run_id:z.string(),status:z.string()}).passthrough().parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
   async compositionView(id:string,runId?:string) {return compositionViewSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/view${runId?`?run_id=${encodeURIComponent(runId)}`:''}`));}
   async compositions() {return compositionListSchema.parse(await this.read('business-ontology/v1/compositions'));}

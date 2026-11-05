@@ -1,0 +1,16 @@
+# Separately authorized live-provider acceptance
+
+This checklist is not an authorization to perform live writes or deploy. Use owned test resources and explicit approved recipients when a live acceptance window is authorized.
+
+- Verify the exact selected Google account, OAuth client/callback origin, granted Gmail read/send, Sheets and Calendar scopes, credential encryption and account ownership. Test reconnect/revocation; execution must stop rather than substitute an account.
+- Review current registered tools, source connections/mappings, destination restrictions, quotas, agent budgets and owner/approver permissions. Validate/approve the exact workflow revision. OAuth alone is not business consent.
+- Evaluate live model plans/content using representative actual evidence. Check missing identity handling, citations, typed output bindings, unsupported requests, completion criteria and evidence gaps. Controlled providers do not prove model quality.
+- Approve a test Sheet payload; verify creation/readback and the returned actual ID/URL. Confirm downstream content uses that receipt and restart does not recreate the Sheet.
+- Approve an exact Gmail payload to an authorized test recipient. Verify provider receipt, deliverability, thread/RFC correlation and matching-reply continuation. Check unrelated/automatic/bulk replies, mailbox quotas, bounded thread reads and retention requirements. No placeholder Gmail URL is expected.
+- Review Calendar IDs, actual event times/timezone and exact payload before a test event. Verify the real provider receipt. Guest invitations remain unsupported by the current adapter.
+- Configure fresh worker authentication and the intended trigger/runtime process roles. Verify leases, worker restart, event/job handoff, paused waits, approval deadlines, recurring scope/expiry and duplicate suppression. Reconciliation procedures must address unknown writes and interrupted evaluator calls without blind retries.
+- Approve recurring business scope separately: fixed account and destinations, constrained operation inputs, purpose/content scope, exact cron/IANA timezone, expiry and limits. Verify two separate occurrences read changed source data, with independent report/send receipts. Check DST/missed-run/overlap policies and pause/resume/cancel/revoke.
+- Before deployment, back up intended databases, apply/rehearse additive initialization/migrations on the actual PostgreSQL version/configuration, verify least-privilege roles and concurrent worker behavior, and establish rollback, monitoring, quotas, retention and operator reconciliation ownership.
+- Build from the reviewed source, configure exact frontend/backend origins and authentication, then deploy only after explicit authorization. No production service was restarted by Phase 4 implementation. Local browser tests run against an isolated staged build and disposable controlled backend.
+
+Remaining product prerequisites: installed process/stage contracts must be compatible with the requested adaptive actions. This phase intentionally does not install or rewrite domain processes. Advanced recurring scope and payload-path editors require an operator who understands the registered operation/input schemas. Live Google/model behavior and production operational qualification remain environment-specific work.

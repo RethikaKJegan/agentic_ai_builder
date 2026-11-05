@@ -23,6 +23,9 @@ import {
   EventForm,
 } from "./LifecyclePanels";
 
+import {GoogleAccountSelect} from "@/features/workflows/GoogleWorkflowConnection";
+import {AdaptiveCasePanel} from "./AdaptiveCasePanel";
+
 const button = "rounded-lg border px-3 py-2 text-sm disabled:opacity-40";
 type Pending = {
   id: string | null;
@@ -70,6 +73,7 @@ function LifecycleWorkspace({
   const [savedId, setSavedId] = useState(initialCaseId ?? "");
   const [value, setValue] = useState<BusinessCase | null>(null);
   const [goal, setGoal] = useState("");
+  const [googleConnection,setGoogleConnection]=useState("");
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [pane, setPane] = useState("Progress");
   const [error, setError] = useState<Error | null>(null);
@@ -275,6 +279,7 @@ function LifecycleWorkspace({
           process.version === 1;
         body = {
           original_user_goal: goal,
+          ...(googleConnection?{google_connection_id:googleConnection}:{}),
           inputs: fieldInputs(process, inputs),
           ...(simpson
             ? {}
@@ -555,6 +560,7 @@ function LifecycleWorkspace({
               className="mt-1 w-full rounded-lg border bg-background p-2"
             />
           </label>
+          <GoogleAccountSelect value={googleConnection} onChange={setGoogleConnection} disabled={busy||uncertain}/>
           <div className="grid gap-3 md:grid-cols-2">
             {process &&
               userFields(process).map(({ path, spec, required }) => {
@@ -640,6 +646,7 @@ function LifecycleWorkspace({
                   disabled={
                     busy ||
                     uncertain ||
+                    (!!value["adaptive"] && ["start", "resume"].includes(op)) ||
                     terminal(value) ||
                     !canWrite ||
                     (op !== "prepare" && !canExecute) ||
@@ -673,6 +680,7 @@ function LifecycleWorkspace({
               </p>
             )}
           </div>
+          <AdaptiveCasePanel key={value.case_id} value={value} onSnapshot={setValue}/>
           <nav aria-label="Lifecycle inspection" className="my-4 flex flex-wrap gap-2">
             {[
               "Progress",
@@ -762,7 +770,7 @@ function LifecycleWorkspace({
                         <h4 className="text-sm font-medium">External action approval required</h4>
                         <SavedDetails
                           label="Exact prepared action"
-                          value={composition.run?.actions}
+                          value={a.resolved_payload ?? composition.run?.actions}
                         />
                         {a.allowed_decisions.map((decision) => (
                           <button

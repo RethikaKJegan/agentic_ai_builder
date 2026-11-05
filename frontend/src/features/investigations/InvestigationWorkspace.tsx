@@ -12,9 +12,11 @@ import {getReport,InvestigationReportView,InvestigationEvidence,InvestigationNod
 import {Link} from '@/lib/navigation';
 import DynamicInvestigationWorkspace from './DynamicInvestigationWorkspace';
 import BusinessLifecycle from './BusinessLifecycle';
+import ConnectedInvestigation from './ConnectedInvestigation';
 
 export default function InvestigationWorkspace() {
  const search=useSearchParams();
+ if(search.get('connected')==='1')return <ConnectedInvestigation/>;
  if(search.has('case'))return <div className="h-full overflow-auto p-4"><Link to="/app/workflows" className="text-sm text-primary">Back to workflows</Link><BusinessLifecycle initialCaseId={search.get('case')??undefined}/></div>;
  return search.has('composition')||search.get('dynamic')==='1'?<DynamicInvestigationWorkspace/>:<LegacyInvestigationWorkspace/>;
 }

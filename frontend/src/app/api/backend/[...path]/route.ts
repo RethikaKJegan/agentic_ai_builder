@@ -57,7 +57,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const controller = new AbortController();
   const abort = () => controller.abort();
   request.signal.addEventListener('abort', abort, { once: true });
-  const timeout = setTimeout(abort, route === 'workflows/plan' ? config.plannerTimeout : route.startsWith('data-operations/') ? 125_000 : (route.startsWith('data-queries/') || route === 'knowledge-graph/records') ? 65_000 : config.normalTimeout);
+  const timeout = setTimeout(abort, (route === 'workflows/plan' || route === 'business-ontology/v1/action-plans' || /^business-ontology\/v1\/cases\/[^/]+\/(drive|adaptive(?:\/revise)?)$/.test(route)) ? config.plannerTimeout : route.startsWith('data-operations/') ? 125_000 : (route.startsWith('data-queries/') || route === 'knowledge-graph/records') ? 65_000 : config.normalTimeout);
   let streaming = false;
   const cleanup = () => { clearTimeout(timeout); request.signal.removeEventListener('abort', abort); };
   try {

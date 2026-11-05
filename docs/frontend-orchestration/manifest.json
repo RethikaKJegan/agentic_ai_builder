@@ -1,0 +1,39 @@
+{
+  "qualification": "Actual controlled browser-to-backend acceptance. No live provider effects or deployment. Raw reply files contain executed case/run snapshots; provider/model/source transports are controlled.",
+  "artifacts": [
+    {
+      "source": "/home/raf/agentic-ai-builder/.local/frontend-phase4-evidence/reply-desktop.json",
+      "sha256": "ea2f52c83ab725e9304c525a216e41b704417e0b2b8cf51c5f66a727bd5dc8a6",
+      "bytes": 1181282,
+      "case_id": "case_3f7d6dc6e346125b3a833c28",
+      "case_status": "COMPLETED_PROVISIONALLY",
+      "adaptive_status": "completed",
+      "plan_revision": 1,
+      "run_id": "run_e115f220a42e4b7e9597891e2cbf6543",
+      "receipt_qualification": "The saved run is the actual pre-reply send/report snapshot; the case is the final post-reply persisted snapshot."
+    },
+    {
+      "source": "/home/raf/agentic-ai-builder/.local/frontend-phase4-evidence/reply-mobile.json",
+      "sha256": "66124db0655a1e568156f4ca53fe9f8af58b0d21054e2a67fe4f1c3a155bb73a",
+      "bytes": 1181283,
+      "case_id": "case_068b761243dfada846ab8abc",
+      "case_status": "COMPLETED_PROVISIONALLY",
+      "adaptive_status": "completed",
+      "plan_revision": 1,
+      "run_id": "run_f6a17bf22cfb4953aafcc29e8aa70dd0",
+      "receipt_qualification": "The saved run is the actual pre-reply send/report snapshot; the case is the final post-reply persisted snapshot."
+    },
+    {
+      "source": "/home/raf/agentic-ai-builder/.local/frontend-phase4-evidence/reply-desktop.png",
+      "sha256": "8ca73e07789c5a3547e02a487555d2afdb934f776f5e34ce70c70b3786515ce8",
+      "bytes": 81494,
+      "repository_artifact": "screenshots/reply-desktop.png"
+    },
+    {
+      "source": "/home/raf/agentic-ai-builder/.local/frontend-phase4-evidence/reply-mobile.png",
+      "sha256": "7de2febd6a0b27b447cdfd19a06d6439b52cedff3c54dec926fc51cfa00201ad",
+      "bytes": 58248,
+      "repository_artifact": "screenshots/reply-mobile.png"
+    }
+  ]
+}
