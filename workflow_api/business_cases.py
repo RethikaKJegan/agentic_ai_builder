@@ -183,6 +183,7 @@ class BusinessCases:
 
     def section(self, auth, case_id, name):
         case = self.get(auth, case_id)
+        if name=='adaptive':return deepcopy(case.get('adaptive',{}))
         if name in ('history','reassessments'):
             from .lifecycle_reassessment import LifecycleReassessment
             return LifecycleReassessment(self).history(auth,case_id) if name=='history' else {'items':case.get('reassessments',[])}
@@ -326,6 +327,7 @@ class BusinessCases:
                 return self._load(db, scope, case_id) if operation in ('start','advance','resume','cancel') else old
             case = self._load(db, scope, case_id)
             if case['revision'] != body['expected_revision']:fail('Case changed; reload its revision.', 'CASE_CONFLICT', 409)
+            if case.get('adaptive') and operation!='cancel':fail('Use the existing driver or adaptive supply/revision commands for this case.','ADAPTIVE_DRIVER_REQUIRED',409)
             if case['case_status'] in TERMINAL:fail('Case is terminal.', 'CASE_TERMINAL', 409)
             if operation == 'cancel':
                 case.update(case_status='CANCELLED', execution_status='CANCELLED', completed_at=self.timestamp())
@@ -473,6 +475,7 @@ class BusinessCases:
             seen.add(sid);ordered.append(case['stages'][sid])
         for sid in case['stages']:visit(sid)
         for stage in ordered:
+            if stage.get('adaptive_controlled'):continue
             status = stage['execution_status'];definition = stage['definition']
             if status in TERMINAL | {'RUNNING', 'FAILED', 'BLOCKED'}:continue
             if status == 'WAITING_FOR_AUTHORIZATION' and stage.get('composition_id') and not wake_authorization:continue
@@ -582,29 +585,7 @@ class BusinessCases:
                     stage['deadline_exceeded'] = True
                 else:
                     fail('The pinned stage execution deadline expired.', 'CASE_STAGE_TIMEOUT', 409)
-            resolver = EvidenceCompletion(case, stage, self.timestamp(), case.get('configuration_snapshot', self.configuration.get(scope, {})))
-            outputs = {}
-            for name, binding in definition['output_bindings'].items():
-                if binding['source'] in ('runtime', 'receipt'):
-                    value = at(stage.get('runtime_result', {}), binding['path'])
-                    if value is MISSING:fail('Required runtime output was not returned.', 'CASE_OUTPUT_INVALID')
-                    receipt = binding['source'] == 'receipt'
-                    if receipt and binding['path'].split('.')[0] not in stage.get('workflow', {}).get('metadata', {}).get('composition_action_verifiers', {}):
-                        fail('Receipt bindings require a verified deterministic action node.', 'CASE_OUTPUT_INVALID')
-                    # Model narrative is never actual evidence. Provider receipts remain separate.
-                    outputs[name] = artifact(value, 'ACTUAL' if receipt else 'INFERRED', [{'run_id': stage['run_id']}], 'connector_receipt' if receipt else 'verified_runtime_result', self.timestamp(), case_id)
-                else:
-                    entry = resolver.binding(binding)
-                    if not entry:fail('Required output binding was not resolved.', 'CASE_OUTPUT_INVALID')
-                    outputs[name] = entry
-            raw = {k:e['value'] for k,e in outputs.items()}
-            if not conforms(raw, definition['output_schema']):fail('Stage output does not satisfy its pinned schema.', 'CASE_OUTPUT_INVALID')
-            if not all(self.predicate(p, resolver, raw, stage.get('runtime_result', {})) for p in definition['completion_criteria']):
-                fail('Stage completion criteria are not satisfied.', 'CASE_COMPLETION_UNVERIFIED')
-            provisional = (stage.get('pending_real_world_event') or stage.get('event_timeout_provisional') or stage.get('deadline_exceeded') or bool(stage.get('missing_evidence')) or stage.get('analytical_runtime_result', False) or any(e['provenance_type'] in ('INFERRED', 'SYNTHETIC') for e in list(outputs.values())+list(stage['resolved_inputs'].values())))
-            if provisional and not definition['provisional_continuation_policy']['allowed']:fail('This stage requires verified evidence.', 'CASE_EVIDENCE_REQUIRED')
-            stage['outputs'] = outputs;stage['business_outcome_status'] = 'PROVISIONAL' if provisional else 'EVIDENCE_COMPLETE'
-            stage['execution_status'] = 'COMPLETED_PROVISIONALLY' if provisional else 'COMPLETED'
+            self.resolve_outputs(case,stage,scope)
         except Exception as exc:
             code = getattr(exc, 'code', 'CASE_EXECUTION_FAILED')
             stage['error'] = classify(code, task=sid, external_write=definition['side_effect_classification'] in ('draft', 'write'))
@@ -614,6 +595,33 @@ class BusinessCases:
             stage['execution_status'] = 'BLOCKED' if code == 'CASE_STAGE_TIMEOUT' and definition['timeout_policy']['action'] != 'fail' else 'FAILED'
             stage['retry_after'] = self.clock()+definition['retry_policy']['backoff_seconds']
         self.finish(auth, case_id, sid, token, stage)
+
+    def resolve_outputs(self,case,stage,scope):
+        """Validate pinned stage outputs for both ordinary and adaptive continuation."""
+        definition=stage['definition'];case_id=case['case_id']
+        resolver = EvidenceCompletion(case, stage, self.timestamp(), case.get('configuration_snapshot', self.configuration.get(scope, {})))
+        outputs = {}
+        for name, binding in definition['output_bindings'].items():
+            if binding['source'] in ('runtime', 'receipt'):
+                value = at(stage.get('runtime_result', {}), binding['path'])
+                if value is MISSING:fail('Required runtime output was not returned.', 'CASE_OUTPUT_INVALID')
+                receipt = binding['source'] == 'receipt'
+                if receipt and binding['path'].split('.')[0] not in stage.get('workflow', {}).get('metadata', {}).get('composition_action_verifiers', {}):
+                    fail('Receipt bindings require a verified deterministic action node.', 'CASE_OUTPUT_INVALID')
+                # Model narrative is never actual evidence. Provider receipts remain separate.
+                outputs[name] = artifact(value, 'ACTUAL' if receipt else 'INFERRED', [{'run_id': stage['run_id']}], 'connector_receipt' if receipt else 'verified_runtime_result', self.timestamp(), case_id)
+            else:
+                entry = resolver.binding(binding)
+                if not entry:fail('Required output binding was not resolved.', 'CASE_OUTPUT_INVALID')
+                outputs[name] = entry
+        raw = {k:e['value'] for k,e in outputs.items()}
+        if not conforms(raw, definition['output_schema']):fail('Stage output does not satisfy its pinned schema.', 'CASE_OUTPUT_INVALID')
+        if not all(self.predicate(p, resolver, raw, stage.get('runtime_result', {})) for p in definition['completion_criteria']):
+            fail('Stage completion criteria are not satisfied.', 'CASE_COMPLETION_UNVERIFIED')
+        provisional = (stage.get('pending_real_world_event') or stage.get('event_timeout_provisional') or stage.get('deadline_exceeded') or bool(stage.get('missing_evidence')) or stage.get('analytical_runtime_result', False) or any(e['provenance_type'] in ('INFERRED', 'SYNTHETIC') for e in list(outputs.values())+list(stage['resolved_inputs'].values())))
+        if provisional and not definition['provisional_continuation_policy']['allowed']:fail('This stage requires verified evidence.', 'CASE_EVIDENCE_REQUIRED')
+        stage['outputs'] = outputs;stage['business_outcome_status'] = 'PROVISIONAL' if provisional else 'EVIDENCE_COMPLETE'
+        stage['execution_status'] = 'COMPLETED_PROVISIONALLY' if provisional else 'COMPLETED'
 
     def checkpoint(self, auth, case_id, sid, token, updates):
         scope = self.scope(auth, True, True)

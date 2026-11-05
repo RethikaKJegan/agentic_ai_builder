@@ -1,0 +1,237 @@
+{
+  "action_ids": [
+    "read"
+  ],
+  "completion_criteria": [
+    "send"
+  ],
+  "decision": "revise_plan",
+  "event_request": null,
+  "input_requests": [],
+  "observation_ids": [
+    "evidence:1771a19343a2a8eb511a9f58b94d96f81d94440705aa84797e6324410bb1b640"
+  ],
+  "plan_revision": 1,
+  "proposal": {
+    "actions": [
+      {
+        "action_id": "read",
+        "bindings": [
+          {
+            "key": "preparation_id",
+            "kind": "context",
+            "path": [],
+            "target": [
+              "preparation_id"
+            ]
+          },
+          {
+            "key": "task",
+            "kind": "literal",
+            "path": [],
+            "target": [
+              "task"
+            ]
+          }
+        ],
+        "budget": {
+          "max_llm_calls": 0,
+          "max_retries": 0,
+          "max_tool_calls": 1,
+          "timeout_seconds": 60
+        },
+        "capability_id": "business.read.complaints",
+        "depends_on": [],
+        "evidence_references": [],
+        "instructions": "Prepare source-backed findings or content.",
+        "optional": false,
+        "required_approvals": [],
+        "when": null
+      },
+      {
+        "action_id": "analysis",
+        "bindings": [
+          {
+            "action_id": "read",
+            "kind": "output",
+            "path": [],
+            "target": [
+              "data"
+            ]
+          }
+        ],
+        "budget": {
+          "max_llm_calls": 1,
+          "max_retries": 0,
+          "max_tool_calls": 0,
+          "timeout_seconds": 60
+        },
+        "capability_id": "content.prepare",
+        "depends_on": [
+          "read"
+        ],
+        "evidence_references": [
+          "read"
+        ],
+        "instructions": "Review the actual complaint observations and explicitly identify unverified diagnosis.",
+        "optional": false,
+        "required_approvals": [],
+        "when": null
+      },
+      {
+        "action_id": "sheet",
+        "bindings": [
+          {
+            "key": "project",
+            "kind": "literal",
+            "path": [],
+            "target": [
+              "project_id"
+            ]
+          },
+          {
+            "key": "creation",
+            "kind": "literal",
+            "path": [],
+            "target": [
+              "creation_key"
+            ]
+          },
+          {
+            "key": "title",
+            "kind": "literal",
+            "path": [],
+            "target": [
+              "title"
+            ]
+          },
+          {
+            "action_id": "analysis",
+            "kind": "generated",
+            "path": [
+              "tabs"
+            ],
+            "target": [
+              "tabs"
+            ]
+          }
+        ],
+        "budget": {
+          "max_llm_calls": 0,
+          "max_retries": 0,
+          "max_tool_calls": 1,
+          "timeout_seconds": 60
+        },
+        "capability_id": "tool.extension_sheets_create_report",
+        "depends_on": [
+          "analysis"
+        ],
+        "evidence_references": [],
+        "instructions": "Prepare source-backed findings or content.",
+        "optional": false,
+        "required_approvals": [
+          "exact_payload"
+        ],
+        "when": null
+      },
+      {
+        "action_id": "email",
+        "bindings": [
+          {
+            "action_id": "analysis",
+            "kind": "generated",
+            "path": [],
+            "target": [
+              "data"
+            ]
+          },
+          {
+            "action_id": "sheet",
+            "kind": "receipt",
+            "path": [
+              "spreadsheet_url"
+            ],
+            "target": [
+              "artifact_url"
+            ]
+          }
+        ],
+        "budget": {
+          "max_llm_calls": 1,
+          "max_retries": 0,
+          "max_tool_calls": 0,
+          "timeout_seconds": 60
+        },
+        "capability_id": "content.prepare",
+        "depends_on": [
+          "analysis",
+          "sheet"
+        ],
+        "evidence_references": [
+          "analysis",
+          "sheet"
+        ],
+        "instructions": "Prepare source-backed findings or content.",
+        "optional": false,
+        "required_approvals": [],
+        "when": null
+      },
+      {
+        "action_id": "send",
+        "bindings": [
+          {
+            "key": "recipient",
+            "kind": "literal",
+            "path": [],
+            "target": [
+              "to"
+            ]
+          },
+          {
+            "action_id": "email",
+            "kind": "generated",
+            "path": [
+              "subject"
+            ],
+            "target": [
+              "subject"
+            ]
+          },
+          {
+            "action_id": "email",
+            "kind": "generated",
+            "path": [
+              "body"
+            ],
+            "target": [
+              "body"
+            ]
+          }
+        ],
+        "budget": {
+          "max_llm_calls": 0,
+          "max_retries": 0,
+          "max_tool_calls": 1,
+          "timeout_seconds": 60
+        },
+        "capability_id": "tool.extension_mail_send",
+        "depends_on": [
+          "email"
+        ],
+        "evidence_references": [],
+        "instructions": "Prepare source-backed findings or content.",
+        "optional": false,
+        "required_approvals": [
+          "exact_payload"
+        ],
+        "when": null
+      }
+    ],
+    "completion_criteria": [
+      "send"
+    ],
+    "missing_inputs": []
+  },
+  "rationale": "Decision based on actual scoped observations.",
+  "schema_version": "evaluator-decision-v1"
+}

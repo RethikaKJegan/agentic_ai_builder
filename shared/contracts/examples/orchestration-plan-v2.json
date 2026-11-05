@@ -1,0 +1,783 @@
+{
+  "account_reference": null,
+  "actions": [
+    {
+      "action_id": "read",
+      "bindings": [
+        {
+          "key": "preparation_id",
+          "kind": "context",
+          "path": [],
+          "target": [
+            "preparation_id"
+          ]
+        },
+        {
+          "key": "task",
+          "kind": "literal",
+          "path": [],
+          "target": [
+            "task"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 0,
+        "max_retries": 0,
+        "max_tool_calls": 1,
+        "timeout_seconds": 60
+      },
+      "capability_id": "business.read.complaints",
+      "depends_on": [],
+      "evidence_references": [],
+      "expected_output_schema": {
+        "properties": {
+          "coverage": {
+            "required": [
+              "state",
+              "conclusion_ready"
+            ],
+            "type": "object"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "version_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "type": "object"
+      },
+      "instructions": "Prepare source-backed findings or content.",
+      "optional": false,
+      "required_approvals": [],
+      "when": null
+    },
+    {
+      "action_id": "analysis",
+      "bindings": [
+        {
+          "action_id": "read",
+          "kind": "output",
+          "path": [],
+          "target": [
+            "data"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 1,
+        "max_retries": 0,
+        "max_tool_calls": 0,
+        "timeout_seconds": 60
+      },
+      "capability_id": "content.prepare",
+      "depends_on": [
+        "read"
+      ],
+      "evidence_references": [
+        "read"
+      ],
+      "expected_output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "body": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "source_references": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "subject": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "tabs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "rows": {
+                  "items": {
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "type": "array"
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "headers",
+                "rows"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 12000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_references",
+          "assumptions"
+        ],
+        "type": "object"
+      },
+      "instructions": "Prepare source-backed findings or content.",
+      "optional": false,
+      "required_approvals": [],
+      "when": null
+    },
+    {
+      "action_id": "sheet",
+      "bindings": [
+        {
+          "key": "project",
+          "kind": "literal",
+          "path": [],
+          "target": [
+            "project_id"
+          ]
+        },
+        {
+          "key": "creation",
+          "kind": "literal",
+          "path": [],
+          "target": [
+            "creation_key"
+          ]
+        },
+        {
+          "key": "title",
+          "kind": "literal",
+          "path": [],
+          "target": [
+            "title"
+          ]
+        },
+        {
+          "action_id": "analysis",
+          "kind": "generated",
+          "path": [
+            "tabs"
+          ],
+          "target": [
+            "tabs"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 0,
+        "max_retries": 0,
+        "max_tool_calls": 1,
+        "timeout_seconds": 60
+      },
+      "capability_id": "tool.extension_sheets_create_report",
+      "depends_on": [
+        "analysis"
+      ],
+      "evidence_references": [],
+      "expected_output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "creation_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "project_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "proposed_write_targets": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "allow_create": {
+                  "const": true
+                },
+                "identity_column": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "range": {
+                  "maxLength": 1000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "spreadsheet_id": {
+                  "pattern": "^[A-Za-z0-9_-]{1,255}$",
+                  "type": "string"
+                },
+                "writable_columns": {
+                  "items": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 99,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "spreadsheet_id",
+                "range",
+                "identity_column",
+                "writable_columns",
+                "allow_create"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "report_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "spreadsheet_created": {
+            "type": "boolean"
+          },
+          "spreadsheet_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,255}$",
+            "type": "string"
+          },
+          "spreadsheet_url": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "tabs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created": {
+                  "type": "boolean"
+                },
+                "grid_columns": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "grid_rows": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "headers": {
+                  "items": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "sheet_id": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "title": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sheet_id",
+                "title",
+                "headers",
+                "grid_rows",
+                "grid_columns",
+                "created"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "written_rows": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "creation_key",
+          "spreadsheet_id",
+          "spreadsheet_url",
+          "spreadsheet_created",
+          "reused",
+          "tabs",
+          "proposed_write_targets",
+          "written_rows",
+          "report_sha256"
+        ],
+        "type": "object"
+      },
+      "instructions": "Prepare source-backed findings or content.",
+      "optional": false,
+      "required_approvals": [
+        "exact_payload"
+      ],
+      "when": null
+    },
+    {
+      "action_id": "email",
+      "bindings": [
+        {
+          "action_id": "analysis",
+          "kind": "generated",
+          "path": [],
+          "target": [
+            "data"
+          ]
+        },
+        {
+          "action_id": "sheet",
+          "kind": "receipt",
+          "path": [
+            "spreadsheet_url"
+          ],
+          "target": [
+            "artifact_url"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 1,
+        "max_retries": 0,
+        "max_tool_calls": 0,
+        "timeout_seconds": 60
+      },
+      "capability_id": "content.prepare",
+      "depends_on": [
+        "analysis",
+        "sheet"
+      ],
+      "evidence_references": [
+        "analysis",
+        "sheet"
+      ],
+      "expected_output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "body": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "source_references": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "subject": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "tabs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "rows": {
+                  "items": {
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "type": "array"
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "headers",
+                "rows"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 12000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_references",
+          "assumptions"
+        ],
+        "type": "object"
+      },
+      "instructions": "Prepare source-backed findings or content.",
+      "optional": false,
+      "required_approvals": [],
+      "when": null
+    },
+    {
+      "action_id": "email_updated",
+      "bindings": [
+        {
+          "action_id": "analysis",
+          "kind": "generated",
+          "path": [],
+          "target": [
+            "data"
+          ]
+        },
+        {
+          "action_id": "sheet",
+          "kind": "receipt",
+          "path": [
+            "spreadsheet_url"
+          ],
+          "target": [
+            "artifact_url"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 1,
+        "max_retries": 0,
+        "max_tool_calls": 0,
+        "timeout_seconds": 60
+      },
+      "capability_id": "content.prepare",
+      "depends_on": [
+        "analysis",
+        "sheet"
+      ],
+      "evidence_references": [
+        "analysis",
+        "sheet"
+      ],
+      "expected_output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "body": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "source_references": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "subject": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 12000,
+            "type": "string"
+          },
+          "tabs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "rows": {
+                  "items": {
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "type": "array"
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "headers",
+                "rows"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 12000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_references",
+          "assumptions"
+        ],
+        "type": "object"
+      },
+      "instructions": "Include new evidence and the verified link.",
+      "optional": false,
+      "required_approvals": [],
+      "when": null
+    },
+    {
+      "action_id": "send",
+      "bindings": [
+        {
+          "key": "recipient",
+          "kind": "literal",
+          "path": [],
+          "target": [
+            "to"
+          ]
+        },
+        {
+          "action_id": "email_updated",
+          "kind": "generated",
+          "path": [
+            "subject"
+          ],
+          "target": [
+            "subject"
+          ]
+        },
+        {
+          "action_id": "email_updated",
+          "kind": "generated",
+          "path": [
+            "body"
+          ],
+          "target": [
+            "body"
+          ]
+        }
+      ],
+      "budget": {
+        "max_llm_calls": 0,
+        "max_retries": 0,
+        "max_tool_calls": 1,
+        "timeout_seconds": 60
+      },
+      "capability_id": "tool.extension_mail_send",
+      "depends_on": [
+        "email_updated"
+      ],
+      "evidence_references": [],
+      "expected_output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "message_id": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "rfc_message_id": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "message_id",
+          "thread_id",
+          "rfc_message_id"
+        ],
+        "type": "object"
+      },
+      "instructions": "Prepare source-backed findings or content.",
+      "optional": false,
+      "required_approvals": [
+        "exact_payload"
+      ],
+      "when": null
+    }
+  ],
+  "completion_criteria": [
+    "send"
+  ],
+  "constraints": {
+    "max_actions": 16,
+    "max_llm_calls": 32,
+    "max_seconds": 300,
+    "max_tool_calls": 16
+  },
+  "fingerprint": "12eb59da7204836077996f512a1773a0e05b0237bc5eca56b0570c4f94a4e6be",
+  "goal": "Investigate complaint C123, create a Google Sheet of findings and email the assigned engineer with its link.",
+  "missing_inputs": [],
+  "plan_id": "plan_89d33eb000af070363c0dc0b",
+  "previous_revision": {
+    "composition_id": "composition_b68128dc48f820a726660728",
+    "fingerprint": "58324784bbc35bce88c620853b1a6c7e17625d3bcb8935ff173c2d4b5256a0f9",
+    "plan_id": "plan_89d33eb000af070363c0dc0b",
+    "revision": 1
+  },
+  "provenance_references": [
+    "preflight_a22989eaaa2b263a88c7b61c"
+  ],
+  "resource_references": {},
+  "revision": 2,
+  "revision_reason": "New evidence requires unfinished send content to change.",
+  "schema_version": "orchestration-plan-v2",
+  "scope": {
+    "client_id": "simpson",
+    "owner_id": "alice",
+    "workspace_id": "one"
+  },
+  "triggering_observations": [
+    "evidence:1771a19343a2a8eb511a9f58b94d96f81d94440705aa84797e6324410bb1b640"
+  ]
+}

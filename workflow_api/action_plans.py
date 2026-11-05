@@ -8,7 +8,7 @@ from registry.policy import authorize_tool
 from registry.contracts import RegistryError
 from .business_knowledge_model import canonical,digest
 from .capability_contracts import catalogue,contract
-from .action_bindings import validate_plan,deny
+from .action_bindings import validate_plan,deny,binding_value,put,field_schema
 from .google_connections import now
 
 CONTENT_INPUT={'type':'object','additionalProperties':False,'required':['data'],'properties':{
@@ -49,7 +49,7 @@ def trusted_context(composition,auth,body,prepared):
     return context
 
 
-def prepare(composition,auth,body,*,lifecycle_context=None):
+def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_planning_budget=None):
     auth,scope=composition.authorize(auth)
     allowed={'objective','request_key','action_plan','user_values','client_id','preparation_id','business_request','resources','google_connection_id','constraints'}
     if not isinstance(body,dict) or set(body)-allowed:deny('Use supported connected-plan request fields.')
@@ -58,7 +58,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
     reject_secrets(body)
     if not isinstance(body.get('resources',{}),dict):deny('Resource references must be an object.')
     if len(canonical(body).encode())>500000:deny('Action request exceeds the existing bounded context allowance.','ACTION_PLAN_LIMIT')
-    key=composition.preparation.service.key(body);fingerprint=digest([body,lifecycle_context])
+    key=composition.preparation.service.key(body);fingerprint=digest([body,lifecycle_context,_revision])
     with composition.store.transaction(write=False) as db:
         row=db.execute('SELECT fingerprint,document FROM business_compositions WHERE workspace=? AND owner=? AND request_key=?',(*scope,key)).fetchone()
     if row:
@@ -69,14 +69,23 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
         view=composition.preparation.general_context(auth,objective,body['business_request'])
         if view.get('preflight_id'):prepared=composition.preparation.checked(auth,view['preflight_id'])
     context=trusted_context(composition,auth,body,prepared)
+    package_context=None
+    if _revision and _revision.get('package'):
+        pin=_revision['package']
+        package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
+        context['validated_context'].update(package_id=pin['package_id'],package_revision=pin['revision'],pins=deepcopy(package_context['pins']))
     tools=composition.tools(auth);contracts=catalogue(prepared,tools);contracts['content.prepare']=content_contract()
+    if package_context:contracts.update(deepcopy(package_context['package']['capability_contracts']))
+    def tool_id(cid,c):
+        if package_context and cid in package_context['package']['capability_contracts'] and c['kind']=='tool':return 'client_package_read'
+        return 'business_retrieve_evidence' if c.get('retrieval_task') else cid.removeprefix('tool.')
     # Only currently configured and policy-eligible operations are presented to the model.
     connectors=composition.connectors if composition.connectors is not None else getattr(composition.service.runtime_runner,'connectors',{})
     current={t['tool_id']:t for t in tools}
     policy=composition.service.registry_adapter.service._policy
     def eligible(cid,c):
         if c['kind']=='model':return True
-        tid='business_retrieve_evidence' if c.get('retrieval_task') else cid.removeprefix('tool.')
+        tid=tool_id(cid,c)
         record=current.get(tid)
         if tid not in connectors or not record:return False
         d=record['definition']
@@ -86,6 +95,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
             return True
         except RegistryError:return False
     visible={cid:c for cid,c in contracts.items() if eligible(cid,c)}
+    if _revision:
+        visible={cid:c for cid,c in visible.items() if cid in _revision['contracts'] and (c['kind']=='model' or tool_id(cid,c) in _revision['allowed_tools'])}
     hints=[];runtime=getattr(getattr(composition.service,'runtime_runner',None),'runtime',None)
     if runtime and 'runs.view' in auth.get('permissions',[]):
         hints=runtime.experience_memory.ranked(auth,domain='configured_business_ontology',pins=prepared['pins'] if prepared else {},contracts=visible,tool_references=[t['definition'] for t in tools])
@@ -93,7 +104,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
     if proposal is None:
         selector=getattr(composition.service.planner.provider,'plan_actions',None)
         if not callable(selector):deny('The configured provider does not support connected action planning.','ACTION_PLANNER_UNAVAILABLE')
-        proposal=selector(objective,dict(capabilities=visible,binding_context=context,verified_experience_recommendations=hints,tool_constraints={cid:dict(minimum_timeout_seconds=current['business_retrieve_evidence' if c.get('retrieval_task') else cid.removeprefix('tool.')]['definition']['timeout_seconds']) for cid,c in visible.items() if c['kind']=='tool'}))
+        planning_context=dict(capabilities=visible,binding_context=context,verified_experience_recommendations=hints,tool_constraints={cid:dict(minimum_timeout_seconds=current[tool_id(cid,c)]['definition']['timeout_seconds']) for cid,c in visible.items() if c['kind']=='tool'})
+        if _planning_budget:_planning_budget(dict(objective=objective,**planning_context))
+        proposal=selector(objective,planning_context)
     if not isinstance(proposal,dict) or set(proposal)-{'actions','completion_criteria','missing_inputs'}:deny('Invalid structured action proposal.')
     actions=deepcopy(proposal.get('actions',[]))
     if not isinstance(actions,list) or not 1<=len(actions)<=16:deny('Select between one and sixteen action instances.')
@@ -110,6 +123,13 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
         context=trusted_context(composition,auth,body,prepared)
         refreshed=catalogue(prepared,tools)
         visible.update({cid:c for cid,c in refreshed.items() if cid in visible})
+    if _revision:
+        for cid,pinned in _revision.get('contracts',{}).items():
+            if cid not in visible:continue
+            # Retrieval expansion enriches facts, while executable contracts stay pinned.
+            semantic=lambda c:{k:v for k,v in c.items() if k not in ('required_ontology','required_evidence')}
+            if semantic(visible[cid])!=semantic(pinned):deny('Pinned capability semantics changed.','CASE_CAPABILITY_STALE')
+            visible[cid]=deepcopy(pinned)
     for a in actions:
         if not isinstance(a,dict) or a.get('capability_id') not in visible:deny('Plan references an unavailable capability.','ACTION_CAPABILITY_UNKNOWN')
         c=visible[a['capability_id']]
@@ -123,19 +143,38 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
         constraints=body.get('constraints',dict(max_actions=16,max_seconds=300,max_llm_calls=32,max_tool_calls=16)),
         completion_criteria=proposal.get('completion_criteria',[]),missing_inputs=proposal.get('missing_inputs',[]),actions=actions,
         provenance_references=[prepared['preflight_id']] if prepared else [],fingerprint='0'*64,account_reference=body.get('google_connection_id'),resource_references=deepcopy(body.get('resources',{}).get('references',{})))
-    validate_plan(plan,visible,context,scope_doc)
+    if _revision is not None:
+        plan.update(schema_version='orchestration-plan-v2',plan_id=_revision['plan_id'],revision=_revision['revision'],previous_revision=deepcopy(_revision['previous_revision']),revision_reason=_revision['reason'],triggering_observations=deepcopy(_revision['observations']))
+    try:
+        validate_plan(plan,visible,context,scope_doc)
+        if plan['missing_inputs']:deny('Resolve the plan missing_inputs before compiling.','ACTION_INPUT_REQUIRED')
+    except Exception as exc:
+        if getattr(exc,'code',None)=='ACTION_INPUT_REQUIRED':
+            schemas={key:{'type':'string','minLength':1,'maxLength':2000} for key in proposal.get('missing_inputs',[]) if isinstance(key,str) and 1<=len(key)<=160}
+            for a in actions:
+                for b in a.get('bindings',[]):
+                    if b.get('kind')=='literal' and b['key'] not in context['user_values']:
+                        schemas[b['key']]=deepcopy(field_schema(visible[a['capability_id']]['input_schema'],b['target']))
+            exc.required_inputs=schemas
+        raise
+    if package_context:
+        for a in actions:
+            if a['capability_id'] in package_context['package']['capability_contracts'] and visible[a['capability_id']]['kind']=='tool':
+                actual={}
+                for b in a['bindings']:put(actual,b['target'],binding_value(b,context,{}))
+                if actual!=dict(package_id=package_context['pins']['package_id'],revision=package_context['pins']['revision'],capability_id=a['capability_id']):deny('Package retrieval must match pinned package and capability.','ACTION_SCOPE_DENIED')
     known_refs=set(context['evidence'])
     for a in actions:
         if set(a['evidence_references'])-(set(a['depends_on'])|known_refs):deny('Content references must identify declared dependencies or pinned evidence.','ACTION_CONTENT_UNVERIFIED')
     if plan['missing_inputs']:deny('Resolve the plan missing_inputs before compiling.','ACTION_INPUT_REQUIRED')
     plan['fingerprint']=digest({k:v for k,v in plan.items() if k!='fingerprint'})
-    cid='composition_'+plan_id.removeprefix('plan_');configs=[];chosen={};tasks=[]
+    cid='composition_'+(secrets.token_hex(12) if _revision is not None else plan_id.removeprefix('plan_'));configs=[];chosen={};tasks=[]
     from .business_composition import AgentConfigurationFactory
     factory=AgentConfigurationFactory(composition.service.registry_adapter,composition.model_id)
     for a in actions:
         c=visible[a['capability_id']];tool=None
         if c['kind']=='tool':
-            tid='business_retrieve_evidence' if c.get('retrieval_task') else a['capability_id'].removeprefix('tool.')
+            tid=tool_id(a['capability_id'],c)
             tool=current.get(tid)
             if not tool or tid not in connectors:deny('A required connector is not configured.','ACTION_CONNECTOR_REQUIRED')
             definition=tool['definition']
@@ -165,6 +204,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
         resources=deepcopy(body.get('resources',{})),google_connection_id=body.get('google_connection_id'),preparation_id=prepared['preflight_id'] if prepared else None,
         preparation_sha256=prepared['sha256'] if prepared else None,created_at=now(),planning=dict(mode='action_plan',model_calls=int(body.get('action_plan') is None)),
         action_plan=plan,binding_context=context,memory_recommendations=hints)
+    if package_context:doc['client_package_context']=deepcopy(package_context)
     if lifecycle_context is not None:doc['lifecycle_context']=deepcopy(lifecycle_context)
     if doc['google_connection_id']:
         google=getattr(composition.service,'google_tools',None)
@@ -172,6 +212,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None):
         w={'metadata':{'google_connection_id':doc['google_connection_id']}}
         with composition.store.transaction(write=False) as db:google.validate(w,auth,db)
         for tool in chosen.values():google.bind(connectors[tool['tool_id']],w,{},auth,{'tool_id':tool['tool_id']})
+    if _revision is not None:doc['adaptive_control']=deepcopy(_revision['control'])
     doc['sha256']=digest(doc)
     from planner.validation import validate_workflow
     validate_workflow(compile_workflow(doc))
@@ -192,7 +233,9 @@ def compile_workflow(doc):
         metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=doc['composition_id'],composition_sha256=doc['sha256'],
             composition_tasks={},connected_tasks={c['configuration_id']:{**deepcopy(next(t for t in doc['tasks'] if t['task_id']==c['assigned_task'])),'retrieval_task':doc['contracts'][next(t['capability_id'] for t in doc['tasks'] if t['task_id']==c['assigned_task'])].get('retrieval_task'),'dependency_refs':[]} for c in doc['configurations']},composition_action_verifiers={},composition_preparation_id=doc['preparation_id'],unresolved_requirements=[],
             connected_action_plan=deepcopy(doc['action_plan']),connected_contracts=deepcopy(doc['contracts']),action_binding_context=deepcopy(doc['binding_context'])))
-    for key in ('lifecycle_context','google_connection_id'):
+    if doc.get('client_package_context'):
+        pc=doc['client_package_context'];w['metadata'].update(client_package_pin=deepcopy(pc['pins']),client_domain=pc['package']['domain'],client_package_context=deepcopy(pc['tasks']))
+    for key in ('lifecycle_context','google_connection_id','adaptive_control'):
         if doc.get(key) is not None:w['metadata'][key]=deepcopy(doc[key])
     for key in ('sheet_read_targets','sheet_write_targets'):
         if key in doc['resources']:w['metadata'][key]=deepcopy(doc['resources'][key])
@@ -232,6 +275,9 @@ def compile_workflow(doc):
 
 
 def workflow(composition,auth,doc):
+    if doc.get('client_package_context'):
+        pin=doc['client_package_context']['pins']
+        if composition.packages.get(auth,pin['package_id'],pin['revision'])['sha256']!=pin['package_sha256']:deny('Client package pin changed.','CLIENT_PACKAGE_CHANGED')
     current={t['tool_id']:t for t in composition.tools(auth)}
     for chosen in doc['selected_tools'].values():
         if chosen['tool_id'] not in current or current[chosen['tool_id']]['version']!=chosen['version'] or current[chosen['tool_id']]['definition']!=chosen['definition']:

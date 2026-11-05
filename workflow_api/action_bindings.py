@@ -5,6 +5,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator,FormatChecker
 from runtime.service import RuntimeFailure
 
+SCHEMA_V2=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/orchestration-plan-v2.json').read_text())
 SCHEMA=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/orchestration-plan-v1.json').read_text())
 CONTENT_FIELDS={'subject','body','summary','description','title','tabs','rows','questions','findings','source_references','assumptions'}
 REFERENCES={'output','generated','receipt'}
@@ -91,7 +92,7 @@ def resolve_inputs(action,context,actions,run):
 
 
 def validate_plan(plan,contracts,context,scope):
-    if list(Draft202012Validator(SCHEMA,format_checker=FormatChecker()).iter_errors(plan)):deny('Plan violates orchestration-plan-v1.','ACTION_PLAN_INVALID')
+    if list(Draft202012Validator(SCHEMA_V2 if plan.get('schema_version')=='orchestration-plan-v2' else SCHEMA,format_checker=FormatChecker()).iter_errors(plan)):deny('Plan violates orchestration-plan-v1.','ACTION_PLAN_INVALID')
     if plan['scope']!=scope:deny('Plan belongs to another workspace, owner or client.','ACTION_SCOPE_DENIED')
     if plan['constraints'].get('time_zone'):
         from zoneinfo import ZoneInfo,ZoneInfoNotFoundError

@@ -107,9 +107,15 @@ class GraphRunner:
     def next_node(self, db, run, workflow):
         while True:
             ready, skipped = ready_frontier(workflow['nodes'], workflow['edges'], run['node_states'], run['edge_states'])
+            # Adaptive ordering is a hint only; the case-owned guard revalidates authority.
+            preferred=run.get('adaptive_next_action') if workflow.get('metadata',{}).get('adaptive_control') else None
+            if preferred:
+                selected=next((n for n in ready if n['node_id'] in (preferred,'approve_'+preferred,'condition_'+preferred,'skip_'+preferred)),None)
+                if selected:return selected
             # Preserve original graph-order choice between ready and skipped nodes.
             eligible = {n['node_id'] for n in [*ready, *skipped]}
-            for node in workflow['nodes']:
+            ordered=sorted(workflow['nodes'],key=lambda n:0 if n in skipped else 1) if preferred else workflow['nodes']
+            for node in ordered:
                 if node['node_id'] not in eligible:
                     continue
                 if node in ready:
@@ -169,6 +175,8 @@ class GraphRunner:
         for key, value in amount.items():
             if type(value) not in (int, float) or value < 0 or value != value or value == float('inf'):
                 raise RuntimeFailure('INVALID_USAGE', 'Provider usage must contain finite nonnegative counters.')
+        from .adaptive_control import reserve as adaptive_reserve
+        adaptive_reserve(run,workflow,amount)
         counters = {'llm_calls': 'max_llm_calls', 'tool_calls': 'max_tool_calls', 'tokens': 'max_tokens',
                     'retries': 'max_retries', 'estimated_cost_usd': 'max_estimated_cost_usd'}
         groups = [('workflow', workflow['execution_policy']['limits'])]
@@ -307,6 +315,8 @@ class GraphRunner:
                             raise RuntimeFailure('UNMATCHED_BRANCH', 'Graph dependencies cannot advance.')
                         runtime.transition(db, run, 'completed')
                         return runtime.public(run)
+                    from .adaptive_control import guard as adaptive_guard
+                    if not adaptive_guard(db,runtime,run,workflow,node):return runtime.public(run)
                     run['current_node_id'] = node['node_id']
                     kind = node['kind']
                     config = node.get('configuration', {})

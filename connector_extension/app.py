@@ -87,6 +87,11 @@ class CatalogPlanner:
         self.sheet_discoverer = sheet_discoverer
         self.calendar_discoverer = calendar_discoverer
 
+    def evaluate_actions(self, context, *, max_output_tokens=2000):
+        if self.provider is None or not callable(getattr(self.provider,'evaluate_actions',None)):
+            raise PlannerFailure('PLANNER_NOT_CONFIGURED','Configure the adaptive evaluator provider.')
+        return self.provider.evaluate_actions(context,max_output_tokens=max_output_tokens)
+
     def plan_actions(self, objective, context):
         if self.provider is None or not callable(getattr(self.provider,'plan_actions',None)):
             raise PlannerFailure('PLANNER_NOT_CONFIGURED','Configure an action-plan provider.')

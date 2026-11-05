@@ -146,6 +146,21 @@ def install(app, service, auth, reference, env=None):
     async def create_simpson_case(request:Request):
         return await call(simpson_lifecycle.create,await body(request))
 
+    @app.post('/business-ontology/v1/cases/{case_id}/adaptive')
+    async def enable_adaptive(case_id:str,request:Request):
+        from .adaptive_orchestration import AdaptiveOrchestration
+        return await call(AdaptiveOrchestration(service.business_cases).enable,case_id,await body(request))
+
+    @app.post('/business-ontology/v1/cases/{case_id}/adaptive/revise')
+    async def revise_adaptive(case_id:str,request:Request):
+        from .adaptive_orchestration import AdaptiveOrchestration
+        return await call(AdaptiveOrchestration(service.business_cases).revise,case_id,await body(request))
+
+    @app.post('/business-ontology/v1/cases/{case_id}/adaptive/supply')
+    async def supply_adaptive(case_id:str,request:Request):
+        from .adaptive_orchestration import AdaptiveOrchestration
+        return await call(AdaptiveOrchestration(service.business_cases).supply,case_id,await body(request))
+
     @app.post('/business-ontology/v1/cases/{case_id}/drive')
     async def drive_business_case(case_id:str,request:Request):
         return await call(lifecycle_driver.drive,case_id,await body(request))

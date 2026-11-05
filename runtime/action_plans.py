@@ -76,7 +76,8 @@ def verify(workflow,node,output,inputs):
 def observed(workflow,node,run,inputs):
     plan=workflow.get('metadata',{}).get('connected_action_plan')
     if not plan:return
-    run.setdefault('action_instances',{a['action_id']:dict(state='pending',capability_id=a['capability_id'],depends_on=deepcopy(a['depends_on']),external_effect_status='not_started') for a in plan['actions']})
+    for action in plan['actions']:
+        run.setdefault('action_instances',{}).setdefault(action['action_id'],dict(state='pending',capability_id=action['capability_id'],depends_on=deepcopy(action['depends_on']),external_effect_status='not_started'))
     action=action_for(workflow,node['node_id'])
     if not action:return
     plan=workflow['metadata']['connected_action_plan']

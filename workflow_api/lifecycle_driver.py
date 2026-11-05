@@ -97,6 +97,9 @@ class LifecycleDriver:
         return result
 
     def drive(self,auth,case_id,body):
+        if self.cases.get(auth,case_id).get('adaptive'):
+            from .adaptive_orchestration import AdaptiveOrchestration
+            return AdaptiveOrchestration(self.cases).drive(auth,case_id,body)
         cases=self.cases;scope=cases.scope(auth,True,True)
         cases.body(body,('request_key',),('max_commands','max_seconds','max_stage_executions','resume'))
         if list(DRIVER_VALIDATOR.iter_errors(body)):fail('Driver request violates its budget contract.')

@@ -1,0 +1,47 @@
+[
+  {
+    "file": "simpson-trace.json",
+    "sha256": "89c523ead47739c49b30782944f3a5107dc833eedbc7446e7eeb090cc4d43d64",
+    "raw_source_sha256": "7363c0056178fd412cd4b8fcd4a0910b90c6f29fb13cb811782d9ac8b2ffc7ca",
+    "source": "/tmp/adaptive-phase2-verified/test_five_states_same_evaluato0/adaptive-simpson-trace.json",
+    "case_id": "case_a2015e4badc2dae011fbb6f6",
+    "plan_revisions": 1,
+    "runtime_runs": 1
+  },
+  {
+    "file": "gather-trace.json",
+    "sha256": "29852ad0dbcee3668bb82d1d608e06c1e85b484908a97ca84048b12dd84382c8",
+    "raw_source_sha256": "dbd00d7763da980ebeaeb0a6e629b45202744b5957d040c9dd521354c47d20cb",
+    "source": "/tmp/adaptive-phase2-verified/test_missing_evidence_adds_rea0/adaptive-gather-trace.json",
+    "case_id": "case_c966b0145c5ad84e6a1d87ec",
+    "plan_revisions": 2,
+    "runtime_runs": 2
+  },
+  {
+    "file": "approved-revision-trace.json",
+    "sha256": "d039be7e1fecc1b9a9b983cf5fbf4c434df0d31022402d9892eafd1b54b9c437",
+    "raw_source_sha256": "198ab954bdf94956dcf7e2845e22070d5dfa7873f66184570cc560b202479aca",
+    "source": "/tmp/adaptive-phase2-verified/test_revision_preserves_comple1/adaptive-revision-trace.json",
+    "case_id": "case_6baf12d469f0980cb8ab33b0",
+    "plan_revisions": 2,
+    "runtime_runs": 2
+  },
+  {
+    "file": "retail-trace.json",
+    "sha256": "db9b409c05f05fd6c4f8d4f6f4bf579eb1801a4fb8793f71533b8abbcfd005dd",
+    "raw_source_sha256": "d76cbe831ed0a0d8b41fe75b05c3f2e2a7b723d3ad6956c95b47f1e957b26c18",
+    "source": "/tmp/adaptive-phase2-verified/test_native_retail_package_use0/adaptive-retail-trace.json",
+    "case_id": "case_24e02908429938d21971535d",
+    "plan_revisions": 1,
+    "runtime_runs": 1
+  },
+  {
+    "file": "evaluator-revision-trace.json",
+    "sha256": "25f290a7ab919e2a83b064a7a62014545a3e4782714bf268e17bbdb249fd673b",
+    "raw_source_sha256": "0d86045e7e257104d23a432d78f8fa773a6a9846b536e30452cd3c08060ba9ea",
+    "source": "/tmp/adaptive-phase2-verified/test_evaluator_revises_unfinis0/adaptive-evaluator-revision-trace.json",
+    "case_id": "case_2925fcf33825f05fbbac1b3e",
+    "plan_revisions": 2,
+    "runtime_runs": 2
+  }
+]
