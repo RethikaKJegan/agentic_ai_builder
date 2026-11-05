@@ -12,6 +12,7 @@ class TriggerScheduler:
     def __init__(self, service, authenticate, poll_source=None, interval=5):
         self.service = service
         self.authenticate = authenticate
+        if not getattr(service,'worker_authenticate',None):service.worker_authenticate=authenticate
         self.poll_source = poll_source
         self.interval = max(1, int(interval))
         self.stop_event = Event()
@@ -25,16 +26,17 @@ class TriggerScheduler:
         if runner is None:
             return {"polled": 0, "queued": 0, "dispatched": 0}
         polled = queued = dispatched = 0
+        automation=getattr(self.service,'automation',None)
+        if automation:automation.tick(self.authenticate)
         # Poll bindings are workspace scoped and the worker uses fresh auth.
         with lifecycle.store.transaction(write=False) as db:
-            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations").fetchall()}
+            workspaces = {row[0] for row in db.execute("SELECT DISTINCT workspace FROM lifecycle_triggers UNION SELECT DISTINCT workspace FROM lifecycle_preparations UNION SELECT DISTINCT workspace FROM lifecycle_jobs").fetchall()}
         for workspace in workspaces:
             if self.stop_event.is_set():break
             lifecycle.reconcile_cleanup(workspace)
             auth = self.authenticate(workspace, "local-builder")
-            if not auth:
-                continue
-            for binding in lifecycle.poll_bindings(workspace):
+            bindings=lifecycle.poll_bindings(workspace) if auth else []
+            for binding in bindings:
                 if self.stop_event.is_set():break
                 binding_id = binding["binding_id"]
                 now = time.time()
@@ -109,3 +111,46 @@ class TriggerScheduler:
         self.stop_event.set()
         if self.thread:
             self.thread.join(timeout=5)
+
+
+class CronSchedule:
+    """Five-field cron, evaluated on UTC minutes through an IANA timezone.
+
+    DST gaps have no occurrence; repeated wall-clock minutes have distinct UTC
+    occurrences. Day-of-month and weekday use standard cron OR semantics.
+    """
+    def __init__(self,expression,zone):
+        from zoneinfo import ZoneInfo
+        from .lifecycle import LifecycleFailure
+        try:
+            self.zone=ZoneInfo(zone)
+            fields=expression.split()
+            if len(fields)!=5:raise ValueError()
+            self.values=[];self.wild=[]
+            for text,(lo,hi) in zip(fields,[(0,59),(0,23),(1,31),(1,12),(0,7)]):
+                self.wild.append(text=='*');values=set()
+                for part in text.split(','):
+                    raw,*step=part.split('/');stride=int(step[0]) if step else 1
+                    if len(step)>1 or stride<1:raise ValueError()
+                    if raw=='*':start,end=lo,hi
+                    elif '-' in raw:start,end=map(int,raw.split('-'))
+                    else:start=int(raw);end=hi if step else start
+                    if not lo<=start<=end<=hi:raise ValueError()
+                    values.update(range(start,end+1,stride))
+                self.values.append(values)
+            if 7 in self.values[4]:self.values[4].add(0);self.values[4].remove(7)
+        except Exception:
+            raise LifecycleFailure('INVALID_SCHEDULE','Supply a valid five-field cron expression and IANA timezone.',422) from None
+
+    def next(self,after):
+        from datetime import datetime,timezone
+        from .lifecycle import LifecycleFailure
+        stamp=(int(after)//60+1)*60
+        for _ in range(366*24*60*5):
+            d=datetime.fromtimestamp(stamp,timezone.utc).astimezone(self.zone)
+            minute,hour,dom,month,dow=self.values
+            day=d.day in dom;weekday=(d.weekday()+1)%7 in dow
+            matches=(day and weekday) if self.wild[2] or self.wild[4] else (day or weekday)
+            if d.minute in minute and d.hour in hour and d.month in month and matches:return stamp
+            stamp+=60
+        raise LifecycleFailure('INVALID_SCHEDULE','No occurrence within the bounded five-year horizon.',422)

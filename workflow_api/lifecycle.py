@@ -378,10 +378,14 @@ class LifecycleService:
     def lease(self, workspace, limit=10, seconds=30):
         with self.store.transaction() as db:
             now = now_iso(self.clock)
-            rows = db.execute("SELECT job_id, document FROM lifecycle_jobs WHERE workspace=? AND (state='queued' OR (state='leased' AND lease_until<?)) AND available_at<=? ORDER BY rowid LIMIT ?", (workspace, now, now, limit)).fetchall()
+            rows = db.execute("SELECT job_id, document FROM lifecycle_jobs WHERE workspace=? AND (state='queued' OR (state='leased' AND lease_until<?)) AND available_at<=? ORDER BY rowid LIMIT ?", (workspace, now, now, max(limit,100))).fetchall()
+            active=[json.loads(r[0]) for r in db.execute("SELECT document FROM lifecycle_jobs WHERE workspace=? AND state='leased' AND lease_until>?",(workspace,now)).fetchall()]
+            held={j.get('serialization_key') for j in active if j.get('serialization_key')}
             jobs = []
             for job_id, encoded in rows:
                 job = json.loads(encoded)
+                if job.get('serialization_key') in held:continue
+                if job.get('serialization_key'):held.add(job['serialization_key'])
                 job["state"], job["attempt"] = "leased", job["attempt"] + 1
                 job["lease_until"] = (datetime.fromtimestamp(self.clock(), timezone.utc) + timedelta(seconds=seconds)).isoformat()
                 db.execute("UPDATE lifecycle_jobs SET state='leased', lease_until=?, attempt=?, document=? WHERE job_id=?", (job["lease_until"], job["attempt"], json.dumps(job), job_id))
@@ -389,6 +393,7 @@ class LifecycleService:
                 db.execute('INSERT INTO lifecycle_job_claims VALUES (?,?) ON CONFLICT(job_id) DO UPDATE SET token=excluded.token',(job_id,token))
                 self.leased_tokens[job_id]=token
                 jobs.append(job)
+                if len(jobs)>=limit:break
             return jobs
 
     def poll_bindings(self, workspace):
@@ -427,6 +432,12 @@ class LifecycleService:
             if job['state']!='leased':return job
             if not job.get('lease_until') or job['lease_until']<=now_iso(self.clock):
                 raise LifecycleFailure('JOB_LEASE_EXPIRED','The dispatch lease expired before execution.')
+            if job.get('automation_kind'):
+                automation=getattr(self.workflows,'automation',None)
+                if automation is None:return self._finish_job(db,job,'dead_letter','AUTOMATION_UNAVAILABLE',claim)
+            else:automation=None
+        if automation:return automation.execute_job(job,claim,runner)
+        with self.store.transaction() as db:
             release_row = db.execute("SELECT state, document FROM lifecycle_releases WHERE release_id=?", (job["release_id"],)).fetchone()
             identity_row = db.execute("SELECT authority, document FROM lifecycle_identities WHERE identity_id=?", (job["automation_identity_id"],)).fetchone()
             tombstoned = db.execute("SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?", (job["workspace_id"], self._job_workflow(db, job_id))).fetchone()

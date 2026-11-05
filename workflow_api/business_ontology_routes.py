@@ -83,6 +83,9 @@ def install(app, service, auth, reference, env=None):
     from .business_cases import BusinessCases
     service.business_cases=BusinessCases(service)
     app.state.business_cases=service.business_cases
+    from .automation import DurableAutomation
+    automation=DurableAutomation(service)
+    app.state.automation=automation
     from .simpson_lifecycle import SimpsonLifecycle, definition as simpson_process
     from .lifecycle_driver import LifecycleDriver
     simpson_lifecycle=SimpsonLifecycle(service.business_cases)
@@ -145,6 +148,27 @@ def install(app, service, auth, reference, env=None):
     @app.post('/business-ontology/v1/simpson-lifecycle/cases')
     async def create_simpson_case(request:Request):
         return await call(simpson_lifecycle.create,await body(request))
+
+    @app.get('/business-ontology/v1/automation')
+    async def automation_listing(kind:str|None=None,before:str|None=None,limit:int=100):return await call(automation.listing,kind,before,limit)
+
+    @app.get('/business-ontology/v1/automation/{identifier}')
+    async def automation_get(identifier:str):return await call(automation.get,identifier)
+
+    @app.post('/business-ontology/v1/automation/authorizations')
+    async def automation_authorize(request:Request):return await call(automation.authorize,await body(request))
+
+    @app.post('/business-ontology/v1/automation/subscriptions')
+    async def automation_subscribe(request:Request):return await call(automation.subscribe,await body(request))
+
+    @app.post('/business-ontology/v1/automation/schedules')
+    async def automation_schedule(request:Request):return await call(automation.schedule,await body(request))
+
+    @app.post('/business-ontology/v1/automation/timers')
+    async def automation_timer(request:Request):return await call(automation.timer,await body(request))
+
+    @app.post('/business-ontology/v1/automation/{identifier}/control')
+    async def automation_control(identifier:str,request:Request):return await call(automation.control,identifier,await body(request))
 
     @app.post('/business-ontology/v1/cases/{case_id}/adaptive')
     async def enable_adaptive(case_id:str,request:Request):

@@ -130,9 +130,9 @@ class RuntimeService:
         # Trusted in-process persistence hook; never accepted from an API payload.
         return self._create_run(request, auth, allow_superseded=False, on_created=on_created)
 
-    def create_automation_run(self, request, auth):
+    def create_automation_run(self, request, auth, *, on_created=None):
         """Trusted lifecycle entry point for a job pinned to an immutable release."""
-        return self._create_run(request, auth, allow_superseded=True)
+        return self._create_run(request, auth, allow_superseded=True, on_created=on_created)
 
     def _create_run(self, request, auth, allow_superseded, on_created=None):
         self.authorize(auth, 'workflow.execute', {'admin', 'builder'})

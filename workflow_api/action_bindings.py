@@ -147,7 +147,14 @@ def validate_plan(plan,contracts,context,scope):
                 if list(Draft202012Validator(target).iter_errors(value)):deny('Literal/context value violates its destination schema.')
                 if b['kind']=='evidence' and c['kind']=='tool' and not content_target(b['target']) and b['path'] not in context.get('authority_evidence_paths',{}).get(b['key'],[]):
                     deny('Mapped evidence is not approved as identity authority.','ACTION_AUTHORITY_DENIED')
-            if not compatible(source,target):deny('Binding input/output types are incompatible.')
+            if not compatible(source,target):
+                # Provider receipts may omit an identifier. Admit explicit non-null
+                # narrowing only for receipts; runtime input validation still blocks
+                # the dependent action when the actual receipt contains null.
+                narrowed=deepcopy(source)
+                if b['kind']=='receipt' and isinstance(source.get('type'),list) and 'null' in source['type']:
+                    narrowed['type']=[t for t in source['type'] if t!='null']
+                if narrowed==source or not compatible(narrowed,target):deny('Binding input/output types are incompatible.')
         # Required top-level fields must be fully supplied; nested required fields are checked on resolution.
         if c['supported_operation'].startswith('calendar.') and c['supported_operation']!='calendar.discover' and ['calendar_id'] not in targets:deny('Calendar identity must be explicit.','ACTION_INPUT_REQUIRED')
         if set(c['input_schema'].get('required',[]))-{p[0] for p in targets}:deny('A required action input has no binding.','ACTION_INPUT_REQUIRED')

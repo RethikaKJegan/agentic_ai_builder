@@ -122,6 +122,8 @@ def main() -> None:
     validate_agents()
     validate_tools()
     validate_api_and_control_contracts()
+    automation=validator(CONTRACTS / 'durable-automation-v1.json')
+    assert_valid(automation,EXAMPLES / 'durable-automation-v1.json')
     evaluator=validator(CONTRACTS / 'evaluator-decision-v1.json')
     assert_valid(evaluator,EXAMPLES / 'evaluator-decision-v1.json')
     revision=validator(CONTRACTS / 'orchestration-plan-v2.json')

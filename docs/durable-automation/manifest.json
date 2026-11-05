@@ -1,0 +1,50 @@
+[
+  {
+    "file": "reply-driven-trace.json",
+    "sha256": "f3bf65c06c33985ccf052ba3c8eff4096e2b0326f87390716cbbaabc4a0fc4a2",
+    "raw_source_sha256": "cc123bf93cafe774133121b36974336b955366e3a0e370f9d70d2a8535d9ad35",
+    "source": "/tmp/durable-phase3-accepted/test_reply_resumes_same_case_a0/reply-driven-trace.json",
+    "runs": 1,
+    "jobs": 1
+  },
+  {
+    "file": "daily-schedule-trace.json",
+    "sha256": "fc8a58c5e51efb413ddabe12c30e53ab5da46801782113e22428b1f8aad538cb",
+    "raw_source_sha256": "e9d1237c6404520ba606b6e699389ada90bd7a48d45c12415ca33df02a3d8717",
+    "source": "/tmp/durable-phase3-accepted/test_daily_report_distinct_occ0/daily-schedule-trace.json",
+    "runs": 2,
+    "jobs": 2
+  },
+  {
+    "file": "deadline-followup-trace.json",
+    "sha256": "21d4c5abd3101678678fedecdb0f2f0ea929bea6110196412e090de6d645d1d9",
+    "raw_source_sha256": "369ae049142fd2067c0b92ff395daf052da18910f466fdbfd9445bf9d5baaab0",
+    "source": "/tmp/durable-phase3-accepted/test_timer_deadline_reevaluate0/deadline-followup-trace.json",
+    "runs": 2,
+    "jobs": 3
+  },
+  {
+    "file": "retail-schedule-trace.json",
+    "sha256": "7fac8e77882b14dbcd5b38e43488d4d8898079500159862a8e1d21c89237c871",
+    "raw_source_sha256": "8e6a0bb3b3ae3ff9b243c22298c3cb4e0f42bee7dd179bb43b11f40298f941f2",
+    "source": "/tmp/durable-phase3-accepted/test_generic_worker_scheduler_0/retail-schedule-trace.json",
+    "runs": 1,
+    "jobs": 1
+  },
+  {
+    "file": "restart-recovery-trace.json",
+    "sha256": "03d2960c5eb0a978c896c978611798e5cd2052551ad2b364dbfea01ce7a15056",
+    "raw_source_sha256": "dec3011d265cdd6f53b15ecad77877ff6017264db9bca4681be345fbe8f96d05",
+    "source": "/tmp/durable-phase3-accepted/test_restart_after_completed_s0/restart-recovery-trace.json",
+    "runs": 1,
+    "jobs": 1
+  },
+  {
+    "file": "uncertain-send-trace.json",
+    "sha256": "3a8cbd65a48d8899ce8d38f501bb7a16fb9fbd5697a184d07eb52e9659dddd55",
+    "raw_source_sha256": "d00eb8857f8fed6fb1dd54fb4390b4a7c8aa2350300a3cffbea74fd967354a57",
+    "source": "/tmp/durable-error-verified/test_uncertain_gmail_send_is_n0/uncertain-send-trace.json",
+    "runs": 1,
+    "jobs": 1
+  }
+]

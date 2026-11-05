@@ -125,6 +125,8 @@ class AdaptiveOrchestration:
             if item.get('error_code'):obs.append(dict(observation_id='failure:'+aid+':'+item['error_code'],kind='failure',action_id=aid,value=item['error_code']))
         for key,entry in doc['binding_context'].get('evidence',{}).items():
             obs.append(dict(observation_id='evidence:'+digest([key,entry]),kind='mapped_evidence',reference=key,value=brief(entry)))
+        if run and run['status'] in ('failed','blocked','rejected'):
+            obs.append(dict(observation_id='run_failure:'+run['run_id']+':'+str(run.get('error_code')),kind='failure',value=dict(status=run['status'],error_code=run.get('error_code'))))
         obs.extend(deepcopy(a.get('input_observations',[])))
         return obs[:64]
 
@@ -227,7 +229,7 @@ class AdaptiveOrchestration:
             self.cases._save(db,scope,current);self.cases._remember(db,scope,body,fp,current)
             return current
 
-    def supply(self,auth,case_id,body):
+    def supply(self,auth,case_id,body,*,on_accept=None):
         scope=self.cases.scope(auth,True,True)
         self.cases.body(body,('request_key','expected_revision','wait_id'),('inputs','event'))
         reject_secrets(body);fp=digest(['adaptive.supply',case_id,body])
@@ -256,7 +258,11 @@ class AdaptiveOrchestration:
             wait.update(status='SATISFIED',observation_id=observation['observation_id'])
             a.setdefault('wait_history',[]).append(deepcopy(wait));a.setdefault('input_observations',[]).append(observation);a['pending_wait']=None
             self._status(case,'READY');self._phase(case,'PLAN' if not a['composition_id'] else 'EVALUATE')
+            automation=getattr(self.service,'automation',None)
+            if automation:automation._unsuspend(db,auth,case)
             self.cases._save(db,scope,case);self.cases._remember(db,scope,body,fp,case)
+            if on_accept:on_accept(db,case)
+            elif automation:automation._enqueue(db,scope,case_id,'input:'+body['request_key'],'case')
             return case
 
     def _wait(self,case,kind,schemas=None,event=None,reason=None):
@@ -329,7 +335,7 @@ class AdaptiveOrchestration:
                     if edge['source'] in run['node_states']:run['edge_states'][edge['edge_id']]='selected'
                 run['usage']=deepcopy(carry.get('usage',{}));run['created_at']=carry['created_at']
                 run['preserved_from_run']=carry['run_id']
-            run['created_at']=min(run['created_at'],a['started_at'])
+            run['created_at']=min(run['created_at'],a['started_at']+a.get('waited_seconds',0))
             run.update(adaptive_initialized=True,adaptive_limits=deepcopy(a['limits']),adaptive_reasoning_usage=deepcopy(a['reasoning_usage']))
             runtime.save(db,run)
             current['adaptive']['run_id']=created['run_id'];self._stage(current)['run_id']=created['run_id'];self.cases._save(db,scope,current)

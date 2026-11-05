@@ -789,7 +789,7 @@ class BusinessCases:
             # Refresh only eligibility; execution requires another bounded command.
             self.refresh(case, scope);self._save(db, scope, case)
 
-    def event(self, auth, case_id, body):
+    def event(self, auth, case_id, body, *, on_accept=None):
         scope = self.scope(auth, True)
         RuntimeService.authorize(auth, 'events.ingest', {'admin','builder'})
         self.body(body, ('request_key','event_id','event_type','source','correlation_keys','payload'))
@@ -828,6 +828,8 @@ class BusinessCases:
                 self.refresh(case, scope)
             self.record(case, 'event.received', wait_id=wait['wait_id'], event_id=body['event_id'])
             self._save(db, scope, case);self._remember(db, scope, body, fingerprint, case)
+            if on_accept:on_accept(db,case)
+            elif automation:=getattr(self.service,'automation',None):automation._enqueue(db,scope,case_id,'event:'+body['source']+':'+body['event_id'],'case')
         return case
 
     def cancel_runs(self, db, auth, case):

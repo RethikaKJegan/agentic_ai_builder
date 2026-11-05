@@ -1,0 +1,50 @@
+{
+  "connection_id": "gc_d3bd0a5220b96fc53b0e51632f6fb9f0",
+  "content_scope": "Complaint observations, explicit assumptions and verified report URL.",
+  "expires_at": 1796471530.0421717,
+  "limits": {
+    "max_actions_per_occurrence": 8,
+    "max_occurrences": 10
+  },
+  "operations": {
+    "extension_mail_send": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "maxLength": 12000,
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "to": {
+          "const": "engineer@example.com"
+        }
+      },
+      "required": [
+        "to",
+        "subject",
+        "body"
+      ],
+      "type": "object"
+    },
+    "extension_sheets_create_report": {
+      "properties": {
+        "project_id": {
+          "const": "complaint_report"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    }
+  },
+  "purpose": "Daily source-backed complaint report.",
+  "request_key": "recurring_consent_001",
+  "schedule": {
+    "cron": "0 18 * * *",
+    "timezone": "Asia/Kolkata"
+  }
+}

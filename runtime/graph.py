@@ -250,6 +250,9 @@ class GraphRunner:
         params = self.params(node, run, workflow)
         if list(Draft202012Validator(grant['input_schema']).iter_errors(params)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
+        automation=getattr(runtime.workflows,'automation',None)
+        if automation and run.get('automation_reference') and connector.external_write:
+            with runtime.store.transaction(write=False) as db:automation.check_action(db,auth,run,workflow,node,params)
         if workflow.get('metadata',{}).get('connected_action_plan'):
             from .action_plans import preflight
             preflight(connector,params)
@@ -306,6 +309,11 @@ class GraphRunner:
                     workflow, grants = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
                     if digest(workflow) != run['workflow_digest']:
                         raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed after execution was queued.')
+                    automation=getattr(runtime.workflows,'automation',None)
+                    if automation and run.get('automation_reference'):
+                        automation.guard_run(db,auth,run,workflow)
+                    from .adaptive_control import suspended as adaptive_suspended
+                    if adaptive_suspended(db,runtime,run,workflow):return runtime.public(run)
                     if runtime.clock() - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
                         raise RuntimeFailure('RUN_TIMEOUT', 'The execution duration budget is exhausted.')
                     node = self.next_node(db, run, workflow)

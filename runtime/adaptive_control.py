@@ -36,3 +36,15 @@ def reserve(run, workflow, amount):
     for key,ceiling in [('tokens','max_tokens'),('tool_calls','max_tool_calls'),('llm_calls','max_llm_calls')]:
         if existing.get(key,0)+external.get(key,0)+amount.get(key,0)>limits[ceiling]:
             raise RuntimeFailure('ADAPTIVE_BUDGET_EXHAUSTED','Case-wide execution/reasoning allowance is exhausted.',409)
+
+
+def suspended(db,runtime,run,workflow):
+    control=workflow.get('metadata',{}).get('adaptive_control')
+    if not control:return False
+    import json
+    row=db.execute('SELECT document FROM business_cases WHERE workspace=? AND owner=? AND case_id=?',(run['workspace_id'],run['subject_id'],control['case_id'])).fetchone()
+    if not row:return False
+    case=json.loads(row[0]);adaptive=case.get('adaptive',{})
+    if case['case_status']!='CANCELLED' and adaptive.get('suspended_at') is not None and adaptive.get('composition_id')==workflow['metadata']['composition_id']:
+        run['lease_until']=0;runtime.save(db,run);return True
+    return False
