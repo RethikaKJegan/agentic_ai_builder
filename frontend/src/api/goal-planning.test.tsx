@@ -1,0 +1,53 @@
+import { beforeEach,afterEach,vi,it,expect } from 'vitest';
+import { render,screen,fireEvent,waitFor,cleanup } from '@testing-library/react';
+import Overview from '@/screens/app.index';
+import { api,ApiError } from './client';
+import { useBackend } from './state';
+import { useMesh } from '@/domain/store';
+const {navigate}=vi.hoisted(()=>({navigate:vi.fn()}));
+vi.mock('@/lib/navigation',()=>({useNavigate:()=>navigate,Link:({children}:{children:React.ReactNode})=><span>{children}</span>}));
+vi.mock('@/features/investigations/InvestigationList',()=>({InvestigationList:()=>null}));
+beforeEach(()=>{
+ vi.restoreAllMocks();navigate.mockReset();
+ useMesh.setState({workflows:[],agents:[]});
+ useBackend.setState({status:'connected',error:null,session:{mode:'local-development',planning_available:true,runtime_available:true,approval_service_available:true,dynamic_composition_available:true,auth:{subject:{subject_id:'alice',workspace_id:'one'},roles:['builder'],permissions:['workflow.plan','workflow.view'],scopes:[],decision:'allow'}}});
+ vi.spyOn(useBackend.getState(),'initialize').mockResolvedValue(undefined);
+ vi.spyOn(api,'googleConnections').mockResolvedValue({items:[{connection_id:'gc_owned',account_email:'owner@example.com',status:'connected'}]} as never);
+});
+afterEach(cleanup);
+it('submits the main goal and selected account to connected planning with no connector payload form',async()=>{
+ const create=vi.spyOn(api,'createActionPlan').mockResolvedValue({composition_id:'composition_goal'} as never);
+ const legacy=vi.spyOn(api,'submitInvestigation');render(<Overview/>);
+ await screen.findByText(/owner@example.com/);
+ expect(screen.queryByLabelText('Optional connected action')).not.toBeInTheDocument();
+ expect(screen.queryByLabelText('project_id')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Workflow Google account'),{target:{value:'gc_owned'}});
+ fireEvent.change(screen.getByLabelText('Process description'),{target:{value:'Search public guidance and prepare a report using available tools.'}});
+ fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
+ await waitFor(()=>expect(create).toHaveBeenCalledTimes(1));
+ expect(create.mock.calls[0]![0]).toMatchObject({google_connection_id:'gc_owned',automatic_inputs:true,user_values:{},business_request:{}});
+ expect(create.mock.calls[0]![0]).not.toHaveProperty('operations');
+ expect(legacy).not.toHaveBeenCalled();
+ expect(navigate).toHaveBeenCalledWith({to:'/app/workflows/investigate',search:{connected:'1',composition:'composition_goal'}});
+});
+it('asks for a real missing recipient and preserves the goal/account on explicit retry',async()=>{
+ const create=vi.spyOn(api,'createActionPlan').mockRejectedValueOnce(new ApiError({error_code:'ACTION_INPUT_REQUIRED',message:'Recipient needed.',request_id:'req_goal',retryable:false,details:{required_inputs:{recipient:{type:'string',format:'email'}}}},undefined,{outcome:'rejected'})).mockResolvedValueOnce({composition_id:'composition_goal'} as never);
+ render(<Overview/>);await screen.findByText(/owner@example.com/);
+ fireEvent.change(screen.getByLabelText('Workflow Google account'),{target:{value:'gc_owned'}});
+ const goal='Investigate complaint C123 and email the findings to the engineer.';
+ fireEvent.change(screen.getByLabelText('Process description'),{target:{value:goal}});
+ fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
+ const field=await screen.findByLabelText('Email recipient');
+ fireEvent.change(field,{target:{value:'engineer@example.com'}});
+ fireEvent.click(screen.getByRole('button',{name:'Retry generation'}));
+ await waitFor(()=>expect(create).toHaveBeenCalledTimes(2));
+ expect(create.mock.calls[1]![0]).toMatchObject({objective:goal,google_connection_id:'gc_owned',user_values:{recipient:'engineer@example.com'}});
+ expect(screen.queryByLabelText('Explicit user values')).not.toBeInTheDocument();
+});
+it('retains the original planning key when retrying an unconfirmed unchanged request',async()=>{
+ const create=vi.spyOn(api,'createActionPlan').mockRejectedValueOnce(new ApiError({error_code:'API_UNAVAILABLE',message:'Unconfirmed.',request_id:'req_goal',retryable:true},undefined,{outcome:'unknown'})).mockResolvedValueOnce({composition_id:'composition_goal'} as never);
+ render(<Overview/>);fireEvent.change(screen.getByLabelText('Process description'),{target:{value:'Investigate complaint C123.'}});
+ fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));await screen.findByText('Unconfirmed.');
+ fireEvent.click(screen.getByRole('button',{name:'Retry generation'}));await waitFor(()=>expect(create).toHaveBeenCalledTimes(2));
+ expect(create.mock.calls[0]![0]['request_key']).toBe(create.mock.calls[1]![0]['request_key']);
+});

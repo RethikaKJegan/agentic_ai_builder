@@ -16,8 +16,22 @@ def analysis_schema(context):
     for record in context.get('records',[]):
         by_record.setdefault(record['record_id'],set()).update(record['values'])
     variants=[dict(type='object',additionalProperties=False,required=['record_id','mapping_id'],properties=dict(record_id=dict(type='string',const=rid),mapping_id=dict(type='string',enum=sorted(mids)))) for rid,mids in sorted(by_record.items()) if mids]
-    if variants:refs['items']={'anyOf':variants}
-    else:refs['maxItems']=0
+    finding=schema['properties']['findings']['items']
+    # Coverage, missing records and rule limitations are not source observations.
+    # Match the transport schema to validate_analysis before asking the model.
+    uncited=deepcopy(finding)
+    uncited['properties']['kind']['enum']=['limitation','unverified']
+    if variants:
+        refs['items']={'anyOf':variants}
+        uncited['properties']['references']['items']={'anyOf':deepcopy(variants)}
+        cited=deepcopy(finding)
+        cited['properties']['kind']['enum']=['observation','agreement','discrepancy']
+        cited['properties']['references']['minItems']=1
+        schema['properties']['findings']['items']={'anyOf':[cited,uncited]}
+    else:
+        uncited['properties']['references']['maxItems']=0
+        schema['properties']['findings']['items']=uncited
+    schema['properties']['findings']['description']='Cite supplied record_id/mapping_id pairs for observations, agreements and discrepancies. Describe retrieval coverage, missing records and evidence gaps as limitation or unverified findings. Never invent a source citation.'
     return schema
 
 

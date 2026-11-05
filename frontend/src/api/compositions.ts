@@ -16,3 +16,11 @@ export function preparationGapMessage(gap:Record<string,unknown>) {
  const messages:Record<string,string>={CASE_IDENTIFIER_REQUIRED:'Add a complaint ID or engine serial to your request.',REQUIRED_RESOURCE_INPUT:'Supply the required fields for the selected connected action.',ENGINEER_REFERENCE_REQUIRED:'Provide the engineer reference for the inspection request.',REGISTERED_TOOL_REQUIRED:'The required tool is not registered in this workspace.',CONNECTOR_NOT_CONFIGURED:'The required connector needs workspace setup.',EXPLICIT_CAPABILITY_NOT_PLANNED:'The generated plan did not include your selected action. Update the request and generate again.',NO_SUPPORTED_CAPABILITY:'No registered capability matches this request.',SCHEMA_INCOMPATIBLE:'The available tool does not accept the inputs required by this task.'};
  return reasons.map(reason=>messages[reason]??(typeof gap['requirement']==='string'?gap['requirement']:'The request requires additional input or authorized workspace capabilities.')).join(' ');
 }
+
+export function compositionFailureMessage(code: string | null) {
+ if(code==='INVESTIGATION_AGENT_REFERENCE') return 'Execution stopped because the agent summary contained an unsupported or missing source citation.';
+ if(code==='INVESTIGATION_AGENT_OUTPUT') return 'Execution stopped because the agent summary did not match the required result format.';
+ if(code==='DATABASE_BUSY') return 'Execution stopped because the application database was busy.';
+ if(code==='INVOCATION_FAILED') return 'Execution stopped because of an internal service failure.';
+ return `Execution stopped: ${(code??'unknown failure').replaceAll('_',' ').toLowerCase()}.`;
+}

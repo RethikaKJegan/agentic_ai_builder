@@ -87,6 +87,8 @@ class OpenAIStructuredOutputProvider:
                 'Return a JSON object with actions, completion_criteria (required action IDs) and missing_inputs. '
                 'Each action must match the supplied action_schema. Propose a dependency DAG of distinct action instances, including repeated capabilities when requested. '
                 'Use only registered capability IDs and declared schema fields. Bind typed path segments, never expressions. '
+                'The user supplies a goal and optionally an account, not technical connector payloads. Use supplied configuration keys for internal operation IDs and retrieval task names; never ask for project_id, creation_key or tabs JSON. Generate title and tabs with content.prepare using actual retrieved evidence. Use a content.prepare action even for read-only source-backed reports. Build as many distinct connector steps as the existing action budget permits; the capability catalogue is not a fixed connector menu. '
+                'An explicit recipient address is supplied in binding_context.user_values when present. If the user says email me, use the supplied recipient or selected_account_email; never invent another address. For any other missing business identity, request a plain required input. '
                 'literal references must name supplied user_values keys; context, configuration and evidence references must name supplied binding_context keys. '
                 'output/generated/receipt references require explicit depends_on. Receipt bindings use actual upstream connector results. '
                 'Use content.prepare to generate structured findings, email subject/body, spreadsheet tabs or Calendar description using data from evidence and artifact_url from a verified receipt. '

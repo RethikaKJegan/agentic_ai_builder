@@ -191,3 +191,48 @@ def test_analysis_schema_allows_only_observed_record_field_pairs():
  assert not Draft202012Validator(schema).is_valid(output('r1','mapping:symptom'))
  assert not Draft202012Validator(schema).is_valid(output('invented','mapping:serial'))
  assert not Draft202012Validator(analysis_schema({})).is_valid(output('r1','mapping:serial'))
+
+
+@pytest.mark.parametrize('kind',['observation','agreement','discrepancy'])
+def test_model_schema_rejects_uncited_source_claims_before_runtime_validation(kind):
+ from runtime.capability_composition import analysis_schema
+ from jsonschema import Draft202012Validator
+ from runtime.model_protocol import response_format,decode_response
+ from runtime.service import RuntimeFailure
+ output=dict(summary='No matches.',findings=[dict(kind=kind,statement='The retrieval returned zero records.',references=[])],missing_information=['Actual complaint identifier'])
+ for evidence in ({},{'records':[dict(record_id='real-record',values={'mapping:symptom':'Leak'})]}):
+  schema=analysis_schema(evidence)
+  assert not Draft202012Validator(schema).is_valid(output)
+  context={'final_output_schema':schema,'available_tools':[]}
+  wire=response_format('tool',context)['schema']
+  with pytest.raises(RuntimeFailure) as caught:decode_response(__import__('json').dumps({'decision':dict(action='finish',reason='Read completed.',output=output)}),context,wire)
+  assert caught.value.code=='MODEL_OUTPUT_SCHEMA_INVALID'
+  # An explicit evidence gap remains valid; unsupported claims are never relabelled by runtime.
+  for allowed in ('limitation','unverified'):
+   qualified=deepcopy(output);qualified['findings'][0]['kind']=allowed
+   assert Draft202012Validator(schema).is_valid(qualified)
+
+
+def test_citation_failure_is_model_validation_and_does_not_offer_retry_read():
+ from runtime.recovery import classify,failure_feedback
+ failure=classify('INVESTIGATION_AGENT_REFERENCE',task='complaints',source='business_retrieve_evidence')
+ assert failure['category']=='invalid_model_output'
+ assert failure['recovery_strategy']=='correct_structured_output'
+ feedback=failure_feedback({'classified_failures':[failure]})
+ assert feedback and 'limitation' in feedback[0]['hint']
+ view=CompositionPresentation.recovery_view({'status':'failed','error_code':'INVESTIGATION_AGENT_REFERENCE'},{'nodes':[]},0)
+ assert not view['eligible'] and 'source citation' in view['reason'] and 'Source reads may already have completed' in view['reason']
+
+
+def test_historical_citation_failure_is_presented_without_rewriting_saved_run(composition):
+ f=composition;_,ui,rt=setup(f);doc=prepare(f)
+ workflow=approve(f,f.c.workflow(f.x.a,doc['composition_id']))
+ created=rt.create_run(dict(request_id='historical_citation',idempotency_key='historical_citation_001',payload=dict(workflow_id=workflow['workflow_id'],workflow_version=1,inputs={})),f.x.a)
+ old=dict(error_code='INVESTIGATION_AGENT_REFERENCE',category='tool_execution_failure',affected_task='task_1',source_or_tool='business_retrieve_evidence',retry_eligible=False,recovery_strategy='retry_read',human_intervention=True)
+ with rt.store.transaction() as db:
+  saved=rt.load(db,created['run_id'],f.x.a);saved.update(status='failed',error_code='INVESTIGATION_AGENT_REFERENCE',classified_failures=[old]);rt.save(db,saved)
+ view=ui.view(f.x.a,doc['composition_id'],created['run_id'])
+ assert view['run']['failures'][0]['category']=='invalid_model_output'
+ assert view['tasks'][0]['errors'][0]['recovery_strategy']=='correct_structured_output'
+ assert not view['recovery']['eligible']
+ with rt.store.transaction(write=False) as db:assert rt.load(db,created['run_id'],f.x.a)['classified_failures']==[old]

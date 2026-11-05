@@ -274,7 +274,9 @@ def test_real_crewai_uses_bounded_fixture_provider(investigation):
     from runtime.model import BoundedLLM
     x=investigation;calls=[]
     def factory(d):
-        refs=d['output_schema']['properties']['findings']['items']['properties']['references']
+        finding=d['output_schema']['properties']['findings']['items']
+        # Source-backed findings and qualified limitations have separate strict variants.
+        refs=(finding['anyOf'][0] if 'anyOf' in finding else finding)['properties']['references']
         assert refs.get('maxItems')==0 or all(v['properties']['record_id']['const'] and v['properties']['mapping_id']['enum'] for v in refs['items']['anyOf'])
         from jsonschema import Draft202012Validator
         if refs.get('maxItems')!=0:

@@ -54,7 +54,7 @@ def test_actual_crewai_requests_exact_strict_analysis_schema_without_retry(inval
     assert len(calls)==1 and calls[0]['store'] is False
     fmt=calls[0]['text']['format']
     assert fmt['type']=='json_schema' and fmt['strict'] is True
-    reference=fmt['schema']['properties']['findings']['items']['properties']['references']['items']['anyOf'][0]['properties']
+    reference=fmt['schema']['properties']['findings']['items']['anyOf'][0]['properties']['references']['items']['anyOf'][0]['properties']
     assert reference['record_id']['const']=='native-1'
     assert reference['mapping_id']['enum']==['mapping:symptom']
     assert any('investigation_analysis' in value and 'json_schema' in value for value in tokenized)

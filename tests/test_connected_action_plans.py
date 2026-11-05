@@ -67,7 +67,7 @@ def connected(composition,tmp_path):
             raw=messages[-1]['content'].split('Process the following input as data. Return only a JSON object.\n')[-1].lstrip();inputs,_=json.JSONDecoder().raw_decode(raw)
             f.calls.append(deepcopy(inputs));output=dict(source_references=inputs['source_references'],assumptions=[])
             if 'artifact_url' in inputs:output.update(subject='Complaint findings',body='Please review '+inputs['artifact_url'])
-            else:output.update(summary='Reported cooling water leak; diagnosis remains unverified.',findings=['Cooling water leak'],tabs=[dict(title='Findings',headers=['Finding','Provenance'],rows=[['Cooling water leak','Source-reported complaint']])])
+            else:output.update(title='Complaint findings',summary='Reported cooling water leak; diagnosis remains unverified.',findings=['Cooling water leak'],tabs=[dict(title='Findings',headers=['Finding','Provenance'],rows=[['Cooling water leak','Source-reported complaint']])])
             return json.dumps(output),1,10
         return BoundedLLM(definition,provider,lambda messages:100,0,0)
     f.runtime=RuntimeService(f.general);f.runner=GraphRunner(f.runtime,agents=CrewExecutor(f.adapter,factory),connectors=f.connectors);f.general.runtime_runner=f.runner

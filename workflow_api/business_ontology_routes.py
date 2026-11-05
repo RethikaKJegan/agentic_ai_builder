@@ -96,7 +96,9 @@ def install(app, service, auth, reference, env=None):
             data = await run_in_threadpool(fn, getattr(app.state,'workflow_auth',auth), *args)
             return JSONResponse(service.envelope(reference(),200,data),headers={'Cache-Control':'no-store'})
         except (ApiFailure, RuntimeFailure) as exc:
-            if isinstance(exc,RuntimeFailure):exc=ApiFailure(exc.code,str(exc),exc.status)
+            if isinstance(exc,RuntimeFailure):
+                required=getattr(exc,'required_inputs',None)
+                exc=ApiFailure(exc.code,str(exc),exc.status,details={'required_inputs':required} if required else None)
             return JSONResponse(service.failure(reference(),exc),status_code=exc.status,headers={'Cache-Control':'no-store'})
         except Exception:
             exc = ApiFailure('BUSINESS_ONTOLOGY_UNAVAILABLE','Business ontology is unavailable. Refresh before retrying.',503)

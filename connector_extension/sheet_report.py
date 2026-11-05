@@ -10,6 +10,8 @@ from .sheet_creation import SheetsSetup
 
 
 class ReportSheetsSetup(SheetsSetup):
+    # These fields identify this application operation, never an existing Google resource.
+    planning_input_roles = {'project_id': 'workflow_key', 'creation_key': 'action_key'}
     def for_action(self, effect_id):
         if not isinstance(effect_id, str) or not effect_id.strip():
             denied('EFFECT_REFERENCE_REQUIRED', 'Report export requires its runtime action reference.')

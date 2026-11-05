@@ -99,6 +99,21 @@ export function ConnectedPlan({
       },
     );
   }
+  const goalMode=doc?.['interaction_mode']==='goal';
+  async function prepareReview() {
+    await command.act('prepare-review:'+id,{composition_id:id},async body=>{
+      const key=String(body['request_key']);
+      const current=await api.compositionView(id);
+      let ref={workflow_id:current.workflow_id,workflow_version:current.workflow_version??1};
+      if(!current.workflow_status){
+        const workflow=await api.compositionWorkflow(id);
+        ref={workflow_id:workflow.workflow_id,workflow_version:workflow.version};
+        await api.request('save_workflow_version',{...ref,base_version:0,workflow},key+'_save');
+      }
+      if(!current.workflow_status||current.workflow_status==='draft')await api.request('validate_workflow',ref,key+'_validate');
+      update();
+    });
+  }
   const disabled = command.busy || stale || command.unknown;
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
@@ -145,7 +160,8 @@ export function ConnectedPlan({
             }}
           />
           <div className="flex flex-wrap gap-2">
-            {!view.workflow_status && (
+            {goalMode&&(!view.workflow_status||view.workflow_status==='draft')&&<button className={actionButton} disabled={disabled||!backend.can('workflow.edit')||!backend.can('workflow.validate')} onClick={()=>void prepareReview()}>Review plan</button>}
+            {!goalMode&&!view.workflow_status && (
               <button
                 className={actionButton}
                 disabled={disabled || !backend.can("workflow.edit")}
@@ -154,7 +170,7 @@ export function ConnectedPlan({
                 Save workflow draft
               </button>
             )}
-            {view.workflow_status === "draft" && (
+            {!goalMode&&view.workflow_status === "draft" && (
               <button
                 className={actionButton}
                 disabled={disabled || !backend.can("workflow.validate")}

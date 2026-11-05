@@ -140,6 +140,9 @@ class LivePlannerProvider:
             for tool,filename in [('smtp_send_email','smtp-send-email.json'),('google_sheets_read_rows','google-sheets-read.json')]}
         self.context['tool_output_schemas']['google_sheets_upsert_record'] = definition['output_schema']
 
+    def plan_actions(self,objective,context):
+        return self.provider.plan_actions(objective,context)
+
     def select_capabilities(self,objective,context):
         return self.provider.select_capabilities(objective,context)
 

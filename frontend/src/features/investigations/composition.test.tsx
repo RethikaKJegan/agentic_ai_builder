@@ -55,3 +55,10 @@ it('exposes actual connected-read receipt counts for checking a tool invocation'
  expect(screen.getByText(/returned_messages/)).toBeVisible();
  expect(screen.getByText(/message_1/)).toBeVisible();
 });
+
+it('explains citation validation separately from agent identity and service failures',async()=>{
+ const {compositionFailureMessage}=await import('@/api/compositions');
+ expect(compositionFailureMessage('INVESTIGATION_AGENT_REFERENCE')).toBe('Execution stopped because the agent summary contained an unsupported or missing source citation.');
+ expect(compositionFailureMessage('AGENT_REGISTRATION_REQUIRED')).toContain('agent registration required');
+ expect(compositionFailureMessage('INVOCATION_FAILED')).toContain('internal service failure');
+});

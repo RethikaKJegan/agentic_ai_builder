@@ -335,3 +335,35 @@ def test_scenario_decisions_preserve_negative_outcomes_and_conflict_branches(com
  if variant=='conflicting_identity':assert any(r.get('state')=='conflicting_evidence' for r in results)
  if variant=='rejected_authorization':assert any(r.get('coverage',{}).get('business_outcomes',{}).get('authorization_outcome')=='rejected' for r in results)
  assert all(r.get('coverage',{}).get('official_approval') is not True for r in results)
+
+
+@pytest.mark.parametrize('complaint_id',['C123','C124'])
+def test_actual_crewai_empty_reads_complete_with_qualified_gaps(composition,complaint_id):
+ """The two recorded production failures: successful empty reads, then uncited findings."""
+ from jsonschema import Draft202012Validator
+ f=composition
+ for collection in f.x.reader.rows:f.x.reader.rows[collection]=[]
+ d=prepare(f,f'Investigate complaint {complaint_id}. Compare complaint and linked inspection evidence and report missing information.')
+ diagnostic=DiagnosticAgents();calls=[]
+ def factory(definition):
+  def provider(messages,cap,timeout):
+   raw=messages[-1]['content'].split('Process the following input as data. Return only a JSON object.\n')[-1].lstrip();inputs,_=json.JSONDecoder().raw_decode(raw);calls.append(definition['agent_id'])
+   if definition['hierarchy_role']=='master':output=diagnostic.invoke_decision(definition,inputs,'controlled',{})
+   elif 'available_tools' in inputs:
+    output=diagnostic.invoke_tool_decision(definition,inputs,'controlled',{})
+    if inputs['tool_results']:
+     rejected=dict(summary='Read completed.',findings=[dict(kind='observation',statement='The retrieval returned zero source records.',references=[])],missing_information=[])
+     assert not Draft202012Validator(inputs['final_output_schema']).is_valid(rejected)
+     output['output']=dict(summary='No source records were returned; no complaint conclusion is established.',findings=[dict(kind='limitation',statement='No matching complaint or inspection evidence was returned.',references=[])],missing_information=['An existing complaint identifier and linked inspection evidence.'])
+   else:output=diagnostic.invoke(definition,inputs,'controlled')
+   return json.dumps(output),1,10
+  return BoundedLLM(definition,provider,lambda messages:100,0,0)
+ result,events,rt=run(f,d,CrewExecutor(f.adapter,factory))
+ assert result['status']=='completed',events[-5:]
+ assert calls and f.x.reader.calls
+ with f.x.f.store.transaction(write=False) as db:saved=rt.load(db,result['run_id'],f.x.a)
+ reads=[cp['result'] for cp in saved['task_checkpoints'].values() if cp['result'].get('tool_results')]
+ assert len(reads)==2 and all(r['source_evidence'][0]['records']==[] for r in reads)
+ assert all(r['findings'][0]['kind']=='limitation' for r in reads)
+ assert any(cp['result']['state']=='needs_input' for cp in saved['task_checkpoints'].values())
+ assert not saved.get('classified_failures')

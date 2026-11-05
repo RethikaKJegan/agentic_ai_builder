@@ -51,11 +51,12 @@ def trusted_context(composition,auth,body,prepared):
 
 def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_planning_budget=None):
     auth,scope=composition.authorize(auth)
-    allowed={'objective','request_key','action_plan','user_values','client_id','preparation_id','business_request','resources','google_connection_id','constraints'}
+    allowed={'objective','request_key','action_plan','user_values','client_id','preparation_id','business_request','resources','google_connection_id','constraints','automatic_inputs'}
     if not isinstance(body,dict) or set(body)-allowed:deny('Use supported connected-plan request fields.')
     objective=body.get('objective')
     if not isinstance(objective,str) or not 1<=len(objective)<=4000:deny('Supply a bounded goal.')
     reject_secrets(body)
+    if type(body.get('automatic_inputs',False)) is not bool:deny('Automatic inputs must be a boolean.')
     if not isinstance(body.get('resources',{}),dict):deny('Resource references must be an object.')
     if len(canonical(body).encode())>500000:deny('Action request exceeds the existing bounded context allowance.','ACTION_PLAN_LIMIT')
     key=composition.preparation.service.key(body);fingerprint=digest([body,lifecycle_context,_revision])
@@ -74,13 +75,13 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         pin=_revision['package']
         package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
         context['validated_context'].update(package_id=pin['package_id'],package_revision=pin['revision'],pins=deepcopy(package_context['pins']))
-    tools=composition.tools(auth);contracts=catalogue(prepared,tools);contracts['content.prepare']=content_contract()
+    connectors=composition.connectors if composition.connectors is not None else getattr(composition.service.runtime_runner,'connectors',{})
+    tools=composition.tools(auth);contracts=catalogue(prepared,tools,connectors);contracts['content.prepare']=content_contract()
     if package_context:contracts.update(deepcopy(package_context['package']['capability_contracts']))
     def tool_id(cid,c):
         if package_context and cid in package_context['package']['capability_contracts'] and c['kind']=='tool':return 'client_package_read'
         return 'business_retrieve_evidence' if c.get('retrieval_task') else cid.removeprefix('tool.')
     # Only currently configured and policy-eligible operations are presented to the model.
-    connectors=composition.connectors if composition.connectors is not None else getattr(composition.service.runtime_runner,'connectors',{})
     current={t['tool_id']:t for t in tools}
     policy=composition.service.registry_adapter.service._policy
     def eligible(cid,c):
@@ -100,6 +101,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     hints=[];runtime=getattr(getattr(composition.service,'runtime_runner',None),'runtime',None)
     if runtime and 'runs.view' in auth.get('permissions',[]):
         hints=runtime.experience_memory.ranked(auth,domain='configured_business_ontology',pins=prepared['pins'] if prepared else {},contracts=visible,tool_references=[t['definition'] for t in tools])
+    from .goal_inputs import configure,bind_internal
+    configure(context,composition,auth,body,visible,connectors,tool_id)
     proposal=body.get('action_plan')
     if proposal is None:
         selector=getattr(composition.service.planner.provider,'plan_actions',None)
@@ -121,8 +124,13 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         request.update(objective='; '.join(QUESTIONS[t] for t in sorted(needed)),inputs=inputs,version_id=version['version_id'])
         prepared=composition.preparation.prepare(auth,request)
         context=trusted_context(composition,auth,body,prepared)
-        refreshed=catalogue(prepared,tools)
+        refreshed=catalogue(prepared,tools,connectors)
         visible.update({cid:c for cid,c in refreshed.items() if cid in visible})
+    configure(context,composition,auth,body,visible,connectors,tool_id)
+    if body.get('automatic_inputs'):
+        satisfied=bind_internal(actions,visible,context,connectors,tool_id,key)
+        proposal=deepcopy(proposal)
+        proposal['missing_inputs']=[k for k in proposal.get('missing_inputs',[]) if k not in satisfied]
     if _revision:
         for cid,pinned in _revision.get('contracts',{}).items():
             if cid not in visible:continue
@@ -135,6 +143,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         c=visible[a['capability_id']]
         if 'expected_output_schema' in a and a['expected_output_schema']!=c['output_schema']:deny('Model cannot change declared output schemas.')
         a['expected_output_schema']=deepcopy(c['output_schema'])
+    if body.get('automatic_inputs') and not body.get('google_connection_id'):
+        google_actions=[a for a in actions if a.get('capability_id') in visible and visible[a['capability_id']]['kind']=='tool' and (current[tool_id(a['capability_id'],visible[a['capability_id']])]['definition']['provider_id'] in {'google_sheets','gmail','google_calendar'} or tool_id(a['capability_id'],visible[a['capability_id']])=='smtp_send_email')]
+        if google_actions:deny('Select the Google account to use for this request.','GOOGLE_CONNECTION_REQUIRED')
     plan_id='plan_'+secrets.token_hex(12)
     if prepared and prepared.get('domain_context',{}).get('client_id') and body.get('client_id',prepared['domain_context']['client_id'])!=prepared['domain_context']['client_id']:deny('Plan client differs from pinned preparation.','ACTION_SCOPE_DENIED')
     client=body.get('client_id') or (prepared or {}).get('domain_context',{}).get('client_id') or 'configured_client'
@@ -152,6 +163,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if getattr(exc,'code',None)=='ACTION_INPUT_REQUIRED':
             schemas={key:{'type':'string','minLength':1,'maxLength':2000} for key in proposal.get('missing_inputs',[]) if isinstance(key,str) and 1<=len(key)<=160}
             for a in actions:
+                for field in visible[a['capability_id']]['input_schema'].get('required',[]):
+                    if not any(b.get('target',[None])[0]==field for b in a.get('bindings',[])):
+                        schemas[field]=deepcopy(field_schema(visible[a['capability_id']]['input_schema'],[field]))
                 for b in a.get('bindings',[]):
                     if b.get('kind')=='literal' and b['key'] not in context['user_values']:
                         schemas[b['key']]=deepcopy(field_schema(visible[a['capability_id']]['input_schema'],b['target']))
@@ -203,7 +217,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         tasks=tasks,contracts={a['capability_id']:visible[a['capability_id']] for a in actions},configurations=configs,master=None,selected_tools=chosen,
         resources=deepcopy(body.get('resources',{})),google_connection_id=body.get('google_connection_id'),preparation_id=prepared['preflight_id'] if prepared else None,
         preparation_sha256=prepared['sha256'] if prepared else None,created_at=now(),planning=dict(mode='action_plan',model_calls=int(body.get('action_plan') is None)),
-        action_plan=plan,binding_context=context,memory_recommendations=hints)
+        action_plan=plan,binding_context=context,memory_recommendations=hints,interaction_mode='goal' if body.get('automatic_inputs') else 'advanced')
     if package_context:doc['client_package_context']=deepcopy(package_context)
     if lifecycle_context is not None:doc['lifecycle_context']=deepcopy(lifecycle_context)
     if doc['google_connection_id']:

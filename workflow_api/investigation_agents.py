@@ -112,12 +112,8 @@ class InvestigationAgents:
         factory=self.factory();d=definition(capability,self.model_id)
         # Bind citations to the actual evidence packet, not plausible-looking
         # business identifiers, rule IDs or fields from another record.
-        refs=d['output_schema']['properties']['findings']['items']['properties']['references']
-        by_record={}
-        for r in context['records']:by_record.setdefault(r['record_id'],set()).update(r['values'])
-        variants=[dict(type='object',additionalProperties=False,required=['record_id','mapping_id'],properties=dict(record_id=dict(type='string',const=rid),mapping_id=dict(type='string',enum=sorted(mids)))) for rid,mids in sorted(by_record.items()) if mids]
-        if variants:refs['items']={'anyOf':variants}
-        else:refs['maxItems']=0
+        from runtime.capability_composition import analysis_schema
+        d['output_schema']=analysis_schema(context)
         d['instructions']+=' Copy legal record_id/mapping_id pairs exactly from citation_catalog and the response schema. Business complaint IDs, evidence IDs, rule IDs, field paths and collection names are not citation identifiers. Discuss missing evidence and rule limitations as limitation findings with an empty references array; never invent a citation. Missing facts may also go in missing_information.'
         d['instructions']+=' Scope missing information to task_requirements. Do not require later-stage warranty, diagnosis, authorization or incorporation facts for a comparison/history task. Distinguish additional observations from actual contradictory statements; a newly mentioned defect is not automatically a discrepancy.'
         d['instructions']+=' Keep the result concise: at most 16 findings, 12 references per finding and 24 missing-information items; summary at most 3000 characters, statements at most 1500 and missing-information items at most 500. These are hard output limits.'

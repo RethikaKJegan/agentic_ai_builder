@@ -15,7 +15,8 @@ import { useRef } from "react";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import {isInvestigationPrompt} from '@/api/investigations';
 import {InvestigationContext,type InvestigationContextValue} from '@/features/investigations/InvestigationContext';
-import {CompositionOptions,compositionActionInputs,emptyCompositionOptions} from '@/features/investigations/CompositionOptions';
+import {CompositionOptions,emptyCompositionOptions} from '@/features/investigations/CompositionOptions';
+import {BusinessInputs} from '@/features/investigations/BusinessInputs';
 import {InvestigationList} from '@/features/investigations/InvestigationList';
 
 export default function Overview() {
@@ -25,6 +26,7 @@ export default function Overview() {
   const [workflowMode,setWorkflowMode]=useState('auto');
   const [optionsOpen,setOptionsOpen]=useState(false);
   const [toolOptions,setToolOptions]=useState(emptyCompositionOptions);
+  const [businessValues,setBusinessValues]=useState<Record<string,unknown>>({});
   const [evidenceContext,setEvidenceContext]=useState<InvestigationContextValue>({});
   const investigationKey=useRef<{prompt:string;key:string}|null>(null);
   const generationLock = useRef(false);
@@ -56,16 +58,15 @@ export default function Overview() {
       if (currentBackend.status !== "connected") throw currentBackend.error ?? new InputError("Could not connect to the workflow API. Retry when it is connected.");
       if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
       if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
-      if(isInvestigationPrompt(prompt,workflowMode)||toolOptions.packageId) {
-        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions);
+      if(isInvestigationPrompt(prompt,workflowMode)||(workflowMode!=='automation'&&currentBackend.session?.dynamic_composition_available===true)||toolOptions.packageId) {
+        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(businessValues);
         if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
         const key=investigationKey.current.key;
-        const dynamic=currentBackend.session?.dynamic_composition_available===true;
-        const job=dynamic?await api.submitInvestigation('compose',{objective:prompt,request_key:key,planning_mode:'model',...(toolOptions.packageId?{}:{business_request:evidenceContext}),recovery_max_retries:1,...compositionActionInputs(toolOptions,currentBackend.tools)},key):await api.submitInvestigation('plan',{objective:prompt,request_key:key,planning_mode:'model',analysis_mode:'crewai',...evidenceContext},key);
-        navigate({to:'/app/workflows/investigate',search:{job:job.job_id,...(dynamic?{dynamic:'1'}:{})}});
+        const doc=await api.createActionPlan({objective:prompt,request_key:key,automatic_inputs:true,business_request:evidenceContext,user_values:businessValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
+        navigate({to:'/app/workflows/investigate',search:{connected:'1',composition:doc.composition_id}});
         return;
       }
-      const saved = await createWorkflow({ objective: prompt, context });
+      const saved = await createWorkflow({ objective: prompt, context: {...context,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})} });
       if (saved.existing) toast.info("Opened the existing saved workflow for this request. Your previous revision was preserved.");
       const state = useMesh.getState();
       const current = state.workflows.find(workflow => workflow.id === saved.workflow.workflow_id);
@@ -78,9 +79,11 @@ export default function Overview() {
     <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-5xl font-semibold tracking-tight md:text-6xl">What should we automate today?</motion.h1>
     <p className="mt-3 text-lg text-muted-foreground">Describe your requirement in one prompt. PraxilonAI uses available sources and knowledge to draft the workflow, agents, tools and approvals.</p>
     <section className="mt-10 rounded-3xl border border-border-accent bg-background p-6 shadow-lift md:p-7">
-          <textarea value={description} disabled={planning} onChange={(e) => setDescription(e.target.value)} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
+          <textarea value={description} disabled={planning} onChange={(e) => {setDescription(e.target.value);setBusinessValues({});setApiError(null);}} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
       <p className="mt-4 text-sm text-muted-foreground">Describe what you need. Supported engine, complaint, inspection and warranty investigations generate a branching workflow you can run and inspect. Other automation requests use the existing workflow builder.</p>
-      <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}{optionsOpen&&<>{!toolOptions.packageId&&<InvestigationContext value={evidenceContext} onChange={setEvidenceContext} objective={description}/>}<CompositionOptions value={toolOptions} onChange={setToolOptions}/></>}</details>
+      <CompositionOptions value={toolOptions} onChange={value=>{setToolOptions(value);setBusinessValues({});setApiError(null);}}/>
+      <BusinessInputs error={apiError} values={businessValues} onChange={setBusinessValues}/>
+      <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}{optionsOpen&&<InvestigationContext value={evidenceContext} onChange={setEvidenceContext} objective={description}/>}</details>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
         <button type="button" disabled={cancelling} onClick={() => void cancel()} className="rounded-xl border border-border px-4 py-3 text-sm disabled:opacity-40">{cancelling ? "Cancelling…" : "Cancel generation"}</button>}

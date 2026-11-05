@@ -57,7 +57,7 @@ def contract(cid,operation,purpose,kind='model',task=None,tool_operation=None,ef
  return c
 
 
-def catalogue(preparation,tools):
+def catalogue(preparation,tools,connectors=None):
  from .business_preparation import BusinessEvidenceAdapter
  result={}
  for task in ('complaints','inspection','warranty','replacement','history','recurrence'):
@@ -75,6 +75,11 @@ def catalogue(preparation,tools):
  result['business.report']=contract('business.report','summarize','Prepare a source-backed summary')
  for record in tools:
   d=record['definition'];semantic=EXTERNAL.get(d['capability'])
+  if not semantic and connectors is not None and d['tool_id'] in connectors:
+   connector=connectors[d['tool_id']]
+   classifier=getattr(connector,'external_write_for_workflow',None)
+   effect=classifier({'metadata':{}}) if callable(classifier) else getattr(connector,'external_write',True)
+   semantic=('registered.'+d['capability'],'write' if effect else 'read','schema_and_tool_receipt')
   if semantic:
    op,effect,verify=semantic;cid='tool.'+d['tool_id']
    result[cid]=contract(cid,op,d['description'],'tool',tool_operation=d['capability'],effect=effect,inputs=d['input_schema'],outputs=d['output_schema'],verify=verify)

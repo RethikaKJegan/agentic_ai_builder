@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
-import { ApiError } from "./client";
+import { api, ApiError } from "./client";
 import Overview from "@/screens/app.index";
 import { CanonicalWorkflowSchema } from "./contracts.generated";
 import { useBackend } from "./state";
@@ -45,6 +45,7 @@ beforeEach(() => {
       },
     },
   });
+  vi.spyOn(api,"googleConnections").mockResolvedValue({items:[]} as never);
   vi.spyOn(useBackend.getState(), "initialize").mockResolvedValue(undefined);
 });
 afterEach(() => {

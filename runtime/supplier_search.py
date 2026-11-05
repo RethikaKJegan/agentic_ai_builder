@@ -97,6 +97,7 @@ for tool in (SEARCH,PAGE):tool['authentication']={'mode':'none','credential_refe
 
 
 class SupplierSearchConnector(Connector):
+    planning_input_defaults = {'region': 'in-en', 'max_results': 5}
     search_lock=threading.Lock()
     next_search=0.0
     def __init__(self,tool):super().__init__(tool,None)

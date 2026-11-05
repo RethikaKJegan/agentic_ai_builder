@@ -70,7 +70,14 @@ class CompositionPresentation:
             events=[]
             if run:
                 events=[json.loads(r[0]) for r in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence DESC LIMIT 1000',(scope[0],run_id)).fetchall()][::-1]
-        tasks=[];checkpoints=(run or {}).get('task_checkpoints',{});failures=(run or {}).get('classified_failures',[])
+        tasks=[];checkpoints=(run or {}).get('task_checkpoints',{});failures=deepcopy((run or {}).get('classified_failures',[]))
+        # Historical records retain their original diagnostics. Present citation
+        # validation with its current classification without rewriting the run.
+        from runtime.recovery import classify
+        for failure in failures:
+            if failure.get('error_code') in ('INVESTIGATION_AGENT_REFERENCE','INVESTIGATION_AGENT_OUTPUT'):
+                failure.update(classify(failure['error_code'],task=failure.get('affected_task'),source=failure.get('source_or_tool')))
+
         spawned={e['details']['agent_id']:e['details']['node_id'] for e in events if e['event_type']=='agent.spawned' and e['details'].get('agent_id')}
         for task in doc['tasks']:
             config=next((c for c in doc['configurations'] if c['assigned_task']==task['task_id']),None)
@@ -123,6 +130,8 @@ class CompositionPresentation:
         from runtime.recovery import classify
         if not run or not workflow or run['status'] not in ('failed','blocked'):return dict(eligible=False,reason='No failed execution requires recovery.')
         failure=classify(run.get('error_code','UNKNOWN_INVOCATION_RESULT'))
+        if run.get('error_code')=='INVESTIGATION_AGENT_REFERENCE':
+            return dict(eligible=False,reason='The agent summary contained an unsupported or missing source citation. Review the retrieved records and evidence gaps, then start a new run with the corrected result schema. Source reads may already have completed; this error does not mean an agent ID is missing.',failure=failure)
         writes=[n for n in workflow['nodes'] if n['kind']=='tool' and workflow['execution_policy'].get('allow_external_writes')]
         if any(run['node_states'].get(n['node_id']) in ('executing','completed','blocked','failed') for n in writes):return dict(eligible=False,reason='Reconcile the external action before preparing another attempt.',failure=failure)
         if run.get('error_code')=='UNKNOWN_INVOCATION_RESULT' and workflow['metadata'].get('composition_tasks'):failure=classify('DELEGATION_INTERRUPTED')

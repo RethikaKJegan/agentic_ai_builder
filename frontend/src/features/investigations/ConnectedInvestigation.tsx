@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/api/client";
-import { objectInput } from "@/api/orchestration";
+import { BusinessInputs } from "./BusinessInputs";
 import { useBackend } from "@/api/state";
 import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
@@ -29,8 +29,7 @@ function ConnectedWorkspace() {
   const command = useOrchestrationCommand();
   const [goal, setGoal] = useState("");
   const [google, setGoogle] = useState("");
-  const [recipient, setRecipient] = useState("");
-  const [values, setValues] = useState("{}");
+  const [values, setValues] = useState<Record<string,unknown>>({});
   const [context, setContext] = useState<InvestigationContextValue>({});
   const [localError, setLocalError] = useState<Error | null>(null);
   const navigate = (cid: string, rid?: string) =>
@@ -56,11 +55,12 @@ function ConnectedWorkspace() {
               e.preventDefault();
               setLocalError(null);
               try {
-                const user_values = { ...objectInput(values), ...(recipient ? { recipient } : {}) };
+                const user_values = values;
                 void command.act(
                   "plan",
                   {
                     objective: goal,
+                    automatic_inputs: true,
                     google_connection_id: google || undefined,
                     business_request: context,
                     user_values,
@@ -85,40 +85,14 @@ function ConnectedWorkspace() {
                 className="mt-2 w-full rounded-lg border bg-background p-3"
                 value={goal}
                 disabled={command.busy || command.unknown}
-                onChange={(e) => setGoal(e.target.value)}
+                onChange={(e) => {setGoal(e.target.value);setValues({});command.setError(null);}}
                 placeholder="Investigate a complaint, report findings and contact the assigned engineer…"
               />
             </label>
             <fieldset disabled={command.busy || command.unknown} className="space-y-3">
-              <GoogleAccountSelect value={google} onChange={setGoogle} />
-              <label className="block text-sm">
-                Authorized recipient (when required)
-                <input
-                  aria-label="Authorized recipient"
-                  type="email"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  className="mt-1 w-full rounded-lg border bg-background p-2"
-                />
-              </label>
-              <InvestigationContext value={context} onChange={setContext} objective={goal} />
-              <details>
-                <summary className="cursor-pointer text-sm">Additional resource inputs</summary>
-                <label className="mt-2 block text-xs">
-                  Explicit user values (JSON object)
-                  <textarea
-                    aria-label="Explicit user values"
-                    rows={4}
-                    value={values}
-                    onChange={(e) => setValues(e.target.value)}
-                    className="mt-1 w-full rounded-lg border bg-background p-2 font-mono"
-                  />
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Supply resource IDs, calendar times and report identifiers when requested.
-                  Generated content cannot supply identities or permissions.
-                </p>
-              </details>
+              <GoogleAccountSelect value={google} onChange={id=>{setGoogle(id);setValues({});command.setError(null);}} />
+              <BusinessInputs error={command.error} values={values} onChange={setValues}/>
+              <details><summary className="cursor-pointer text-sm">Evidence options</summary><InvestigationContext value={context} onChange={setContext} objective={goal}/></details>
             </fieldset>
             <ApiFeedback error={localError ?? command.error} />
             {command.unknown && (

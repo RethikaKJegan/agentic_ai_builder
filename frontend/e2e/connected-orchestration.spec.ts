@@ -178,15 +178,13 @@ test("B: prompt planning, reviewed recurring consent and two fresh occurrences",
   await page.goto("/app/workflows/investigate?connected=1");
   await page
     .getByLabel("Business goal")
-    .fill("Investigate complaint C123, create a report and email findings daily.");
+    .fill("Investigate complaint C123, create a report and email engineer@example.com the findings daily.");
   await page.getByLabel("Workflow Google account").first().selectOption(setup.connection_id);
-  await page.getByLabel("Authorized recipient").fill("engineer@example.com");
-  await page.getByText("Additional resource inputs", { exact: true }).click();
-  await page.getByLabel("Explicit user values").fill(JSON.stringify(setup.values));
+  await expect(page.getByLabel("Explicit user values")).toHaveCount(0);
+  await expect(page.getByLabel("Optional connected action")).toHaveCount(0);
   await page.getByRole("button", { name: "Propose connected plan" }).click();
   await expect(page.getByRole("heading", { name: "Connected action plan" })).toBeVisible();
-  await page.getByRole("button", { name: "Save workflow draft" }).click();
-  await page.getByRole("button", { name: "Validate workflow" }).click();
+  await page.getByRole("button", { name: "Review plan", exact: true }).click();
   await page.getByRole("button", { name: "Approve workflow", exact: true }).click();
   const a = page.getByRole("region", { name: "Background automation" });
   await a.getByText("Configure reviewed automation").click();
@@ -291,11 +289,10 @@ test("E: revoked selected account blocks planning and never substitutes another 
   await page.goto("/app/workflows/investigate?connected=1");
   await page
     .getByLabel("Business goal")
-    .fill("Investigate complaint C123, create a Sheet and email findings.");
+    .fill("Investigate complaint C123, create a Sheet and email engineer@example.com the findings.");
   await page.getByLabel("Workflow Google account").first().selectOption(setup.connection_id);
-  await page.getByLabel("Authorized recipient").fill("engineer@example.com");
-  await page.getByText("Additional resource inputs", { exact: true }).click();
-  await page.getByLabel("Explicit user values").fill(JSON.stringify(setup.values));
+  await expect(page.getByLabel("Explicit user values")).toHaveCount(0);
+  await expect(page.getByLabel("Optional connected action")).toHaveCount(0);
   const before = await control(page, "state");
   await control(page, "revoke-account");
   await page.getByRole("button", { name: "Propose connected plan" }).click();

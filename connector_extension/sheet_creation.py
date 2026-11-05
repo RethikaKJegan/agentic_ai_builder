@@ -74,6 +74,10 @@ class SheetResourceStore:
 
 
 class SheetsSetup(Connector):
+    @property
+    def planning_input_roles(self):
+        return {'project_id': 'workflow_key', 'creation_key': 'action_key'} if self.definition['capability']=='create_spreadsheet' else {}
+
     def __init__(self, definition, api, journal, resources, read_targets=None, write_targets=None):
         super().__init__(definition, api, journal)
         self.resources = resources

@@ -7,7 +7,7 @@ from runtime.service import RuntimeFailure
 
 SCHEMA_V2=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/orchestration-plan-v2.json').read_text())
 SCHEMA=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/orchestration-plan-v1.json').read_text())
-CONTENT_FIELDS={'subject','body','summary','description','title','tabs','rows','questions','findings','source_references','assumptions'}
+CONTENT_FIELDS={'subject','body','summary','description','title','tabs','rows','questions','findings','source_references','assumptions','query'}
 REFERENCES={'output','generated','receipt'}
 
 
