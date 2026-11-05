@@ -776,3 +776,17 @@ navigation/composition and desktop/mobile passed with zero browser/asset errors.
 cases; both smoke cases were cancelled without execution. Lifecycle migrations
 1/2 verified. No paid calls or live connector effects. Private rollback artifacts
 and receipts: `.local/business-lifecycle-ui-release-20261104/`.
+
+
+## Gmail-only business investigation setup correction
+
+Fixed false SIDE_EFFECT_MISMATCH for standalone Gmail drafts when the deployment
+uses automatic procurement connectors. Planning now shares runtime's standalone
+write classification; normal destination/schema/permission checks and exact action
+approvals remain. Multi-action UI/web-search are unchanged. Tests caught and fixed
+an eager metadata access regression on legacy row connectors before deployment.
+Final affected suite: 65 passed. Existing backend/worker correction deployed;
+170,591 rows across 32 tables preserved. Normal authenticated public planning with
+saved user inputs verified ready, zero model calls/external actions; original
+failed workflow retained. Generate an updated workflow to use the fix.
+Evidence: `openspec/changes/business-draft-connector-binding/verification.md`.

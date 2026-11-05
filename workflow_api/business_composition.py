@@ -63,7 +63,11 @@ class BusinessComposition:
             if d['capability'] not in c['allowed_tool_operations'] or c['capability_id'].startswith('tool.') and d['tool_id']!=c['capability_id'].removeprefix('tool.'):continue
             if not compatible(d,c['input_schema'],c['output_schema']):reasons.append('SCHEMA_INCOMPATIBLE');continue
             if d['tool_id'] not in connectors:reasons.append('CONNECTOR_NOT_CONFIGURED');continue
-            if bool(c['side_effect'] in ('draft','write'))!=bool(getattr(connectors[d['tool_id']],'external_write',True)):reasons.append('SIDE_EFFECT_MISMATCH');continue
+            connector=connectors[d['tool_id']]
+            classify=getattr(connector,'external_write_for_workflow',None)
+            # Business compositions generate standalone workflows, never procurement releases.
+            external_write=classify({'metadata':{}}) if callable(classify) else getattr(connector,'external_write',True)
+            if bool(c['side_effect'] in ('draft','write'))!=bool(external_write):reasons.append('SIDE_EFFECT_MISMATCH');continue
             probe=dict(permissions=d['permission_scopes'],limits=deepcopy(policy.agent_limits))
             probe['limits'].update(max_tool_calls=min(1,probe['limits']['max_tool_calls']),max_retries=0)
             # Exact Registry authorization rules, without minting an assignment.

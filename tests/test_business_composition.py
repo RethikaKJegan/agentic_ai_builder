@@ -177,9 +177,10 @@ def test_model_selection_uses_existing_provider_and_rejects_unregistered_request
  assert provider.context['capability_composition_catalog']
 
 
-def install_external(f,tool_id):
+def install_external(f,tool_id,automatic=False):
  from connector_extension.catalog import CATALOG
  tool=deepcopy(CATALOG[tool_id]);tool['availability']='enabled'
+ if automatic:tool['approval_required']=False
  policy=deepcopy(f.registry._policy);policy.version+=1;policy.approved_providers.add(tool['provider_id']);policy.agent_permissions.update(tool['permission_scopes']);policy.allowed_destinations.update(tool.get('allowed_destinations',[]));policy.remaining_quota[tool_id]=20
  scope=set(tool['permission_scopes'])|set(tool['authentication']['scopes'])
  policy.credential_references['cred_test_'+tool_id]=dict(provider_id=tool['provider_id'],scopes=list(scope))

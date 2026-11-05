@@ -1,0 +1,4 @@
+- [x] Reproduce the deployed unbound/standalone Gmail effect mismatch.
+- [x] Share standalone effect classification between planning and runtime binding.
+- [x] Verify valid draft planning, destination/schema rejection and unchanged runtime approvals with controlled provider tests.
+- [x] Validate affected backend regressions and contracts; deploy through existing authorized service procedure and verify authenticated readiness without creating mail.

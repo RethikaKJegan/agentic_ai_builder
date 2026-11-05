@@ -547,6 +547,14 @@ class ScopedConnector:
     def __init__(self, connector, procurement, workflow=None, action_approval=None):
         self.connector,self.procurement,self.workflow=connector,procurement,workflow
         self.action_approval=action_approval
+    def standalone_write(self, workflow):
+        return not workflow.get('metadata',{}).get('procurement_project_id') and self.definition['tool_id'] in {
+            'extension_sheets_create_report','extension_sheets_create','extension_sheets_add_tabs',
+            'extension_mail_send','extension_mail_draft','extension_mail_reply',
+            'extension_calendar_create','extension_calendar_update','extension_calendar_cancel'}
+    def external_write_for_workflow(self, workflow):
+        # Classification only: Registry grants and exact action approvals are still required.
+        return bool(self.connector.external_write or self.standalone_write(workflow))
     def bind_context(self,workflow,run,auth,node):
         gates={n['node_id']:n.get('approval_gate_id') for n in workflow['nodes'] if n['kind']=='approval'}
         immediate={gates[e['source']] for e in workflow['edges'] if e['target']==node['node_id'] and e.get('outcome')=='approved' and e['source'] in gates}
@@ -555,10 +563,7 @@ class ScopedConnector:
     def __getattr__(self,name):return getattr(self.connector,name)
     def bind_workflow(self,workflow):
         bound=self.connector.bind_workflow(workflow)
-        if not workflow.get('metadata',{}).get('procurement_project_id') and self.definition['tool_id'] in {
-            'extension_sheets_create_report','extension_sheets_create','extension_sheets_add_tabs',
-            'extension_mail_send','extension_mail_draft','extension_mail_reply',
-            'extension_calendar_create','extension_calendar_update','extension_calendar_cancel'}:
+        if self.standalone_write(workflow):
             bound.definition=deepcopy(bound.definition)
             bound.definition['approval_required']=True
             bound.external_write=True
