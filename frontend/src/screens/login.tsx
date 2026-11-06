@@ -3,9 +3,10 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, Loader2, LockKeyhole } from "lucide-react";
 import { LogoMark } from "@/components/mesh/Logo";
+import { resetBrowserSession } from "@/lib/browser-session";
 
 export default function Login() {
-  const [email, setEmail] = useState("engineering@bellcorpstudio.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,6 +20,7 @@ export default function Login() {
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Sign-in failed. Please try again.");
+      resetBrowserSession();
       // A full navigation discards any cached workspace state from an earlier session.
       window.location.assign("/app");
     } catch (failure) {

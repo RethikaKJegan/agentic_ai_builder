@@ -4,6 +4,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST, PUT } from '@/app/api/backend/[...path]/route';
 import { backendConfig } from '@/lib/backend-config';
+import { createWorkspaceSession, WORKSPACE_COOKIE } from '@/lib/workspace-auth';
+
+function authorizedRequest(input: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
+  const headers = new Headers(init?.headers);
+  headers.append('cookie', `${WORKSPACE_COOKIE}=${createWorkspaceSession()}`);
+  return new NextRequest(input, { ...init, headers });
+}
 
 const base = 'http://127.0.0.1:3001/api/backend/';
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split('/') }) });
@@ -11,7 +18,7 @@ const envelope = (status = 200) => ({ request_id: 'req_backend', status, data: s
   error: { error_code: status === 401 ? 'AUTHENTICATION_REQUIRED' : 'OPERATION_NOT_AUTHORIZED', message: 'Access denied.', request_id: 'req_backend', retryable: false },
 } : { items: [] } });
 const response = (status = 200) => new Response(JSON.stringify(envelope(status)), { status, headers: { 'content-type': 'application/json' } });
-beforeEach(() => { vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('TextEncoder', TextEncoder); vi.stubGlobal('TextDecoder', TextDecoder); });
+beforeEach(() => { vi.stubEnv('BUILDER_LOGIN_SECRET', 'proxy-tests-use-an-explicit-32-character-key'); vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('TextEncoder', TextEncoder); vi.stubGlobal('TextDecoder', TextDecoder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 it('defaults to live port 8000 and supports an explicit test API on 8011', () => {
@@ -28,7 +35,7 @@ it.each(['https://public.example', 'http://user:password@127.0.0.1:8000', 'http:
 
 it.each([401, 403, 409, 422, 500])('preserves upstream HTTP %s and its canonical error', async (status) => {
   const fetch = vi.fn().mockResolvedValue(response(status)); vi.stubGlobal('fetch', fetch);
-  const result = await GET(new NextRequest(base + 'workflows'), context('workflows'));
+  const result = await GET(authorizedRequest(base + 'workflows'), context('workflows'));
   expect(result.status).toBe(status);
   expect(await result.json()).toEqual(envelope(status));
   expect(result.headers.get('cache-control')).toBe('no-store');
@@ -37,7 +44,7 @@ it.each([401, 403, 409, 422, 500])('preserves upstream HTTP %s and its canonical
 it('forwards permitted cookies, correlation IDs and exact mutation bodies once', async () => {
   const fetch = vi.fn().mockResolvedValue(response()); vi.stubGlobal('fetch', fetch);
   const body = JSON.stringify({ request_id: 'req_action', operation: 'save_workflow_version', payload: {} });
-  const request = new NextRequest(base + 'workflows/id/versions/1', { method: 'PUT', headers: {
+  const request = authorizedRequest(base + 'workflows/id/versions/1', { method: 'PUT', headers: {
     'content-type': 'application/json', 'host': '127.0.0.1:3001', 'origin': 'http://127.0.0.1:3001', 'x-correlation-id': 'corr_action',
     'cookie': 'builder_dev_session=local-session; unrelated=private', 'authorization': 'Bearer do-not-forward',
   }, body });
@@ -58,17 +65,17 @@ it('supports exact public HTTPS origin only in production configuration', async 
   vi.stubEnv('BUILDER_ENVIRONMENT', 'production');
   const fetch = vi.fn().mockResolvedValue(response()); vi.stubGlobal('fetch', fetch);
   const publicBase = 'https://praxi.bellcorpstudio.com/api/backend/';
-  expect((await GET(new NextRequest(publicBase + 'session'), context('session'))).status).toBe(200);
+  expect((await GET(authorizedRequest(publicBase + 'session'), context('session'))).status).toBe(200);
   for (const origin of ['http://praxi.bellcorpstudio.com', 'https://praxi.bellcorpstudio.com:444', 'https://evil.example']) {
-    expect((await POST(new NextRequest(publicBase + 'workflows/plan', { method: 'POST', headers: { origin } }), context('workflows/plan'))).status).toBe(403);
+    expect((await POST(authorizedRequest(publicBase + 'workflows/plan', { method: 'POST', headers: { origin } }), context('workflows/plan'))).status).toBe(403);
   }
-  expect((await POST(new NextRequest(publicBase + 'workflows/plan', { method: 'POST' }), context('workflows/plan'))).status).toBe(403);
+  expect((await POST(authorizedRequest(publicBase + 'workflows/plan', { method: 'POST' }), context('workflows/plan'))).status).toBe(403);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
 it('rejects requests above the body limit before calling the backend', async () => {
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
-  const result = await POST(new NextRequest(base + 'workflows/plan', { method: 'POST', body: 'x'.repeat(2 * 1024 * 1024 + 1) }), context('workflows/plan'));
+  const result = await POST(authorizedRequest(base + 'workflows/plan', { method: 'POST', body: 'x'.repeat(2 * 1024 * 1024 + 1) }), context('workflows/plan'));
   expect(result.status).toBe(413);
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -76,13 +83,13 @@ it('rejects requests above the body limit before calling the backend', async () 
 it('reports malformed JSON separately from invalid contracts', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response('not-json')).mockResolvedValueOnce(new Response(JSON.stringify({ result: 'unknown' })));
   vi.stubGlobal('fetch', fetch);
-  expect(await (await GET(new NextRequest(base + 'session'), context('session'))).json()).toMatchObject({ data: { error: { error_code: 'API_MALFORMED_JSON' } } });
-  expect(await (await GET(new NextRequest(base + 'session'), context('session'))).json()).toMatchObject({ data: { error: { error_code: 'API_INVALID_CONTRACT' } } });
+  expect(await (await GET(authorizedRequest(base + 'session'), context('session'))).json()).toMatchObject({ data: { error: { error_code: 'API_MALFORMED_JSON' } } });
+  expect(await (await GET(authorizedRequest(base + 'session'), context('session'))).json()).toMatchObject({ data: { error: { error_code: 'API_INVALID_CONTRACT' } } });
 });
 
 it('does not retry a mutation after network failure', async () => {
   const fetch = vi.fn().mockRejectedValue(new TypeError('offline')); vi.stubGlobal('fetch', fetch);
-  const result = await POST(new NextRequest(base + 'workflows/plan', { method: 'POST', body: '{}' }), context('workflows/plan'));
+  const result = await POST(authorizedRequest(base + 'workflows/plan', { method: 'POST', body: '{}' }), context('workflows/plan'));
   expect(await result.json()).toMatchObject({ data: { error: { error_code: 'API_UNAVAILABLE', retryable: false } } });
   expect(fetch).toHaveBeenCalledTimes(1);
 });
@@ -90,7 +97,7 @@ it('does not retry a mutation after network failure', async () => {
 it('times out normal APIs separately from long synchronous planning', async () => {
   vi.useFakeTimers();
   vi.stubGlobal('fetch', vi.fn((_url: unknown, options: RequestInit) => new Promise((_resolve, reject) => options.signal?.addEventListener('abort', () => reject(new Error('aborted'))))));
-  const pending = GET(new NextRequest(base + 'workflows'), context('workflows'));
+  const pending = GET(authorizedRequest(base + 'workflows'), context('workflows'));
   await vi.advanceTimersByTimeAsync(30_001);
   expect((await pending).status).toBe(504);
   expect(backendConfig().plannerTimeout).toBeGreaterThan(180_000);
@@ -102,14 +109,14 @@ it('preserves all allowed session cookies and rejects unrelated upstream cookies
   headers.append('set-cookie', '__Secure-builder_session=two; Secure; HttpOnly; Path=/api/backend');
   headers.append('set-cookie', 'unrelated=three');
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope()), { headers })));
-  const result = await GET(new NextRequest(base + 'session'), context('session'));
+  const result = await GET(authorizedRequest(base + 'session'), context('session'));
   expect(result.headers.getSetCookie()).toHaveLength(2);
 });
 
 it('streams SSE bytes and forwards the reconnect cursor', async () => {
   const fetch = vi.fn().mockResolvedValue(new Response('id: 12\ndata: {"state":"running"}\n\n', { headers: { 'content-type': 'text/event-stream' } }));
   vi.stubGlobal('fetch', fetch);
-  const result = await GET(new NextRequest(base + 'workflow-overview/events', { headers: { accept: 'text/event-stream', 'last-event-id': '11' } }), context('workflow-overview/events'));
+  const result = await GET(authorizedRequest(base + 'workflow-overview/events', { headers: { accept: 'text/event-stream', 'last-event-id': '11' } }), context('workflow-overview/events'));
   expect(result.headers.get('content-type')).toBe('text/event-stream');
   expect(result.headers.get('x-accel-buffering')).toBe('no');
   expect(await result.text()).toContain('id: 12');
@@ -120,7 +127,7 @@ it('forwards signed Slack webhook bytes unchanged and preserves verification cha
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ challenge: 'verified-challenge' })));
   vi.stubGlobal('fetch', fetch);
   const raw = '{ "type": "url_verification" }';
-  const result = await POST(new NextRequest(base + 'webhooks/slack_events/binding', { method: 'POST', headers: { 'x-slack-signature': 'v0=signed', 'x-slack-request-timestamp': '123', 'content-type': 'application/json' }, body: raw }), context('webhooks/slack_events/binding'));
+  const result = await POST(authorizedRequest(base + 'webhooks/slack_events/binding', { method: 'POST', headers: { 'x-slack-signature': 'v0=signed', 'x-slack-request-timestamp': '123', 'content-type': 'application/json' }, body: raw }), context('webhooks/slack_events/binding'));
   expect(await result.json()).toEqual({ challenge: 'verified-challenge' });
   const options = fetch.mock.calls[0]![1] as RequestInit;
   expect(new TextDecoder().decode(options.body as Uint8Array)).toBe(raw);
@@ -130,25 +137,25 @@ it('forwards signed Slack webhook bytes unchanged and preserves verification cha
 it('allows only the Google GET callback cross-site and preserves its binding cookie', async () => {
   const callback='integrations/google/callback';
   const fetch=vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'http://127.0.0.1:3001/app/integrations?google=cancelled','set-cookie':'builder_google_oauth=; Path=/api/backend/integrations/google; Max-Age=0; HttpOnly; SameSite=Lax'}}));vi.stubGlobal('fetch',fetch);
-  const result=await GET(new NextRequest(base+callback+'?state=opaque&error=access_denied',{headers:{'sec-fetch-site':'cross-site',cookie:'builder_google_oauth=bound; unrelated=drop'}}),context(callback));
+  const result=await GET(authorizedRequest(base+callback+'?state=opaque&error=access_denied',{headers:{'sec-fetch-site':'cross-site',cookie:'builder_google_oauth=bound; unrelated=drop'}}),context(callback));
   expect(result.status).toBe(303);expect(result.headers.get('referrer-policy')).toBe('no-referrer');
   expect(new Headers(fetch.mock.calls[0]![1].headers).get('cookie')).toBe('builder_google_oauth=bound');
   expect(result.headers.get('set-cookie')).toContain('builder_google_oauth=');
   fetch.mockClear();
-  const denied=await GET(new NextRequest(base+'workflows',{headers:{'sec-fetch-site':'cross-site'}}),context('workflows'));
+  const denied=await GET(authorizedRequest(base+'workflows',{headers:{'sec-fetch-site':'cross-site'}}),context('workflows'));
   expect(denied.status).toBe(403);expect(fetch).not.toHaveBeenCalled();
 });
 
 it('rejects a Google callback redirect outside the configured integrations destination',async()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'https://evil.example/app/integrations?google=connected'}})));
-  const result=await GET(new NextRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
+  const result=await GET(authorizedRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
   expect(result.status).toBe(502);
 });
 
 it('supports an explicitly configured public Google return through the loopback gateway',async()=>{
   vi.stubEnv('BUILDER_GOOGLE_RETURN_ORIGIN','https://praxi.bellcorpstudio.com');
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(null,{status:303,headers:{location:'https://praxi.bellcorpstudio.com/app/integrations?google=expired'}})));
-  const result=await GET(new NextRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
+  const result=await GET(authorizedRequest(base+'integrations/google/callback'),context('integrations/google/callback'));
   expect(result.status).toBe(303);
   expect(result.headers.get('location')).toBe('https://praxi.bellcorpstudio.com/app/integrations?google=expired');
 });
@@ -157,7 +164,7 @@ it('preserves a query job idempotency header and exact body through the producti
   vi.stubEnv('BUILDER_ENVIRONMENT','production');
   const fetch=vi.fn().mockResolvedValue(response(202));vi.stubGlobal('fetch',fetch);
   const body=JSON.stringify({plan_id:'dq_owned'});const key='query_job_retry_123456';
-  const result=await POST(new NextRequest('https://praxi.bellcorpstudio.com/api/backend/data-queries/jobs',{method:'POST',headers:{origin:'https://praxi.bellcorpstudio.com','content-type':'application/json','idempotency-key':key,cookie:'builder_dev_session=bound; unrelated=drop'},body}),context('data-queries/jobs'));
+  const result=await POST(authorizedRequest('https://praxi.bellcorpstudio.com/api/backend/data-queries/jobs',{method:'POST',headers:{origin:'https://praxi.bellcorpstudio.com','content-type':'application/json','idempotency-key':key,cookie:'builder_dev_session=bound; unrelated=drop'},body}),context('data-queries/jobs'));
   expect(result.status).toBe(202);expect(fetch).toHaveBeenCalledTimes(1);
   const options=fetch.mock.calls[0]![1] as RequestInit;
   expect(new Headers(options.headers).get('idempotency-key')).toBe(key);
@@ -168,7 +175,7 @@ it('preserves a query job idempotency header and exact body through the producti
 it.each(['data-operations/prepare','data-operations/dbop_0123456789abcdef0123456789abcdef/recover'])('preserves CRUD intent keys and exact bytes for %s',async(path)=>{
   const fetch=vi.fn().mockResolvedValue(response(200));vi.stubGlobal('fetch',fetch);
   const body=path.endsWith('/prepare')?'{"steps":[]}':'{}';const key='database_intent_retry_1234';
-  const result=await POST(new NextRequest(base+path,{method:'POST',headers:{host:new URL(base).host,origin:new URL(base).origin,'content-type':'application/json','idempotency-key':key},body}),context(path));
+  const result=await POST(authorizedRequest(base+path,{method:'POST',headers:{host:new URL(base).host,origin:new URL(base).origin,'content-type':'application/json','idempotency-key':key},body}),context(path));
   expect(result.status).toBe(200);
   const options=fetch.mock.calls[0]![1] as RequestInit;
   expect(new Headers(options.headers).get('idempotency-key')).toBe(key);

@@ -422,7 +422,7 @@ class RegistryAdapter:
             return [deepcopy(grant) for key, grant in self._grants.items() if key[:4] == prefix]
 
 
-def load_registry_config(path):
+def load_registry_config(path, expected_workspace='local-workspace'):
     """Bootstrap through public registry methods from explicit repository-local JSON.
 
     A malformed configuration fails startup without reflecting file contents.
@@ -438,7 +438,7 @@ def load_registry_config(path):
         if set(config) - {'policy', 'agents', 'tools', 'bindings', 'subject_permissions', 'subject_scopes', 'operator_permissions', 'auto_resolve_planner'}:
             raise ValueError()
         policy_data = deepcopy(config['policy'])
-        if set(policy_data) - {f.name for f in fields(WorkspacePolicy)} or policy_data.get('workspace_id') != 'local-workspace':
+        if set(policy_data) - {f.name for f in fields(WorkspacePolicy)} or policy_data.get('workspace_id') != expected_workspace:
             raise ValueError()
         # Workflow approvals belong to Rethika, never operator-created JSON grants.
         if policy_data.get('approval_grants'):

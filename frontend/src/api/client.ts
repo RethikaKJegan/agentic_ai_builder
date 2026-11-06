@@ -1,3 +1,4 @@
+import { browserSessionCurrent } from '@/lib/browser-session';
 import {actionDocumentSchema,automationSchema,automationListSchema} from './orchestration';
 import {compositionViewSchema,compositionListSchema} from './compositions';
 import {caseSchema,caseIndexSchema,processDefinitionSchema,processIndexSchema,packageDetailsSchema,driveResultSchema,type CaseOperation} from './business-lifecycle';
@@ -54,7 +55,7 @@ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.st
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
-const sessionData = z.object({ planning_jobs_available: z.boolean().optional(), dynamic_composition_available:z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+const sessionData = z.object({ reply_monitor_available: z.boolean().optional(), planning_jobs_available: z.boolean().optional(), dynamic_composition_available:z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
 export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
   published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
@@ -414,12 +415,15 @@ export class WorkflowClient {
     }
   }
   private async readOnce(path: string, options: RequestInit = {}, recoverSession = true): Promise<unknown> {
+    if (!browserSessionCurrent()) return fail("AUTHENTICATION_REQUIRED", "The account changed. Reopen the workspace.");
     const generation = this.sessionGeneration;
     let response: Response;
     try { response = await this.transport(this.base + path, { credentials: "same-origin", cache: "no-store", ...options }); }
     catch { return fail("API_UNAVAILABLE", "The workflow API is unavailable. Retry when it is connected.", new Headers(options.headers).get("X-Request-ID") ?? "req_client", true); }
+    if (!browserSessionCurrent()) return fail("AUTHENTICATION_REQUIRED", "The account changed. Reopen the workspace.");
     let raw: unknown;
     try { raw = await response.json(); } catch { return fail("INVALID_API_RESPONSE", "The API returned an unusable response."); }
+    if (!browserSessionCurrent()) return fail("AUTHENTICATION_REQUIRED", "The account changed. Reopen the workspace.");
     if (containsSecret(raw)) return fail("UNSAFE_API_RESPONSE", "The API returned unsafe data. Nothing was displayed.");
     const envelope = ApiResponseSchema.safeParse(raw);
     if (!envelope.success) return fail("INVALID_API_RESPONSE", "The API response does not match the accepted envelope.");

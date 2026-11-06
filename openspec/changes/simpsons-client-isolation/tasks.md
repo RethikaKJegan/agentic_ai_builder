@@ -1,0 +1,6 @@
+- [x] Add signed client login and fail-closed upstream selection.
+- [x] Pin backend and worker identity, store and Registry to Simpsons.
+- [x] Add explicit Simpsons ontology/source provisioning without shared history.
+- [x] Verify authenticated workflow, retrieval and cross-company denial.
+- [x] Verify frontend login/proxy, account switching and existing regressions.
+- [x] Document configuration, validation and deployment boundaries.

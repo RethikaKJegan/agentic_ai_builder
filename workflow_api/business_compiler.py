@@ -40,7 +40,8 @@ def check_snapshot(snapshot):
     if len(canonical(snapshot)) > 12000000:
         invalid('The saved draft exceeds the compilation size limit.')
     namespace = snapshot.get('workspace', {}).get('namespace', '')
-    if not re.fullmatch(r'urn:simpson-business:[a-f0-9]{24}:', namespace):
+    subway = snapshot.get('workspace', {}).get('ontology_id') == 'subway'
+    if not re.fullmatch(r'urn:' + ('subway' if subway else 'simpson') + r'-business:[a-f0-9]{24}:', namespace):
         invalid()
     sources = snapshot.get('sources', [])
     if len({s['source_id'] for s in sources}) != len(sources):
@@ -51,7 +52,8 @@ def check_snapshot(snapshot):
     groups = ('concepts', 'relationships', 'rules')
     definitions = {kind: snapshot[kind] for kind in groups}
     modules = {x['module_id'] for items in definitions.values() for x in items}
-    if not modules <= {m[0] for m in MODULES}:
+    allowed_modules = {m['id'] for m in snapshot.get('modules', [])} if subway else {m[0] for m in MODULES}
+    if not modules <= allowed_modules:
         invalid()
     for module in sorted(modules):
         result = {kind: [] for kind in groups}

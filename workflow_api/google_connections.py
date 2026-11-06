@@ -135,7 +135,7 @@ class GoogleConnections:
             rows = db.execute("SELECT connection_id,workspace,owner,account_id,email,scopes,status,credentials,revision,created_at,updated_at,verified_at,error_code FROM google_connections WHERE workspace=? AND owner=? ORDER BY created_at", (workspace,owner)).fetchall()
         return dict(configured=not bool(self.config_error), setup_message=self.config_error,
                     callback_uri=self.redirect_uri or None, callback_in_client_file=self.registered_callback,
-                    items=[self.public(row) for row in rows], capabilities=list(CAPABILITIES), shared_demo_identity=True)
+                    items=[self.public(row) for row in rows], capabilities=list(CAPABILITIES), shared_demo_identity=not bool(self.env.get("BUILDER_CLIENT_ID")))
 
     def authorize(self, auth, browser, capabilities, connection_id=None):
         self.require_config()

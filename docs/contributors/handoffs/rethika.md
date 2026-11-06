@@ -1,5 +1,31 @@
 # Handoff — Rethika
 
+## Subway authentication — 6 November 2026, deployed
+
+Registered a separate Subway account, signed client audience, private assertion key,
+backend service and empty application store. Subway data/ontology and model/runtime
+operations remain unconfigured, with mutation guards and read-only authority.
+Both public logins pass; cross-account passwords/assertions and access to Simpsons
+sources are rejected. Simpsons credentials/configuration and service PID are
+unchanged. 32 backend and 194 frontend tests, types/lint/build/contracts/spec checks
+passed. See `docs/subway-client-auth.md` for deployment and evidence locations.
+
+## Simpsons client isolation — 6 November 2026, deployed
+
+Implemented signed Simpsons website identity and an exclusive dedicated backend
+route. The existing planner, context/evidence retrieval, ontology, Registry,
+runtime and workers use a pinned company workspace/subject and separate provisioned
+store. Source endpoints are explicitly allowlisted; shared credentials, context,
+histories and jobs are not inherited. Alex Simpsons is the temporary login.
+Two bound sources and eight saved ontology versions are prepared privately.
+The user subsequently authorized rollout: the dedicated Simpsons API/workers and
+website login are live. Public/browser identity and isolation checks passed; one
+projected source reference read succeeded without writes. The user chose to test
+model-backed chat personally; no live model question was submitted. See
+`docs/simpsons-client-isolation.md` and
+`openspec/changes/simpsons-client-isolation/verification.md` for validation,
+private artifact locations, activation steps and remaining deployment checks.
+
 ## Generic lifecycle Phase 6 — 4 November 2026, local only
 
 Extended the existing package/case/memory/runtime components with configurable
@@ -939,3 +965,39 @@ Final affected suite: 65 passed. Existing backend/worker correction deployed;
 saved user inputs verified ready, zero model calls/external actions; original
 failed workflow retained. Generate an updated workflow to use the fix.
 Evidence: `openspec/changes/business-draft-connector-binding/verification.md`.
+
+
+## Subway archive onboarding — 6 November 2026
+
+Subway now has separate read-only restored central/finance sources, an evidence-backed
+five-layer ontology (54 concepts, 11 candidate references) and a server-pinned client
+package using existing planning/Registry/runtime. A bounded read completed locally
+through the full workflow with no model calls. Existing Simpsons credentials, ontology,
+metadata snapshots and backend process were preserved; both public logins pass.
+See `docs/subway-business-ontology.md` and
+`openspec/changes/subway-data-onboarding/verification.md` for provenance, source
+repair details, bounded-read limits, test results, deployment and rollback evidence.
+Live AI chat is left for the user's own test as explicitly requested.
+
+
+## Isolated client Google connections — 6 November 2026
+
+Fixed omitted OAuth configuration and dropped browser cookies for Simpsons/Subway.
+State-bound signed callback routing survives missing/changed workspace cookies;
+client-local encryption/storage and owned Google connector bindings preserve account
+isolation. Four existing engineering connections remained unchanged. Both clients'
+public Connect Google → real Google sign-in → cancellation flows passed on desktop
+and mobile. User consent and external effects were not performed. See
+`docs/tenant-google-connections.md` and the tenant-google-oauth verification record.
+
+
+## Simpsons workspace audit — 6 November 2026
+
+Audited Simpsons live pages/APIs, source reads, deterministic preparation and active
+worker health; broad isolated workflow/approval/runtime regressions passed. Fixed
+unsupported legacy inbox polling in Runs/Monitoring and validated process lease
+ownership so stale supervisor rows cannot prevent dedicated-client restart.
+242 broad backend tests, 12 final affected tests and 529 frontend tests passed, plus
+build/types/lint/contracts/OpenSpec. Current Google/data/ontology/workflow rows were
+preserved. No paid model calls or outgoing effects were used. See
+`openspec/changes/simpsons-workspace-audit/verification.md` for evidence and limits.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createWorkspaceSession, SESSION_SECONDS, verifyWorkspacePassword, WORKSPACE_COOKIE } from "@/lib/workspace-auth";
+import { authenticateWorkspace, createClientSession, SESSION_SECONDS, WORKSPACE_COOKIE } from "@/lib/workspace-auth";
+import { backendConfig } from "@/lib/backend-config";
 import { sameOriginLoginRequest, secureLoginCookie } from "@/lib/workspace-auth-request";
 
 export const runtime = "nodejs";
@@ -38,9 +39,11 @@ export async function POST(request: NextRequest) {
   try { body = JSON.parse(text); } catch { return result("Enter your email and password.", 400); }
   if (!body || typeof body !== "object" || !("email" in body) || !("password" in body)) return result("Enter your email and password.", 400);
   try {
-    if (!await verifyWorkspacePassword(body.email, body.password)) return result("The email or password is incorrect.", 401);
+    const account = await authenticateWorkspace(body.email, body.password);
+    if (!account) return result("The email or password is incorrect.", 401);
+    if (account !== "operator") backendConfig(account);
     const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
-    response.cookies.set(WORKSPACE_COOKIE, createWorkspaceSession(), {
+    response.cookies.set(WORKSPACE_COOKIE, createClientSession(account), {
       httpOnly: true, secure: secureLoginCookie(request), sameSite: "lax", path: "/", maxAge: SESSION_SECONDS,
     });
     return response;

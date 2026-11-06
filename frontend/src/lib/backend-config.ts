@@ -1,6 +1,12 @@
 /** Server-only deployment configuration, also validated by instrumentation at startup. */
-export function backendConfig() {
-  const upstream = new URL(process.env['BUILDER_API_URL'] || 'http://127.0.0.1:8000');
+export function backendConfig(account: "operator" | "simpsons" | "subway" = "operator") {
+  const clientURL = process.env[`BUILDER_${account.toUpperCase()}_API_URL`];
+  if (account !== "operator" && (!clientURL || (process.env[`BUILDER_${account.toUpperCase()}_PROXY_SECRET`]?.length || 0) < 32))
+    throw new Error('Configure the dedicated Simpsons backend and proxy secret.');
+  const upstream = new URL(account !== "operator" ? clientURL! : process.env['BUILDER_API_URL'] || 'http://127.0.0.1:8000');
+  const otherClientURL = process.env[account === 'subway' ? 'BUILDER_SIMPSONS_API_URL' : 'BUILDER_SUBWAY_API_URL'];
+  if (account !== "operator" && (upstream.href === new URL(process.env['BUILDER_API_URL'] || 'http://127.0.0.1:8000').href || (otherClientURL && upstream.href === new URL(otherClientURL).href)))
+    throw new Error('Simpsons must use a separate backend.');
   const host = upstream.hostname;
   const privateHost = ['localhost', '127.0.0.1', '[::1]'].includes(host) ||
     /^10\.\d+\.\d+\.\d+$/.test(host) || /^192\.168\.\d+\.\d+$/.test(host) ||

@@ -11,7 +11,11 @@ from .data_operations import DataOperations
 
 
 def install(app,service,auth,env,reference):
-    manager=DataSources(service.store,env)
+    adapter=None
+    if env.get("BUILDER_CLIENT_ID")=="subway" and env.get("BUILDER_SUBWAY_DATA_ENABLED")=="1":
+        from .restored_subway_sources import RestoredSubwayAdapters
+        adapter=RestoredSubwayAdapters(env)
+    manager=DataSources(service.store,env,adapter=adapter)
     app.state.data_sources=manager
     from .business_ontology_routes import install as install_business_ontology
     install_business_ontology(app,service,auth,reference,env)

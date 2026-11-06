@@ -13,10 +13,10 @@ const definitions=z.object({concepts:z.array(concept),relationships:z.array(rela
 export const businessVersionSchema=definitions.extend({version_id:z.string(),revision:z.number(),kind:z.enum(['foundation','draft']),created_at:z.string(),sources:z.array(businessDocumentSchema).default([]),questions:z.record(z.array(z.string())).default({}),reference_import:z.object({kit_version:z.string(),source_basis:z.string(),added_modules:z.array(z.string()),bundle_sha256:z.string()}).optional(),extraction:z.object({module_id:z.string(),model:z.string(),input_tokens:z.number().nullable(),output_tokens:z.number().nullable(),classification_adjustments:z.array(classificationAdjustment).optional()}).passthrough().optional()});
 export const businessOntologySchema=z.object({
  api_version:z.literal(1),
- workspace:z.object({ontology_id:z.literal('simpson'),title:z.string(),namespace:z.string(),revision:z.number().int().positive(),status:z.enum(['foundation','draft']),created_at:z.string(),sources:z.object({service:z.string(),quality:z.string()}),source_revisions:z.record(z.number().int().nonnegative())}).nullable(),
+ workspace:z.object({ontology_id:z.enum(['simpson','subway']),title:z.string(),namespace:z.string(),revision:z.number().int().positive(),status:z.enum(['foundation','draft']),created_at:z.string(),sources:z.record(z.string()),source_revisions:z.record(z.number().int().nonnegative())}).nullable(),
  layers:z.array(layer),modules:z.array(module),
  available_sources:z.array(z.object({connection_id:z.string(),name:z.string(),engine:z.literal('mongodb'),connection_status:z.literal('connected'),metadata_revision:z.number().int().nonnegative()})),
- source_bindings:z.array(z.object({role:z.enum(['service','quality']),connection_id:z.string(),name:z.string().nullable(),status:z.enum(['connected','metadata_changed','unavailable'])})),
+ source_bindings:z.array(z.object({role:z.enum(['service','quality','central','finance']),connection_id:z.string(),name:z.string().nullable(),status:z.enum(['connected','metadata_changed','unavailable'])})),
  versions:z.array(z.object({version_id:z.string(),revision:z.number().int().positive(),created_at:z.string(),kind:z.enum(['foundation','draft'])})),
  counts:z.object({concepts:z.number().int().nonnegative(),relationships:z.number().int().nonnegative(),rules:z.number().int().nonnegative()}),
  generation_status:z.enum(['not_started','draft_available']),

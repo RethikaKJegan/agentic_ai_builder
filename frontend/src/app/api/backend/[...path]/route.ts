@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { backendConfig } from "@/lib/backend-config";
 import { ApiResponseSchema, SafeErrorSchema } from "@/api/contracts.generated";
 import { containsSecret } from "@/api/client";
+import { clientAssertion, workspaceAccount, WORKSPACE_COOKIE } from "@/lib/workspace-auth";
+
+import {GOOGLE_ROUTE_COOKIE,GOOGLE_CALLBACK_PATH,googleRouteCookie,googleRouteAccount} from '@/lib/google-oauth-routing';
 
 export const dynamic = "force-dynamic";
 const safeId = (value: string | null) => value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
@@ -12,14 +15,26 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const error = (code: string, message: string, status: number, retryable = false) => NextResponse.json({ request_id: reference, status,
     data: { correlation_id: correlation, error: { error_code: code, message, request_id: reference, retryable } } },
     { status, headers: { "Cache-Control": "no-store", "X-Request-ID": reference, "X-Correlation-ID": correlation } });
-  let config: ReturnType<typeof backendConfig>;
-  try { config = backendConfig(); } catch { return error("API_CONFIGURATION_INVALID", "The server API configuration is invalid. Contact the administrator.", 503); }
   const { path } = await context.params;
   if(path[0]==="ontology") return error("LEGACY_ONTOLOGY_RETIRED", "Use Business Ontology for definitions, profiling and source records.",410);
   if (!path.length || path.some((part) => part==="."||part===".."||!/^[a-zA-Z0-9_-]+$/.test(part))) return error("INVALID_ROUTE", "Use a supported API route.", 400);
   const route = path.join("/");
   const webhook = route.startsWith("webhooks/");
   const googleCallback = route === "integrations/google/callback" && request.method === "GET";
+  let account = workspaceAccount(request.cookies.get(WORKSPACE_COOKIE)?.value);
+  const routing=request.cookies.get(GOOGLE_ROUTE_COOKIE)?.value;
+  if(googleCallback&&routing){
+    const initiating=googleRouteAccount(routing,request.nextUrl.searchParams.get('state')||'');
+    if(!initiating)return error('OAUTH_SESSION_INVALID','Google authorization expired. Start Connect Google again.',400);
+    account=initiating;
+  }else if(googleCallback&&account&&account!=='operator'){
+    return error('OAUTH_SESSION_INVALID','Start Connect Google again in this workspace.',400);
+  }
+  const client = account && account !== 'operator' ? account : null;
+  let config: ReturnType<typeof backendConfig>;
+  try { config = backendConfig(account || "operator"); } catch { return error("API_CONFIGURATION_INVALID", "The server API configuration is invalid. Contact the administrator.", 503); }
+  if (!account && !webhook && !googleCallback)
+    return error('AUTHENTICATION_REQUIRED', 'Sign in to open the workspace.', 401);
   const origin = request.headers.get("origin");
   // NextURL rewrites loopback IPs to localhost; Host retains the actual browser origin.
   const requestOrigin = request.headers.get('host') ? `${request.nextUrl.protocol}//${request.headers.get('host')!.toLowerCase()}` : request.nextUrl.origin;
@@ -63,6 +78,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const url = new URL(path.map(encodeURIComponent).join('/') + request.nextUrl.search, config.upstream);
     const headers = new Headers({ 'x-request-id': reference, 'x-correlation-id': correlation });
+    if (client) headers.set('x-builder-client-assertion', clientAssertion(client));
     for (const key of ['content-type', 'accept', 'last-event-id', 'origin', 'sec-fetch-site', 'x-builder-signature', 'x-builder-timestamp',
       'x-hub-signature-256', 'x-slack-signature', 'x-slack-request-timestamp']) {
       const value = request.headers.get(key);
@@ -72,14 +88,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const key = request.headers.get('idempotency-key');
       if (key) headers.set('idempotency-key', key);
     }
-    const cookies = request.cookies.getAll().filter((cookie) => cookieNames.has(cookie.name));
+    const cookies = request.cookies.getAll().filter((cookie) => cookieNames.has(cookie.name) && (!client || cookie.name === "builder_google_oauth"));
     if (cookies.length) headers.set('cookie', cookies.map((c) => `${c.name}=${c.value}`).join('; '));
     const response = await fetch(url, { method: request.method, headers, cache: 'no-store', redirect: 'manual', signal: controller.signal,
       ...(body ? { body: body as BodyInit } : {}) });
+    if (client && response.headers.get('x-builder-client') !== client)
+      return error('CLIENT_BACKEND_MISMATCH', 'The configured backend does not serve this client.', 503);
     const resultHeaders = new Headers({ 'Cache-Control': 'no-store', 'X-Request-ID': reference, 'X-Correlation-ID': correlation });
     for (const cookie of response.headers.getSetCookie()) {
       const name = cookie.split('=', 1)[0];
-      if (name && cookieNames.has(name)) resultHeaders.append('set-cookie', cookie);
+      if (name && cookieNames.has(name) && (!client || name === "builder_google_oauth")) resultHeaders.append('set-cookie', cookie);
     }
     if ([302, 303].includes(response.status) && ['auth/login', 'auth/callback', 'integrations/google/callback'].includes(route)) {
       const location = response.headers.get('location');
@@ -88,6 +106,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if (!(route === 'auth/login' && target.origin === 'https://accounts.google.com' && target.pathname === '/o/oauth2/v2/auth') &&
           !(route === 'auth/callback' && config.origins.includes(target.origin) && target.pathname === '/app') &&
           !(googleCallback && (config.origins.includes(target.origin) || target.origin === config.googleReturnOrigin) && target.pathname === '/app/integrations' && ['connected','cancelled','expired','account_mismatch','failed'].includes(target.searchParams.get('google') || ''))) return error('API_INVALID_CONTRACT', 'The login destination is invalid.', 502);
+      if(googleCallback)resultHeaders.append('set-cookie',`${GOOGLE_ROUTE_COOKIE}=; Path=${GOOGLE_CALLBACK_PATH}; Max-Age=0; HttpOnly; SameSite=Lax${target.protocol==='https:'?'; Secure':''}`);
       resultHeaders.set('location', location);
       resultHeaders.set('Referrer-Policy', 'no-referrer');
       return new NextResponse(null, { status: response.status, headers: resultHeaders });
@@ -132,6 +151,15 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (!response.ok) {
       const data = parsed.data.data;
       if (!SafeErrorSchema.safeParse(data && !Array.isArray(data) ? data['error'] : null).success) return error('API_INVALID_CONTRACT', 'The backend returned an invalid error contract.', 502);
+    }
+    if(response.ok&&request.method==='POST'&&/^integrations\/google\/(?:authorize|connections\/[^/]+\/authorize)$/.test(route)&&account){
+      const data=parsed.data.data;
+      const destination=data&&!Array.isArray(data)&&typeof data['authorization_url']==='string'?new URL(data['authorization_url']):null;
+      if(!destination||destination.origin!=='https://accounts.google.com'||destination.pathname!=='/o/oauth2/v2/auth')return error('API_INVALID_CONTRACT','Invalid Google authorization destination.',502);
+      const callback=new URL(destination.searchParams.get('redirect_uri')||'');
+      if(callback.pathname!==GOOGLE_CALLBACK_PATH||!(config.origins.includes(callback.origin)||callback.origin===config.googleReturnOrigin))return error('API_INVALID_CONTRACT','Invalid Google callback destination.',502);
+      const value=googleRouteCookie(account,destination.searchParams.get('state')||'');
+      resultHeaders.append('set-cookie',`${GOOGLE_ROUTE_COOKIE}=${value}; Path=${GOOGLE_CALLBACK_PATH}; Max-Age=600; HttpOnly; SameSite=Lax${callback.protocol==='https:'?'; Secure':''}`);
     }
     resultHeaders.set('X-Request-ID', parsed.data.request_id);
     return NextResponse.json(raw, { status: response.status, headers: resultHeaders });

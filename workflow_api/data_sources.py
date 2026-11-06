@@ -53,6 +53,10 @@ def changes(previous, current):
 class DataSources:
     def __init__(self, store, env, adapter=None):
         self.store, self.env = store, env
+        self.client_sources = None
+        if env.get('BUILDER_CLIENT_ID'):
+            with store.transaction(write=False) as db:
+                self.client_sources = frozenset(r[0] for r in db.execute('SELECT connection_id FROM client_source_bindings'))
         self.adapter = adapter or CloudAdapters(env)
         self.cipher = None
         keyfile = env.get('BUILDER_DATA_SOURCE_KEY_FILE') or env.get('BUILDER_GOOGLE_KEY_FILE')
@@ -87,6 +91,8 @@ class DataSources:
 
     def owned(self, db, auth, cid):
         workspace, owner = GoogleConnections.identity(auth)
+        if self.client_sources is not None and cid not in self.client_sources:
+            raise ApiFailure('DATA_SOURCE_NOT_FOUND', 'Database connection not found.', 404)
         row = db.execute('SELECT secret,document FROM data_source_connections WHERE connection_id=? AND workspace=? AND owner=?',(cid,workspace,owner)).fetchone()
         if not row: raise ApiFailure('DATA_SOURCE_NOT_FOUND', 'Database connection not found.', 404)
         return row[0], json.loads(row[1])
@@ -104,9 +110,14 @@ class DataSources:
         workspace, owner = GoogleConnections.identity(auth)
         with self.store.transaction(write=False) as db:
             rows=db.execute('SELECT document FROM data_source_connections WHERE workspace=? AND owner=? ORDER BY connection_id',(workspace,owner)).fetchall()
-        return {'configured':bool(self.cipher),'shared_demo_identity':auth['subject']['subject_id']=='local-builder','items':[json.loads(r[0]) for r in rows]}
+        return {'configured':bool(self.cipher),'shared_demo_identity':auth['subject']['subject_id']=='local-builder','items':[d for r in rows for d in [json.loads(r[0])] if self.client_sources is None or d['connection_id'] in self.client_sources]}
+
+    def require_source_management(self):
+        if self.client_sources is not None:
+            raise ApiFailure('CLIENT_SOURCE_PINNED', 'Client source endpoints are provisioned by the administrator.', 403)
 
     def test(self, auth, body):
+        self.require_source_management()
         GoogleConnections.identity(auth, True)
         config=configuration(body)
         try:self.adapter.test(config)
@@ -127,6 +138,7 @@ class DataSources:
         return job
 
     def connect(self, auth, body):
+        self.require_source_management()
         self.configured()
         workspace, owner=GoogleConnections.identity(auth,True)
         config=configuration(body)
@@ -178,6 +190,7 @@ class DataSources:
         return doc
 
     def credentials(self, auth, cid, body):
+        self.require_source_management()
         self.configured()
         GoogleConnections.identity(auth, True)
         config = configuration(body)

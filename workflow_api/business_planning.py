@@ -67,7 +67,9 @@ def retrieve(store, auth, objective, version_id=None):
         return result
     check_snapshot(snapshot)
     query = terms(objective)
-    module_scores = {mid: len(query & terms(ALIASES.get(mid, '') + ' ' + label)) for mid, label, _, _ in MODULES}
+    modules = [(m['id'],m['label'],m.get('description',''),m['layers']) for m in snapshot['modules']] if snapshot.get('workspace',{}).get('ontology_id') == 'subway' else MODULES
+    aliases = {} if snapshot.get('workspace',{}).get('ontology_id') == 'subway' else ALIASES
+    module_scores = {mid: len(query & terms(aliases.get(mid, '') + ' ' + label)) for mid, label, _, _ in modules}
     def score(item):
         return 5 * len(query & terms(item['label'] + ' ' + item['id'])) + len(query & terms(item['definition']))
     # Concept labels support organization-specific terms without an alias dictionary.

@@ -12,6 +12,10 @@ REGISTRY = ROOT / '.local/live-provider-registry.json'
 
 
 def environment():
+    # A tenant service must explicitly receive its own configuration. Never inherit
+    # shared database, Google, SMTP or other provider credentials from the root .env.
+    if os.environ.get('BUILDER_CLIENT_ID'):
+        return dict(os.environ)
     return {**(load_env() if (ROOT / '.env').exists() else {}), **os.environ}
 
 
@@ -37,6 +41,23 @@ def model_configuration(env):
 
 
 def registry_configuration(env):
+    if env.get('BUILDER_CLIENT_ID') and env.get('BUILDER_CLIENT_INTEGRATIONS', 'business-only') == 'business-only':
+        from .client_isolation import WORKSPACE
+        from .business_preparation import retrieval_tool_definition
+        config = dict(auto_resolve_planner=True, policy=dict(workspace_id="client-"+env["BUILDER_CLIENT_ID"],
+            agent_permissions=['workflow.read_input', 'tools.read'], approved_providers=['builder_business'],
+            allowed_destinations=[], remaining_quota={'business_retrieve_evidence': 10000},
+            credential_references={}, approval_roles=['admin', 'approver']),
+            agents=[], tools=[{'definition': retrieval_tool_definition()}], bindings=[],
+            subject_permissions=['tools.read'], subject_scopes=['tools.read'], operator_permissions=['tools.manage'])
+        if env['BUILDER_CLIENT_ID']=='subway' and env.get('BUILDER_SUBWAY_DATA_ENABLED')=='1':
+            from .client_packages import package_tool_definition
+            config['tools'].append({'definition':package_tool_definition()})
+            config['policy']['remaining_quota']['client_package_read']=10000
+        if env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
+            from .tenant_google import extend_registry
+            extend_registry(config)
+        return config
     from .slack_gmail import registry_configuration as gmail_registry
     config = gmail_registry(env)
     config['tools'][0]['definition']['approval_required'] = env.get('BUILDER_EMAIL_DIRECT_SEND') != '1'
@@ -83,8 +104,8 @@ def registry_configuration(env):
     return config
 
 
-def operator_auth(config):
-    return dict(subject=dict(subject_id='local-builder', workspace_id='local-workspace'), roles=['admin', 'approver'],
+def operator_auth(config, subject=None):
+    return dict(subject=subject or dict(subject_id='local-builder', workspace_id='local-workspace'), roles=['admin', 'approver'],
                 permissions=sorted(set(ROLE_PERMISSIONS['admin']) | {'workflow.execute', 'tools.manage'} | set(config['subject_permissions'])),
                 scopes=['workspace:read', 'workspace:write', *config['subject_scopes']], decision='allow')
 
@@ -124,7 +145,7 @@ class LivePlannerProvider:
         self.sheet_discoverer = sheet_discoverer
         self.direct_send = direct_send
         self.context['customer_automation_defaults'] = {'enabled': direct_send,
-            'manager_email': manager_email or allowed_recipients[0]}
+            'manager_email': manager_email or (allowed_recipients[0] if allowed_recipients else None)}
         self.sheet_targets = sheet_targets or []
         definition = json.loads((ROOT / 'shared/contracts/examples/tools/google-sheets-upsert-record.json').read_text())
         definition['availability'] = 'enabled'
@@ -347,6 +368,9 @@ class LivePlannerProvider:
 
 def create_configured_app(env=None, database=None, client=None, model_factory=None):
     env = environment() if env is None else env
+    from .client_isolation import ClientIsolation, WORKSPACE
+    isolation = ClientIsolation.configured(env, database)
+    business_only = bool(isolation and env.get('BUILDER_CLIENT_INTEGRATIONS', 'business-only') == 'business-only')
     usage_budgets = env.get('BUILDER_ENFORCE_USAGE_BUDGETS', '1')
     if usage_budgets not in {'0', '1'}:
         raise ValueError('BUILDER_ENFORCE_USAGE_BUDGETS must be 0 or 1.')
@@ -358,22 +382,26 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         raise ValueError('Explicitly enable development authentication for the local live launcher.')
     allowed_origins = origins(env.get('BUILDER_UI_ORIGINS'))
     config = registry_configuration(env)
+    if isolation:
+        config['policy']['workspace_id'] = isolation.subject['workspace_id']
     from .procurement import configuration as procurement_configuration, extend_registry
     procurement_settings = procurement_configuration(env)
     if procurement_settings:
         extend_registry(config, procurement_settings)
     model, rates, tokenizers = model_configuration(env)
-    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    private_write(REGISTRY, json.dumps(config, indent=2) + '\n')
+    registry_path = isolation.database.parent / 'registry.json' if isolation else REGISTRY
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    private_write(registry_path, json.dumps(config, indent=2) + '\n')
     app = create_app(dev_auth=True, roles=['admin', 'approver'], runtime_enabled=True,
-                     registry_config=REGISTRY, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
+                     registry_config=registry_path, database=database or env.get('BUILDER_DATABASE_URL'), start_workers=False, planning_available=True,
                      environment_name=mode, ui_origins=allowed_origins,
                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False, google_oauth_config=env)
     service = app.state.workflow_service
+    allowed_recipients = [] if business_only else recipients(env)
     service.background_execution=process_role=='api'
     service.business_composition.model_id=model
     from .integration_checks import smtp_probe
-    service.integration_probes={'smtp':smtp_probe(env)}
+    service.integration_probes={} if business_only else {'smtp':smtp_probe(env)}
     service.auxiliary_database_url=env.get('BUILDER_AUXILIARY_DATABASE_URL')
     from openai import OpenAI
     from planner import PlannerService
@@ -393,7 +421,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     def validate_configuration(workflow):
         from runtime.email_recipients import validate_email_workflow
         validate_record_workflow(workflow, targets)
-        validate_email_workflow(workflow, allow_automatic=direct_send, managers=recipients(env))
+        validate_email_workflow(workflow, allow_automatic=direct_send, managers=allowed_recipients)
         from planner.validation import validate_output_mappings
         validate_output_mappings(workflow, {item['definition']['tool_id']: item['definition']['output_schema'] for item in config['tools']})
         from .sheet_discovery import validate_discovered_setup
@@ -408,11 +436,16 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         raise ValueError('Unknown provider credential reference.')
     runner = service.runtime_runner
     runner.runtime.enforce_usage_budgets = enforce_usage_budgets
-    runner.connectors.update({'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),
-                         'smtp_send_email': SMTPConnector(resolve, recipients(env), ['smtp.gmail.com'], timeout=15, require_approval=not direct_send)})
+    if not business_only:
+        runner.connectors.update({'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),
+                             'smtp_send_email': SMTPConnector(resolve, allowed_recipients, ['smtp.gmail.com'], timeout=15, require_approval=not direct_send)})
     runner.direct_write_tools = frozenset({'smtp_send_email'} if direct_send else ())
-    runner.connectors['google_sheets_upsert_record'] = GoogleSheetsRecordConnector(
-        resolve, ROOT / env['GOOGLE_TOKEN_FILE'], targets, timeout=15, require_approval=not direct_write)
+    if not business_only:
+        runner.connectors['google_sheets_upsert_record'] = GoogleSheetsRecordConnector(
+            resolve, ROOT / env['GOOGLE_TOKEN_FILE'], targets, timeout=15, require_approval=not direct_write)
+    if isolation and env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
+        from .tenant_google import install as install_tenant_google
+        install_tenant_google(app,env)
     runner.connectors.update(app.state.database_workflows.connectors())
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
@@ -424,11 +457,21 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     source = ProviderTriggerSource(service, runner.connectors)
     service.trigger_poller = source.poll
     service.trigger_configuration_validator = source.validate_configuration
-    service.planner = PlannerService(provider=LivePlannerProvider(model, recipients(env), client, direct_send,
-        targets, direct_write, planner_timeout, lambda resource: service.google_tools.discover(runner.connectors['google_sheets_read_rows'], resource),
-        env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])))
+    provider = LivePlannerProvider(model, allowed_recipients, client, direct_send,
+        targets, direct_write, planner_timeout, None if business_only else lambda resource: service.google_tools.discover(runner.connectors['google_sheets_read_rows'], resource),
+        env.get('BUILDER_CASE_BOSS_EMAIL', env.get('GMAIL_SMTP_USER')))
+    if business_only:
+        provider.context['available_tools'] = []
+        provider.context['available_capabilities'] = ['classify_text', 'generate_report']
+        provider.context['allowed_agent_permissions'] = ['workflow.read_input']
+        provider.context['tool_output_schemas'] = {}
+        provider.context.pop('sheet_record_tool', None)
+    service.planner = PlannerService(provider=provider)
     from threading import Event, Thread
-    auth = operator_auth(config)
+    auth = operator_auth(config, isolation.subject if isolation else None)
+    if isolation and isolation.client == 'subway' and isolation.data_enabled:
+        from .subway_onboarding import install_package_sources
+        install_package_sources(app, auth, env)
     if procurement_settings:
         from .procurement import install
         procurement_worker = install(app, procurement_settings, env, client, model, auth)
@@ -472,6 +515,8 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
                             'rows': [headers, *matches[:20]], 'truncated': len(matches) > 20})
         return results
     if env.get('BUILDER_REPLY_MONITOR') == '1':
+        if business_only:
+            raise ValueError('Configure tenant-specific mail integrations before enabling the reply monitor.')
         from .reply_cases import ReplyCases
         boss = env.get('BUILDER_CASE_BOSS_EMAIL', env['GMAIL_SMTP_USER'])
         if boss not in recipients(env):

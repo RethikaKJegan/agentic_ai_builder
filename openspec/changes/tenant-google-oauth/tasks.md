@@ -1,0 +1,5 @@
+- [x] Configure separate tenant Google web-client files and encryption keys.
+- [x] Preserve OAuth browser cookies and route callbacks to their initiating tenant.
+- [x] Register Google workflow tools with current owned-account enforcement and no shared token fallback.
+- [x] Test callback success, cancellation, expiry, routing tampering and tenant/account isolation.
+- [x] Deploy and verify both client connect flows and unchanged operator connections.

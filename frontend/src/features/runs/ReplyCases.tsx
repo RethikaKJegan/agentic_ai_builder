@@ -22,6 +22,7 @@ const labels: Record<Kind, string> = {
 
 export function ReplyCases() {
   const backend = useBackend();
+  const available=backend.session?.reply_monitor_available!==false;
   const [cases, setCases] = useState<Case[]>([]);
   const [error, setError] = useState("");
   const [monitor, setMonitor] = useState("");
@@ -42,11 +43,11 @@ export function ReplyCases() {
     finally { reading.current = false; setRefreshing(false); }
   };
   useEffect(() => {
-    if (backend.status !== "connected") return;
+    if (backend.status !== "connected" || !available) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(), 15000);
     return () => window.clearInterval(timer);
-  }, [backend.status]);
+  }, [backend.status,available]);
   const act = async (caseId: string, replyId: string, kind: Kind) => {
     if (pending.current || !backend.can("workflow.approve")) return;
     pending.current = true; setBusy(true);
@@ -62,7 +63,7 @@ export function ReplyCases() {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Email submission failed"); }
     finally { pending.current = false; setBusy(false); }
   };
-  if (backend.status !== "connected") return null;
+  if (backend.status !== "connected" || !available) return null;
   return <section className="mt-8 space-y-4" aria-label="Customer reply cases">
     <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Customer replies</h2>
       <button type="button" className="rounded border px-3 py-1 text-sm" disabled={refreshing || busy} onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button></div>

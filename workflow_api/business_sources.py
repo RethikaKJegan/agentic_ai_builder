@@ -83,6 +83,8 @@ class BusinessSources:
                 changes=diff(json.loads(baseline[0]) if baseline else None,snapshot) if connection['metadata_revision']!=baseline_revision else []
                 changed_names={d['name'] for d in changes}
                 inventory={s['collection']:s for s in specs() if s['role']==role}
+                if workspace.get('ontology_id')=='subway':
+                    inventory={d['name']:dict(modules=sorted({c['module_id'] for c in definitions.get('concepts',[]) if c['id'].endswith(':'+role+'_'+d['name'])})) for d in (snapshot or {}).get('datasets',[])}
                 impacted_modules=sorted({m for name in changed_names for m in inventory.get(name,{}).get('modules',[])})
                 impacted={kind:[dict(id=c['id'],label=c['label'],module_id=c['module_id']) for c in definitions.get(kind,[]) if c['module_id'] in impacted_modules] for kind in ('concepts','rules')}
                 workflows=[]

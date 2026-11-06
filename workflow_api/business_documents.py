@@ -36,11 +36,13 @@ class BusinessDocuments:
 
     def add(self,auth,body):
         scope=identity(auth,True)
+        with self.store.transaction(write=False) as db:
+            module_ids={m['id'] for m in self.ontology.module_catalog(db,scope)}
         if (not isinstance(body,dict) or set(body)!={'title','kind','module_ids','text'}
             or not isinstance(body['title'],str) or not 1<=len(body['title'].strip())<=160
             or body['kind'] not in ('blueprint','application_code','policy','process','evidence')
             or not isinstance(body['module_ids'],list) or not 1<=len(body['module_ids'])<=12
-            or any(not isinstance(m,str) or m not in TARGETS for m in body['module_ids'])
+            or any(not isinstance(m,str) or m not in module_ids for m in body['module_ids'])
             or len(body['module_ids'])!=len(set(body['module_ids']))
             or not isinstance(body['text'],str) or not 20<=len(body['text'].strip())<=16000):
             raise ApiFailure('BUSINESS_DOCUMENT_INVALID','Provide a title, source kind, module selection and 20–16000 characters of source text.',422)
@@ -99,7 +101,7 @@ def context_documents(ontology,db,scope,workspace,module_id):
         row=db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',(cid,connection['metadata_revision'])).fetchone()
         if not row:continue
         for dataset in json.loads(row[0]).get('datasets',[]):
-            if dataset.get('name') not in TARGETS[module_id]:continue
+            if dataset.get('name') not in TARGETS.get(module_id,()):continue
             fields=[{'name':f['name'],'types':f.get('types',[])} for f in dataset.get('fields',[])
                     if isinstance(f.get('name'),str) and not re.search(r'password|secret|token|credential|private.?key|api.?key',f['name'],re.I)][:60]
             text='Saved sampled/declared schema; not business policy.\n'+json.dumps(dict(collection=dataset['name'],fields=fields),sort_keys=True)

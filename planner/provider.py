@@ -13,6 +13,8 @@ from .contracts import load_contracts
 
 def _load_project_env() -> None:
     """Load the local project .env without logging or exporting secrets."""
+    if os.environ.get('BUILDER_CLIENT_ID'):
+        return
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
     if not os.path.exists(env_path):
         return

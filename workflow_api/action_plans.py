@@ -79,6 +79,12 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         pin=_revision['package']
         package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
         context['validated_context'].update(package_id=pin['package_id'],package_revision=pin['revision'],pins=deepcopy(package_context['pins']))
+    elif getattr(composition.service,'default_client_package',None):
+        pin=composition.service.default_client_package
+        package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
+        if body.get('client_id','subway')!=package_context['package']['client_id']:
+            deny('Plan client differs from the authenticated client.','ACTION_SCOPE_DENIED')
+        context['validated_context'].update(package_id=pin['package_id'],package_revision=pin['revision'],pins=deepcopy(package_context['pins']))
     connectors=composition.connectors if composition.connectors is not None else getattr(composition.service.runtime_runner,'connectors',{})
     tools=composition.tools(auth);contracts=catalogue(prepared,tools,connectors);contracts['content.prepare']=content_contract()
     if package_context:contracts.update(deepcopy(package_context['package']['capability_contracts']))
@@ -113,6 +119,14 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if not callable(selector):deny('The configured provider does not support connected action planning.','ACTION_PLANNER_UNAVAILABLE')
         planning_context=dict(capabilities=visible,binding_context=context,verified_experience_recommendations=hints,tool_constraints={cid:dict(minimum_timeout_seconds=current[tool_id(cid,c)]['definition']['timeout_seconds']) for cid,c in visible.items() if c['kind']=='tool'})
         planning_context['binding_paths']={cid:dict(input=declared_paths(c['input_schema']),output=declared_paths(c['output_schema'])) for cid,c in visible.items()}
+        if package_context:
+            package=package_context['package']
+            from .business_planning import retrieve
+            planning_context['client_knowledge']=dict(client_id=package['client_id'],domain=package['domain'],
+                ontology_version=package['ontology_version'],concepts=deepcopy(package['concepts']),
+                source_mappings=deepcopy(package['source_mappings']),
+                ontology_evidence=retrieve(composition.store,auth,objective,package['ontology_version']))
+
         if _planning_feedback:planning_context['validation_feedback']=deepcopy(_planning_feedback)
         if _planning_budget:_planning_budget(dict(objective=objective,**planning_context))
         proposal=selector(objective,planning_context)
@@ -154,7 +168,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if google_actions:deny('Select the Google account to use for this request.','GOOGLE_CONNECTION_REQUIRED')
     plan_id='plan_'+secrets.token_hex(12)
     if prepared and prepared.get('domain_context',{}).get('client_id') and body.get('client_id',prepared['domain_context']['client_id'])!=prepared['domain_context']['client_id']:deny('Plan client differs from pinned preparation.','ACTION_SCOPE_DENIED')
-    client=body.get('client_id') or (prepared or {}).get('domain_context',{}).get('client_id') or 'configured_client'
+    client=body.get('client_id') or (prepared or {}).get('domain_context',{}).get('client_id') or (package_context or {}).get('package',{}).get('client_id') or 'configured_client'
     scope_doc=dict(workspace_id=scope[0],owner_id=scope[1],client_id=client)
     plan=dict(schema_version='orchestration-plan-v1',plan_id=plan_id,revision=1,scope=scope_doc,goal=objective,
         constraints=body.get('constraints',dict(max_actions=16,max_seconds=300,max_llm_calls=32,max_tool_calls=16)),

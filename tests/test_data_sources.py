@@ -170,7 +170,11 @@ def test_authenticated_routes_do_not_echo_secret_errors(manager):
         def envelope(self,ref,status,data):return {'data':data}
         def failure(self,ref,exc):return {'error':{'error_code':exc.code,'message':str(exc)}}
     app=FastAPI()
-    with patch('workflow_api.data_source_routes.DataSources',return_value=manager):install(app,Service(),auth(),{},lambda:'test')
+    # This fixture exercises source routes only; the business ontology installer
+    # requires the complete WorkflowService, which this deliberately small stub omits.
+    with patch('workflow_api.data_source_routes.DataSources',return_value=manager), \
+         patch('workflow_api.business_ontology_routes.install'):
+        install(app,Service(),auth(),{},lambda:'test')
     client=TestClient(app)
     result=client.post('/data-sources',json=config())
     assert result.status_code==200 and 'private-value' not in result.text

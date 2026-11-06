@@ -1,0 +1,6 @@
+- [x] Inventory and fingerprint both original archives and determine restore format.
+- [x] Extract schema metadata and bounded aggregate evidence in private staging.
+- [x] Document entities, relationships, business areas and unresolved semantics.
+- [x] Integrate isolated Subway sources using existing data-access mechanisms.
+- [x] Build and validate Subway business ontology with source provenance.
+- [x] Verify Subway retrieval and preserve Simpsons isolation and workflow behavior.

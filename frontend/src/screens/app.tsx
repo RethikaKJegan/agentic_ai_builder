@@ -3,7 +3,8 @@ import { confirmDraftNavigation } from "@/features/workflows/unsaved";
 import { displayText } from "@/lib/display-text";
 import { usePathname } from "next/navigation";
 import { Link, useNavigate } from "@/lib/navigation";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { BROWSER_SESSION, browserSessionCurrent, resetBrowserSession } from "@/lib/browser-session";
 import { Database, History, Settings as SettingsIcon, ShieldCheck, Plug, Store, Bell, Bot, ChevronsLeft, ChevronsRight, LayoutGrid, RotateCcw, Search, Workflow as WfIcon } from "lucide-react";
 import { LogoMark } from "@/components/mesh/Logo";
 import { CommandPalette } from "@/features/shell/CommandPalette";
@@ -40,6 +41,19 @@ const NAV = [
 ] as const;
 
 export default function AppShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    browserSessionCurrent();
+    const changed = () => {
+      if (!browserSessionCurrent()) {
+        sessionStorage.clear();
+        window.location.replace("/login");
+      }
+    };
+    const storage = (event: StorageEvent) => { if (event.key === BROWSER_SESSION) changed(); };
+    window.addEventListener("storage", storage);
+    window.addEventListener("focus", changed);
+    return () => { window.removeEventListener("storage", storage); window.removeEventListener("focus", changed); };
+  }, []);
   const ready = useMeshHydrated();
   const [collapsed, setCollapsed] = useState(false);
   const [cmd, setCmd] = useState(false);
@@ -52,6 +66,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/workspace-auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("Sign-out failed. Please try again.");
+      resetBrowserSession();
       window.location.assign("/login");
     } catch {
       toast.error("Unable to sign out. Please try again.");
@@ -66,6 +81,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const role = useMesh((s) => s.role);
   const localPending = useMesh((s) => s.runs.filter((r) => r.status === "paused").length);
   const serverPending = useBackend((s) => Object.values(s.overview).reduce((total, item) => total + item.pending_approval_count, 0));
+  const simpsons = useBackend((s) => s.session?.auth.subject.workspace_id === "client-simpsons");
+  const subway = useBackend((s) => s.session?.auth.subject.workspace_id === "client-subway");
+  const workspaceLabel = simpsons ? "Simpsons workspace" : subway ? "Subway workspace" : "Local workspace";
+  const accountLabel = simpsons ? "Simpsons client" : subway ? "Subway client" : "engineering@bellcorpstudio.com";
   const pending = Math.max(localPending, serverPending);
   const inBuilder = /^\/app\/workflows\/[^/]+$/.test(pathname);
   const crumbs = pathname.split("/").filter(Boolean).slice(1);
@@ -111,7 +130,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
           <Link to="/app" className="flex min-w-0 items-center gap-2 md:hidden" aria-label="PraxilonAI workspace"><LogoMark className="h-8 w-8 shrink-0" /><span className="min-w-0"><span className="block font-display text-sm font-semibold">PraxilonAI</span></span></Link>
-          <span className="hidden rounded-md border border-border px-2 py-1 text-xs font-medium sm:inline">Local workspace</span>
+          <span className="hidden rounded-md border border-border px-2 py-1 text-xs font-medium sm:inline">{workspaceLabel}</span>
           <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground sm:flex">
             <span>/</span>
             <span className="capitalize text-foreground">{crumbs[0] ?? "overview"}</span>
@@ -147,8 +166,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-xs font-medium text-background" aria-label="User menu">P</DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
-                <p>Local workspace</p>
-                <p className="truncate text-xs font-normal text-muted-foreground" title="engineering@bellcorpstudio.com">engineering@bellcorpstudio.com</p>
+                <p>{workspaceLabel}</p>
+                <p className="truncate text-xs font-normal text-muted-foreground" title={accountLabel}>{accountLabel}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild><Link to="/">Back to website</Link></DropdownMenuItem>

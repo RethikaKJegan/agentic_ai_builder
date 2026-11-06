@@ -35,14 +35,19 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     mode = deployment_mode(environment_name or os.getenv('BUILDER_ENVIRONMENT', 'development'))
     allowed_origins = origins(ui_origins if ui_origins is not None else os.getenv('BUILDER_UI_ORIGINS'))
     configured_roles = roles or os.getenv('BUILDER_DEV_ROLES', 'builder').split(',')
+    from .client_isolation import ClientIsolation, HEADER
+    isolation = ClientIsolation.configured(google_oauth_config or dict(os.environ), database)
     if any(role not in ROLE_PERMISSIONS for role in configured_roles):
         raise ValueError('Configure known development roles only.')
     adapter, extra_permissions, extra_scopes = None, [], []
     configuration = registry_config or os.getenv('BUILDER_REGISTRY_CONFIG')
     if service is None and configuration:
-        adapter, extra_permissions, extra_scopes = load_registry_config(configuration)
+        adapter, extra_permissions, extra_scopes = load_registry_config(configuration,
+            expected_workspace=isolation.subject['workspace_id'] if isolation else 'local-workspace')
     workflow_service = service or WorkflowService(WorkflowStore(database or os.getenv('BUILDER_DATABASE_URL') or ROOT / '.local/workflows.sqlite3'), registry_adapter=adapter,
                                                   lifecycle_adapter=lifecycle_adapter, trigger_secrets=trigger_secrets)
+    if isolation and Path(workflow_service.store.path).resolve() != isolation.database:
+        raise ValueError('The service store must match the provisioned Simpsons database.')
     connect_runtime = runtime_enabled if runtime_enabled is not None else os.getenv('BUILDER_RUNTIME_ENABLED') == '1'
     if connect_runtime:
         from runtime import RuntimeService
@@ -62,6 +67,10 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         auth['permissions'] = sorted(set(auth['permissions']) | set(extra_permissions))
         auth['scopes'] = sorted(set(auth['scopes']) | set(extra_scopes))
     auth['permissions'] = sorted(set(auth['permissions']) | runtime_permissions)
+    if isolation:
+        auth['subject'] = isolation.subject
+        if isolation.client == 'subway' and not isolation.data_enabled:
+            auth['scopes'] = ['workspace:read']
     workers = []
     if start_workers and workflow_service.runtime_runner is not None and os.getenv('BUILDER_RUNTIME_WORKER') == '1':
         from runtime.worker import RuntimeWorker
@@ -147,16 +156,24 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             origin = request.headers.get('origin')
             if origin and origin not in allowed_origins:
                 response = error('ORIGIN_NOT_AUTHORIZED', 'This request origin is not authorized.', 403)
-            elif not enabled:
+            elif isolation and not isolation.accepts(request.headers.get(HEADER)):
+                response = error('AUTHENTICATION_REQUIRED', 'Sign in with this client account.', 401)
+            elif not isolation and request.headers.get(HEADER):
+                response = error('CLIENT_NOT_AUTHORIZED', 'This backend does not serve this client.', 403)
+            elif isolation and isolation.client == 'subway' and not isolation.data_enabled and request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+                response = error('CLIENT_NOT_CONFIGURED', 'Subway authentication is ready. Data and workflows have not been configured yet.', 409)
+            elif not enabled and not isolation:
                 response = error('AUTHENTICATION_REQUIRED', 'Authentication is not configured. Enable development authentication only for local use.', 401)
             elif host not in {'localhost', '127.0.0.1', '::1', 'testserver'} or (request.headers.get('sec-fetch-site') == 'cross-site' and not google_callback):
                 response = error('DEVELOPMENT_AUTH_LOCAL_ONLY', 'Development sessions are restricted to loopback hosts and origins.', 403)
-            elif not google_callback and request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
+            elif not isolation and not google_callback and request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
                 response = error('AUTHENTICATION_REQUIRED', 'Your local session expired or is invalid. Reopen the workspace to recover it.', 401)
             else:
                 response = await call_next(request)
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-Builder-Service'] = 'workflow-api'
+            if isolation:
+                response.headers['X-Builder-Client'] = isolation.client
             response.headers['X-Request-ID'] = reference
             response.headers['X-Correlation-ID'] = correlation
             return response
@@ -166,10 +183,11 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
 
     @app.get('/session')
     def get_session():
-        data = dict(auth=auth, mode='local-development', planning_jobs_available=True, planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
+        data = dict(auth=auth, reply_monitor_available=getattr(workflow_service,'reply_cases',None) is not None, mode='client-isolated' if isolation else 'local-development', planning_jobs_available=True, planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
                     runtime_available=workflow_service.runtime_runner is not None, approval_service_available=workflow_service.runtime_runner is not None, dynamic_composition_available=hasattr(workflow_service,'business_composition'))
         response = JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
-        response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)
+        if not isolation:
+            response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)
         return response
 
     async def dispatch(request, operation, additions=None):
@@ -539,4 +557,6 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     return app
 
 
-app = create_app()
+# Dedicated clients must use their configured factory; an import must never
+# construct a second app with the shared default Registry or start a shared store.
+app = create_app() if not os.getenv('BUILDER_CLIENT_ID') else None

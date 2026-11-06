@@ -1,0 +1,5 @@
+- [x] Audit live desktop/mobile navigation, APIs, connected sources and worker health.
+- [x] Suppress unsupported inbox-monitor polling using explicit server availability.
+- [x] Allow only validated process leases in dedicated-store startup scope checking.
+- [x] Verify deterministic business-read preparation and isolated workflow regressions.
+- [x] Deploy verified fixes and repeat live checks.

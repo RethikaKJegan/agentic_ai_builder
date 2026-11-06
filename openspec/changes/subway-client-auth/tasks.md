@@ -1,0 +1,4 @@
+- [x] Extend signed account and dedicated-backend selection to Subway.
+- [x] Provision an empty Subway store and authentication-only backend.
+- [x] Test independent identity, audience checks and Simpsons regressions.
+- [x] Deploy and verify both public logins without data/model operations.

@@ -44,8 +44,10 @@ class BusinessGeneration:
 
     def submit(self,auth,body):
         scope=identity(auth,True)
+        with self.store.transaction(write=False) as db:
+            modules=self.ontology.module_catalog(db,scope)
         if (not isinstance(body,dict) or set(body)!={'module_id','expected_revision','request_key'}
-            or not isinstance(body['module_id'],str) or body['module_id'] not in {m[0] for m in MODULES}
+            or not isinstance(body['module_id'],str) or body['module_id'] not in {m['id'] for m in modules}
             or type(body['expected_revision']) is not int or body['expected_revision']<1
             or not isinstance(body['request_key'],str) or not re.fullmatch(r'[A-Za-z0-9_-]{8,100}',body['request_key'])):
             raise ApiFailure('BUSINESS_GENERATION_INVALID','Choose a module, current revision and request key.',422)
@@ -77,7 +79,7 @@ class BusinessGeneration:
                 needed_sources={e['source_id'] for items in protected_definitions.values() for x in items for e in x['evidence']}
                 available_sources={d['source_id'] for d in documents}
                 documents += [d for d in latest.get('sources',[]) if d['source_id'] in needed_sources-available_sources]
-                payload=dict(required_concepts=required_concepts,module_id=body['module_id'],module_description=next(m[2] for m in MODULES if m[0]==body['module_id']),
+                payload=dict(required_concepts=required_concepts,module_id=body['module_id'],module_description=next(m['description'] for m in modules if m['id']==body['module_id']),
                     documents=documents,retained_concepts=[{k:c[k] for k in ('id','label','layer')} for c in retained['concepts']])
                 if protected:payload['protected_definitions']=protected_definitions
                 if len(json.dumps(payload))>100000:raise ApiFailure('BUSINESS_EVIDENCE_LIMIT','Selected evidence exceeds the input limit.',422)
@@ -145,7 +147,7 @@ class BusinessGeneration:
                 # Expected-revision CAS also serializes concurrent PostgreSQL completions.
                 next_workspace={**workspace,'revision':workspace['revision']+1,'status':'draft'}
                 updated=db.execute('UPDATE business_ontology_workspaces SET document=? WHERE workspace=? AND owner=? AND ontology_id=? AND document=?',
-                    (json.dumps(next_workspace),*scope,'simpson',json.dumps(workspace))).rowcount
+                    (json.dumps(next_workspace),*scope,workspace['ontology_id'],json.dumps(workspace))).rowcount
                 if not updated:raise ApiFailure('BUSINESS_REVISION_CONFLICT','A newer draft exists.',409)
                 previous=db.execute('SELECT document FROM business_ontology_versions WHERE workspace=? AND owner=?',scope).fetchall()
                 previous=max((json.loads(r[0]) for r in previous),key=lambda v:v['revision'])
@@ -153,7 +155,7 @@ class BusinessGeneration:
                 evidence={d['source_id']:d for d in previous.get('sources',[])}
                 evidence.update({d['source_id']:d for d in doc['payload']['documents']})
                 version=dict(version_id=version_id,revision=next_workspace['revision'],created_at=now(),kind='draft',workspace=next_workspace,
-                    layers=deepcopy(LAYERS),modules=[dict(id=i,label=l,description=d,layers=layers,concept_count=0) for i,l,d,layers in MODULES],
+                    layers=deepcopy(previous.get('layers',LAYERS)),modules=deepcopy(previous['modules']),
                     **{kind:doc['retained'][kind]+output[kind] for kind in ('concepts','relationships','rules')},
                     questions={**previous.get('questions',{}),doc['module_id']:output['questions']},sources=list(evidence.values()),
                     extraction=dict(module_id=doc['module_id'],job_id=job_id,**usage),validation=dict(schema='passed',citations='passed',references='passed',semantic_compilation='not_run',business_policy_verified=False))

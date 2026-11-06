@@ -1,0 +1,411 @@
+{
+  "status": "passed",
+  "compiler_version": "simpson-owl-shacl-v1",
+  "version_id": "bov_subway_archive_v1",
+  "revision": 1,
+  "checks": {
+    "snapshot": "passed",
+    "rdf_syntax": "passed",
+    "shapes_meta_shacl": "passed",
+    "definition_shacl": "passed"
+  },
+  "definition_conforms": true,
+  "instance_validation": "not_run",
+  "owl_reasoning": "not_run",
+  "business_policy_verified": false,
+  "counts": {
+    "concepts": 54,
+    "relationships": 11,
+    "rules": 0,
+    "ontology_triples": 5467,
+    "instance_shape_triples": 4032
+  },
+  "issues": [],
+  "warnings": [
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_grnreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_poreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:candidate_reference_9",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvalconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_cfapprovalmappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_stages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_7",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_8",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgetmodifications",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_lineitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:business_record",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocumentcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_apps",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogprojects",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_confirmappdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_assets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_grnreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_poreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_reportfiles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:object",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departmentroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_roles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_stategsts",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_userroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_vendors",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_companies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_foreigncurrencies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_locations",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_vendormappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_arolds",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plactuals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plaops",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_pluems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_0",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_1",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_categories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_faitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_items",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_purchaseorders",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_subcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_3",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_4",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_5",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_6",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_grns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_invoicedatas",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_vendorgrnstagetimelines",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:candidate_reference_10",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwaregrns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwareitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepoconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepos",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarestages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:candidate_reference_2",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_dcs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_electricityconsumptions",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_storeproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_stores",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "approvals",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "budgets",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "evidence",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "organization",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "performance",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "procurement",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "receipts",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "smallwares",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "stores",
+      "message": "Which source definitions and approved policies govern this business area?"
+    }
+  ]
+}

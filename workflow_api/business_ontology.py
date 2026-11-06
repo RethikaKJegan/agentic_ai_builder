@@ -54,7 +54,8 @@ class BusinessOntology:
 
     @staticmethod
     def document(db, scope):
-        row = db.execute('SELECT document FROM business_ontology_workspaces WHERE workspace=? AND owner=? AND ontology_id=?', (*scope, 'simpson')).fetchone()
+        ontology_id = 'subway' if scope[0] == 'client-subway' else 'simpson'
+        row = db.execute('SELECT document FROM business_ontology_workspaces WHERE workspace=? AND owner=? AND ontology_id=?', (*scope, ontology_id)).fetchone()
         return json.loads(row[0]) if row else None
 
     def view(self, db, scope):
@@ -72,8 +73,9 @@ class BusinessOntology:
             bindings.append(dict(role=role, connection_id=cid, name=current.get('name') if current else None,
                 status='unavailable' if not current or current['connection_status'] != 'connected' else
                        'metadata_changed' if current['metadata_revision'] != workspace['source_revisions'][role] else 'connected'))
-        return dict(api_version=1, workspace=workspace, layers=deepcopy(LAYERS),
-                    modules=[dict(id=i,label=l,description=d,layers=layers,concept_count=sum(c.get('module_id')==i for c in definitions['concepts'])) for i,l,d,layers in MODULES],
+        modules = latest.get('modules') if workspace and workspace.get('ontology_id') == 'subway' else None
+        return dict(api_version=1, workspace=workspace, layers=deepcopy(latest.get('layers', LAYERS)),
+                    modules=[{**m,'concept_count':sum(c.get('module_id')==m['id'] for c in definitions['concepts'])} for m in modules] if modules else [dict(id=i,label=l,description=d,layers=layers,concept_count=sum(c.get('module_id')==i for c in definitions['concepts'])) for i,l,d,layers in MODULES],
                     available_sources=[dict(connection_id=cid, **c) for cid,c in sorted(connections.items())
                                        if c['engine']=='mongodb' and c['connection_status']=='connected'],
                     source_bindings=bindings,
@@ -83,6 +85,13 @@ class BusinessOntology:
                     definitions=definitions,documents=documents,questions=latest.get('questions',{}),
                     current_version_id=latest.get('version_id'))
 
+
+    def module_catalog(self, db, scope):
+        if scope[0] == 'client-subway':
+            row=db.execute("SELECT document FROM business_ontology_versions WHERE workspace=? AND owner=? ORDER BY CAST(json_extract(document,'$.revision') AS INTEGER) DESC LIMIT 1",scope).fetchone()
+            return json.loads(row[0]).get('modules',[]) if row else []
+        return [dict(id=i,label=l,description=d,layers=layers) for i,l,d,layers in MODULES]
+
     def get(self, auth):
         scope = identity(auth)
         with self.store.transaction(write=False) as db:
@@ -90,6 +99,8 @@ class BusinessOntology:
 
     def initialize(self, auth, body):
         scope = identity(auth, True)
+        if scope[0]=='client-subway':
+            raise ApiFailure('CLIENT_SOURCE_PINNED','Subway ontology sources are provisioned by the administrator.',403)
         if (not isinstance(body,dict) or set(body) != {'sources'} or not isinstance(body['sources'],dict)
             or set(body['sources']) != {'service','quality'}
             or any(not isinstance(cid,str) or not 1 <= len(cid) <= 128 for cid in body['sources'].values())

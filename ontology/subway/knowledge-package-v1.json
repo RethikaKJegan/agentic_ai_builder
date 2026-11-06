@@ -1,0 +1,1600 @@
+{
+  "package_id": "subway-business-v1",
+  "revision": 1,
+  "client_id": "subway",
+  "domain": "restaurant_operations",
+  "ontology_version": "bov_subway_archive_v1",
+  "concepts": [
+    {
+      "id": "stores:central_stores",
+      "label": "Store",
+      "definition": "Stored central.stores record in the Subway archive snapshot."
+    },
+    {
+      "id": "organization:central_vendors",
+      "label": "Supplier",
+      "definition": "Stored central.vendors record in the Subway archive snapshot."
+    },
+    {
+      "id": "organization:finance_companies",
+      "label": "Legal company",
+      "definition": "Stored finance.companies record in the Subway archive snapshot."
+    },
+    {
+      "id": "procurement:finance_purchaseorders",
+      "label": "Purchase order",
+      "definition": "Stored finance.purchaseorders record in the Subway archive snapshot."
+    },
+    {
+      "id": "receipts:finance_grns",
+      "label": "Goods receipt",
+      "definition": "Stored finance.grns record in the Subway archive snapshot."
+    },
+    {
+      "id": "receipts:finance_invoicedatas",
+      "label": "Invoice record",
+      "definition": "Stored finance.invoicedatas record in the Subway archive snapshot."
+    },
+    {
+      "id": "budgets:finance_budgets",
+      "label": "Budget",
+      "definition": "Stored finance.budgets record in the Subway archive snapshot."
+    },
+    {
+      "id": "budgets:finance_lineitems",
+      "label": "Budget line item",
+      "definition": "Stored finance.lineitems record in the Subway archive snapshot."
+    },
+    {
+      "id": "approvals:finance_approvals",
+      "label": "Approval record",
+      "definition": "Stored finance.approvals record in the Subway archive snapshot."
+    },
+    {
+      "id": "smallwares:finance_smallwarepos",
+      "label": "Smallwares purchase order",
+      "definition": "Stored finance.smallwarepos record in the Subway archive snapshot."
+    },
+    {
+      "id": "performance:central_plactuals",
+      "label": "P&L actual record",
+      "definition": "Stored central.plactuals record in the Subway archive snapshot."
+    },
+    {
+      "id": "performance:central_arolds",
+      "label": "Weekly balance record",
+      "definition": "Stored central.arolds record in the Subway archive snapshot. Source acronym and calculation semantics require confirmation."
+    }
+  ],
+  "relationships": [],
+  "source_mappings": [
+    {
+      "id": "subway.central.stores._id",
+      "concept": "stores:central_stores",
+      "field": "_id",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.name",
+      "concept": "stores:central_stores",
+      "field": "name",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.storeNumber",
+      "concept": "stores:central_stores",
+      "field": "storeNumber",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.restaurantName",
+      "concept": "stores:central_stores",
+      "field": "restaurantName",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.region",
+      "concept": "stores:central_stores",
+      "field": "region",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.status",
+      "concept": "stores:central_stores",
+      "field": "status",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.vendors._id",
+      "concept": "organization:central_vendors",
+      "field": "_id",
+      "source": "subway.central.vendors"
+    },
+    {
+      "id": "subway.central.vendors.name",
+      "concept": "organization:central_vendors",
+      "field": "name",
+      "source": "subway.central.vendors"
+    },
+    {
+      "id": "subway.finance.companies._id",
+      "concept": "organization:finance_companies",
+      "field": "_id",
+      "source": "subway.finance.companies"
+    },
+    {
+      "id": "subway.finance.companies.name",
+      "concept": "organization:finance_companies",
+      "field": "name",
+      "source": "subway.finance.companies"
+    },
+    {
+      "id": "subway.finance.purchaseorders._id",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "_id",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.poNumber",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "poNumber",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.poDate",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "poDate",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.vendorName",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "vendorName",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.status",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "status",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.totalAmount",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "totalAmount",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.grns._id",
+      "concept": "receipts:finance_grns",
+      "field": "_id",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.purchaseOrderId",
+      "concept": "receipts:finance_grns",
+      "field": "purchaseOrderId",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.invoiceDataId",
+      "concept": "receipts:finance_grns",
+      "field": "invoiceDataId",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.status",
+      "concept": "receipts:finance_grns",
+      "field": "status",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.invoicedatas._id",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "_id",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.poId",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "poId",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.grnId",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "grnId",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.invoiceNumber",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "invoiceNumber",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.paymentStatus",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "paymentStatus",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.status",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "status",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.budgets._id",
+      "concept": "budgets:finance_budgets",
+      "field": "_id",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.budgets.storeId",
+      "concept": "budgets:finance_budgets",
+      "field": "storeId",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.budgets.status",
+      "concept": "budgets:finance_budgets",
+      "field": "status",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.lineitems._id",
+      "concept": "budgets:finance_lineitems",
+      "field": "_id",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.budgetId",
+      "concept": "budgets:finance_lineitems",
+      "field": "budgetId",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.category",
+      "concept": "budgets:finance_lineitems",
+      "field": "category",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.status",
+      "concept": "budgets:finance_lineitems",
+      "field": "status",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.approvals._id",
+      "concept": "approvals:finance_approvals",
+      "field": "_id",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.approvals.approvalConfigId",
+      "concept": "approvals:finance_approvals",
+      "field": "approvalConfigId",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.approvals.status",
+      "concept": "approvals:finance_approvals",
+      "field": "status",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.smallwarepos._id",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "_id",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.poNumber",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "poNumber",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.status",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "status",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.amount",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "amount",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.central.plactuals._id",
+      "concept": "performance:central_plactuals",
+      "field": "_id",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.storeId",
+      "concept": "performance:central_plactuals",
+      "field": "storeId",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.storeCode",
+      "concept": "performance:central_plactuals",
+      "field": "storeCode",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.plItem",
+      "concept": "performance:central_plactuals",
+      "field": "plItem",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.arolds._id",
+      "concept": "performance:central_arolds",
+      "field": "_id",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.customerNum",
+      "concept": "performance:central_arolds",
+      "field": "customerNum",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.entity",
+      "concept": "performance:central_arolds",
+      "field": "entity",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.weekEndingDate",
+      "concept": "performance:central_arolds",
+      "field": "weekEndingDate",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.netSales",
+      "concept": "performance:central_arolds",
+      "field": "netSales",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.endBalance",
+      "concept": "performance:central_arolds",
+      "field": "endBalance",
+      "source": "subway.central.arolds"
+    }
+  ],
+  "evidence_requirements": [
+    {
+      "capability_id": "subway.read.stores",
+      "mapping_id": "subway.central.stores._id"
+    },
+    {
+      "capability_id": "subway.read.vendors",
+      "mapping_id": "subway.central.vendors._id"
+    },
+    {
+      "capability_id": "subway.read.companies",
+      "mapping_id": "subway.finance.companies._id"
+    },
+    {
+      "capability_id": "subway.read.purchaseorders",
+      "mapping_id": "subway.finance.purchaseorders._id"
+    },
+    {
+      "capability_id": "subway.read.grns",
+      "mapping_id": "subway.finance.grns._id"
+    },
+    {
+      "capability_id": "subway.read.invoicedatas",
+      "mapping_id": "subway.finance.invoicedatas._id"
+    },
+    {
+      "capability_id": "subway.read.budgets",
+      "mapping_id": "subway.finance.budgets._id"
+    },
+    {
+      "capability_id": "subway.read.lineitems",
+      "mapping_id": "subway.finance.lineitems._id"
+    },
+    {
+      "capability_id": "subway.read.approvals",
+      "mapping_id": "subway.finance.approvals._id"
+    },
+    {
+      "capability_id": "subway.read.smallwarepos",
+      "mapping_id": "subway.finance.smallwarepos._id"
+    },
+    {
+      "capability_id": "subway.read.plactuals",
+      "mapping_id": "subway.central.plactuals._id"
+    },
+    {
+      "capability_id": "subway.read.arolds",
+      "mapping_id": "subway.central.arolds._id"
+    }
+  ],
+  "capability_contracts": {
+    "subway.read.stores": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.stores",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Store records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "stores:central_stores"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.vendors": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.vendors",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Supplier records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "organization:central_vendors"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.companies": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.companies",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Legal company records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "organization:finance_companies"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.purchaseorders": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.purchaseorders",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Purchase order records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "procurement:finance_purchaseorders"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.grns": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.grns",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Goods receipt records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "receipts:finance_grns"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.invoicedatas": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.invoicedatas",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Invoice record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "receipts:finance_invoicedatas"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.budgets": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.budgets",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Budget records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "budgets:finance_budgets"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.lineitems": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.lineitems",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Budget line item records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "budgets:finance_lineitems"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.approvals": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.approvals",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Approval record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "approvals:finance_approvals"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.smallwarepos": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.smallwarepos",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Smallwares purchase order records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "smallwares:finance_smallwarepos"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.plactuals": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.plactuals",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 P&L actual record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "performance:central_plactuals"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.arolds": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.arolds",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Weekly balance record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "performance:central_arolds"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    }
+  },
+  "rules": [],
+  "resource_bindings": {
+    "subway.read.stores": {
+      "source_id": "subway.central.stores",
+      "mapping_ids": [
+        "subway.central.stores._id",
+        "subway.central.stores.name",
+        "subway.central.stores.storeNumber",
+        "subway.central.stores.restaurantName",
+        "subway.central.stores.region",
+        "subway.central.stores.status"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "stores",
+      "fields": [
+        "_id",
+        "name",
+        "storeNumber",
+        "restaurantName",
+        "region",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.vendors": {
+      "source_id": "subway.central.vendors",
+      "mapping_ids": [
+        "subway.central.vendors._id",
+        "subway.central.vendors.name"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "vendors",
+      "fields": [
+        "_id",
+        "name"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.companies": {
+      "source_id": "subway.finance.companies",
+      "mapping_ids": [
+        "subway.finance.companies._id",
+        "subway.finance.companies.name"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "companies",
+      "fields": [
+        "_id",
+        "name"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.purchaseorders": {
+      "source_id": "subway.finance.purchaseorders",
+      "mapping_ids": [
+        "subway.finance.purchaseorders._id",
+        "subway.finance.purchaseorders.poNumber",
+        "subway.finance.purchaseorders.poDate",
+        "subway.finance.purchaseorders.vendorName",
+        "subway.finance.purchaseorders.status",
+        "subway.finance.purchaseorders.totalAmount"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "purchaseorders",
+      "fields": [
+        "_id",
+        "poNumber",
+        "poDate",
+        "vendorName",
+        "status",
+        "totalAmount"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.grns": {
+      "source_id": "subway.finance.grns",
+      "mapping_ids": [
+        "subway.finance.grns._id",
+        "subway.finance.grns.purchaseOrderId",
+        "subway.finance.grns.invoiceDataId",
+        "subway.finance.grns.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "grns",
+      "fields": [
+        "_id",
+        "purchaseOrderId",
+        "invoiceDataId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.invoicedatas": {
+      "source_id": "subway.finance.invoicedatas",
+      "mapping_ids": [
+        "subway.finance.invoicedatas._id",
+        "subway.finance.invoicedatas.poId",
+        "subway.finance.invoicedatas.grnId",
+        "subway.finance.invoicedatas.invoiceNumber",
+        "subway.finance.invoicedatas.paymentStatus",
+        "subway.finance.invoicedatas.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "invoicedatas",
+      "fields": [
+        "_id",
+        "poId",
+        "grnId",
+        "invoiceNumber",
+        "paymentStatus",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.budgets": {
+      "source_id": "subway.finance.budgets",
+      "mapping_ids": [
+        "subway.finance.budgets._id",
+        "subway.finance.budgets.storeId",
+        "subway.finance.budgets.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "budgets",
+      "fields": [
+        "_id",
+        "storeId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.lineitems": {
+      "source_id": "subway.finance.lineitems",
+      "mapping_ids": [
+        "subway.finance.lineitems._id",
+        "subway.finance.lineitems.budgetId",
+        "subway.finance.lineitems.category",
+        "subway.finance.lineitems.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "lineitems",
+      "fields": [
+        "_id",
+        "budgetId",
+        "category",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.approvals": {
+      "source_id": "subway.finance.approvals",
+      "mapping_ids": [
+        "subway.finance.approvals._id",
+        "subway.finance.approvals.approvalConfigId",
+        "subway.finance.approvals.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "approvals",
+      "fields": [
+        "_id",
+        "approvalConfigId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.smallwarepos": {
+      "source_id": "subway.finance.smallwarepos",
+      "mapping_ids": [
+        "subway.finance.smallwarepos._id",
+        "subway.finance.smallwarepos.poNumber",
+        "subway.finance.smallwarepos.status",
+        "subway.finance.smallwarepos.amount"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "smallwarepos",
+      "fields": [
+        "_id",
+        "poNumber",
+        "status",
+        "amount"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.plactuals": {
+      "source_id": "subway.central.plactuals",
+      "mapping_ids": [
+        "subway.central.plactuals._id",
+        "subway.central.plactuals.storeId",
+        "subway.central.plactuals.storeCode",
+        "subway.central.plactuals.plItem"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "plactuals",
+      "fields": [
+        "_id",
+        "storeId",
+        "storeCode",
+        "plItem"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.arolds": {
+      "source_id": "subway.central.arolds",
+      "mapping_ids": [
+        "subway.central.arolds._id",
+        "subway.central.arolds.customerNum",
+        "subway.central.arolds.entity",
+        "subway.central.arolds.weekEndingDate",
+        "subway.central.arolds.netSales",
+        "subway.central.arolds.endBalance"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "arolds",
+      "fields": [
+        "_id",
+        "customerNum",
+        "entity",
+        "weekEndingDate",
+        "netSales",
+        "endBalance"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    }
+  },
+  "validation_requirements": [
+    "acyclic_dependencies",
+    "mapped_evidence",
+    "current_source_authority"
+  ]
+}
