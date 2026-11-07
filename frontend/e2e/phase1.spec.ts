@@ -39,6 +39,8 @@ for (const mobile of [false, true]) {
         data: { job_id: 'plan_cancel_ui', state: cancelled ? 'cancelled' : 'running', result: null } } });
     });
     await page.goto('/app');
+    await page.getByText('Workflow options',{exact:true}).click();
+    await page.getByLabel('Workflow type',{exact:true}).selectOption('automation');
     const prompt = 'Summarize synthetic notes without external actions';
     await page.getByLabel('Process description').fill(prompt);
     await page.getByRole('button', { name: 'Generate workflow' }).click();

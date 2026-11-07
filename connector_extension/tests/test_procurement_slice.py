@@ -9,6 +9,7 @@ import unittest
 from urllib.parse import urlparse,unquote
 from fastapi.testclient import TestClient
 from connector_extension.app import create_extension_app,STATE_ROOT
+from connector_extension.catalog import CATALOG
 from connector_extension.transport import COOKIE
 from connector_extension.tests.test_sheet_creation import OfflineSheets
 from connector_extension.procurement.store import ProcurementError
@@ -141,7 +142,8 @@ class SliceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=STATE_ROOT) as directory:
             app=create_extension_app({'enabled_providers':[]},Path(directory))
             self.assertFalse(hasattr(app.state,'procurement_service'))
-            self.assertEqual(len(app.state.workflow_service.registry.list_tools(app.state.extension_auth)['data']['items']),19)
+            tools=app.state.workflow_service.registry.list_tools(app.state.extension_auth)['data']['items']
+            self.assertEqual({tool['tool_id'] for tool in tools},set(CATALOG))
         with self.assertRaises(ValueError):create_extension_app({**CONFIG,'procurement_enabled':'yes'},Path(self.temp.name))
     def test_unknown_draft_result_is_frozen_without_replay(self):
         self.http.fail_draft=True;state=self.setup()

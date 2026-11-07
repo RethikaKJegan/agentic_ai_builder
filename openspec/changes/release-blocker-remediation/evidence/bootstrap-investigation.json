@@ -1,0 +1,72 @@
+{
+  "scope": "Read-only independent service metadata/journal aggregates and schema-only inspection. No business rows read or data restored. immutable main-file view excludes active WAL and is not a consistent live snapshot.",
+  "services": [
+    {
+      "service": "agentic-builder-backend",
+      "pid": 1203436,
+      "database_paths": []
+    },
+    {
+      "service": "agentic-builder-worker",
+      "pid": 1203437,
+      "database_paths": []
+    }
+  ],
+  "schema_views": [
+    {
+      "path": ".local/investigation-ui-rollout-20261103/workflows-backup.sqlite3",
+      "mtime_utc": "2026-11-03T11:06:12.137012+00:00",
+      "objects": 106,
+      "schema_sha256": "87a1f0a4635820f0582c544d2062504887d8bc952899a033c20549e229ed0630"
+    },
+    {
+      "path": ".local/workflows.sqlite3",
+      "mtime_utc": "2026-11-07T08:05:26.326144+00:00",
+      "objects": 124,
+      "schema_sha256": "4d354268508fc3147c58295b3873ab1a2567fdc12b549105f8908f53063a5d52"
+    }
+  ],
+  "schema_difference_since_nov3": {
+    "added_objects": [
+      "automation_deliveries",
+      "automation_delivery_event",
+      "automation_migrations",
+      "automation_records",
+      "business_case_commands",
+      "business_case_migrations",
+      "business_case_revisions",
+      "business_cases",
+      "business_compositions",
+      "business_evidence_environments",
+      "business_evidence_preflights",
+      "business_evidence_revocations",
+      "business_investigation_metadata",
+      "business_lifecycle_feedback",
+      "business_prepared_workflows",
+      "business_process_definitions",
+      "client_knowledge_packages",
+      "runtime_experiences"
+    ],
+    "removed_objects": [],
+    "changed_objects": []
+  },
+  "journal_aggregates": {
+    "agentic-builder-backend": {
+      "lines": 766,
+      "exit_code": 0,
+      "bootstrap_mentions": 0,
+      "migration_mentions": 0,
+      "database_error_lines": 229
+    },
+    "agentic-builder-worker": {
+      "lines": 0,
+      "exit_code": 0,
+      "bootstrap_mentions": 0,
+      "migration_mentions": 0,
+      "database_error_lines": 0
+    }
+  },
+  "conclusion": "Independent pre-incident backup predates legitimate deployments/work by days. Schema differences cannot be attributed to validation, and no exact pre-run fingerprint/transaction audit was found. Record equivalence and exact incident effects remain unverified.",
+  "configured_root_database_key": "not set: create_app uses repository .local/workflows.sqlite3 by default",
+  "configured_service_caveat": "Service metadata identifies this installation but initial launcher arguments/process environment do not by themselves prove exact active connection state. Root launcher reads .env, and default path may therefore be used; no service restart performed."
+}

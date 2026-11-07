@@ -45,3 +45,14 @@ it('rejects retired ontology routes without contacting the backend',async()=>{
  expect(response.status).toBe(410);expect(fetch).not.toHaveBeenCalled();
  const other=await GET(authorizedRequest('http://127.0.0.1:3001/api/backend/runs/other%3Aid'),{params:Promise.resolve({path:['runs','other:id']})});expect(other.status).toBe(400);
 });
+
+it("forwards only the named extension session and strips unrelated cookies", async () => {
+  const upstream=vi.fn().mockResolvedValue(new Response(JSON.stringify({request_id:"req_extension",status:200,data:{items:[]}}),{status:200,headers:{"content-type":"application/json","set-cookie":"builder_extension_session=opaque-test; Path=/api/backend; HttpOnly; SameSite=Strict"}}));
+  vi.stubGlobal("fetch",upstream);
+  const request=new NextRequest("http://127.0.0.1:3001/api/backend/tools",{headers:{cookie:`${WORKSPACE_COOKIE}=${createWorkspaceSession()}; builder_extension_session=opaque-test; unrelated=private`}});
+  const response=await GET(request,{params:Promise.resolve({path:["tools"]})});
+  expect(response.status).toBe(200);
+  const sent=new Headers(upstream.mock.calls[0]![1].headers);
+  expect(sent.get("cookie")).toBe("builder_extension_session=opaque-test");
+  expect(response.headers.get("set-cookie")).toContain("builder_extension_session=opaque-test");
+});

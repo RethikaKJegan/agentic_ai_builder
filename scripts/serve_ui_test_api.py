@@ -13,7 +13,6 @@ sys.path.insert(0, str(ROOT))
 import uvicorn
 from planner import PlannerService
 from planner.provider import RuleBasedStructuredOutputProvider
-from workflow_api.main import create_app, ROLE_PERMISSIONS
 from integration_config import load_env
 
 
@@ -53,6 +52,8 @@ if __name__ == '__main__':
     directory.mkdir(exist_ok=True)
     with (TemporaryDirectory(prefix="run-", dir=directory) if os.getenv("BUILDER_TEST_FRESH_DATABASE") == "1" else nullcontext(directory)) as database_directory:
         directory = Path(database_directory)
+        os.environ['BUILDER_DATABASE_URL'] = str(directory / 'unused-default.sqlite3')
+        from workflow_api.main import create_app, ROLE_PERMISSIONS
         # Explicit browser-only configured registry; never used by product startup.
         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
         agent.update(agent_id='reader_agent', capabilities=['read_spreadsheet'], permissions=['data.read'])

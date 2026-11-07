@@ -24,9 +24,11 @@ CATEGORIES = {
 }
 CODES = {
  'DATABASE_BUSY':'storage_contention','INVOCATION_FAILED':'internal_execution_failure',
+ 'ACTION_CONTENT_UNVERIFIED':'invalid_model_output',
  'INVESTIGATION_AGENT_REFERENCE':'invalid_model_output','INVESTIGATION_AGENT_OUTPUT':'invalid_model_output',
  'AGENT_OUTPUT_INVALID':'invalid_model_output','MODEL_OUTPUT_SCHEMA_INVALID':'invalid_model_output',
  'MODEL_OUTPUT_TRUNCATED':'invalid_model_output','CAPABILITY_RESULT_INVALID':'invalid_model_output',
+ 'PUBLIC_QUERY_PRIVATE_DATA':'missing_evidence',
  'BUSINESS_RETRIEVAL_NOT_READY':'missing_evidence','EVIDENCE_MISSING':'missing_evidence','INVALID_INPUT':'missing_evidence',
  'EVIDENCE_VALUE_INVALID':'invalid_source_values','BUSINESS_VALUE_INVALID':'invalid_source_values',
  'BUSINESS_SOURCE_STALE':'stale_metadata','SOURCE_METADATA_STALE':'stale_metadata','BUSINESS_PREPARATION_STALE':'stale_metadata','ONTOLOGY_SELECTION_STALE':'stale_metadata',

@@ -1,0 +1,6 @@
+- [x] Diagnose exact saved list request and unready retrieval plans read-only.
+- [x] Add failing-before/passing-after isolated identifier regressions.
+- [x] Enforce clarification before connected-plan compilation; preserve pins/authority.
+- [x] Verify isolated tenant startup requires no schema changes or network calls.
+- [x] Activate scoped Simpsons service fix and verify live clarification without provider effects.
+- [x] Complete affected three-module regression run: 101 passed, zero failed/skipped.

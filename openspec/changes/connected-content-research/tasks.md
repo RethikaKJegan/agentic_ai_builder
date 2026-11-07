@@ -1,0 +1,8 @@
+- [x] Identify actual failed content step and preserve completed spreadsheet/history.
+- [x] Reproduce and fix bounded source/link validation correction; retain strict verification.
+- [x] Verify one-call denial and two-call reviewed correction without duplicate effects.
+- [x] Enable existing tenant public search behind explicit configuration and pre-network identifier/email guard.
+- [x] Verify benign live public search and selected Gmail/Calendar read-only reachability.
+- [x] Qualify isolated startup without schema changes and activate only the idle Simpsons backend.
+- [x] Record exact passing and failing suites and verify live tool registration without replay.
+- [ ] Resolve the separate legacy selected-account procurement coordination qualification failure.

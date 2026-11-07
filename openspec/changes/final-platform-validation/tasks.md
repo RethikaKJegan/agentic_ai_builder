@@ -1,8 +1,16 @@
-- [x] Inspect instructions, prior reports, staged source and test configurations.
-- [ ] Run complete safe backend/connector suites with all PostgreSQL modules enabled.
-- [ ] Run separately controlled PostgreSQL outage test and source/contract/migration gates.
-- [ ] Run frontend units/types/lint and isolated production build.
-- [ ] Run all applicable browser suites using their proper fixtures and separate artifacts.
-- [ ] Reproduce/fix actual defects with regressions; preserve the user's staging index.
-- [ ] Run load/failure validation and document external/staging/SLO blockers.
-- [ ] Produce final classified release decision and exact evidence.
+- [x] Inspect repository/contributor instructions, Phase 1–3 reports, source and test configurations.
+- [x] Execute all 2,531 current backend/connector cases, including isolated PostgreSQL modules; record failures and separate rechecks without a clean-full-run claim.
+- [x] Run separately controlled owned-cluster PostgreSQL outage drill/migrations and final contracts/generated/SQL/AST/whitespace/strict OpenSpec gates.
+- [x] Run frontend units/types/lint and isolated production build.
+- [x] Execute all 151 applicable browser cases in matching fixture groups; retain 49 unresolved logical-case failures and timing failures.
+- [x] Investigate failures, fix scoped product/fixture defects and preserve existing work; no staging/commit by this agent.
+- [x] Run bounded one/two/four/eight-process load/resource checks and report contention/scaling/SLO limits.
+- [x] Exercise current combined editor activation/run flow on desktop/mobile without deleting legacy assertions.
+- [x] Exercise simultaneous loss of two active workers on SQLite/PostgreSQL and actual SQLite write-permission loss.
+- [x] Restore explicitly user-confirmed Questions entry point; verify permissions, units/build and query/source browsers.
+- [x] Add private bootstrap guards and fresh-process regressions; rerun complete verification and disclose earlier shared-default initialization.
+- [x] Produce detailed classified NOT READY decision and exact evidence.
+- [ ] Qualify clean regression under combined load and resolve remaining UI acceptance failures.
+- [ ] Independently audit the earlier shared-default-store impact; no pre-run equivalence evidence is available.
+- [ ] Obtain verified staging/live sandbox targets and approved SLOs; qualify multi-host/soak/live-provider/alerts/backup rollback prerequisites.
+- [ ] Production deployment or migration: not authorized/performed.

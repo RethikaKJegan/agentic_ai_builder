@@ -1,0 +1,19 @@
+{
+  "deployment": "frontend-only existing password-gated preview",
+  "target": "https://praxi.bellcorpstudio.com",
+  "previous_build_id": "pfc-WuDU2o7XWTROkdry-",
+  "new_build_id": "V-Ftl_VyxdrHrfAmGDCem",
+  "backup": ".local/release-blocker-remediation/frontend-rollback-build",
+  "backend_restarted": false,
+  "production_database_migrated": false,
+  "real_provider_action": false,
+  "time_utc": "20261107-091156",
+  "result": "published; loopback login HTTP 200",
+  "public_https_checks": {
+    "login": 200,
+    "app_without_login": 307,
+    "api_without_login": 401
+  },
+  "unchanged_backend_pid": 1203436,
+  "unchanged_worker_pid": 1203437
+}

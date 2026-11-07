@@ -1,7 +1,7 @@
 """Small, data-free rule feedback; never include rejected model text or secrets."""
 from copy import deepcopy
 
-OUTPUT_ERRORS = frozenset({'INVESTIGATION_AGENT_REFERENCE', 'INVESTIGATION_AGENT_OUTPUT', 'MODEL_OUTPUT_INVALID_JSON', 'MODEL_OUTPUT_SCHEMA_INVALID', 'AGENT_OUTPUT_INVALID', 'MODEL_OUTPUT_TRUNCATED'})
+OUTPUT_ERRORS = frozenset({'INVESTIGATION_AGENT_REFERENCE', 'INVESTIGATION_AGENT_OUTPUT', 'MODEL_OUTPUT_INVALID_JSON', 'MODEL_OUTPUT_SCHEMA_INVALID', 'AGENT_OUTPUT_INVALID', 'MODEL_OUTPUT_TRUNCATED', 'ACTION_CONTENT_UNVERIFIED'})
 HINTS = {
     'INVESTIGATION_AGENT_REFERENCE': 'Every observation, agreement or discrepancy requires a supplied record_id/mapping_id pair. Use limitation or unverified findings for retrieval coverage and missing evidence. Never invent references.',
     'INVESTIGATION_AGENT_OUTPUT': 'Return summary, findings and missing_information matching the supplied evidence-bound schema.',

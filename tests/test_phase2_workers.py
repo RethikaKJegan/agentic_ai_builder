@@ -238,13 +238,23 @@ def test_graceful_drain_renews_group_lease_and_cannot_steal_new_owner(context):
             self.thread=Thread(target=lambda:(entered.set(),finish.wait(5)));self.thread.start()
         def stop(self):self.stop_event.set()
     worker=Draining()
-    first=WorkerSupervisor(context.service.store,[worker],ttl=.6,shutdown_timeout=4)
-    second=WorkerSupervisor(context.service.store,[Component()],ttl=.6)
+    now=[100.0]
+    first=WorkerSupervisor(context.service.store,[worker],ttl=.6,shutdown_timeout=4,clock=lambda:now[0])
+    second=WorkerSupervisor(context.service.store,[Component()],ttl=.6,clock=lambda:now[0])
+    from queue import Queue
+    renewed=Queue()
+    original_renew=first.renew_owned
+    def observed_renew():
+        result=original_renew();renewed.put(now[0]);return result
+    first.renew_owned=observed_renew
     first.tick();assert entered.wait(1)
     stop=Thread(target=first.stop);stop.start()
     try:
         assert worker.stop_event.wait(1)
-        time.sleep(.9)
+        assert renewed.get(timeout=2)==100.0
+        now[0]=100.4
+        while renewed.get(timeout=2)<now[0]:pass
+        now[0]=100.8  # Beyond the original lease, within its observed renewal.
         assert second.tick() is False
         assert stop.is_alive()
     finally:finish.set();stop.join(3)
@@ -269,3 +279,53 @@ def test_worker_entrypoint_runs_framework_lifespan_and_clean_shutdown():
         await run_app(FastAPI(lifespan=lifespan),stop)
     asyncio.run(check())
     assert states==['started','stopped']
+
+
+def test_supervisor_lease_begins_after_transaction_lock_is_acquired(context):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    now=[100.0]
+    store=context.service.store
+    supervisor=WorkerSupervisor(store,[Component()],clock=lambda:now[0],ttl=3)
+    @contextmanager
+    def delayed(*args,**kwargs):
+        now[0]+=5
+        with store.transaction(*args,**kwargs) as db:yield db
+    supervisor.store=SimpleNamespace(transaction=delayed)
+    assert supervisor.acquire()
+    with store.transaction(write=False) as db:
+        expires=db.execute('SELECT expires FROM builder_worker_leases WHERE name=?',(supervisor.key,)).fetchone()[0]
+    assert expires==now[0]+3
+    supervisor.store=store
+    now[0]=expires
+    assert supervisor.renew_owned() is False
+    supervisor.release()
+
+
+def test_parallel_drain_keeps_singleton_group_lease_until_all_consumers_stop(context):
+    from threading import Event,Thread
+    from queue import Queue
+    now=[100.0];finish=Event();stopping=Event();renewed=Queue()
+    class Parallel(Component):
+        def start(self):
+            self.thread=Thread(target=lambda:finish.wait(5));self.thread.start()
+        def stop(self):stopping.set()
+    first=WorkerSupervisor(context.service.store,[Component()],parallel_workers=[Parallel()],clock=lambda:now[0],ttl=.6,shutdown_timeout=4)
+    second=WorkerSupervisor(context.service.store,[Component()],clock=lambda:now[0],ttl=.6)
+    original=first.renew_owned
+    def observe():
+        result=original();renewed.put(now[0]);return result
+    first.renew_owned=observe
+    first.tick();stop=Thread(target=first.stop);stop.start()
+    try:
+        assert stopping.wait(2)
+        assert renewed.get(timeout=2)==100.0
+        now[0]=100.4
+        while renewed.get(timeout=2)<now[0]:pass
+        now[0]=100.8
+        assert second.tick() is False
+        assert stop.is_alive()
+    finally:finish.set();stop.join(3)
+    assert second.tick() is True
+    assert first.renew_owned() is False
+    second.stop()

@@ -1,0 +1,11 @@
+{
+  "service": "agentic-builder-simpsons.service",
+  "web_enabled": true,
+  "previous_flag": "unset",
+  "other_configuration_changed": false,
+  "credential_values_changed": false,
+  "database_migrations": 0,
+  "execution_replays": 0,
+  "mail_or_calendar_writes": 0,
+  "unauthenticated_session": 401
+}

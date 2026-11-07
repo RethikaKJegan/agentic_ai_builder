@@ -16,6 +16,8 @@ sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/"tests"))
 
 if __name__=='__main__':
+    bootstrap = TemporaryDirectory(prefix='builder-orchestration-bootstrap-')
+    os.environ['BUILDER_DATABASE_URL'] = str(Path(bootstrap.name) / 'unused-default.sqlite3')
     os.environ.update(CREWAI_TESTING='true',CREWAI_TRACING_ENABLED='false',CREWAI_DISABLE_TELEMETRY='true')
     import crewai
     import pytest

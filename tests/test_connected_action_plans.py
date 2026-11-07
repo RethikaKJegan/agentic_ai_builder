@@ -421,3 +421,150 @@ def test_specialist_cannot_invent_mapped_evidence_references():
     workflow={'metadata':{'connected_action_plan':{'actions':[{'action_id':'compare','capability_id':'business.compare'}]}}}
     output={'summary':'Claim','findings':[{'kind':'observation','statement':'Invented fact','references':[{'record_id':'not_supplied','mapping_id':'mapping:absent'}]}],'missing_information':[]}
     with pytest.raises(RuntimeFailure):verify(workflow,{'node_id':'compare','kind':'agent'},output,{'context':{'evidence':{'records':[]}}})
+
+
+def test_unanchored_case_read_requires_clarification_before_compilation(connected):
+    f=connected
+    prepared=f.general.business_preparation.prepare(f.x.a,dict(objective='Compare complaints with linked inspections.'))
+    req=dict(objective='List up to 10 complaints with linked inspection records, newest first.',request_key='unanchored_read_001',
+        preparation_id=prepared['preflight_id'],user_values={'task':'complaints'},action_plan=dict(actions=[
+            action('read','business.read.complaints',[bind('context','preparation_id','preparation_id'),bind('literal','task','task')])],completion_criteria=['read'],missing_inputs=[]))
+    f.x.reader.calls.clear()
+    with pytest.raises(RuntimeFailure) as error:
+        f.c.prepare_actions(f.x.a,req)
+    assert error.value.code=='ACTION_INPUT_REQUIRED'
+    assert 'complaint_id' in error.value.required_inputs
+    assert not f.x.reader.calls
+    with f.x.f.store.transaction(write=False) as db:
+        assert db.execute('SELECT COUNT(*) FROM business_compositions').fetchone()[0]==0
+
+
+def test_explicit_case_identifier_reprepares_unanchored_read(connected):
+    f=connected
+    prepared=f.general.business_preparation.prepare(f.x.a,dict(objective='Compare complaints with linked inspections.'))
+    req=dict(objective='Show the selected complaint and its inspection.',request_key='anchored_read_input_001',
+        preparation_id=prepared['preflight_id'],user_values={'task':'complaints','complaint_id':'C123'},action_plan=dict(actions=[
+            action('read','business.read.complaints',[bind('context','preparation_id','preparation_id'),bind('literal','task','task')])],completion_criteria=['read'],missing_inputs=[]))
+    doc=f.c.prepare_actions(f.x.a,req)
+    current=f.general.business_preparation.checked(f.x.a,doc['preparation_id'])
+    assert current['inputs']['identifiers']=={'complaint_id':'C123'}
+    assert current['preflight_id']!=prepared['preflight_id']
+    assert f.general.business_preparation.get(f.x.a,prepared['preflight_id'])['inputs']['identifiers']=={}
+
+
+@pytest.mark.parametrize('body',[
+    'Report: https://docs.google.com/spreadsheets/d/approved_book/edit.',
+    '[Report](https://docs.google.com/spreadsheets/d/approved_book/edit)',
+])
+def test_verified_content_accepts_provided_link_in_prose(body):
+    from runtime.action_plans import verify
+    workflow={'metadata':{'connected_action_plan':{'actions':[{'action_id':'content','capability_id':'content.prepare'}]}}}
+    verify(workflow,{'node_id':'content','kind':'agent'},{'body':body,'source_references':[]},
+        {'source_references':[],'artifact_url':'https://docs.google.com/spreadsheets/d/approved_book/edit'})
+
+
+def test_unprovided_content_url_gets_only_one_pure_model_correction():
+    from runtime.action_plans import validate_content
+    from shared.llm_feedback import correct_once
+    workflow={'metadata':{'connected_action_plan':{'actions':[{'action_id':'content','capability_id':'content.prepare'}]}}}
+    node={'node_id':'content','kind':'agent'};calls=[]
+    def invoke(feedback):
+        calls.append(feedback)
+        output={'body':'https://unprovided.example/link','source_references':[]}
+        validate_content(workflow,node,output,{'source_references':[]})
+        return output
+    corrections=[]
+    with pytest.raises(RuntimeFailure) as error:correct_once(invoke,lambda item:corrections.append(item))
+    assert error.value.code=='ACTION_CONTENT_UNVERIFIED'
+    assert len(calls)==2 and len(corrections)==1
+    assert 'unprovided.example' not in str(corrections)
+
+
+@pytest.mark.parametrize('call_allowance',[1,2])
+def test_corrected_email_content_preserves_created_sheet_and_send(connected,call_allowance):
+    f=connected;original=f.runner.agents
+    class Adapter:
+        external_write=False
+        def reservation(self,*args):return {'llm_calls':1,'tokens':100,'estimated_cost_usd':0}
+        def invoke(self,binding,inputs,reference):
+            output=original.invoke(binding,inputs,reference)
+            if inputs.get('artifact_url') and not binding.get('_validation_feedback'):
+                output['body']='Review https://unprovided.example/link'
+            return output
+    f.runner.agents=Adapter()
+    request=deepcopy(f.request)
+    next(a for a in request['action_plan']['actions'] if a['action_id']=='email')['budget']['max_llm_calls']=call_allowance
+    _,workflow,rid=compile_run(f,request)
+    result=complete(f,workflow,rid)
+    if call_allowance==1:
+        assert result['status']=='failed' and stored(f,rid)['error_code']=='ACTION_CONTENT_UNVERIFIED'
+        assert f.http.write_count==1 and not f.http.sent
+        return
+    assert result['status']=='completed',stored(f,rid).get('error_code')
+    assert f.http.write_count==1 and len(f.http.sent)==1
+    events=f.runtime.events(rid,f.x.a)['items']
+    assert any(e['event_type']=='agent.correction' and e['details']['validation_feedback'][0]['code']=='ACTION_CONTENT_UNVERIFIED' for e in events)
+
+
+def test_generated_unconditional_completion_flag_is_normalized_before_review(connected):
+    f=connected;draft=proposal(f.prepared);draft['actions'][-1]['optional']=True
+    f.general.planner.provider=SimpleNamespace(plan_actions=lambda *_:deepcopy(draft))
+    request=deepcopy(f.request);request.pop('action_plan')
+    doc=f.c.prepare_actions(f.x.a,request)
+    assert doc['composition_id']
+    assert draft['actions'][-1]['optional'] is True  # Never mutate provider input.
+    send=doc['action_plan']['actions'][-1]
+    assert send['optional'] is False and send['when'] is None
+    assert send['required_approvals']==['exact_payload'] and doc['action_plan']['completion_criteria']==['send']
+    assert not f.http.sent and f.http.write_count==0
+
+
+def test_explicit_unconditional_optional_completion_still_rejected(connected):
+    f=connected;request=deepcopy(f.request)
+    request['action_plan']['actions'][-1]['optional']=True
+    with pytest.raises(RuntimeFailure) as error:f.c.prepare_actions(f.x.a,request)
+    assert error.value.code=='ACTION_BINDING_INVALID'
+    assert error.value.binding_issue['action_ids']==['send']
+    assert not f.http.sent and f.http.write_count==0
+
+
+def test_generated_real_condition_gets_bounded_precise_correction(connected):
+    f=connected;corrected=proposal(f.prepared)
+    corrected.update(actions=corrected['actions'][:2],completion_criteria=['analysis'])
+    draft=deepcopy(corrected)
+    draft['actions'][-1].update(optional=True,when=dict(binding=bind('literal','enabled','include_analysis'),equals=True))
+    contexts=[]
+    def selector(goal,context):
+        contexts.append(deepcopy(context))
+        return deepcopy(draft if len(contexts)==1 else corrected)
+    f.general.planner.provider=SimpleNamespace(plan_actions=selector)
+    request=deepcopy(f.request);request.pop('action_plan');request['automatic_inputs']=True
+    assert f.c.prepare_actions(f.x.a,request)['composition_id']
+    assert len(contexts)==2
+    issue=contexts[1]['validation_feedback']['binding_issue']
+    assert issue['field']=='completion_criteria' and issue['action_ids']==['analysis']
+    assert contexts[1]['validation_feedback']['invalid_proposal']['actions'][-1]['when'] is not None
+    assert not f.http.sent and f.http.write_count==0
+
+
+def test_generated_optional_flag_does_not_hide_missing_recipient(connected):
+    f=connected;draft=proposal(f.prepared);draft['actions'][-1]['optional']=True
+    f.general.planner.provider=SimpleNamespace(plan_actions=lambda *_:deepcopy(draft))
+    request=deepcopy(f.request);request.pop('action_plan');request['user_values'].pop('recipient')
+    with pytest.raises(RuntimeFailure) as error:f.c.prepare_actions(f.x.a,request)
+    assert error.value.code=='ACTION_INPUT_REQUIRED'
+    assert 'recipient' in error.value.required_inputs
+    assert not f.http.sent and f.http.write_count==0
+
+
+def test_repeated_conditional_completion_stops_after_one_correction(connected):
+    f=connected;draft=proposal(f.prepared)
+    draft.update(actions=draft['actions'][:2],completion_criteria=['analysis'])
+    draft['actions'][-1].update(optional=True,when=dict(binding=bind('literal','enabled','include_analysis'),equals=True))
+    calls=[]
+    f.general.planner.provider=SimpleNamespace(plan_actions=lambda *args:(calls.append(1) or deepcopy(draft)))
+    request=deepcopy(f.request);request.pop('action_plan');request['automatic_inputs']=True
+    with pytest.raises(RuntimeFailure) as error:f.c.prepare_actions(f.x.a,request)
+    assert error.value.code=='ACTION_BINDING_INVALID' and len(calls)==2
+    assert draft['actions'][-1]['optional'] is True and draft['actions'][-1]['when'] is not None
+    assert not f.http.sent and f.http.write_count==0

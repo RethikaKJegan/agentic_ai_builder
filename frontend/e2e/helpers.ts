@@ -11,8 +11,10 @@ export async function localDraft(page:Page,name:string){
 }
 export async function generate(page:Page,objective:string){
  await page.goto('/app');await page.getByLabel('Process description').fill(objective);
+ await page.getByText('Workflow options',{exact:true}).click();await page.getByLabel('Workflow type',{exact:true}).selectOption('automation');
  await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
- await page.getByRole('button',{name:'Review and edit workflow',exact:true}).click();
+
+ await page.waitForURL(/\/app\/workflows\/[^/]+$/);
  await expect(page.getByLabel('Workflow name',{exact:true})).toBeVisible();
  return new URL(page.url()).pathname.split('/').at(-1)!;
 }

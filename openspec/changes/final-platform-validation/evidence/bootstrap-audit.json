@@ -1,0 +1,9 @@
+{
+  "shared_default_path": "/home/raf/agentic-ai-builder/.local/workflows.sqlite3",
+  "observed_at_utc": "2026-11-07T07:24:46.252641+00:00",
+  "mtime_utc": "2026-11-07T07:24:39.149638+00:00",
+  "size_bytes": 4244287488,
+  "pre_run_fingerprint_available": false,
+  "record_or_schema_equivalence_verified": false,
+  "action": "No restore or service mutation attempted. Earlier eager initialization is diagnostic, not isolation-qualified evidence."
+}

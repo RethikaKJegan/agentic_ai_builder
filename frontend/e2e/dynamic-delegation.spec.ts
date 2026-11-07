@@ -32,7 +32,7 @@ for (const mobile of [false, true]) {
     await page.goto(`/app/workflows/${workflow.workflow_id}`);
     await page.getByRole("tab", { name: "Execution", exact: true }).click();
     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
-    await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+    await page.getByRole("region", { name: "Recorded execution", exact: true }).getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
     await expect(dialog.getByText(/^Spawned · Task/)).toHaveCount(0);
     phase = 1;

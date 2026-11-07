@@ -33,6 +33,7 @@ for (const mobile of [false,true]) for (const matched of [true,false]) test(`aut
   await route.fulfill({status:200,json:{request_id:'req_ontology_browser',status:200,data}});
  });
  await page.goto('/app');await page.getByRole('textbox',{name:'Process description',exact:true}).fill(matched?'Create a Simpson warranty complaint assessment workflow':'Translate French poetry into Spanish');
+ await page.getByText('Workflow options',{exact:true}).click();await page.getByLabel('Workflow type',{exact:true}).selectOption('automation');
  await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
  await expect(page).toHaveURL(new RegExp(`/app/workflows/${w.workflow_id}$`));
  await expect(page.getByRole('button',{name:'View ontology evidence',exact:true})).toBeVisible();

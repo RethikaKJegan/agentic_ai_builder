@@ -28,7 +28,7 @@ for (const mobile of [false, true]) {
     await page.goto(`/app/workflows/${workflow.workflow_id}`);
     await page.getByRole("tab", { name: "Execution", exact: true }).click();
     await expect(page.getByLabel("Select workflow run")).toHaveValue(run.run_id);
-    await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+    await page.getByRole("region", { name: "Recorded execution", exact: true }).getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
     await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
     await dialog.locator(`.react-flow__node[data-id="${run.run_id}:${tool.details.node_id}"]`).click();

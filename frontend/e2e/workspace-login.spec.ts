@@ -9,6 +9,7 @@ for (const mobile of [false, true]) {
     await page.goto("/app/workflows");
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+    await page.getByLabel("Email", { exact: true }).fill("engineering@bellcorpstudio.com");
     await page.getByLabel("Password", { exact: true }).fill("87654321");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByRole("main").getByRole("alert")).toContainText("email or password is incorrect");
@@ -31,6 +32,7 @@ for (const mobile of [false, true]) {
     expect((await page.request.get("/api/backend/session")).status()).toBe(401);
     await page.goBack();
     await expect(page).toHaveURL(/\/login$/);
+    await page.getByLabel("Email", { exact: true }).fill("engineering@bellcorpstudio.com");
     await page.getByLabel("Password", { exact: true }).fill("12345678");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByLabel("Process description")).toBeVisible();
@@ -46,6 +48,6 @@ test("Launch Workspace opens the login page", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Launch Workspace", exact: true }).first().click();
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("engineering@bellcorpstudio.com");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("");
   await page.screenshot({ path: "../.local/workspace-login/login.png" });
 });

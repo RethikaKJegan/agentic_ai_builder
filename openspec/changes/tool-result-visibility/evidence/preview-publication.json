@@ -1,0 +1,11 @@
+{
+  "scope": "existing password-gated Builder preview; frontend and Simpsons presentation only",
+  "credential_reads": 0,
+  "previous_build": "V-Ftl_VyxdrHrfAmGDCem",
+  "new_build": "KQHhQpTBedkYc5z5IxDWh",
+  "rollback_build": ".local/tool-result-visibility/frontend-rollback-20261107-095522",
+  "tenant_unauthenticated_session": 401,
+  "database_migrations": 0,
+  "provider_actions": 0,
+  "published": true
+}

@@ -8,3 +8,8 @@ with focused regressions; do not rebuild the architecture or weaken assertions.
 Classify release requirements PASS/FAIL/BLOCKED/NOT TESTED and issue an evidence-
 based production/pilot readiness decision. Missing staging hosts, live targets,
 SLO approval and external alert infrastructure remain explicit blockers.
+
+User-designated eventual target: https://praxi.bellcorpstudio.com/. This is a
+deployment target, not staging authorization. The user explicitly forbids
+production deployment/modification until separately approved. Multi-host checks
+require verified staging access and infrastructure identifiers.

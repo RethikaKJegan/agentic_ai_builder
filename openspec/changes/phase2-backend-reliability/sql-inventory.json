@@ -1411,14 +1411,14 @@
     },
     {
       "file": "runtime/graph.py",
-      "line": 546,
+      "line": 556,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND EXISTS (SELECT 1 FROM json_each(runtime_runs.document,'$.approvals') a WHERE json_extract(a.value,'$.approval_id')=?) LIMIT 1",
       "dynamic": false
     },
     {
       "file": "runtime/graph.py",
-      "line": 555,
+      "line": 565,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' AND json_extract(document,'$.details.approval_id')=? ORDER BY sequence LIMIT 1",
       "dynamic": false
@@ -1635,14 +1635,14 @@
     },
     {
       "file": "runtime/recovery.py",
-      "line": 94,
+      "line": 96,
       "kind": "execute",
       "sql": "SELECT 1 FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='node.started' AND json_extract(document,'$.details.node_id')=? AND json_extract(document,'$.details.invocation_id')=? LIMIT 1",
       "dynamic": false
     },
     {
       "file": "runtime/recovery.py",
-      "line": 108,
+      "line": 110,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='node.started' AND json_extract(document,'$.details.node_id')=? ORDER BY sequence DESC LIMIT 1",
       "dynamic": false
@@ -2832,14 +2832,14 @@
     },
     {
       "file": "scripts/serve_orchestration_ui_test_api.py",
-      "line": 105,
+      "line": 107,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_runs",
       "dynamic": false
     },
     {
       "file": "scripts/serve_ui_test_api.py",
-      "line": 203,
+      "line": 204,
       "kind": "execute",
       "sql": "SELECT 1 FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
       "dynamic": false
@@ -3007,14 +3007,14 @@
     },
     {
       "file": "workflow_api/action_plans.py",
-      "line": 287,
+      "line": 305,
       "kind": "execute",
       "sql": "SELECT fingerprint,document FROM business_compositions WHERE workspace=? AND owner=? AND request_key=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/action_plans.py",
-      "line": 291,
+      "line": 309,
       "kind": "execute",
       "sql": "INSERT INTO business_compositions VALUES (?,?,?,?,?,?)",
       "dynamic": false
@@ -4967,91 +4967,98 @@
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 43,
+      "line": 46,
       "kind": "execute",
       "sql": "SELECT document FROM business_compositions WHERE workspace=? AND owner=? ORDER BY rowid DESC LIMIT 50",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 44,
+      "line": 47,
       "kind": "execute",
       "sql": "SELECT workflow_id,display_name,deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 46,
+      "line": 49,
       "kind": "execute",
       "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_runs'",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 47,
+      "line": 50,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND subject=? ORDER BY rowid DESC LIMIT 200",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 48,
+      "line": 51,
       "kind": "execute",
       "sql": "SELECT workflow_id FROM lifecycle_tombstones WHERE workspace=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 60,
+      "line": 63,
       "kind": "execute",
       "sql": "SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 61,
+      "line": 64,
       "kind": "execute",
       "sql": "SELECT display_name,deleted_at FROM business_investigation_metadata WHERE workspace=? AND owner=? AND workflow_id=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 72,
+      "line": 70,
+      "kind": "execute",
+      "sql": "SELECT run_id FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? ORDER BY rowid DESC LIMIT 1",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/composition_presentation.py",
+      "line": 78,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence DESC LIMIT 1000",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 155,
+      "line": 169,
       "kind": "execute",
       "sql": "INSERT INTO business_investigation_metadata VALUES (?,?,?,?,?,?) ON CONFLICT(workspace,owner,workflow_id) DO UPDATE SET display_name=excluded.display_name,updated_at=excluded.updated_at",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 165,
+      "line": 179,
       "kind": "execute",
       "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_runs'",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 166,
+      "line": 180,
       "kind": "execute",
       "sql": "SELECT 1 FROM runtime_runs WHERE workspace=? AND workflow_id=? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval')",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 168,
+      "line": 182,
       "kind": "execute",
       "sql": "SELECT release_id FROM lifecycle_active WHERE workspace=? AND workflow_id=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/composition_presentation.py",
-      "line": 175,
+      "line": 189,
       "kind": "execute",
       "sql": "INSERT INTO business_investigation_metadata VALUES (?,?,?,?,?,?) ON CONFLICT(workspace,owner,workflow_id) DO UPDATE SET deleted_at=excluded.deleted_at,updated_at=excluded.updated_at",
       "dynamic": false
@@ -7487,14 +7494,14 @@
     },
     {
       "file": "workflow_api/live_providers.py",
-      "line": 125,
+      "line": 127,
       "kind": "execute",
       "sql": "SELECT document, authority FROM lifecycle_identities WHERE workspace=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/live_providers.py",
-      "line": 491,
+      "line": 498,
       "kind": "execute",
       "sql": "SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?",
       "dynamic": false
@@ -8093,6 +8100,13 @@
       "kind": "execute",
       "sql": "INSERT OR IGNORE INTO procurement_quote_messages VALUES (?,?,?,?)",
       "dynamic": false
+    },
+    {
+      "file": "workflow_api/public_research.py",
+      "line": 47,
+      "kind": "execute",
+      "sql_expression": "grant",
+      "dynamic": true
     },
     {
       "file": "workflow_api/release_read.py",
@@ -9132,98 +9146,98 @@
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 25,
+      "line": 27,
       "kind": "execute",
       "sql": "SELECT owner,expires FROM builder_worker_leases WHERE name=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 28,
+      "line": 30,
       "kind": "execute",
       "sql": "INSERT INTO builder_worker_leases VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires=excluded.expires",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 29,
+      "line": 31,
       "kind": "execute",
       "sql": "INSERT INTO builder_worker_health VALUES (?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET state=excluded.state,heartbeat=excluded.heartbeat",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 36,
+      "line": 38,
       "kind": "execute",
       "sql": "INSERT INTO builder_worker_component_health VALUES (?,?,?) ON CONFLICT(worker_id,name) DO UPDATE SET document=excluded.document",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 66,
+      "line": 68,
       "kind": "execute",
       "sql": "DELETE FROM builder_worker_leases WHERE name=? AND owner=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 67,
+      "line": 69,
       "kind": "execute",
       "sql": "UPDATE builder_worker_health SET state=?,heartbeat=? WHERE worker_id=?",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 113,
+      "line": 120,
       "kind": "execute",
-      "sql": "UPDATE builder_worker_leases SET expires=? WHERE name=? AND owner=?",
-      "dynamic": false
-    },
-    {
-      "file": "workflow_api/worker_control.py",
-      "line": 115,
-      "kind": "execute",
-      "sql": "UPDATE builder_worker_health SET state='stopping',heartbeat=? WHERE worker_id=?",
+      "sql": "UPDATE builder_worker_leases SET expires=? WHERE name=? AND owner=? AND expires>?",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
       "line": 122,
       "kind": "execute",
+      "sql": "UPDATE builder_worker_health SET state='stopping',heartbeat=? WHERE worker_id=?",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 129,
+      "kind": "execute",
       "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-      "dynamic": false
-    },
-    {
-      "file": "workflow_api/worker_control.py",
-      "line": 125,
-      "kind": "execute",
-      "sql": "SELECT role,state,heartbeat FROM builder_worker_health",
-      "dynamic": false
-    },
-    {
-      "file": "workflow_api/worker_control.py",
-      "line": 128,
-      "kind": "execute",
-      "sql": "SELECT name,document FROM builder_worker_component_health",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
       "line": 132,
       "kind": "execute",
+      "sql": "SELECT role,state,heartbeat FROM builder_worker_health",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 135,
+      "kind": "execute",
+      "sql": "SELECT name,document FROM builder_worker_component_health",
+      "dynamic": false
+    },
+    {
+      "file": "workflow_api/worker_control.py",
+      "line": 139,
+      "kind": "execute",
       "sql": "SELECT state,COUNT(*) FROM lifecycle_jobs WHERE workspace=? GROUP BY state",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 133,
+      "line": 140,
       "kind": "execute",
       "sql": "SELECT state,COUNT(*) FROM builder_planning_jobs WHERE workspace=? GROUP BY state",
       "dynamic": false
     },
     {
       "file": "workflow_api/worker_control.py",
-      "line": 135,
+      "line": 142,
       "kind": "execute",
       "sql": "SELECT COUNT(*) FROM runtime_runs WHERE workspace=? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval')",
       "dynamic": false

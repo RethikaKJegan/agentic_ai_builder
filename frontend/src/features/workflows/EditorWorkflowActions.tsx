@@ -13,6 +13,7 @@ import { ApiFeedback } from "./ApiFeedback";
 import { RunWorkflowDialog } from "./RunWorkflowDialog";
 import { SheetAccessReview } from "./SheetAccessReview";
 import { CustomerAutomationReview } from "./CustomerAutomationReview";
+import { WorkflowControls } from "./WorkflowControls";
 import { ProcurementReview } from "./ProcurementReview";
 
 type Release = Awaited<ReturnType<typeof api.releaseState>>["release"];
@@ -38,6 +39,7 @@ export function EditorWorkflowActions({
   const [progress, setProgress] = useState<Partial<Record<Stage, string>>>({});
   const [runDocument, setRunDocument] = useState<CanonicalWorkflow>();
   const runRelease = useRef<string | undefined>(undefined);
+  const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const dirty = hasWorkflowEdits(workflow, agents);
   const releaseId = backend.overview[workflow.id]?.release_id;
@@ -369,6 +371,10 @@ export function EditorWorkflowActions({
             Refresh release status
           </button>
         </div>
+      </details>
+      <details className="w-full" onToggle={event => setRevisionsOpen(event.currentTarget.open)}>
+        <summary className="cursor-pointer text-xs">Manage saved revisions</summary>
+        {revisionsOpen && <WorkflowControls workflow={workflow} onStarted={onExecution}/>}
       </details>
       {!!Object.keys(progress).length && (
         <ol aria-label="Preparation progress" className="flex w-full flex-wrap gap-2 text-[11px]">

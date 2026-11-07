@@ -185,13 +185,14 @@ def test_http_build_and_review_envelopes(manager):
     from fastapi.testclient import TestClient
     from types import SimpleNamespace
     from workflow_api.data_source_routes import install
-    class Service:
-        store=manager.store
+    from workflow_api.service import WorkflowService
+    from registry import RegistryService, WorkspacePolicy
+    class Service(WorkflowService):
         def envelope(self,ref,status,data):return {'data':data}
         def failure(self,ref,exc):return {'error':{'error_code':exc.code,'message':str(exc)}}
     app=FastAPI()
     with patch('workflow_api.data_source_routes.DataSources',return_value=SimpleNamespace(relationships=manager,store=manager.store,env={},semantic=manager.ontology.semantic)):
-        install(app,Service(),auth(),{},lambda:'test')
+        install(app,Service(manager.store,registry=RegistryService(WorkspacePolicy(auth()['subject']['workspace_id']))),auth(),{},lambda:'test')
     client=TestClient(app)
     response=client.get('/data-relationships')
     assert response.status_code==200 and response.headers['cache-control']=='no-store'

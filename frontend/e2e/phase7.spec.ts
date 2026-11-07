@@ -23,15 +23,25 @@ for(const mobile of [false,true]){
   await source.selectOption(router!);await target.selectOption({label:targetLabel});
   await page.getByLabel('Connection outcome').selectOption('yes');await page.getByRole('button',{name:'Connect steps',exact:true}).click();
   await page.getByLabel('Connection outcome').selectOption('no');await page.getByRole('button',{name:'Connect steps',exact:true}).click();
-  const actions=page.getByRole('region',{name:'Workflow actions'});
+  await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
+ const actions=page.getByRole('region',{name:'Workflow actions'});
   await actions.getByRole('button',{name:'Save draft',exact:true}).click();await expect(actions.getByText(/Save draft confirmed · v2/)).toBeVisible();
   await page.reload();const saved=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
   expect(saved.version).toBe(2);expect(saved.conditions.find((condition:{expression:string})=>condition.expression==="'yes'")).toBeTruthy();
   expect(saved.agents.some((agent:{instructions:string})=>agent.instructions.includes('Phase seven reviewed instruction'))).toBe(true);
+  await page.getByText("Manage saved revisions",{exact:true}).click();await page.getByText("Revision actions",{exact:true}).click();
   await actions.getByRole('button',{name:'Validate',exact:true}).click();await expect(actions.getByText(/Validate confirmed · v2/)).toBeVisible();
+  // Lifecycle evidence lives in the current Workflow details dialog.
+  await page.getByRole('button',{name:'Workflow details',exact:true}).click();
+  const lifecycle=page.getByRole('dialog',{name:'Workflow details',exact:true});
+  await lifecycle.getByLabel('Workflow lifecycle',{exact:true}).locator(':scope > summary').click();
+  await lifecycle.getByText('Workflow lifecycle · 14 stages',{exact:true}).click();
+  await expect(lifecycle.getByText(/no supported side-effect-free runtime simulation/)).toBeVisible();
+  await lifecycle.getByRole('button',{name:'Close',exact:true}).click();
   // Product simulation is intentionally unavailable; it must never start execution.
-  await page.getByText('Workflow lifecycle · 14 stages',{exact:true}).click();
-  await expect(page.getByText(/no supported side-effect-free runtime simulation/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Run simulation',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'Workflow launch actions'}).getByRole('button',{name:'Run',exact:true})).toBeDisabled();
   expect((await(await page.request.get(`/api/backend/runs?workflow_id=${id}`)).json()).data.total).toBe(0);
   // Changed executable agent definitions require an explicit trusted operator
   // Registry review. The fixture invokes the real registration/validation API.
@@ -45,6 +55,7 @@ for(const mobile of [false,true]){
   const key=crypto.randomUUID();const executed=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect(executed.status(),await executed.text()).toBe(200);
   const run=(await executed.json()).data.run;const firstEvents=(await(await page.request.get(`/api/backend/runs/${run.run_id}/events?limit=500`)).json()).data.items;expect(run.status,JSON.stringify(firstEvents.filter((event:{event_type:string})=>['node.failed','runtime.denied','run.failed','run.blocked'].includes(event.event_type)))).toBe('completed');
   const repeat=await mutation(page,'execute_workflow',`workflows/${id}/execute`,{workflow_id:id,workflow_version:2,inputs:inputValues},'POST',key);expect((await repeat.json()).data.run.run_id).toBe(run.run_id);
+  await page.getByText('Manage saved revisions',{exact:true}).click();
   await page.getByRole('tab',{name:'Execution',exact:true}).click();await page.getByRole('button',{name:'Refresh trace',exact:true}).click();
   await expect(page.getByText(new RegExp(`Read-only historical revision v2 · Run ${run.run_id}`))).toBeVisible();
   await page.getByRole('button',{name:/Router.*condition/}).click();await expect(page.getByLabel('Node execution trace').getByText('yes',{exact:true})).toBeVisible();
@@ -75,12 +86,12 @@ test('settings and integration failures recover without a fabricated verificatio
  await page.goto('/app/settings');await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toContainText('Settings temporarily unavailable');await expect(page.getByLabel('Notification preference')).toBeDisabled();
  failed=false;await page.getByRole('button',{name:'Reload settings',exact:true}).click();await expect(page.getByLabel('Notification preference')).toBeEnabled();await expect(page.getByRole('alert').filter({hasText:'SERVICE_UNAVAILABLE'})).toHaveCount(0);
  let rejected=true;
- await page.route('**/api/backend/integrations/*/test',async route=>{
+ await page.route('**/api/backend/integrations/google/connections',async route=>{
   if(rejected)await route.fulfill({status:403,json:{request_id:'req_phase7_provider',status:403,data:{error:{error_code:'OPERATION_NOT_AUTHORIZED',message:'Provider checks are not authorized.',request_id:'req_phase7_provider',retryable:false}}}});
   else await route.continue();
  });
- await page.goto('/app/integrations');await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+ await page.goto('/app/integrations');await page.getByRole('button',{name:'Refresh Google connections',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toContainText('Provider checks are not authorized');await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
- rejected=false;await page.getByRole('button',{name:'Check configuration',exact:true}).first().click();
+ rejected=false;await page.getByRole('button',{name:'Refresh Google connections',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'OPERATION_NOT_AUTHORIZED'})).toHaveCount(0);await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
 });

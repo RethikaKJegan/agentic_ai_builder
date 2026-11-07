@@ -75,7 +75,7 @@ async function advanceCase(
     } else {
       const drive = panel.getByRole("button", { name: "Continue bounded evaluation" });
       await expect(drive).toBeEnabled();
-      await drive.click();
+      await Promise.all([page.waitForResponse(response=>response.request().method()==="POST"&&response.url().endsWith("/drive")),drive.click()]);
       await expect(panel.getByRole("button", { name: "Refresh adaptive state" })).toBeEnabled();
     }
     await panel.getByRole("button", { name: "Refresh adaptive state" }).click();

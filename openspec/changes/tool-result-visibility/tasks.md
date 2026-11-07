@@ -1,0 +1,8 @@
+- [x] Reproduce database-read record loss and null tool identity in the projection.
+- [x] Preserve real recorded read evidence/tool metadata and provider identifiers.
+- [x] Add truthful readable, zero-match, pending and historical receipt UI states.
+- [x] Complete affected backend59/frontend34 checks and build/types/lint/contracts.
+- [x] Verify isolated tenant startup requires no schema changes or network calls.
+- [x] Publish within existing authorization after safer review; retain frontend rollback.
+- [x] Verify public desktop inspector against existing run using only read requests.
+- [x] Record exact evidence and limits without rerunning workflows or provider actions.

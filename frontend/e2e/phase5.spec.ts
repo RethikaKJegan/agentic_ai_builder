@@ -66,6 +66,8 @@ for (const mobile of [false, true]) {
     );
     await conflict.getByRole("button", { name: "Rebase non-overlapping edits" }).click();
     await expect(conflict).toHaveCount(0);
+    await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
     const actions = page.getByRole("region", { name: "Workflow actions" });
     await expect(actions).toContainText("server revision v2");
     const server = (await (await page.request.get(`/api/backend/workflows/${id}`)).json()).data
@@ -95,6 +97,8 @@ for (const mobile of [false, true]) {
       await route.abort("failed");
     });
     await page.getByLabel("Workflow name", { exact: true }).fill("Accepted before response loss");
+    await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(
       page.getByRole("region", { name: "Workflow actions" }).getByRole("alert"),
@@ -200,6 +204,8 @@ for (const mobile of [false, true]) {
       await route.fetch();
       await route.abort("failed");
     });
+    await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(
       page.getByRole("region", { name: "Workflow actions" }).getByRole("alert"),

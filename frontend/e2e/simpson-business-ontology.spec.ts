@@ -31,7 +31,7 @@ for (const mobile of [false,true]) test(`separate Simpson foundation ${mobile?'m
  });
  await page.goto('/app/data-intelligence');
  await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Simpson Business Ontology',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Business Ontology',exact:true})).toBeVisible();
  await expect(page.getByRole('group',{name:'Business ontology modules'}).getByRole('button')).toHaveCount(12);
  await page.getByRole('button',{name:'Foundational',exact:true}).click();
  await expect(page.getByRole('article',{name:'Selected business module'}).getByRole('heading',{name:'Evidence and provenance'})).toBeVisible();
@@ -41,9 +41,9 @@ for (const mobile of [false,true]) test(`separate Simpson foundation ${mobile?'m
  await page.getByRole('button',{name:'Create business ontology workspace'}).click();
  await expect(page.getByRole('heading',{name:'Foundation ready'})).toBeVisible();
  await expect(page.getByText('Revision 1',{exact:true})).toBeVisible();
- await page.getByRole('tab',{name:'Ontology',exact:true}).click();
- await expect(page.getByRole('region',{name:'Ontology foundation'})).toBeVisible();
- await expect(page.getByRole('button',{name:'Concept: Existing service ticket',exact:true})).toBeVisible();
+ await expect(page.getByRole('tab',{name:'Ontology',exact:true})).toHaveCount(0);
+ await page.getByRole('tab',{name:'Semantic Intelligence',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Semantic Intelligence workspace'})).toBeVisible();
  await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Foundation ready'})).toBeVisible();
  await page.reload();await page.getByRole('tab',{name:'Business Ontology',exact:true}).click();

@@ -125,7 +125,12 @@ def validate_plan(plan,contracts,context,scope):
     if len(actions)!=len(plan['actions']):deny('Action instance IDs must be unique.')
     if len(actions)>plan['constraints']['max_actions']:deny('Action count exceeds plan budget.')
     if set(plan['completion_criteria'])-set(actions):deny('Completion criteria reference an unknown action.')
-    if any(actions[a]['optional'] for a in plan['completion_criteria']):deny('Completion criteria must name required actions.')
+    conditional_completion=[a for a in plan['completion_criteria'] if actions[a]['optional']]
+    if conditional_completion:
+        error=RuntimeFailure('ACTION_BINDING_INVALID','Completion criteria must name required actions.',422)
+        error.binding_issue=dict(field='completion_criteria',action_ids=conditional_completion,
+            correction='Requested work must be unconditional (optional=false, when=null). Keep genuine user conditions optional and out of required completion. Request missing business inputs through missing_inputs; never use a condition to hide them or drop requested work.')
+        raise error
     pending=set(actions);done=set()
     while pending:
         ready={i for i in pending if set(actions[i]['depends_on'])<=done}

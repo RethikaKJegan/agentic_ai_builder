@@ -1,0 +1,70 @@
+{
+  "scope": "2530 cases in four nonoverlapping module partitions plus one separately executed outage case. JUnit suite test attributes include passing subtests; testcase counts are used here.",
+  "partitions": [
+    {
+      "shard": 0,
+      "cases": 676,
+      "passed": 675,
+      "failed": 1,
+      "skipped": 0,
+      "seconds": 1593.416
+    },
+    {
+      "shard": 1,
+      "cases": 654,
+      "passed": 654,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 1610.2
+    },
+    {
+      "shard": 2,
+      "cases": 492,
+      "passed": 492,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 1527.404
+    },
+    {
+      "shard": 3,
+      "cases": 708,
+      "passed": 707,
+      "failed": 1,
+      "skipped": 0,
+      "seconds": 1618.55
+    }
+  ],
+  "outage": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 4.56
+  },
+  "collection": {
+    "cases": 2531,
+    "executed_nodeids": 2531,
+    "missing": 0,
+    "unexpected": 0
+  },
+  "focused_rechecks": [
+    {
+      "modules": [
+        "tests/test_phase2_workers.py"
+      ],
+      "passed": 17,
+      "failed": 0,
+      "seconds": 13.46,
+      "note": "Unchanged module passed; earlier 0.6s-TTL drain failure under concurrency remains a timing-sensitive risk."
+    },
+    {
+      "modules": [
+        "connector_extension/tests/test_procurement_slice.py",
+        "connector_extension/tests/test_application.py"
+      ],
+      "passed": 26,
+      "failed": 0,
+      "seconds": 80.77,
+      "note": "Replaced stale count19 with exact current catalog IDs; no product catalog change."
+    }
+  ]
+}

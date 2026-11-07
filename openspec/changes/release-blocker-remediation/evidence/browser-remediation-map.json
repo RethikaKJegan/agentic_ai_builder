@@ -1,0 +1,296 @@
+[
+  {
+    "original_file": "phase7.spec.ts",
+    "original_case": "complete isolated release journey and controlled failure desktop",
+    "retained_intent": "Complete actual persisted release journey, edited agent registration, branching execution, failure/idempotency and retained earlier release; settings/provider read errors recover truthfully.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase7.spec.ts",
+    "original_case": "complete isolated release journey and controlled failure mobile",
+    "retained_intent": "Complete actual persisted release journey, edited agent registration, branching execution, failure/idempotency and retained earlier release; settings/provider read errors recover truthfully.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase7.spec.ts",
+    "original_case": "settings and integration failures recover without a fabricated verification",
+    "retained_intent": "Complete actual persisted release journey, edited agent registration, branching execution, failure/idempotency and retained earlier release; settings/provider read errors recover truthfully.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "detailed-graph.spec.ts",
+    "original_case": "detailed graph containment, business review and reload on desktop",
+    "retained_intent": "Bounded hierarchy/source mapping review, entity paging, build progress and stale-review denial.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "detailed-graph.spec.ts",
+    "original_case": "stale graph blocks review on desktop",
+    "retained_intent": "Bounded hierarchy/source mapping review, entity paging, build progress and stale-review denial.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "detailed-graph.spec.ts",
+    "original_case": "detailed graph containment, business review and reload on mobile",
+    "retained_intent": "Bounded hierarchy/source mapping review, entity paging, build progress and stale-review denial.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "detailed-graph.spec.ts",
+    "original_case": "stale graph blocks review on mobile",
+    "retained_intent": "Bounded hierarchy/source mapping review, entity paging, build progress and stale-review denial.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "knowledge-preview.spec.ts",
+    "original_case": "one prompt submits automatic KG planning desktop",
+    "retained_intent": "One automatic planning submission, retained prompt on model failure, no hidden KG preview; connected account chooser remains supported.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "knowledge-preview.spec.ts",
+    "original_case": "one prompt submits automatic KG planning mobile",
+    "retained_intent": "One automatic planning submission, retained prompt on model failure, no hidden KG preview; connected account chooser remains supported.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "api-integration.spec.ts",
+    "original_case": "generated canonical branches and gates survive explicit save and reload",
+    "retained_intent": "Canonical branches/gates survive save; trusted approval/publication/activation; risky grants denied; invalid graph creates no run.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "api-integration.spec.ts",
+    "original_case": "trusted publication requires explicit approval and activation; new drafts clear grants",
+    "retained_intent": "Canonical branches/gates survive save; trusted approval/publication/activation; risky grants denied; invalid graph creates no run.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "api-integration.spec.ts",
+    "original_case": "pending approval and risky Registry assignments cannot approve or publish",
+    "retained_intent": "Canonical branches/gates survive save; trusted approval/publication/activation; risky grants denied; invalid graph creates no run.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "api-integration.spec.ts",
+    "original_case": "invalid graph validation fails authoritatively without creating a run",
+    "retained_intent": "Canonical branches/gates survive save; trusted approval/publication/activation; risky grants denied; invalid graph creates no run.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "baseline.spec.ts",
+    "original_case": "local draft canvas editing, undo and reload persistence work",
+    "retained_intent": "Landing/workspace routing, local edit undo/redo/reload and no simulated controls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "baseline.spec.ts",
+    "original_case": "all workspace routes load without demo role controls",
+    "retained_intent": "Landing/workspace routing, local edit undo/redo/reload and no simulated controls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "data-relationships.spec.ts",
+    "original_case": "relationship review, reload and descriptions on desktop",
+    "retained_intent": "Technical relationship map navigation, accept/reject persistence and source descriptions.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "data-relationships.spec.ts",
+    "original_case": "relationship review, reload and descriptions on mobile",
+    "retained_intent": "Technical relationship map navigation, accept/reject persistence and source descriptions.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "evidence-coverage.spec.ts",
+    "original_case": "scenario context, preflight and classified report on desktop",
+    "retained_intent": "Scenario/preflight submission through current action-plan API; inspect archived plan coverage and classified report evidence.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "evidence-coverage.spec.ts",
+    "original_case": "scenario context, preflight and classified report on mobile",
+    "retained_intent": "Scenario/preflight submission through current action-plan API; inspect archived plan coverage and classified report evidence.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "business-ontology.spec.ts",
+    "original_case": "business ontology reviews, evidence and refresh settings on desktop",
+    "retained_intent": "Source evidence, semantic review/direction, zoom, refresh configuration and persisted reviewed meaning.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "business-ontology.spec.ts",
+    "original_case": "business ontology reviews, evidence and refresh settings on mobile",
+    "retained_intent": "Source evidence, semantic review/direction, zoom, refresh configuration and persisted reviewed meaning.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "business-planning.spec.ts",
+    "original_case": "automatic ontology contribution matched desktop",
+    "retained_intent": "Planner context and ontology contributions/citations/download survive direct canonical draft navigation.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "business-planning.spec.ts",
+    "original_case": "automatic ontology contribution matched mobile",
+    "retained_intent": "Planner context and ontology contributions/citations/download survive direct canonical draft navigation.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "semantic-kg.spec.ts",
+    "original_case": "essential Knowledge graph desktop",
+    "retained_intent": "Current semantic canvas navigation/filtering/review, provenance, scoped connections and refresh controls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "semantic-kg.spec.ts",
+    "original_case": "essential Knowledge graph mobile",
+    "retained_intent": "Current semantic canvas navigation/filtering/review, provenance, scoped connections and refresh controls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "simpson-business-ontology.spec.ts",
+    "original_case": "separate Simpson foundation desktop",
+    "retained_intent": "Independent foundation create/reload and separation from Semantic Intelligence; retired legacy ontology is explicitly absent without legacy writes.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "simpson-business-ontology.spec.ts",
+    "original_case": "separate Simpson foundation mobile",
+    "retained_intent": "Independent foundation create/reload and separation from Semantic Intelligence; retired legacy ontology is explicitly absent without legacy writes.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase1.spec.ts",
+    "original_case": "planning progress and cancellation preserve the prompt on desktop",
+    "retained_intent": "Durable automation planning/cancel with prompt retention and no private browser provider calls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase1.spec.ts",
+    "original_case": "planning progress and cancellation preserve the prompt on mobile",
+    "retained_intent": "Durable automation planning/cancel with prompt retention and no private browser provider calls.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase3.spec.ts",
+    "original_case": "explicit lifecycle, typed run and confirmed settings desktop",
+    "retained_intent": "Explicit saved-revision lifecycle, separately activated release, typed execution and confirmed settings/configuration reads.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase3.spec.ts",
+    "original_case": "explicit lifecycle, typed run and confirmed settings mobile",
+    "retained_intent": "Explicit saved-revision lifecycle, separately activated release, typed execution and confirmed settings/configuration reads.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase4.spec.ts",
+    "original_case": "exact historical revision and preserved design desktop",
+    "retained_intent": "Exact historical run version, retained draft/design/connect/undo/redo/save, structured canonical planning/hierarchy review.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase4.spec.ts",
+    "original_case": "structured generation review desktop",
+    "retained_intent": "Exact historical run version, retained draft/design/connect/undo/redo/save, structured canonical planning/hierarchy review.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase4.spec.ts",
+    "original_case": "exact historical revision and preserved design mobile",
+    "retained_intent": "Exact historical run version, retained draft/design/connect/undo/redo/save, structured canonical planning/hierarchy review.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase4.spec.ts",
+    "original_case": "structured generation review mobile",
+    "retained_intent": "Exact historical run version, retained draft/design/connect/undo/redo/save, structured canonical planning/hierarchy review.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "non-overlapping conflict rebase preserves edits desktop",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "unknown save outcome is checked without replay desktop",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "non-overlapping conflict rebase preserves edits mobile",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "unknown save outcome is checked without replay mobile",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "uncertain first save recovery desktop",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase5.spec.ts",
+    "original_case": "uncertain first save recovery mobile",
+    "retained_intent": "Nonoverlapping rebase, uncertain first/later saves without replay, independent tabs and overlapping conflict refusal.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase6.spec.ts",
+    "original_case": "runtime history reconnect and exact approval desktop",
+    "retained_intent": "Exact approval/rejection, event pagination/reconnect and current read-only governance evidence navigation.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "phase6.spec.ts",
+    "original_case": "runtime history reconnect and exact approval mobile",
+    "retained_intent": "Exact approval/rejection, event pagination/reconnect and current read-only governance evidence navigation.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "prompt-only.spec.ts",
+    "original_case": "prompt-only setup on desktop",
+    "retained_intent": "Fresh planning session and automatic inputs, published-revision manual execution, configured event waits without execution.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "prompt-only.spec.ts",
+    "original_case": "prompt-only setup on mobile",
+    "retained_intent": "Fresh planning session and automatic inputs, published-revision manual execution, configured event waits without execution.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "investigation-workflow.spec.ts",
+    "original_case": "prompt, branching canvas, execution and evidence on desktop",
+    "retained_intent": "Archived read-only branching plan job/run/evidence/report/reload through supported saved-plan route; current prompt/action generation additionally covered by actual orchestration suite.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "investigation-workflow.spec.ts",
+    "original_case": "prompt, branching canvas, execution and evidence on mobile",
+    "retained_intent": "Archived read-only branching plan job/run/evidence/report/reload through supported saved-plan route; current prompt/action generation additionally covered by actual orchestration suite.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "connectors.spec.ts",
+    "original_case": "extension discovery and approved connector execution on desktop",
+    "retained_intent": "Actual extension registry discovery/configuration and controlled calendar/mail/read execution with exact approvals and receipts.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  },
+  {
+    "original_file": "connectors.spec.ts",
+    "original_case": "extension discovery and approved connector execution on mobile",
+    "retained_intent": "Actual extension registry discovery/configuration and controlled calendar/mail/read execution with exact approvals and receipts.",
+    "status": "PASS in complete151-case r2; second complete round pending"
+  }
+]

@@ -35,8 +35,12 @@ for(const mobile of [false,true])test(`prompt, branching canvas, execution and e
  if(mobile)await page.setViewportSize({width:390,height:844});
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));const mock=await setup(page);
  await page.goto('/app');await page.getByLabel('Process description').fill('Investigate complaint C123, compare its linked inspection and check warranty readiness.');
- await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
- await expect(page).toHaveURL(/workflows\/investigate\?job=job_plan/);
+ // Archived read-only plans remain inspectable/runable; the current Overview
+ // action-plan generator is exercised by connected-orchestration.spec.ts.
+ const planned=await page.evaluate(async()=>{const response=await fetch('/api/backend/business-ontology/v1/investigations/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'plan',request_key:crypto.randomUUID(),payload:{objective:'Investigate complaint C123, compare its linked inspection and check warranty readiness.'}})});return {status:response.status};});
+ expect(planned.status).toBe(200);
+ await page.goto('/app/workflows/investigate?job=job_plan');
+ await expect(page).toHaveURL(/workflows\/investigate\?.*job=job_plan/);
  await expect(page.getByRole('button',{name:'Run investigation',exact:true})).toBeVisible({timeout:15000});
  await expect(page.locator('.react-flow__node')).toHaveCount(18);
  await expect(page.locator('.react-flow__edge-text').getByText('Unknown',{exact:true}).first()).toBeVisible();

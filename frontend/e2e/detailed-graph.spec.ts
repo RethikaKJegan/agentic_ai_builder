@@ -105,28 +105,30 @@ for (const mobile of [false, true]) {
       });
     });
     await page.goto("/app/data-intelligence");
-    await page.getByRole("tab", { name: "Relationships", exact: true }).click();
-    await page.getByRole("button", { name: "Detailed knowledge graph", exact: true }).click();
+    await page.getByRole("tab", { name: "Semantic Intelligence", exact: true }).click();
+    await page.getByText("Review source links and mappings",{exact:true}).click();
+    await page.getByRole("button",{name:"Source mappings",exact:true}).click();
     await expect(page.getByText(/Detailed graph v2 · revision 1/)).toBeVisible();
     await page.getByRole("button", { name: "Expand Postgres", exact: true }).click();
     await page.getByRole("button", { name: "Expand demo", exact: true }).click();
-    await page.getByRole("button", { name: "Expand northwind", exact: true }).click();
-    await page.getByRole("button", { name: "Expand northwind.orders", exact: true }).click();
+    await page.getByRole("button", { name: "Expand Postgres", exact: true }).click();
+    await page.getByRole("button", { name: "Expand Postgres.orders", exact: true }).click();
     await page.getByRole("button", { name: "customerID (field)", exact: true }).click();
     await expect(page.getByLabel("Mapping role")).toHaveValue("reference");
     await page.getByText("Discovered metadata and constraints", { exact: true }).click();
     await expect(page.getByText("Stable ID: pg_orders_customerID", { exact: true })).toBeVisible();
     const relationships = page.getByRole("region", { name: "Qualified relationships" });
     await relationships.locator("summary").filter({ hasText: /declared$/ }).first().click();
-    await relationships.getByRole("button", { name: "Postgres / demo / northwind / customers / customerID", exact: true }).first().click();
+    await relationships.getByRole("button", { name: "Postgres / demo / Postgres / customers / customerID", exact: true }).first().click();
     await expect(page.getByText("Stable ID: pg_customers_customerID", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Business entities", exact: true }).click();
     await page.getByTestId("mapping-mongo_customers").click();
     await page.getByRole("button", { name: "Confirm mapping", exact: true }).click();
     await expect(page.getByText("Review status: confirmed", { exact: true })).toBeVisible();
     await page.reload();
-    await page.getByRole("tab", { name: "Relationships", exact: true }).click();
-    await page.getByRole("button", { name: "Detailed knowledge graph", exact: true }).click();
+    await page.getByRole("tab", { name: "Semantic Intelligence", exact: true }).click();
+    await page.getByText("Review source links and mappings",{exact:true}).click();
+    await page.getByRole("button",{name:"Source mappings",exact:true}).click();
     await page.getByRole("button", { name: "Business entities", exact: true }).click();
     await page.getByLabel("Mapping status").selectOption("confirmed");
     await page.getByTestId("mapping-mongo_customers").click();
@@ -155,10 +157,10 @@ for (const mobile of [false, true]) {
       }),
     ).toBeVisible();
     // A short worker build must become visible without reload/tab switching.
-    await page.getByRole("button", { name: "Build relationships", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Building…", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Regenerate Semantic Intelligence", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Updating metadata graph…", exact: true })).toBeDisabled();
     await expect(
-      page.getByRole("button", { name: "Build relationships", exact: true }),
+      page.getByRole("button", { name: "Regenerate Semantic Intelligence", exact: true }),
     ).toBeEnabled({ timeout: 4000 });
     await expect(page.getByText(/Detailed graph v2 · revision 6/)).toBeVisible();
     await expect(
@@ -201,8 +203,9 @@ for (const mobile of [false, true]) {
       });
     });
     await page.goto("/app/data-intelligence");
-    await page.getByRole("tab", { name: "Relationships", exact: true }).click();
-    await page.getByRole("button", { name: "Detailed knowledge graph", exact: true }).click();
+    await page.getByRole("tab", { name: "Semantic Intelligence", exact: true }).click();
+    await page.getByText("Review source links and mappings",{exact:true}).click();
+    await page.getByRole("button",{name:"Source mappings",exact:true}).click();
     await page.getByRole("button", { name: "Business entities", exact: true }).click();
     await page.getByTestId("mapping-mongo_customers").click();
     await expect(page.getByRole("button", { name: "Confirm mapping", exact: true })).toBeDisabled();

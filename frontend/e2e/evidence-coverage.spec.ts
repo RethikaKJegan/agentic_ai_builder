@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {createHmac,randomBytes} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+const actionPlan=JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname,'../src/test/fixtures/orchestration.json'),'utf8')).document;
 const fixture=JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname,'fixtures/investigation.json'),'utf8'));
 for(const mobile of [false,true])test(`scenario context, preflight and classified report on ${mobile?'mobile':'desktop'}`,async({page})=>{
  if(mobile)await page.setViewportSize({width:390,height:844});
@@ -17,6 +18,8 @@ for(const mobile of [false,true])test(`scenario context, preflight and classifie
   else if(target.startsWith('workflow-overview'))data={items:[],next_sequence:0,has_more:false};
   else if(target.endsWith('/environments'))data={items:[{dataset_id:'dataset_fixture',cases:[{case_id:'case_fixture',label:'Complete · C123',source_identifiers:{complaint_id:'C123'}}]}]};
   else if(target.endsWith('/preflight')){checked=req.postDataJSON();data={preflight_id:'preflight_fixture',coverage:checks};}
+  else if(target==='business-ontology/v1/action-plans'&&req.method()==='POST'){submitted=req.postDataJSON();data=actionPlan;}
+  else if(target==='business-ontology/v1/action-plans/'+actionPlan.composition_id)data=actionPlan;
   else if(target==='business-ontology/v1/investigations')data={items:[],jobs:[]};
   else if(target.endsWith('/jobs')&&req.method()==='POST'){submitted=req.postDataJSON().payload;data={job_id:'job_coverage',kind:'plan',state:'queued',created_at:'2026-11-04T10:00:00Z',updated_at:'2026-11-04T10:00:00Z',workflow_id:null,run_id:null,error:null};}
   else if(target.endsWith('/jobs/job_coverage'))data={job_id:'job_coverage',kind:'plan',state:'running',created_at:'2026-11-04T10:00:00Z',updated_at:'2026-11-04T10:00:00Z',workflow_id:null,run_id:null,error:null};
@@ -35,8 +38,8 @@ for(const mobile of [false,true])test(`scenario context, preflight and classifie
  await expect(page.getByText('warranty: needs input',{exact:true})).toBeVisible();
  expect(checked).toMatchObject({evidence_context:{dataset_id:'dataset_fixture',case_id:'case_fixture'},inputs:{assessment_date:'2026-11-04'}});
  await page.screenshot({path:`../.local/coverage-context-${mobile?'mobile':'desktop'}.png`,fullPage:true});
- await page.getByRole('button',{name:'Generate workflow',exact:true}).click();await expect(page).toHaveURL(/job=job_coverage/);
- expect(submitted).toMatchObject({evidence_context:{dataset_id:'dataset_fixture',case_id:'case_fixture'},inputs:{assessment_date:'2026-11-04'}});
+ await page.getByRole('button',{name:'Generate workflow',exact:true}).click();await expect(page).toHaveURL(/connected=1.*composition=/);
+ expect(submitted).toMatchObject({business_request:{evidence_context:{dataset_id:'dataset_fixture',case_id:'case_fixture'},inputs:{assessment_date:'2026-11-04'}}});
  await page.goto('/app/workflows/investigate?workflow=investigation_fixture&run=run_fixture');
  await expect(page.getByRole('heading',{name:'Pre-run evidence coverage'})).toBeVisible();
  await page.getByRole('button',{name:'View report',exact:true}).click();

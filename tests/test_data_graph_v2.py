@@ -161,15 +161,16 @@ def test_http_v2_uses_current_authority_and_safe_envelopes(manager):
     from types import SimpleNamespace
     from unittest.mock import patch
     from workflow_api.data_source_routes import install
-    class Service:
-        store=manager.store
+    from workflow_api.service import WorkflowService
+    from registry import RegistryService, WorkspacePolicy
+    class Service(WorkflowService):
         def envelope(self,ref,status,data):
             from workflow_api.service import WorkflowService
             return WorkflowService.envelope(ref,status,data)
         def failure(self,ref,exc):return {'error':{'error_code':exc.code}}
     app=FastAPI()
     with patch('workflow_api.data_source_routes.DataSources',return_value=SimpleNamespace(relationships=manager,store=manager.store,env={},semantic=manager.ontology.semantic)):
-        install(app,Service(),auth(),{},lambda:'test')
+        install(app,Service(manager.store,registry=RegistryService(WorkspacePolicy(auth()['subject']['workspace_id']))),auth(),{},lambda:'test')
     built(manager);client=TestClient(app)
     response=client.get('/data-relationships/v2');assert response.status_code==200 and response.headers['cache-control']=='no-store'
     assert response.json()['data']['version']==2

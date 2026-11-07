@@ -18,8 +18,8 @@ for(const mobile of [false,true])test(`real lifecycle API, Simpson and retail on
   if(retail)await panel.getByLabel('resolution',{exact:true}).selectOption('replacement_proposal');else await panel.getByLabel('resolution path',{exact:true}).selectOption('replacement');
   await panel.getByLabel('monitoring required',{exact:true}).selectOption('true');
   if(!retail)await panel.getByLabel('capa required',{exact:true}).selectOption('true');
-  await panel.getByRole('button',{name:'Create case',exact:true}).click();await expect(panel.getByRole('button',{name:'Prepare',exact:true})).toBeEnabled();
-  const id=await panel.getByLabel('Lifecycle case ID').inputValue();await panel.getByRole('button',{name:'Prepare',exact:true}).click();await expect(panel.getByRole('button',{name:'Drive / continue',exact:true})).toBeEnabled();
+  const [created]=await Promise.all([page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/cases')),panel.getByRole('button',{name:'Create case',exact:true}).click()]);expect(created.ok(),await created.text()).toBe(true);await expect(panel.getByRole('button',{name:'Prepare',exact:true})).toBeEnabled();
+  const id=await panel.getByLabel('Lifecycle case ID').inputValue();await Promise.all([page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/prepare')),panel.getByRole('button',{name:'Prepare',exact:true}).click()]);await expect(panel.getByRole('button',{name:'Drive / continue',exact:true})).toBeEnabled();
   let snapshot:BusinessCase|undefined;
   for(let attempt=0;attempt<10;attempt++){
    await panel.getByRole('button',{name:'Drive / continue',exact:true}).click();await expect(panel.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled({timeout:90000});

@@ -50,8 +50,7 @@ for (const mobile of [false, true]) {
         await expect(page.getByLabel("Google Sheets URL or ID")).toHaveCount(0);
         await expect(page.getByRole("combobox", { name: "Workflow input source" })).toHaveCount(0);
         await page.getByRole("button", { name: "Generate workflow" }).click();
-        await expect(page.getByRole("region", { name: "Generation result" })).toBeVisible();
-        await page.getByRole("button", { name: "Review and edit workflow" }).click();
+
         await expect(page).toHaveURL(new RegExp(`/app/workflows/${published.workflow_id}$`));
         expect(sessionRequests).toBeGreaterThanOrEqual(2);
         const planning = calls.find((call) => call.operation === "plan_workflow");

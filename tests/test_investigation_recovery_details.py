@@ -18,7 +18,7 @@ def test_tool_discovery_works_while_another_connection_owns_writer_lock(composit
  f=composition;d=prepare(f);w=approve(f,f.c.workflow(f.x.a,d['composition_id']));rt=RuntimeService(f.general);rt.store.busy_timeout_ms=25
  created=rt.create_run(dict(request_id='read_lock',idempotency_key='read_lock_001',payload=dict(workflow_id=w['workflow_id'],workflow_version=1,inputs={})),f.x.a)
  with rt.store.transaction() as db:
-  current=rt.load(db,created['run_id'],f.x.a);current.update(status='running',worker='worker_test');rt.save(db,current)
+  current=rt.load(db,created['run_id'],f.x.a);current.update(status='running',worker='worker_test',lease_until=rt.clock()+30);rt.save(db,current)
  node=next(n for n in w['nodes'] if n['node_id']=='master_orchestrator');master=next(a for a in w['agents'] if a['agent_id']==node['agent_id'])
  session=DelegationSession(GraphRunner(rt,agents=DiagnosticAgents(),connectors=f.connectors),created['run_id'],f.x.a,'worker_test',w,node,master,{})
  child=next(a for a in session.children.values() if a['allowed_tool_ids'])

@@ -1,0 +1,16 @@
+{
+  "registered_required_tools": [
+    "extension_calendar_create",
+    "extension_mail_send",
+    "extension_sheets_create_report",
+    "supplier_read_page",
+    "supplier_web_search"
+  ],
+  "registered_tool_count": 26,
+  "existing_run_status": "failed",
+  "existing_spreadsheet_preserved": true,
+  "failed_step_classification": "invalid_model_output",
+  "execution_requests_submitted": 0,
+  "paid_calls": 0,
+  "provider_writes": 0
+}

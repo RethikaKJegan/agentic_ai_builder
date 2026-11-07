@@ -85,7 +85,6 @@ export function AdaptiveCasePanel({
       )}
       <button
         className={actionButton}
-        disabled={command.busy}
         onClick={() => setRefresh((n) => n + 1)}
       >
         Refresh adaptive state

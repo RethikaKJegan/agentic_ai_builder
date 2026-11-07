@@ -8,7 +8,6 @@ import {
   MarkerType,
   ReactFlow,
   ReactFlowProvider,
-  addEdge,
   applyEdgeChanges,
   applyNodeChanges,
   useReactFlow,
@@ -70,6 +69,7 @@ import { EditorWorkflowActions } from "@/features/workflows/EditorWorkflowAction
 import { useWorkflowTrace } from "./useWorkflowTrace";
 import { AgentCommunication } from "./AgentCommunication";
 import { HierarchyView } from "./HierarchyView";
+import { GraphTools } from "./GraphTools";
 import { ProcurementProjectCommunication } from "./ProcurementProjectCommunication";
 import { ExecutionView } from "./ExecutionView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -149,14 +149,16 @@ function Builder({ workflow }: { workflow: Workflow }) {
   const undo = useCallback(() => {
     const prev = past[past.length - 1];
     if (!prev) return;
-    setFuture((f) => [{ nodes: clean(nodesRef.current), edges: edgesRef.current }, ...f]);
+    const snapshot = { nodes: clean(nodesRef.current), edges: [...edgesRef.current] };
+    setFuture((f) => [snapshot, ...f]);
     setPast((p) => p.slice(0, -1));
     commit(prev, { history: false });
   }, [past, commit]);
   const redo = useCallback(() => {
     const next = future[0];
     if (!next) return;
-    setPast((p) => [...p, { nodes: clean(nodesRef.current), edges: edgesRef.current }]);
+    const snapshot = { nodes: clean(nodesRef.current), edges: [...edgesRef.current] };
+    setPast((p) => [...p, snapshot]);
     setFuture((f) => f.slice(1));
     commit(next, { history: false });
   }, [future, commit]);
@@ -233,18 +235,20 @@ function Builder({ workflow }: { workflow: Workflow }) {
   );
 
   const onConnect = useCallback(
-    (c: Connection) => {
+    (c: Connection, requestedOutcome?: string) => {
       if (c.source === c.target) return;
       const src = nodesRef.current.find((n) => n.id === c.source);
       const declared = src?.data.kind === "condition" ? (src.data["condition"] as { outcomes?: string[] } | undefined)?.outcomes ?? ["critical", "standard"]
         : src?.data.kind === "approval" ? ["approved", "rejected"] : undefined;
-      const label = declared?.find((outcome) => !edgesRef.current.some((edge) => edge.source === c.source && edge.label === outcome));
+      const label = requestedOutcome ?? declared?.find((outcome) => !edgesRef.current.some((edge) => edge.source === c.source && edge.label === outcome));
+      if (declared && label && !declared.includes(label)) return;
       if (declared && !label) { toast("Every declared outcome already has a connection."); return; }
       if (edgesRef.current.some((edge) => edge.source === c.source && edge.target === c.target && edge.label === label)) return;
-      const next = addEdge(
-        { ...c, id: uid("edge"), label } as Edge,
-        edgesRef.current as Edge[],
-      ) as unknown as WorkflowEdge[];
+      // Distinct condition outcomes may intentionally share a destination.
+      // ReactFlow's addEdge collapses that pair regardless of outcome label.
+      const next: WorkflowEdge[] = [...edgesRef.current, {
+        id: uid("edge"), source: c.source, target: c.target, label,
+      }];
       commit({
         nodes: nodesRef.current,
         edges: next.map((e) => ({
@@ -577,6 +581,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
 
 
       </>}
+      {mode === "design" && <GraphTools nodes={clean(nodes)} edges={edges} onSelect={id=>{setSelectedId(id);setPanel("inspector");}} onConnect={(source,target,label)=>onConnect({source,target,sourceHandle:null,targetHandle:null},label)} onRemove={id=>{if(window.confirm("Remove this connection from the working draft?"))commit({nodes:nodesRef.current,edges:edgesRef.current.filter(edge=>edge.id!==id)});}}/>}
       {mode === "execution" ? <div className="min-h-0 flex-1 overflow-hidden"><ExecutionView key={executionIntent||"history"} preferRun={!!executionIntent} trace={trace} workflow={current} onDesign={() => setMode("design")} /></div> : mode === "hierarchy" ? <div className="flex min-h-0 flex-1 flex-col"><HierarchyView workflow={{...current,nodes:clean(nodes),edges}} agents={agents} onEdit={id=>{setMode("design");setUnderlying(true);setSelectedId(id);setPanel("inspector");}} /></div> : current.canonical?.metadata["procurement_plan"]&&!underlying ? <ProcurementProjectCommunication workflowId={current.id} version={current.serverVersion??1} view="design"/> : (
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Canvas */}

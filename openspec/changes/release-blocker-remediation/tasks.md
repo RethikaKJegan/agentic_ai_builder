@@ -1,0 +1,7 @@
+- [ ] Map each recorded browser failure to current UI behavior and retained assertions.
+- [ ] Implement confirmed product and test-contract fixes; preserve Questions and permissions.
+- [ ] Investigate shared-default bootstrap read-only and strengthen isolation.
+- [ ] Resolve worker-drain and adaptive orchestration timing with regressions.
+- [ ] Execute reproducible complete isolated backend/PostgreSQL and all browser scenarios.
+- [ ] Verify units/types/lint/build/contracts/source/domain checks.
+- [ ] Record exact results and remaining release blockers.

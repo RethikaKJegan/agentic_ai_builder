@@ -20,8 +20,10 @@ class WorkerSupervisor:
             db.execute('CREATE TABLE IF NOT EXISTS builder_worker_component_health (worker_id TEXT, name TEXT, document TEXT NOT NULL, PRIMARY KEY(worker_id,name))')
 
     def acquire(self):
-        now=self.clock()
         with self.store.transaction() as db:
+            # Lock acquisition can wait longer than a lease. Start the renewal
+            # window only after entering the serialized transaction.
+            now=self.clock()
             row=db.execute('SELECT owner,expires FROM builder_worker_leases WHERE name=?',(self.key,)).fetchone()
             allowed=row is None or row[0]==self.owner or row[1]<=now
             if allowed:
@@ -71,7 +73,7 @@ class WorkerSupervisor:
         if self.role=='api' or (self.thread and self.thread.is_alive()):return
         self.stop_event.clear();self.tick()
         def loop():
-            while not self.stop_event.wait(max(1,self.ttl/3)):
+            while not self.stop_event.wait(max(.01,self.ttl/3)):
                 try:self.tick()
                 except Exception:
                     logging.getLogger(__name__).warning('Worker coordination unavailable; new work is stopping.')
@@ -96,21 +98,26 @@ class WorkerSupervisor:
 
     def stop(self):
         self.stop_event.set()
-        if self.thread:self.thread.join(timeout=5)
-        if self.parallel_started:
-            self._stop_workers(self.parallel_workers)
-            self.parallel_started=False
+        def drain():
+            if self.thread:self.thread.join(timeout=5)
+            if self.parallel_started:
+                self._stop_workers(self.parallel_workers)
+                self.parallel_started=False
+            if self.owned:self._stop_workers()
+        # Joining the supervisor or a parallel consumer can itself outlast the
+        # group lease. Retain ownership throughout that entire drain interval.
         if self.owned:
-            # Retain group ownership during a graceful drain so a standby cannot
-            # enter the coordinator while this process finishes existing work.
             self.renew_owned()
-            with LeaseHeartbeat(self.renew_owned,interval=max(.1,self.ttl/3)):
-                self._stop_workers()
+            with LeaseHeartbeat(self.renew_owned,interval=max(.01,self.ttl/3)):
+                drain()
+        else:
+            drain()
         self.release()
 
     def renew_owned(self):
         with self.store.transaction() as db:
-            cursor=db.execute('UPDATE builder_worker_leases SET expires=? WHERE name=? AND owner=?',(self.clock()+self.ttl,self.key,self.owner))
+            now=self.clock()
+            cursor=db.execute('UPDATE builder_worker_leases SET expires=? WHERE name=? AND owner=? AND expires>?',(now+self.ttl,self.key,self.owner,now))
             if cursor.rowcount:
                 db.execute("UPDATE builder_worker_health SET state='stopping',heartbeat=? WHERE worker_id=?",(self.clock(),self.owner))
             return cursor.rowcount==1

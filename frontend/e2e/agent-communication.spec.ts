@@ -189,7 +189,7 @@ for (const mobile of [false, true]) {
     await page.goto(`/app/workflows/${workflow.workflow_id}`);
     await page.getByRole("tab", { name: "Execution", exact: true }).click();
     await expect(page.getByLabel("Select workflow run")).toHaveValue("run_hierarchy_v2");
-    await page.getByRole("button", { name: "Agent communication", exact: true }).click();
+    await page.getByRole("region", { name: "Recorded execution", exact: true }).getByRole("button", { name: "Agent communication", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Agent communication", exact: true });
     await expect(dialog.getByRole("button", { name: "Step-by-step" })).toHaveCount(0);
     await expect(dialog.getByLabel("Agent communication diagram")).toBeVisible();
@@ -201,8 +201,9 @@ for (const mobile of [false, true]) {
     await expect(inspector.getByText(/Evidence collected/).first()).toBeVisible();
     await inspector.getByText("Technical details", { exact: true }).click();
     await expect(inspector.getByText("research_agent", { exact: true })).toBeVisible();
-    const firstUuid = await inspector.locator("details dl dd").first().innerText();
-    expect(firstUuid).toMatch(/^[0-9a-f-]{36}$/);
+    const nodeUuid = inspector.getByText("Node UUID", { exact: true }).locator("xpath=following-sibling::dd[1]");
+    await expect(nodeUuid).toHaveText(/^[0-9a-f-]{36}$/);
+    const firstUuid = await nodeUuid.innerText();
     await inspector.getByRole("button", { name: "Close details" }).click();
     await dialog.getByRole("button", { name: "Information shared", exact: true }).first().click();
     await expect(inspector.getByText("Information shared", { exact: true }).last()).toBeVisible();
@@ -212,7 +213,7 @@ for (const mobile of [false, true]) {
     await expect(dialog.getByText("Analysis specialist", { exact: true })).toHaveCount(0);
     await dialog.locator('.react-flow__node[data-id="run_hierarchy_v1:research"]').click();
     await inspector.getByText("Technical details", { exact: true }).click();
-    await expect(inspector.locator("details dl dd").first()).toHaveText(firstUuid);
+    await expect(nodeUuid).toHaveText(firstUuid);
     await inspector.getByRole("button", { name: "Close details" }).click();
     await dialog.getByLabel("View", { exact: true }).selectOption("configured");
     await expect(dialog.getByText("Analysis specialist", { exact: true })).toBeVisible();

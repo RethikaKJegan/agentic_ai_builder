@@ -1,0 +1,9 @@
+{
+  "service": "agentic-builder-simpsons.service",
+  "authenticated_session": 200,
+  "schema_unchanged": true,
+  "configuration_changed": false,
+  "workflow_replays": 0,
+  "paid_model_calls": 0,
+  "provider_actions": 0
+}

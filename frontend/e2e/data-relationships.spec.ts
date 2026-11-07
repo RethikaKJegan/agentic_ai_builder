@@ -30,11 +30,13 @@ for(const mobile of [false,true]) {
       }
       await route.fulfill({status:200,json:{request_id:"req_graph_browser",status:200,data}});
     });
-    await page.goto("/app/data-intelligence");await page.getByRole("tab",{name:"Relationships",exact:true}).click();
+    await page.goto("/app/data-intelligence");await page.getByRole("tab",{name:"Semantic Intelligence",exact:true}).click();
+    await page.getByText("Review source links and mappings",{exact:true}).click();
+    await page.getByRole("button",{name:"Source relationships",exact:true}).click();
     await expect(page.getByText("Graph revision 1",{exact:false})).toBeVisible();
     const map=page.getByRole("img",{name:"Dataset relationship map"});
     const fitted=await map.getAttribute("viewBox");
-    await expect(page.getByRole("button",{name:"Inspect northwind.orders.customerID"})).toBeVisible();
+    await expect(page.getByRole("button",{name:"Inspect Postgres.orders.customerID"})).toBeVisible();
     await page.getByRole("button",{name:"Zoom in",exact:true}).click();
     await expect(map).not.toHaveAttribute("viewBox",fitted!);
     const zoomed=await map.getAttribute("viewBox");
@@ -46,12 +48,14 @@ for(const mobile of [false,true]) {
     await page.getByRole("button",{name:"Fit all"}).click();await expect(map).toHaveAttribute("viewBox",fitted!);
     const viewport=page.getByTestId("relationship-map-viewport");
     expect(await viewport.evaluate(el=>el.scrollHeight===el.clientHeight && el.scrollWidth===el.clientWidth)).toBe(true);
-    await page.getByRole("button",{name:"Inspect northwind.orders.customerID"}).click();
+    await page.getByRole("button",{name:"Inspect Postgres.orders.customerID"}).click();
     await expect(page.getByRole("heading",{name:"customerID",exact:true})).toBeVisible();
     await map.screenshot({path:`test-results/detailed-map-${mobile?"mobile":"desktop"}.png`});
     await page.getByRole("button",{name:"Accept",exact:true}).click();
     await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeDisabled();
-    await page.reload();await page.getByRole("tab",{name:"Relationships",exact:true}).click();
+    await page.reload();await page.getByRole("tab",{name:"Semantic Intelligence",exact:true}).click();
+    await page.getByText("Review source links and mappings",{exact:true}).click();
+    await page.getByRole("button",{name:"Source relationships",exact:true}).click();
     await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeDisabled();
     await page.getByLabel("Explore dataset").selectOption("orders");
     await page.getByLabel("Business description").fill("Customer sales orders");

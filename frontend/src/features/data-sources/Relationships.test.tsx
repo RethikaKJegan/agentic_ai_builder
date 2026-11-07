@@ -28,3 +28,15 @@ it("keeps semantic and source edits disabled for viewers",async()=>{
  expect(screen.queryByRole("button",{name:"Generate semantic relationships"})).not.toBeInTheDocument();
  expect(screen.getByRole("button",{name:"Regenerate Semantic Intelligence"})).toBeDisabled();
 });
+
+it("mounts source review only on explicit navigation and retains viewer denial",async()=>{
+ const read=vi.spyOn(api,"relationships").mockResolvedValue({graph:null,stale:true,build_status:"ready",last_error:null});
+ render(<Relationships canManage={false}/>);
+ await screen.findByRole("img",{name:"Semantic Intelligence"});
+ expect(read).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByText("Review source links and mappings"));
+ fireEvent.click(screen.getByRole("button",{name:"Source relationships"}));
+ await screen.findByRole("button",{name:"Build relationships"});
+ expect(screen.getByRole("button",{name:"Build relationships"})).toBeDisabled();
+ expect(read).toHaveBeenCalledWith();
+});

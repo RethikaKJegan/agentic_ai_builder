@@ -14,6 +14,7 @@ export default defineConfig({
       env: { BUILDER_EXTENSION_UI_ORIGINS: "http://127.0.0.1:3313" } },
     { command: "npm run start -- --hostname 127.0.0.1 --port 3313", cwd: ui,
       url: "http://127.0.0.1:3313", reuseExistingServer: false, timeout: 60000,
-      env: { BUILDER_API_URL: "http://127.0.0.1:8013" } },
+      env: { BUILDER_ENVIRONMENT: "test", BUILDER_API_URL: "http://127.0.0.1:8013",
+        BUILDER_UI_ORIGINS: "http://127.0.0.1:3313" } },
   ],
 });

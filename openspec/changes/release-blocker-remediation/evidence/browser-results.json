@@ -1,0 +1,1299 @@
+{
+  "recorded_utc": "2026-11-07T09:12:46.294728+00:00",
+  "rounds": {
+    "r2": [
+      {
+        "group": "general0",
+        "cases": 9,
+        "passed": 9,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general0-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "business-reference.spec.ts",
+            "name": "reference module preservation desktop"
+          },
+          {
+            "file": "business-reference.spec.ts",
+            "name": "reference module preservation mobile"
+          },
+          {
+            "file": "delegated-tools.spec.ts",
+            "name": "delegated Sheets read and checked findings are inspectable on desktop"
+          },
+          {
+            "file": "delegated-tools.spec.ts",
+            "name": "delegated Sheets read and checked findings are inspectable on mobile"
+          },
+          {
+            "file": "dynamic-delegation.spec.ts",
+            "name": "runtime-spawned agents show task and result evidence on desktop"
+          },
+          {
+            "file": "dynamic-delegation.spec.ts",
+            "name": "runtime-spawned agents show task and result evidence on mobile"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "complete isolated release journey and controlled failure desktop"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "complete isolated release journey and controlled failure mobile"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "settings and integration failures recover without a fabricated verification"
+          }
+        ]
+      },
+      {
+        "group": "general1",
+        "cases": 31,
+        "passed": 31,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general1-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "agent-communication.spec.ts",
+            "name": "master and sub-agent UUID diagram inspects handoffs and historical revisions on desktop"
+          },
+          {
+            "file": "agent-communication.spec.ts",
+            "name": "master and sub-agent UUID diagram inspects handoffs and historical revisions on mobile"
+          },
+          {
+            "file": "business-rule-execution.spec.ts",
+            "name": "three executable business rules desktop"
+          },
+          {
+            "file": "business-rule-execution.spec.ts",
+            "name": "three executable business rules mobile"
+          },
+          {
+            "file": "data-insights.spec.ts",
+            "name": "metadata EDA desktop overview and connection selection"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs refresh on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs cancel on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs expiry on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs refresh on mobile"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs cancel on mobile"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs expiry on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery pg on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery mongo on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "disabled operation policy on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "uncertain operation is not replayed on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery pg on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery mongo on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "disabled operation policy on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "uncertain operation is not replayed on mobile"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "detailed graph containment, business review and reload on desktop"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "stale graph blocks review on desktop"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "detailed graph containment, business review and reload on mobile"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "stale graph blocks review on mobile"
+          },
+          {
+            "file": "investigation-actions.spec.ts",
+            "name": "investigation rename/delete persist on desktop"
+          },
+          {
+            "file": "investigation-actions.spec.ts",
+            "name": "investigation rename/delete persist on mobile"
+          },
+          {
+            "file": "knowledge-preview.spec.ts",
+            "name": "one prompt submits automatic KG planning desktop"
+          },
+          {
+            "file": "knowledge-preview.spec.ts",
+            "name": "one prompt submits automatic KG planning mobile"
+          },
+          {
+            "file": "project-agent-communication.spec.ts",
+            "name": "whole project uses the clickable agent diagram on desktop"
+          },
+          {
+            "file": "project-agent-communication.spec.ts",
+            "name": "whole project uses the clickable agent diagram on mobile"
+          },
+          {
+            "file": "sheet-access.spec.ts",
+            "name": "prompt-selected spreadsheet access is reviewable on desktop"
+          },
+          {
+            "file": "sheet-access.spec.ts",
+            "name": "prompt-selected spreadsheet access is reviewable on mobile"
+          }
+        ]
+      },
+      {
+        "group": "general2",
+        "cases": 30,
+        "passed": 30,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general2-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "api-integration.spec.ts",
+            "name": "generated canonical branches and gates survive explicit save and reload"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "trusted publication requires explicit approval and activation; new drafts clear grants"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "pending approval and risky Registry assignments cannot approve or publish"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "invalid graph validation fails authoritatively without creating a run"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "landing and workspace navigation preserve routes without demo controls"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "local draft canvas editing, undo and reload persistence work"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "all workspace routes load without demo role controls"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "mobile navigation and local draft editor remain usable"
+          },
+          {
+            "file": "business-graph.spec.ts",
+            "name": "bounded engine graph desktop"
+          },
+          {
+            "file": "business-graph.spec.ts",
+            "name": "bounded engine graph mobile"
+          },
+          {
+            "file": "business-rules.spec.ts",
+            "name": "rules and definition competency desktop"
+          },
+          {
+            "file": "business-rules.spec.ts",
+            "name": "rules and definition competency mobile"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification postgresql on desktop"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification federated on desktop"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification postgresql on mobile"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification federated on mobile"
+          },
+          {
+            "file": "data-relationships.spec.ts",
+            "name": "relationship review, reload and descriptions on desktop"
+          },
+          {
+            "file": "data-relationships.spec.ts",
+            "name": "relationship review, reload and descriptions on mobile"
+          },
+          {
+            "file": "evidence-coverage.spec.ts",
+            "name": "scenario context, preflight and classified report on desktop"
+          },
+          {
+            "file": "evidence-coverage.spec.ts",
+            "name": "scenario context, preflight and classified report on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview postgresql on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview mongodb on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview both on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview postgresql on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview mongodb on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview both on mobile"
+          },
+          {
+            "file": "workflow-pages.spec.ts",
+            "name": "workflow pages expose totals and navigate on desktop"
+          },
+          {
+            "file": "workflow-pages.spec.ts",
+            "name": "workflow pages expose totals and navigate on mobile"
+          },
+          {
+            "file": "workflow-traces.spec.ts",
+            "name": "node traces and run selection work on desktop"
+          },
+          {
+            "file": "workflow-traces.spec.ts",
+            "name": "node traces and run selection work on mobile"
+          }
+        ]
+      },
+      {
+        "group": "general3",
+        "cases": 26,
+        "passed": 26,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general3-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "business-compilation.spec.ts",
+            "name": "version compilation and export desktop"
+          },
+          {
+            "file": "business-compilation.spec.ts",
+            "name": "version compilation and export mobile"
+          },
+          {
+            "file": "business-generation.spec.ts",
+            "name": "business extraction draft desktop"
+          },
+          {
+            "file": "business-generation.spec.ts",
+            "name": "business extraction draft mobile"
+          },
+          {
+            "file": "business-ontology.spec.ts",
+            "name": "business ontology reviews, evidence and refresh settings on desktop"
+          },
+          {
+            "file": "business-ontology.spec.ts",
+            "name": "business ontology reviews, evidence and refresh settings on mobile"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution matched desktop"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution no match desktop"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution matched mobile"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution no match mobile"
+          },
+          {
+            "file": "business-warranty-knowledge.spec.ts",
+            "name": "warranty knowledge and stable revision selection desktop"
+          },
+          {
+            "file": "business-warranty-knowledge.spec.ts",
+            "name": "warranty knowledge and stable revision selection mobile"
+          },
+          {
+            "file": "current-editor-release.spec.ts",
+            "name": "current editor activation and persisted run desktop"
+          },
+          {
+            "file": "current-editor-release.spec.ts",
+            "name": "current editor activation and persisted run mobile"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow plan review and execution desktop"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow stale approval blocked desktop"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow plan review and execution mobile"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow stale approval blocked mobile"
+          },
+          {
+            "file": "multitask-delegation.spec.ts",
+            "name": "three runtime tasks retain all UUIDs and return links on desktop"
+          },
+          {
+            "file": "multitask-delegation.spec.ts",
+            "name": "three runtime tasks retain all UUIDs and return links on mobile"
+          },
+          {
+            "file": "semantic-kg.spec.ts",
+            "name": "essential Semantic Intelligence desktop"
+          },
+          {
+            "file": "semantic-kg.spec.ts",
+            "name": "essential Semantic Intelligence mobile"
+          },
+          {
+            "file": "simpson-business-ontology.spec.ts",
+            "name": "separate Simpson foundation desktop"
+          },
+          {
+            "file": "simpson-business-ontology.spec.ts",
+            "name": "separate Simpson foundation mobile"
+          },
+          {
+            "file": "slack-gmail.spec.ts",
+            "name": "Slack DM approval approved uses the exact run and exposes both pending messages"
+          },
+          {
+            "file": "slack-gmail.spec.ts",
+            "name": "Slack DM approval rejected uses the exact run and exposes both pending messages"
+          }
+        ]
+      },
+      {
+        "group": "phases",
+        "cases": 28,
+        "passed": 28,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-phases-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "phase1.spec.ts",
+            "name": "real local proxy session and durable planning on desktop"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "real local proxy session and durable planning on mobile"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "planning progress and cancellation preserve the prompt on desktop"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "planning progress and cancellation preserve the prompt on mobile"
+          },
+          {
+            "file": "phase3.spec.ts",
+            "name": "explicit lifecycle, typed run and confirmed settings desktop"
+          },
+          {
+            "file": "phase3.spec.ts",
+            "name": "explicit lifecycle, typed run and confirmed settings mobile"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "exact historical revision and preserved design desktop"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "structured generation review desktop"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "exact historical revision and preserved design mobile"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "structured generation review mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "non-overlapping conflict rebase preserves edits desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "unknown save outcome is checked without replay desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "two tabs keep independent drafts and refuse overlapping rebase desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "non-overlapping conflict rebase preserves edits mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "unknown save outcome is checked without replay mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "two tabs keep independent drafts and refuse overlapping rebase mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "uncertain first save recovery desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "uncertain first save recovery mobile"
+          },
+          {
+            "file": "phase6.spec.ts",
+            "name": "runtime history reconnect and exact approval desktop"
+          },
+          {
+            "file": "phase6.spec.ts",
+            "name": "runtime history reconnect and exact approval mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only setup on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only manual on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only event on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only setup on mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only manual on mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only event on mobile"
+          },
+          {
+            "file": "session-recovery.spec.ts",
+            "name": "open workflows recover a stale session on desktop"
+          },
+          {
+            "file": "session-recovery.spec.ts",
+            "name": "open workflows recover a stale session on mobile"
+          }
+        ]
+      },
+      {
+        "group": "login",
+        "cases": 3,
+        "passed": 3,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-login-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "workspace login preserves shared identity on desktop"
+          },
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "workspace login preserves shared identity on mobile"
+          },
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "Launch Workspace opens the login page"
+          }
+        ]
+      },
+      {
+        "group": "lifecycle",
+        "cases": 14,
+        "passed": 14,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-lifecycle-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "business-lifecycle.spec.ts",
+            "name": "real lifecycle API, Simpson and retail on desktop"
+          },
+          {
+            "file": "business-lifecycle.spec.ts",
+            "name": "real lifecycle API, Simpson and retail on mobile"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "saved workflow, dependencies, approval, report and drawers on desktop"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "saved workflow, dependencies, approval, report and drawers on mobile"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "required inputs block execution and expose request editing"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "recovery submits one explicit job and never creates another run"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "failed generation stays failed without an automatic model retry"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "external action approval remains a separate explicit decision"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "pinned graph and reconciliation survive refresh on desktop"
+          },
+          {
+            "file": "dynamic-investigation.spec.ts",
+            "name": "pinned graph and reconciliation survive refresh on mobile"
+          },
+          {
+            "file": "investigation-workflow.spec.ts",
+            "name": "prompt, branching canvas, execution and evidence on desktop"
+          },
+          {
+            "file": "investigation-workflow.spec.ts",
+            "name": "prompt, branching canvas, execution and evidence on mobile"
+          },
+          {
+            "file": "investigation-workflow.spec.ts",
+            "name": "missing identifier accepts typed input and resumes the saved run"
+          },
+          {
+            "file": "investigation-workflow.spec.ts",
+            "name": "failed generation shows its real error and never renders a fake graph"
+          }
+        ]
+      },
+      {
+        "group": "orchestration",
+        "cases": 8,
+        "passed": 8,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-orchestration-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "A: real API, approved report/email, persisted reply continuation desktop"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "A: real API, approved report/email, persisted reply continuation mobile"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "C: actual missing-recipient wait, typed supply and completion"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "D: evaluator adds retrieval, revises plan and preserves the completed read"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "B: prompt planning, reviewed recurring consent and two fresh occurrences"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "E: refresh and worker reconstruction retain uncertain sends without replay"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "Main prompt: account and goal produce a verified report/email without technical inputs"
+          },
+          {
+            "file": "connected-orchestration.spec.ts",
+            "name": "E: revoked selected account blocks planning and never substitutes another account"
+          }
+        ]
+      },
+      {
+        "group": "extension",
+        "cases": 2,
+        "passed": 2,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-extension-r2-browser.xml",
+        "case_names": [
+          {
+            "file": "connectors.spec.ts",
+            "name": "extension discovery and approved connector execution on desktop"
+          },
+          {
+            "file": "connectors.spec.ts",
+            "name": "extension discovery and approved connector execution on mobile"
+          }
+        ]
+      }
+    ],
+    "r3": [
+      {
+        "group": "general0",
+        "cases": 9,
+        "passed": 9,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general0-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "business-reference.spec.ts",
+            "name": "reference module preservation desktop"
+          },
+          {
+            "file": "business-reference.spec.ts",
+            "name": "reference module preservation mobile"
+          },
+          {
+            "file": "delegated-tools.spec.ts",
+            "name": "delegated Sheets read and checked findings are inspectable on desktop"
+          },
+          {
+            "file": "delegated-tools.spec.ts",
+            "name": "delegated Sheets read and checked findings are inspectable on mobile"
+          },
+          {
+            "file": "dynamic-delegation.spec.ts",
+            "name": "runtime-spawned agents show task and result evidence on desktop"
+          },
+          {
+            "file": "dynamic-delegation.spec.ts",
+            "name": "runtime-spawned agents show task and result evidence on mobile"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "complete isolated release journey and controlled failure desktop"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "complete isolated release journey and controlled failure mobile"
+          },
+          {
+            "file": "phase7.spec.ts",
+            "name": "settings and integration failures recover without a fabricated verification"
+          }
+        ]
+      },
+      {
+        "group": "general1",
+        "cases": 31,
+        "passed": 31,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general1-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "agent-communication.spec.ts",
+            "name": "master and sub-agent UUID diagram inspects handoffs and historical revisions on desktop"
+          },
+          {
+            "file": "agent-communication.spec.ts",
+            "name": "master and sub-agent UUID diagram inspects handoffs and historical revisions on mobile"
+          },
+          {
+            "file": "business-rule-execution.spec.ts",
+            "name": "three executable business rules desktop"
+          },
+          {
+            "file": "business-rule-execution.spec.ts",
+            "name": "three executable business rules mobile"
+          },
+          {
+            "file": "data-insights.spec.ts",
+            "name": "metadata EDA desktop overview and connection selection"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs refresh on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs cancel on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs expiry on desktop"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs refresh on mobile"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs cancel on mobile"
+          },
+          {
+            "file": "data-query-jobs.spec.ts",
+            "name": "query jobs expiry on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery pg on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery mongo on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "disabled operation policy on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "uncertain operation is not replayed on desktop"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery pg on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "reviewed CRUD and guarded recovery mongo on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "disabled operation policy on mobile"
+          },
+          {
+            "file": "database-operations.spec.ts",
+            "name": "uncertain operation is not replayed on mobile"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "detailed graph containment, business review and reload on desktop"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "stale graph blocks review on desktop"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "detailed graph containment, business review and reload on mobile"
+          },
+          {
+            "file": "detailed-graph.spec.ts",
+            "name": "stale graph blocks review on mobile"
+          },
+          {
+            "file": "investigation-actions.spec.ts",
+            "name": "investigation rename/delete persist on desktop"
+          },
+          {
+            "file": "investigation-actions.spec.ts",
+            "name": "investigation rename/delete persist on mobile"
+          },
+          {
+            "file": "knowledge-preview.spec.ts",
+            "name": "one prompt submits automatic KG planning desktop"
+          },
+          {
+            "file": "knowledge-preview.spec.ts",
+            "name": "one prompt submits automatic KG planning mobile"
+          },
+          {
+            "file": "project-agent-communication.spec.ts",
+            "name": "whole project uses the clickable agent diagram on desktop"
+          },
+          {
+            "file": "project-agent-communication.spec.ts",
+            "name": "whole project uses the clickable agent diagram on mobile"
+          },
+          {
+            "file": "sheet-access.spec.ts",
+            "name": "prompt-selected spreadsheet access is reviewable on desktop"
+          },
+          {
+            "file": "sheet-access.spec.ts",
+            "name": "prompt-selected spreadsheet access is reviewable on mobile"
+          }
+        ]
+      },
+      {
+        "group": "general2",
+        "cases": 30,
+        "passed": 30,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general2-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "api-integration.spec.ts",
+            "name": "generated canonical branches and gates survive explicit save and reload"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "trusted publication requires explicit approval and activation; new drafts clear grants"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "pending approval and risky Registry assignments cannot approve or publish"
+          },
+          {
+            "file": "api-integration.spec.ts",
+            "name": "invalid graph validation fails authoritatively without creating a run"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "landing and workspace navigation preserve routes without demo controls"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "local draft canvas editing, undo and reload persistence work"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "all workspace routes load without demo role controls"
+          },
+          {
+            "file": "baseline.spec.ts",
+            "name": "mobile navigation and local draft editor remain usable"
+          },
+          {
+            "file": "business-graph.spec.ts",
+            "name": "bounded engine graph desktop"
+          },
+          {
+            "file": "business-graph.spec.ts",
+            "name": "bounded engine graph mobile"
+          },
+          {
+            "file": "business-rules.spec.ts",
+            "name": "rules and definition competency desktop"
+          },
+          {
+            "file": "business-rules.spec.ts",
+            "name": "rules and definition competency mobile"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification postgresql on desktop"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification federated on desktop"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification postgresql on mobile"
+          },
+          {
+            "file": "data-queries.spec.ts",
+            "name": "data question review, result and clarification federated on mobile"
+          },
+          {
+            "file": "data-relationships.spec.ts",
+            "name": "relationship review, reload and descriptions on desktop"
+          },
+          {
+            "file": "data-relationships.spec.ts",
+            "name": "relationship review, reload and descriptions on mobile"
+          },
+          {
+            "file": "evidence-coverage.spec.ts",
+            "name": "scenario context, preflight and classified report on desktop"
+          },
+          {
+            "file": "evidence-coverage.spec.ts",
+            "name": "scenario context, preflight and classified report on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview postgresql on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview mongodb on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview both on desktop"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview postgresql on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview mongodb on mobile"
+          },
+          {
+            "file": "source-selection.spec.ts",
+            "name": "selected source preview both on mobile"
+          },
+          {
+            "file": "workflow-pages.spec.ts",
+            "name": "workflow pages expose totals and navigate on desktop"
+          },
+          {
+            "file": "workflow-pages.spec.ts",
+            "name": "workflow pages expose totals and navigate on mobile"
+          },
+          {
+            "file": "workflow-traces.spec.ts",
+            "name": "node traces and run selection work on desktop"
+          },
+          {
+            "file": "workflow-traces.spec.ts",
+            "name": "node traces and run selection work on mobile"
+          }
+        ]
+      },
+      {
+        "group": "general3",
+        "cases": 26,
+        "passed": 26,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-general3-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "business-compilation.spec.ts",
+            "name": "version compilation and export desktop"
+          },
+          {
+            "file": "business-compilation.spec.ts",
+            "name": "version compilation and export mobile"
+          },
+          {
+            "file": "business-generation.spec.ts",
+            "name": "business extraction draft desktop"
+          },
+          {
+            "file": "business-generation.spec.ts",
+            "name": "business extraction draft mobile"
+          },
+          {
+            "file": "business-ontology.spec.ts",
+            "name": "business ontology reviews, evidence and refresh settings on desktop"
+          },
+          {
+            "file": "business-ontology.spec.ts",
+            "name": "business ontology reviews, evidence and refresh settings on mobile"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution matched desktop"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution no match desktop"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution matched mobile"
+          },
+          {
+            "file": "business-planning.spec.ts",
+            "name": "automatic ontology contribution no match mobile"
+          },
+          {
+            "file": "business-warranty-knowledge.spec.ts",
+            "name": "warranty knowledge and stable revision selection desktop"
+          },
+          {
+            "file": "business-warranty-knowledge.spec.ts",
+            "name": "warranty knowledge and stable revision selection mobile"
+          },
+          {
+            "file": "current-editor-release.spec.ts",
+            "name": "current editor activation and persisted run desktop"
+          },
+          {
+            "file": "current-editor-release.spec.ts",
+            "name": "current editor activation and persisted run mobile"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow plan review and execution desktop"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow stale approval blocked desktop"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow plan review and execution mobile"
+          },
+          {
+            "file": "database-workflow.spec.ts",
+            "name": "database workflow stale approval blocked mobile"
+          },
+          {
+            "file": "multitask-delegation.spec.ts",
+            "name": "three runtime tasks retain all UUIDs and return links on desktop"
+          },
+          {
+            "file": "multitask-delegation.spec.ts",
+            "name": "three runtime tasks retain all UUIDs and return links on mobile"
+          },
+          {
+            "file": "semantic-kg.spec.ts",
+            "name": "essential Semantic Intelligence desktop"
+          },
+          {
+            "file": "semantic-kg.spec.ts",
+            "name": "essential Semantic Intelligence mobile"
+          },
+          {
+            "file": "simpson-business-ontology.spec.ts",
+            "name": "separate Simpson foundation desktop"
+          },
+          {
+            "file": "simpson-business-ontology.spec.ts",
+            "name": "separate Simpson foundation mobile"
+          },
+          {
+            "file": "slack-gmail.spec.ts",
+            "name": "Slack DM approval approved uses the exact run and exposes both pending messages"
+          },
+          {
+            "file": "slack-gmail.spec.ts",
+            "name": "Slack DM approval rejected uses the exact run and exposes both pending messages"
+          }
+        ]
+      },
+      {
+        "group": "phases",
+        "cases": 28,
+        "passed": 28,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-phases-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "phase1.spec.ts",
+            "name": "real local proxy session and durable planning on desktop"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "real local proxy session and durable planning on mobile"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "planning progress and cancellation preserve the prompt on desktop"
+          },
+          {
+            "file": "phase1.spec.ts",
+            "name": "planning progress and cancellation preserve the prompt on mobile"
+          },
+          {
+            "file": "phase3.spec.ts",
+            "name": "explicit lifecycle, typed run and confirmed settings desktop"
+          },
+          {
+            "file": "phase3.spec.ts",
+            "name": "explicit lifecycle, typed run and confirmed settings mobile"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "exact historical revision and preserved design desktop"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "structured generation review desktop"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "exact historical revision and preserved design mobile"
+          },
+          {
+            "file": "phase4.spec.ts",
+            "name": "structured generation review mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "non-overlapping conflict rebase preserves edits desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "unknown save outcome is checked without replay desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "two tabs keep independent drafts and refuse overlapping rebase desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "non-overlapping conflict rebase preserves edits mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "unknown save outcome is checked without replay mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "two tabs keep independent drafts and refuse overlapping rebase mobile"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "uncertain first save recovery desktop"
+          },
+          {
+            "file": "phase5.spec.ts",
+            "name": "uncertain first save recovery mobile"
+          },
+          {
+            "file": "phase6.spec.ts",
+            "name": "runtime history reconnect and exact approval desktop"
+          },
+          {
+            "file": "phase6.spec.ts",
+            "name": "runtime history reconnect and exact approval mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only setup on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only manual on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only event on desktop"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only setup on mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only manual on mobile"
+          },
+          {
+            "file": "prompt-only.spec.ts",
+            "name": "prompt-only event on mobile"
+          },
+          {
+            "file": "session-recovery.spec.ts",
+            "name": "open workflows recover a stale session on desktop"
+          },
+          {
+            "file": "session-recovery.spec.ts",
+            "name": "open workflows recover a stale session on mobile"
+          }
+        ]
+      },
+      {
+        "group": "login",
+        "cases": 3,
+        "passed": 3,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "source": ".local/release-blocker-remediation/private-login-r3-browser.xml",
+        "case_names": [
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "workspace login preserves shared identity on desktop"
+          },
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "workspace login preserves shared identity on mobile"
+          },
+          {
+            "file": "workspace-login.spec.ts",
+            "name": "Launch Workspace opens the login page"
+          }
+        ]
+      },
+      {
+        "group": "lifecycle",
+        "status": "pending"
+      },
+      {
+        "group": "orchestration",
+        "status": "pending"
+      },
+      {
+        "group": "extension",
+        "status": "pending"
+      }
+    ]
+  },
+  "infrastructure_note": "r2 lifecycle initial startup refused occupied loopback port before any scenario; retained diagnostic log, verified orphan fixture stopped, all14 actual scenarios then passed. r3 remaining groups rerun after environment/access transition ended coordinators at09:04; no failure inferred from interrupted tests."
+}

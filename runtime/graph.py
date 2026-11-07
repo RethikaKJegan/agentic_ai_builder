@@ -53,11 +53,15 @@ class GraphRunner:
             if graph and pin:agent['_account_knowledge']=graph.context(auth,pin,node.get('label',''))
             if item:
                 agent['_validation_feedback'] = item
+            from .action_plans import action_for
+            action=action_for(workflow,node['node_id'])
+            if action and action['capability_id']=='content.prepare':
+                agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
             output = adapter.invoke(agent, params, reference)
             if list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
-            from .action_plans import validate_content_tables
-            validate_content_tables(workflow,node,output)
+            from .action_plans import validate_content
+            validate_content(workflow,node,output,params)
             return output
         def prepare(item):
             if getattr(adapter, 'external_write', False):
@@ -413,7 +417,13 @@ class GraphRunner:
                             if self.agents is None:
                                 raise RuntimeFailure('MODEL_NOT_CONFIGURED', 'A bounded model adapter must be configured.', 503)
                             invocation = (self.agents, agent, self.params(node, run, workflow))
-                            reservation = self.agents.reservation(agent)
+                            reservation_agent=agent
+                            from .action_plans import action_for
+                            action=action_for(workflow,node['node_id'])
+                            if action and action['capability_id']=='content.prepare':
+                                reservation_agent=deepcopy(agent)
+                                reservation_agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
+                            reservation = self.agents.reservation(reservation_agent)
                             reservation['llm_calls'] = max(1, reservation.get('llm_calls', 0))
                         else:
                             connector, grant, agent, params, reservation = self.prepare_tool(run, workflow, grants, node, auth)

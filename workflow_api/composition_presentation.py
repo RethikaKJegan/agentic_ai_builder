@@ -7,12 +7,15 @@ from .google_connections import now
 
 
 def tool_receipt(output):
-    receipt={k:deepcopy(output[k]) for k in ('draft_id','event_id','spreadsheet_id','status') if k in output}
+    receipt={k:deepcopy(output[k]) for k in ('draft_id','message_id','thread_id','event_id','spreadsheet_id','spreadsheet_url','status','request_id','version_id','row_count','has_more') if k in output}
     for field in ('messages','events','rows'):
         if isinstance(output.get(field),list):
             receipt['returned_'+field]=len(output[field])
             if field!='rows':receipt[field+'_identifiers']=[{k:item[k] for k in ('id','message_id','thread_id','event_id') if k in item} for item in output[field][:10] if isinstance(item,dict)]
-    return receipt
+    if isinstance(output.get('records'),list):
+        receipt['returned_records']=len(output['records'])
+        receipt['collections']=sorted({r['collection'] for r in output['records'] if isinstance(r,dict) and isinstance(r.get('collection'),str)})
+    return receipt or {'returned_fields':sorted(output)}
 
 
 def result_view(result):
@@ -63,6 +66,9 @@ class CompositionPresentation:
             workflow=self.store.get(db,scope[0],wid)
             run=None
             runtime=getattr(getattr(self.service,'runtime_runner',None),'runtime',None)
+            if run_id is None and runtime is not None:
+                latest=db.execute('SELECT run_id FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? ORDER BY rowid DESC LIMIT 1',(*scope,wid)).fetchone()
+                if latest:run_id=latest[0]
             if run_id:
                 if runtime is None:fail('The runtime is unavailable.','SERVICE_UNAVAILABLE',503)
                 run=runtime.load(db,run_id,auth)
@@ -75,7 +81,7 @@ class CompositionPresentation:
         # validation with its current classification without rewriting the run.
         from runtime.recovery import classify
         for failure in failures:
-            if failure.get('error_code') in ('INVESTIGATION_AGENT_REFERENCE','INVESTIGATION_AGENT_OUTPUT'):
+            if failure.get('error_code') in ('INVESTIGATION_AGENT_REFERENCE','INVESTIGATION_AGENT_OUTPUT','ACTION_CONTENT_UNVERIFIED'):
                 failure.update(classify(failure['error_code'],task=failure.get('affected_task'),source=failure.get('source_or_tool')))
 
         spawned={e['details']['agent_id']:e['details']['node_id'] for e in events if e['event_type']=='agent.spawned' and e['details'].get('agent_id')}
@@ -98,7 +104,15 @@ class CompositionPresentation:
                 if receipt is not None and task['capability_id']=='content.prepare':
                     output=dict(summary=receipt.get('summary') or receipt.get('body') or '',findings=[],missing_information=deepcopy(receipt.get('questions',[])),records=[],rule_results=[],tool_receipts=[])
                 elif receipt is not None and contract['kind']=='model':output=result_view(receipt)
-                elif receipt is not None:output=dict(summary='Provider returned an action receipt.',findings=[],missing_information=[],records=[],rule_results=[],tool_receipts=[dict(tool_id=task.get('selected_tool_id'),receipt={k:receipt[k] for k in ('draft_id','event_id','spreadsheet_id','status') if k in receipt})])
+                elif receipt is not None:
+                    tool_id=doc['selected_tools'].get(task['task_id'],{}).get('tool_id') or action_node.get('tool_id')
+                    mapped=receipt.get('records')
+                    if isinstance(mapped,list) and all(isinstance(r,dict) and 'record_id' in r and isinstance(r.get('values'),dict) for r in mapped):
+                        output=result_view(dict(source_evidence=[receipt]))
+                        output['summary']='Database read completed: '+str(len(mapped))+' record(s) retrieved.' if mapped else 'Database read completed. No matching records.'
+                    else:
+                        output=dict(summary='Tool execution completed; recorded result details follow.',findings=[],missing_information=[],records=[],rule_results=[])
+                    output['tool_receipts']=[dict(tool_id=tool_id,receipt=tool_receipt(receipt))]
             tasks.append(dict(id=task['task_id'],label=contract['business_purpose'],kind='action' if contract['side_effect'] in ('write','draft') else 'retrieval' if contract['kind']=='tool' else 'agent',state=state,depends_on=task['depends_on'],capability_id=task['capability_id'],agent_id=config['configuration_id'] if config else None,tools=[doc['selected_tools'][task['task_id']]['tool_id']] if task['task_id'] in doc['selected_tools'] else [],condition=task['condition'],result=output,errors=[f for f in failures if f.get('affected_task')==task['task_id']],required_evidence=config.get('required_evidence_facts',[]) if config else contract['required_evidence'],completion_criteria=contract['completion_criteria'],approval_gate=dict(id=gate['node_id'],label=gate['label'],state=(run or {}).get('node_states',{}).get(gate['node_id'],'pending')) if gate else None))
         knowledge={}
         if doc.get('preparation_id'):
@@ -119,7 +133,7 @@ class CompositionPresentation:
             public_run['recovery_history']=[{k:deepcopy(h[k]) for k in ('attempt','timestamp','category','strategy','affected_tasks','verified_success','source_revalidations') if k in h} for h in run.get('recovery_history',[])]
             public_run['outcome']=deepcopy(run.get('outcome_evaluation'))
             public_run['approvals']=runtime.get_run(run_id,auth)['approvals']
-            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(run.get('action_instances',{}).get(n['node_id'],{}).get('resolved_inputs',n.get('configuration',{}).get('input',{}))),receipt={k:deepcopy(run.get('outputs',{}).get(n['node_id'],{}).get(k)) for k in ('draft_id','event_id','spreadsheet_id','status') if k in run.get('outputs',{}).get(n['node_id'],{})}) for n in workflow['nodes'] if n['kind']=='tool']
+            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(run.get('action_instances',{}).get(n['node_id'],{}).get('resolved_inputs',n.get('configuration',{}).get('input',{}))),receipt=tool_receipt(run['outputs'][n['node_id']]) if n['node_id'] in run.get('outputs',{}) else {}) for n in workflow['nodes'] if n['kind']=='tool']
         request_context=dict(google_connection_id=doc.get('google_connection_id'),resources=deepcopy(doc['resources']))
         if doc.get('preparation_id'):
             request_context['business_request']=dict(inputs=deepcopy(prepared['inputs']))

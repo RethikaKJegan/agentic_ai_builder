@@ -1,10 +1,11 @@
 """Standalone loopback transport using existing services, without importing main.app.
 
-Importing workflow_api.main constructs its default database. This separate factory
-avoids that side effect while retaining the canonical envelopes and operation handlers.
+This factory retains the canonical envelopes and operation handlers without
+requesting the default ASGI application or selecting its store.
 """
 import hmac
 import os
+import re
 from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -48,7 +49,7 @@ def create_transport(service, auth, planning_available=False):
         response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)
         return response
 
-    def register(path, method, operation, lifecycle=False):
+    def register(path, method, operation, lifecycle=False, handler=None):
         async def endpoint(request: Request):
             try:
                 additions = dict(request.path_params)
@@ -65,12 +66,19 @@ def create_transport(service, auth, planning_available=False):
                         if key in body['payload'] and body['payload'][key] != value:
                             return error('REFERENCE_MISMATCH', 'Route and payload references must match.', 400)
                         body['payload'][key] = value
-                if lifecycle:
+                if handler is not None:
+                    result = await run_in_threadpool(handler, service, body, auth)
+                elif lifecycle:
                     context = dict(additions, after_sequence=int(request.query_params.get('after_sequence', '0')))
                     result = await run_in_threadpool(service.handle_lifecycle, operation, body, auth, **context)
                 else:
                     result = await run_in_threadpool(service.handle, body, auth)
                 return JSONResponse(result, status_code=result['status'])
+            except ApiFailure as failure:
+                reference = body.get('request_id')
+                if not isinstance(reference, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', reference):
+                    reference = 'req_' + uuid4().hex
+                return JSONResponse(service.failure(reference, failure), status_code=failure.status)
             except (TypeError, ValueError):
                 return error('INVALID_REQUEST', 'Use valid JSON and exact revision references.', 400)
             except Exception:
@@ -89,6 +97,18 @@ def create_transport(service, auth, planning_available=False):
         ('/runs/{run_id}/events', 'GET', 'list_run_events'), ('/approvals', 'GET', 'list_approvals'),
         ('/approvals/{approval_id}/decision', 'POST', 'decide_approval')]:
         register(path, method, operation)
+    from workflow_api.review_actions import submit
+    register('/workflows/{workflow_id}/submit-for-approval', 'POST',
+             'submit_workflow_for_approval', handler=submit)
+
+    @app.get('/workflows/{workflow_id}/release-state')
+    async def release_state(workflow_id: str):
+        if auth.get('decision') != 'allow' or 'workflow.view' not in auth['permissions']:
+            return error('OPERATION_NOT_AUTHORIZED', 'Workflow read permission is required.', 403)
+        from workflow_api.release_read import read_release_state
+        data = await run_in_threadpool(read_release_state, service.store,
+                                       auth['subject']['workspace_id'], workflow_id)
+        return JSONResponse(service.envelope('req_' + uuid4().hex, 200, data))
     for path, method, operation in [('/workflow-overview', 'GET', 'list_workflow_overview'),
         ('/workflow-overview/events', 'GET', 'subscribe_workflow_overview'),
         ('/workflows/{workflow_id}/releases', 'POST', 'activate_release'),

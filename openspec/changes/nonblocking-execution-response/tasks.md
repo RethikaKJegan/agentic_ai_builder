@@ -1,0 +1,9 @@
+- [x] Inspect saved execution read-only and confirm completed run without replay.
+- [x] Reproduce combined-mode inline advancement and lost-run projection defects.
+- [x] Defer configured combined-mode HTTP execution to its existing worker.
+- [x] Discover latest run only within exact workspace/subject/workflow scope.
+- [x] Verify both added regressions fail before and pass after the fixes.
+- [x] Verify isolated startup needs no schema changes/network or live-store access.
+- [x] Activate only idle Simpsons service and verify completed-run rediscovery read-only.
+- [x] Complete all four affected modules: 71 passed, zero failed/skipped.
+- [x] Validate contracts, inventory drift, whitespace and scoped OpenSpec.

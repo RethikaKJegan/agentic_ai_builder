@@ -17,11 +17,12 @@ for(const mobile of [false,true])test(`one prompt submits automatic KG planning 
  });
  await page.goto("/app");
  await expect(page.getByRole("button",{name:"Preview sources and tools",exact:true})).toHaveCount(0);
- await expect(page.getByRole("combobox")).toHaveCount(0);
+ await expect(page.getByRole("combobox")).toHaveCount(1);
+ await expect(page.getByLabel("Workflow Google account")).toBeVisible();
  await page.getByRole("textbox",{name:"Process description",exact:true}).fill("Review our Northwind inventory");
  await page.getByRole("button",{name:"Generate workflow",exact:true}).click();
  await expect(page.getByRole("alert").filter({hasText:"The test model is unavailable"})).toBeVisible();
- expect(plans).toBe(1);expect(previews).toBe(0);expect(accounts).toBe(0);
+ expect(plans).toBe(1);expect(previews).toBe(0);expect(accounts).toBeGreaterThan(0);
  await expect(page.getByRole("region",{name:"Knowledge graph source preview"})).toHaveCount(0);
  await expect(page.getByRole("textbox",{name:"Process description"})).toHaveValue("Review our Northwind inventory");
  expect(errors).toEqual([]);await page.screenshot({path:`test-results/automatic-kg-${mobile?"mobile":"desktop"}.png`,fullPage:true});

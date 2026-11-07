@@ -420,3 +420,24 @@ it('keeps polling after a transient read failure without executing a command',as
   expect(api.request).not.toHaveBeenCalled();
  }finally{vi.useRealTimers();}
 });
+
+
+it("allows a scoped adaptive read while a command is pending without replaying it", async () => {
+  let finish!: () => void;
+  vi.spyOn(api,"businessCaseCommand").mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve({} as never);}));
+  const onSnapshot=vi.fn();
+  const current=saved();current["adaptive"]={...adaptiveSchema.parse(current["adaptive"]),status:"running",pending_wait:null};
+  vi.mocked(api.businessCase).mockResolvedValue(current);
+  render(<AdaptiveCasePanel value={current} onSnapshot={onSnapshot}/>);
+  const advance=await screen.findByRole("button",{name:"Continue bounded evaluation"});
+  await waitFor(()=>expect(advance).toBeEnabled());
+  fireEvent.click(advance);
+  await waitFor(()=>expect(api.businessCaseCommand).toHaveBeenCalledTimes(1));
+  const reads=vi.mocked(api.businessCase).mock.calls.length;
+  const refresh=screen.getByRole("button",{name:"Refresh adaptive state"});
+  expect(refresh).toBeEnabled();fireEvent.click(refresh);
+  await waitFor(()=>expect(vi.mocked(api.businessCase).mock.calls.length).toBeGreaterThan(reads));
+  expect(advance).toBeDisabled();
+  expect(api.businessCaseCommand).toHaveBeenCalledTimes(1);
+  await act(async()=>finish());
+});

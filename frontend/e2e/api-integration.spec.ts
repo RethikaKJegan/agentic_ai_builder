@@ -16,6 +16,8 @@ test("generated canonical branches and gates survive explicit save and reload",a
  const saved=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
  expect(saved.conditions.length).toBeGreaterThan(0);expect(saved.approval_gates.length).toBeGreaterThan(0);
  await page.getByLabel("Workflow name",{exact:true}).fill("Connected invoice review");
+ await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
  const actions=page.getByRole("region",{name:"Workflow actions"});
  await expect(actions.getByRole("button",{name:"Validate",exact:true})).toBeDisabled();
  await actions.getByRole("button",{name:"Save draft",exact:true}).click();
@@ -29,6 +31,8 @@ test("generated canonical branches and gates survive explicit save and reload",a
 
 test("trusted publication requires explicit approval and activation; new drafts clear grants",async({page})=>{
  await page.goto("/app/workflows/registry_ready");
+ await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
  const actions=page.getByRole("region",{name:"Workflow actions"});
  await expect(page.getByLabel("Workflow name",{exact:true})).toBeVisible();
  const initial=(await(await page.request.get("/api/backend/workflows/registry_ready")).json()).data;expect(initial.registry_review.ready).toBe(true);
@@ -59,9 +63,13 @@ test("trusted publication requires explicit approval and activation; new drafts 
 test("pending approval and risky Registry assignments cannot approve or publish",async({page})=>{
  for(const [id,reason] of [["registry_pending","APPROVAL_REQUIRED"],["registry_risky","RISK_NOT_AUTHORIZED"]]){
   await page.goto(`/app/workflows/${id}`);
-  await expect(page.getByRole("region",{name:"Workflow actions"}).getByText(new RegExp(reason!))).toBeVisible();
-  const actions=page.getByRole("region",{name:"Workflow actions"});
+
+  await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
+ const actions=page.getByRole("region",{name:"Workflow actions"});
   await actions.getByRole("button",{name:"Validate",exact:true}).click();
+  const review=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.registry_review;
+  expect(JSON.stringify(review)).toContain(reason!);
   await expect(actions.getByRole("button",{name:"Publish",exact:true})).toBeDisabled();
   const response=await mutation(page,"approve_workflow",`workflows/${id}/approve`,{workflow_id:id,workflow_version:1,action:"approve"});
   expect(response.status()).toBeGreaterThanOrEqual(400);
@@ -72,6 +80,8 @@ test("pending approval and risky Registry assignments cannot approve or publish"
 
 test("invalid graph validation fails authoritatively without creating a run",async({page})=>{
  const id=await localDraft(page,"Persisted plain workflow");
+ await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
  await page.getByRole("button",{name:"Save draft",exact:true}).click();
  await expect(page.getByText(/Save draft confirmed · v1/)).toBeVisible();
  const existing=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;

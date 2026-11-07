@@ -10,6 +10,8 @@ sys.path.insert(0,str(ROOT))
 
 if __name__=='__main__':
     import os
+    bootstrap = TemporaryDirectory(prefix='builder-lifecycle-bootstrap-')
+    os.environ['BUILDER_DATABASE_URL'] = str(Path(bootstrap.name) / 'unused-default.sqlite3')
     os.environ['CREWAI_TESTING']='true'
     os.environ['CREWAI_TRACING_ENABLED']='false'
     os.environ['CREWAI_DISABLE_TELEMETRY']='true'

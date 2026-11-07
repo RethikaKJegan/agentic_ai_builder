@@ -1,0 +1,11 @@
+{
+  "store": "f",
+  "terminated_processes": 2,
+  "signal_exit_code": -9,
+  "accepted_effects": 2,
+  "replayed_dispatches": 0,
+  "outcome": "blocked",
+  "lease_advance_seconds": 31,
+  "reconstruction_and_block_wall_seconds": 0.06845877785235643,
+  "qualification": "One host; controlled providers; fake lease advance; not a production RTO."
+}

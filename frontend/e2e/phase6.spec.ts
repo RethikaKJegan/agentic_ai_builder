@@ -38,8 +38,8 @@ for(const mobile of [false,true]){
     await expect(page.getByRole("list",{name:"Run events"})).toContainText("approval.rejected");
     await page.reload();await page.getByLabel("Filter workflow").fill(id);await page.getByLabel("Filter status").selectOption("rejected");
     await expect(page.getByRole("button",{name:new RegExp(executed.run.run_id)})).toBeVisible();
-    await page.goto("/app/governance");await expect(page.getByRole("tab",{name:"Enforced governance & usage"})).toBeVisible();
-    await page.getByRole("tab",{name:"Draft policies"}).click();await expect(page.getByText(/Browser-only policy drafts/)).toBeVisible();
+    await page.goto("/app/governance");await expect(page.getByRole("tab",{name:"Organization Policies"})).toBeVisible();
+    await page.getByRole("tab",{name:"Usage & Limits"}).click();await expect(page.getByRole("tab",{name:"Usage & Limits"})).toHaveAttribute("aria-selected","true");await expect(page.getByRole("button",{name:"Save policy"})).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 }

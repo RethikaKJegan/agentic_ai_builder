@@ -648,6 +648,12 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     return app
 
 
-# Dedicated clients must use their configured factory; an import must never
-# construct a second app with the shared default Registry or start a shared store.
-app = create_app() if not os.getenv('BUILDER_CLIENT_ID') else None
+def __getattr__(name):
+    # Importing a factory must not initialize a database. Preserve the explicit
+    # ASGI ``workflow_api.main:app`` entry point by constructing it only when
+    # that attribute is requested, not when a configured factory imports us.
+    if name != 'app':
+        raise AttributeError(name)
+    value = create_app() if not os.getenv('BUILDER_CLIENT_ID') else None
+    globals()['app'] = value
+    return value

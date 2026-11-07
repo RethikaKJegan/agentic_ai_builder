@@ -1,0 +1,4 @@
+- [x] Reproduce generated optional/completion contradictions with controlled proposals.
+- [x] Normalize only unconditional generated action flags and improve conditional correction feedback.
+- [x] Verify explicit plans, conditional guards, missing inputs and approvals remain enforced.
+- [x] Run affected tests and record activation scope and limitations.

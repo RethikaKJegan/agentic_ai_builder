@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {render,screen,fireEvent} from '@testing-library/react';
 import {compositionViewSchema,taskEdges} from '@/api/compositions';
-import {CompositionInspector,CompositionReport} from './CompositionPanels';
+import {CompositionInspector,CompositionReport,ToolReceipt} from './CompositionPanels';
 import {parseOperationInputs,compositionActionInputs,emptyCompositionOptions,restoreCompositionOptions} from './CompositionOptions';
 import {dynamicView} from '../../../e2e/fixtures/dynamic-investigation';
 
@@ -61,4 +61,31 @@ it('explains citation validation separately from agent identity and service fail
  expect(compositionFailureMessage('INVESTIGATION_AGENT_REFERENCE')).toBe('Execution stopped because the agent summary contained an unsupported or missing source citation.');
  expect(compositionFailureMessage('AGENT_REGISTRATION_REQUIRED')).toContain('agent registration required');
  expect(compositionFailureMessage('INVOCATION_FAILED')).toContain('internal service failure');
+});
+
+
+it('shows a database read and actual record count instead of an empty receipt',()=>{
+ render(<ToolReceipt value={{tool_id:'business_retrieve_evidence',receipt:{returned_records:3,collections:['tickets','jointinspectionreports']}}}/>);
+ expect(screen.getByText('Database read')).toBeVisible();
+ expect(screen.getByText('3 record(s) retrieved.')).toBeVisible();
+ expect(screen.getByText(/Source collections: tickets, jointinspectionreports/)).toBeVisible();
+});
+it('reports genuine zero matches without inventing records',()=>{
+ render(<ToolReceipt value={{tool_id:'business_retrieve_evidence',receipt:{returned_records:0,collections:[]}}}/>);
+ expect(screen.getByText('No matching records.')).toBeVisible();
+ expect(screen.queryByText('3 record(s) retrieved.')).toBeNull();
+});
+it('uses the recorded task tool for legacy receipts without inventing receipt details',()=>{
+ render(<ToolReceipt value={{tool_id:null,receipt:{}}} fallbackTool="business_retrieve_evidence"/>);
+ expect(screen.getByText('Database read')).toBeVisible();
+ expect(screen.getByText('No receipt details were recorded for this tool.')).toBeVisible();
+ expect(screen.queryByText('Tool response receipt')).toBeNull();
+});
+
+it('shows pending tool state instead of rendering an empty provider receipt',()=>{
+ const view=compositionViewSchema.parse(dynamicView('completed'));
+ view.run!.actions=[{node_id:'pending_tool',label:'Pending database query',state:'pending',inputs:{},receipt:{}}];
+ render(<CompositionReport view={view}/>);
+ expect(screen.getByText('Tool has not returned a result yet.')).toBeVisible();
+ expect(screen.queryByText('Provider receipt')).toBeNull();
 });

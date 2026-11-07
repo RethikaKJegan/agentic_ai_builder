@@ -1,0 +1,11 @@
+{
+  "public_desktop_inspector": "passed",
+  "tool_label": "Database read",
+  "record_count_labels": [
+    "Database read completed: 2 record(s) retrieved.",
+    "2 record(s) retrieved."
+  ],
+  "unwanted_mutations_blocked": [],
+  "workflow_reexecuted": false,
+  "live_provider_actions": 0
+}

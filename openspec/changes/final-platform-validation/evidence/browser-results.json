@@ -1,0 +1,385 @@
+{
+  "scope": "Guarded isolated server startup; desktop/mobile and matching fixture groups; test assertions retained. Subsequent adaptive recheck is recorded separately.",
+  "groups": [
+    {
+      "group": "general0",
+      "cases": 9,
+      "passed": 6,
+      "unsuccessful": 3,
+      "skipped": 0
+    },
+    {
+      "group": "general1",
+      "cases": 31,
+      "passed": 25,
+      "unsuccessful": 6,
+      "skipped": 0
+    },
+    {
+      "group": "general2",
+      "cases": 30,
+      "passed": 20,
+      "unsuccessful": 10,
+      "skipped": 0
+    },
+    {
+      "group": "general3",
+      "cases": 26,
+      "passed": 18,
+      "unsuccessful": 8,
+      "skipped": 0
+    },
+    {
+      "group": "phases",
+      "cases": 28,
+      "passed": 10,
+      "unsuccessful": 18,
+      "skipped": 0
+    },
+    {
+      "group": "login",
+      "cases": 3,
+      "passed": 3,
+      "unsuccessful": 0,
+      "skipped": 0
+    },
+    {
+      "group": "lifecycle",
+      "cases": 14,
+      "passed": 12,
+      "unsuccessful": 2,
+      "skipped": 0
+    },
+    {
+      "group": "orchestration",
+      "cases": 8,
+      "passed": 7,
+      "unsuccessful": 1,
+      "skipped": 0
+    },
+    {
+      "group": "extension",
+      "cases": 2,
+      "passed": 0,
+      "unsuccessful": 2,
+      "skipped": 0
+    }
+  ],
+  "failures": [
+    {
+      "group": "general0",
+      "file": "phase7.spec.ts",
+      "name": "complete isolated release journey and controlled failure desktop",
+      "failure": "Test timeout of 120000ms exceeded."
+    },
+    {
+      "group": "general0",
+      "file": "phase7.spec.ts",
+      "name": "complete isolated release journey and controlled failure mobile",
+      "failure": "Test timeout of 120000ms exceeded."
+    },
+    {
+      "group": "general0",
+      "file": "phase7.spec.ts",
+      "name": "settings and integration failures recover without a fabricated verification",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general1",
+      "file": "detailed-graph.spec.ts",
+      "name": "detailed graph containment, business review and reload on desktop",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general1",
+      "file": "detailed-graph.spec.ts",
+      "name": "stale graph blocks review on desktop",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general1",
+      "file": "detailed-graph.spec.ts",
+      "name": "detailed graph containment, business review and reload on mobile",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general1",
+      "file": "detailed-graph.spec.ts",
+      "name": "stale graph blocks review on mobile",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general1",
+      "file": "knowledge-preview.spec.ts",
+      "name": "one prompt submits automatic KG planning desktop",
+      "failure": "expect(locator).toHaveCount(expected) failed"
+    },
+    {
+      "group": "general1",
+      "file": "knowledge-preview.spec.ts",
+      "name": "one prompt submits automatic KG planning mobile",
+      "failure": "expect(received).toBe(expected) // Object.is equality"
+    },
+    {
+      "group": "general2",
+      "file": "api-integration.spec.ts",
+      "name": "generated canonical branches and gates survive explicit save and reload",
+      "failure": "expect(locator).toBeDisabled() failed"
+    },
+    {
+      "group": "general2",
+      "file": "api-integration.spec.ts",
+      "name": "trusted publication requires explicit approval and activation; new drafts clear grants",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general2",
+      "file": "api-integration.spec.ts",
+      "name": "pending approval and risky Registry assignments cannot approve or publish",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "general2",
+      "file": "api-integration.spec.ts",
+      "name": "invalid graph validation fails authoritatively without creating a run",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general2",
+      "file": "baseline.spec.ts",
+      "name": "local draft canvas editing, undo and reload persistence work",
+      "failure": "expect(locator).toBeDisabled() failed"
+    },
+    {
+      "group": "general2",
+      "file": "baseline.spec.ts",
+      "name": "all workspace routes load without demo role controls",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "general2",
+      "file": "data-relationships.spec.ts",
+      "name": "relationship review, reload and descriptions on desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "general2",
+      "file": "data-relationships.spec.ts",
+      "name": "relationship review, reload and descriptions on mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "general2",
+      "file": "evidence-coverage.spec.ts",
+      "name": "scenario context, preflight and classified report on desktop",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "general2",
+      "file": "evidence-coverage.spec.ts",
+      "name": "scenario context, preflight and classified report on mobile",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "general3",
+      "file": "business-ontology.spec.ts",
+      "name": "business ontology reviews, evidence and refresh settings on desktop",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general3",
+      "file": "business-ontology.spec.ts",
+      "name": "business ontology reviews, evidence and refresh settings on mobile",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general3",
+      "file": "business-planning.spec.ts",
+      "name": "automatic ontology contribution matched desktop",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "general3",
+      "file": "business-planning.spec.ts",
+      "name": "automatic ontology contribution matched mobile",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "general3",
+      "file": "semantic-kg.spec.ts",
+      "name": "essential Knowledge graph desktop",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general3",
+      "file": "semantic-kg.spec.ts",
+      "name": "essential Knowledge graph mobile",
+      "failure": "Test timeout of 60000ms exceeded."
+    },
+    {
+      "group": "general3",
+      "file": "simpson-business-ontology.spec.ts",
+      "name": "separate Simpson foundation desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "general3",
+      "file": "simpson-business-ontology.spec.ts",
+      "name": "separate Simpson foundation mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase1.spec.ts",
+      "name": "planning progress and cancellation preserve the prompt on desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase1.spec.ts",
+      "name": "planning progress and cancellation preserve the prompt on mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase3.spec.ts",
+      "name": "explicit lifecycle, typed run and confirmed settings desktop",
+      "failure": "expect(locator).toBeEnabled() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase3.spec.ts",
+      "name": "explicit lifecycle, typed run and confirmed settings mobile",
+      "failure": "expect(locator).toBeEnabled() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase4.spec.ts",
+      "name": "exact historical revision and preserved design desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase4.spec.ts",
+      "name": "structured generation review desktop",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase4.spec.ts",
+      "name": "exact historical revision and preserved design mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase4.spec.ts",
+      "name": "structured generation review mobile",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "non-overlapping conflict rebase preserves edits desktop",
+      "failure": "expect(locator).toContainText(expected) failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "unknown save outcome is checked without replay desktop",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "non-overlapping conflict rebase preserves edits mobile",
+      "failure": "expect(locator).toContainText(expected) failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "unknown save outcome is checked without replay mobile",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "uncertain first save recovery desktop",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase5.spec.ts",
+      "name": "uncertain first save recovery mobile",
+      "failure": "Test timeout of 30000ms exceeded."
+    },
+    {
+      "group": "phases",
+      "file": "phase6.spec.ts",
+      "name": "runtime history reconnect and exact approval desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "phase6.spec.ts",
+      "name": "runtime history reconnect and exact approval mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "prompt-only.spec.ts",
+      "name": "prompt-only setup on desktop",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "phases",
+      "file": "prompt-only.spec.ts",
+      "name": "prompt-only setup on mobile",
+      "failure": "expect(locator).toBeVisible() failed"
+    },
+    {
+      "group": "lifecycle",
+      "file": "investigation-workflow.spec.ts",
+      "name": "prompt, branching canvas, execution and evidence on desktop",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "lifecycle",
+      "file": "investigation-workflow.spec.ts",
+      "name": "prompt, branching canvas, execution and evidence on mobile",
+      "failure": "expect(page).toHaveURL(expected) failed"
+    },
+    {
+      "group": "orchestration",
+      "file": "connected-orchestration.spec.ts",
+      "name": "D: evaluator adds retrieval, revises plan and preserves the completed read",
+      "failure": "expect(locator).toBeEnabled() failed"
+    },
+    {
+      "group": "extension",
+      "file": "connectors.spec.ts",
+      "name": "extension discovery and approved connector execution on desktop",
+      "failure": "expect(locator).toHaveCount(expected) failed"
+    },
+    {
+      "group": "extension",
+      "file": "connectors.spec.ts",
+      "name": "extension discovery and approved connector execution on mobile",
+      "failure": "expect(locator).toHaveCount(expected) failed"
+    }
+  ],
+  "adaptive_recheck": {
+    "passed": 1,
+    "failed": 0,
+    "seconds": 55.1,
+    "test_seconds": 44.8,
+    "assertion_timeout_seconds": 15,
+    "note": "Unchanged test passed separately; earlier disabled-button timeout under concurrent load remains recorded."
+  },
+  "latest_by_logical_case": {
+    "cases": 151,
+    "passed": 102,
+    "unsuccessful": 49,
+    "skipped": 0,
+    "spec_files": 48
+  }
+}

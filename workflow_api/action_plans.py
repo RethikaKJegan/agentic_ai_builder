@@ -151,19 +151,37 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if not isinstance(proposal,dict) or set(proposal)-{'actions','completion_criteria','missing_inputs'}:deny('Invalid structured action proposal.')
     actions=deepcopy(proposal.get('actions',[]))
     if not isinstance(actions,list) or not 1<=len(actions)<=16:deny('Select between one and sixteen action instances.')
+    # A null condition unambiguously means unconditional execution. Repair only
+    # generated flags; explicit plans and real conditions retain strict validation.
+    if body.get('action_plan') is None:
+        for action in actions:
+            if isinstance(action,dict) and action.get('optional') is True and 'when' in action and action['when'] is None:
+                action['optional']=False
     needed={visible[a['capability_id']]['retrieval_task'] for a in actions if isinstance(a,dict) and a.get('capability_id') in visible and visible[a['capability_id']].get('retrieval_task')}
-    if needed and (not prepared or needed-set(prepared['tasks'])):
+    explicit_identifiers={k:v for k,v in body.get('user_values',{}).items() if k in ('complaint_id','serial')}
+    if needed and (not prepared or needed-set(prepared['tasks']) or (not prepared['inputs']['identifiers'] and explicit_identifiers)):
         from .business_investigations import QUESTIONS
         from .business_resolution import interpret
         request=deepcopy(body.get('business_request') or {})
         version=composition.preparation.service.ontology.version(auth,prepared['version_id'] if prepared else request.get('version_id') or composition.preparation.service.retrieval.latest(auth))
         inputs=deepcopy(prepared['inputs'] if prepared else request.get('inputs',{'identifiers':{}}))
-        inputs['identifiers']=interpret(objective,version,inputs.get('identifiers',{}))['identifiers']
+        identifiers=deepcopy(inputs.get('identifiers',{}))
+        for name,value in explicit_identifiers.items():
+            if name in identifiers and identifiers[name]!=value:deny('Explicit case identifiers disagree.','ACTION_SCOPE_DENIED')
+            identifiers[name]=value
+        inputs['identifiers']=interpret(objective,version,identifiers)['identifiers']
         request.update(objective='; '.join(QUESTIONS[t] for t in sorted(needed)),inputs=inputs,version_id=version['version_id'])
         prepared=composition.preparation.prepare(auth,request)
         context=trusted_context(composition,auth,body,prepared)
         refreshed=catalogue(prepared,tools,connectors)
         visible.update({cid:c for cid,c in refreshed.items() if cid in visible})
+    if needed and prepared and not prepared['inputs']['identifiers']:
+        from runtime.service import RuntimeFailure
+        error=RuntimeFailure('ACTION_INPUT_REQUIRED',
+            'This evidence reader needs one complaint ID or engine serial. A newest-first complaint list requires a supported data query; no list or ordering was assumed.',422)
+        error.required_inputs={'complaint_id':{'type':'string','minLength':1,'maxLength':128,
+            'description':'Exact complaint ID for the case to investigate. Use Data Intelligence Questions for a supported multi-record query.'}}
+        raise error
     configure(context,composition,auth,body,visible,connectors,tool_id)
     if body.get('automatic_inputs'):
         satisfied=bind_internal(actions,visible,context,connectors,tool_id,key)

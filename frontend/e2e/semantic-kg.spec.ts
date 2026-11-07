@@ -1,7 +1,7 @@
 import {test,expect} from "@playwright/test";
 import {readFileSync} from "node:fs";
 const semantic=JSON.parse(readFileSync(new URL("./fixtures/semantic-kg.json",import.meta.url),"utf8"));
-for(const mobile of [false,true])test(`essential Knowledge graph ${mobile?"mobile":"desktop"}`,async({page})=>{
+for(const mobile of [false,true])test(`essential Semantic Intelligence ${mobile?"mobile":"desktop"}`,async({page})=>{
  if(mobile)await page.setViewportSize({width:390,height:844});
  let builds=0,saves=0,reviews=0;const view=structuredClone(semantic);const unexpected:string[]=[],errors:string[]=[];
  page.on("pageerror",e=>errors.push(e.message));
@@ -25,11 +25,11 @@ for(const mobile of [false,true])test(`essential Knowledge graph ${mobile?"mobil
   await route.fulfill({status:200,json:{request_id:"req_essential_browser",status:200,data}});
  });
  await page.goto("/app/data-intelligence");
- await page.getByRole("tab",{name:"Knowledge graph",exact:true}).click();
- const graph=page.getByRole("img",{name:"Knowledge graph",exact:true});await expect(graph).toBeVisible();
- for(const name of ["Actual records","Entity types","Generate semantic relationships","Relationship map","Detailed knowledge graph","Confirm relationship"])
+ await page.getByRole("tab",{name:"Semantic Intelligence",exact:true}).click();
+ const graph=page.getByRole("img",{name:"Semantic Intelligence",exact:true});await expect(graph).toBeVisible();
+ for(const name of ["Actual records","Entity types","Generate semantic relationships","Relationship map","Detailed Semantic Intelligence","Confirm relationship"])
   await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);
- const details=page.getByLabel("Knowledge graph details");
+ const details=page.getByLabel("Semantic Intelligence details");
  await expect(details).toContainText("Inspect");
  const edge=semantic.relationships[0];const names=new Map(semantic.entities.map((e:{entity_id:string;label:string})=>[e.entity_id,e.label]));
  await page.getByRole("button",{name:`Relationship ${names.get(edge.source_entity_id)} ${edge.predicate} ${names.get(edge.target_entity_id)}`,exact:true}).locator("rect").click();
@@ -42,14 +42,14 @@ for(const mobile of [false,true])test(`essential Knowledge graph ${mobile?"mobil
  await expect.poll(()=>reviews).toBe(1);await expect(details).toContainText("Business: confirmed");
  await page.getByRole("button",{name:"Entity Customer",exact:true}).locator("ellipse").click();
  const links=graph.locator('g[aria-label^="Relationship "]');await expect(links).toHaveCount(4);
- const connection=page.getByRole("combobox",{name:"Knowledge graph connection",exact:true});
+ const connection=page.getByRole("combobox",{name:"Semantic Intelligence connection",exact:true});
  await connection.selectOption("pg");await expect(links).toHaveCount(1);
  await connection.selectOption("mongo");await expect(links).toHaveCount(0);await expect(details).not.toContainText("Postgres");
  await connection.selectOption("");await expect(links).toHaveCount(4);
  await page.getByLabel("Semantic relationship status",{exact:true}).selectOption("inferred");await expect(links).toHaveCount(1);
- await page.getByLabel("Search knowledge graph",{exact:true}).fill("unrelated-payroll");await expect(page.getByText(/No entities match/)).toBeVisible();
- await page.getByLabel("Search knowledge graph",{exact:true}).fill("");
- await page.getByRole("button",{name:"Regenerate KG",exact:true}).click();await expect.poll(()=>builds).toBe(1);
+ await page.getByLabel("Search Semantic Intelligence",{exact:true}).fill("unrelated-payroll");await expect(page.getByText(/No entities match/)).toBeVisible();
+ await page.getByLabel("Search Semantic Intelligence",{exact:true}).fill("");
+ await page.getByRole("button",{name:"Regenerate Semantic Intelligence",exact:true}).click();await expect.poll(()=>builds).toBe(1);
  await page.getByLabel("Refresh interval seconds",{exact:true}).fill("60");
  await page.getByRole("checkbox",{name:"Automatic metadata refresh",exact:true}).uncheck();
  await page.getByRole("button",{name:"Save refresh settings",exact:true}).click();await expect.poll(()=>saves).toBe(1);

@@ -1,0 +1,57 @@
+[
+  {
+    "files": [
+      "phase7.spec.ts",
+      "delegated-tools.spec.ts",
+      "dynamic-delegation.spec.ts",
+      "business-reference.spec.ts"
+    ],
+    "seconds": 311.419
+  },
+  {
+    "files": [
+      "detailed-graph.spec.ts",
+      "data-query-jobs.spec.ts",
+      "database-operations.spec.ts",
+      "business-rule-execution.spec.ts",
+      "investigation-actions.spec.ts",
+      "knowledge-preview.spec.ts",
+      "agent-communication.spec.ts",
+      "project-agent-communication.spec.ts",
+      "sheet-access.spec.ts",
+      "data-insights.spec.ts"
+    ],
+    "seconds": 312.40099999999995
+  },
+  {
+    "files": [
+      "api-integration.spec.ts",
+      "data-relationships.spec.ts",
+      "baseline.spec.ts",
+      "evidence-coverage.spec.ts",
+      "business-graph.spec.ts",
+      "source-selection.spec.ts",
+      "data-queries.spec.ts",
+      "business-rules.spec.ts",
+      "workflow-traces.spec.ts",
+      "workflow-pages.spec.ts"
+    ],
+    "seconds": 312.945
+  },
+  {
+    "files": [
+      "semantic-kg.spec.ts",
+      "business-ontology.spec.ts",
+      "business-planning.spec.ts",
+      "database-workflow.spec.ts",
+      "simpson-business-ontology.spec.ts",
+      "business-generation.spec.ts",
+      "current-editor-release.spec.ts",
+      "business-warranty-knowledge.spec.ts",
+      "multitask-delegation.spec.ts",
+      "business-compilation.spec.ts",
+      "slack-gmail.spec.ts"
+    ],
+    "seconds": 313.038
+  }
+]

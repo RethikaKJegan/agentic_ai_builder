@@ -277,3 +277,16 @@ it("stops at a server-denied approval without publishing or activating", async (
     vi.mocked(api.request).mock.calls.filter((call) => call[0] === "approve_workflow"),
   ).toHaveLength(1);
 });
+
+
+it("exposes explicit revision recovery without automatically publishing or running",async()=>{
+ render(<View/>);
+ expect(api.request).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByText("Manage saved revisions"));
+ expect(await screen.findByRole("region",{name:"Workflow actions"})).toBeVisible();
+ fireEvent.click(screen.getByText("Revision actions"));
+ expect(api.request).not.toHaveBeenCalled();
+ expect(await screen.findByRole("button",{name:"Save draft"})).toBeDisabled();
+ expect(api.activateRelease).not.toHaveBeenCalled();
+ expect(started).not.toHaveBeenCalled();
+});

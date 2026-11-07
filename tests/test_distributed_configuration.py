@@ -21,3 +21,17 @@ def test_configured_multi_active_keeps_pollers_singleton_and_limits_server_owned
         fixture.env['BUILDER_WORKER_MODE']='unknown'
         with pytest.raises(ValueError):fixture.make_app(database=fixture.path/'invalid.sqlite')
     finally:fixture.doCleanups()
+
+
+def test_configured_combined_execution_returns_admission_without_inline_work():
+    from unittest.mock import patch
+    fixture=live_fixtures.LiveProviderTests();fixture.setUp()
+    try:
+        service=fixture.app.state.workflow_service
+        assert service.background_execution is True
+        with patch.object(service.runtime_runner.runtime,'create_run',return_value={'run_id':'queued_fixture','status':'queued'}), patch.object(service.runtime_runner,'advance',side_effect=AssertionError('HTTP executed slow runtime work')):
+            result=service.handle(dict(request_id='combined_queue',operation='execute_workflow',idempotency_key='combined_queue_001',payload=dict(workflow_id=fixture.workflow['workflow_id'],workflow_version=1,inputs={})),fixture.auth)
+        assert result['status']==200
+        assert result['data']['run']=={'run_id':'queued_fixture','status':'queued'}
+        assert any(isinstance(w,RuntimeWorker) for w in fixture.app.state.live_workers)
+    finally:fixture.doCleanups()

@@ -117,6 +117,7 @@ for (const mobile of [false, true]) {
       "Unsaved working draft",
     );
     await page.getByRole("tab", { name: "Agent hierarchy", exact: true }).click();
+    await page.getByText("Agent responsibilities and configuration",{exact:true}).click();
     await expect(page.getByText(/No agents are defined/)).toBeVisible();
     await page.getByRole("tab", { name: "Design", exact: true }).click();
     await page.getByText(/Workflow outline and connections/).click();
@@ -124,13 +125,13 @@ for (const mobile of [false, true]) {
     await expect(accessible.getByRole("button").first()).toContainText("Historical start");
     await page.getByLabel("Connection source").selectOption("start");
     await page.getByLabel("Connection target").selectOption("draft_only");
-    await page.getByRole("button", { name: "Connect steps" }).focus();
-    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "Connect steps" }).press("Enter");
     await expect(page.getByRole("button", { name: /Remove connection/ })).toHaveCount(2);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await expect(page.getByRole("button", { name: /Remove connection/ })).toHaveCount(1);
     await page.getByRole("button", { name: "Redo", exact: true }).click();
     await expect(page.getByRole("button", { name: /Remove connection/ })).toHaveCount(2);
+    await page.getByText("Manage saved revisions",{exact:true}).click();
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(page.getByText(/Save draft confirmed · v3/)).toBeVisible();
     await page.reload();
@@ -145,19 +146,24 @@ for (const mobile of [false, true]) {
     await page
       .getByLabel("Process description")
       .fill("Review invoice amounts and require manager approval before reporting the result.");
+    await page.getByText("Workflow options",{exact:true}).click();await page.getByLabel("Workflow type",{exact:true}).selectOption("automation");
     await page.getByRole("button", { name: "Generate workflow", exact: true }).click();
-    const result = page.getByRole("region", { name: "Generation result" });
-    await expect(result).toBeVisible({ timeout: 30000 });
-    await expect(page).toHaveURL(/\/app$/);
-    await expect(result.getByText("Goal", { exact: true })).toBeVisible();
-    await expect(result.getByText("Approval points", { exact: true })).toBeVisible();
-    await result.getByRole("button", { name: "Review and edit workflow" }).click();
-    await expect(page).toHaveURL(/\/app\/workflows\//);
+    await page.waitForURL(/\/app\/workflows\/[^/]+$/);
+    const id=new URL(page.url()).pathname.split('/').at(-1)!;
+    const document=(await(await page.request.get(`/api/backend/workflows/${id}`)).json()).data.workflow;
+    expect(document.metadata.generation_mode).toBe("hierarchy");
+    expect(document.status).toBe("draft");
+    await page.getByRole("button",{name:"Workflow details",exact:true}).click();
+    const review=page.getByRole("dialog",{name:"Workflow details",exact:true});
+    await expect(review.getByText("Goal",{exact:true})).toBeVisible();
+    await expect(review.getByRole("heading",{name:"Approval points",exact:true})).toBeVisible();
+    await review.getByRole("button",{name:"Close",exact:true}).click();
     await expect(page.getByRole("tab", { name: "Design", exact: true })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     await page.getByRole("tab",{name:"Agent hierarchy",exact:true}).click();
+    await page.getByText("Agent responsibilities and configuration",{exact:true}).click();
     await expect(page.getByText(/Master · Master orchestrator/)).toBeVisible();
     await expect(page.getByText(/Delegated ·/).first()).toBeVisible();
     await page.getByRole("tab",{name:"Design",exact:true}).click();

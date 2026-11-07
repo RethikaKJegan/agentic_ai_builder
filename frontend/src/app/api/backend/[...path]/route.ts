@@ -8,7 +8,7 @@ import {GOOGLE_ROUTE_COOKIE,GOOGLE_CALLBACK_PATH,googleRouteCookie,googleRouteAc
 
 export const dynamic = "force-dynamic";
 const safeId = (value: string | null) => value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
-const cookieNames = new Set(["builder_dev_session", "__Secure-builder_session", "__Secure-builder_login", "builder_google_oauth"]);
+const cookieNames = new Set(["builder_extension_session", "builder_dev_session", "__Secure-builder_session", "__Secure-builder_login", "builder_google_oauth"]);
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   let reference = safeId(request.headers.get("x-request-id")) || safeId(request.nextUrl.searchParams.get("request_id")) || `req_${crypto.randomUUID()}`;
   const correlation = safeId(request.headers.get("x-correlation-id")) || reference;

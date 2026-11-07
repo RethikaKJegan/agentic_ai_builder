@@ -61,6 +61,8 @@ def registry_configuration(env):
         if env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
             from .tenant_google import extend_registry
             extend_registry(config)
+        from .public_research import enabled,extend_registry as research_registry
+        if enabled(env):research_registry(config)
         return config
     from .slack_gmail import registry_configuration as gmail_registry
     config = gmail_registry(env)
@@ -402,7 +404,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
                      planner_timeout_seconds=int(env.get('BUILDER_PLANNER_TIMEOUT_SECONDS', '180')),planning_worker_enabled=False, google_oauth_config=env)
     service = app.state.workflow_service
     allowed_recipients = [] if business_only else recipients(env)
-    service.background_execution=process_role=='api'
+    # Configured combined processes already host RuntimeWorker. HTTP only
+    # admits durable runs; model/tool work must not outlive the proxy request.
+    service.background_execution=process_role in {'api','combined'}
     service.business_composition.model_id=model
     from .integration_checks import smtp_probe
     service.integration_probes={} if business_only else {'smtp':smtp_probe(env)}
@@ -439,6 +443,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             return dict(host='smtp.gmail.com', port=587, username=env['GMAIL_SMTP_USER'], password=env['GMAIL_SMTP_PASSWORD'], sender=env['GMAIL_SMTP_USER'])
         raise ValueError('Unknown provider credential reference.')
     runner = service.runtime_runner
+    if isolation:
+        from .public_research import enabled,install as install_research
+        if enabled(env):install_research(service)
     runner.runtime.enforce_usage_budgets = enforce_usage_budgets
     if not business_only:
         runner.connectors.update({'google_sheets_read_rows': GoogleSheetsConnector(resolve, ROOT / env['GOOGLE_TOKEN_FILE'], timeout=15),

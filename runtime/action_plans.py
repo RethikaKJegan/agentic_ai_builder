@@ -61,25 +61,39 @@ def validate_content_tables(workflow,node,output):
             raise error
 
 
+def content_urls(value):
+    """Read native string values, not JSON-escaped text; trim prose punctuation."""
+    import re
+    if isinstance(value,str):return {u.rstrip('.,;:!?') for u in re.findall(r'https?://[^\s<>"\)\]]+',value)}
+    if isinstance(value,dict):return set().union(*(content_urls(v) for v in value.values())) if value else set()
+    if isinstance(value,list):return set().union(*(content_urls(v) for v in value)) if value else set()
+    return set()
+
+
+def validate_content(workflow,node,output,inputs):
+    action=action_for(workflow,node['node_id'])
+    if not action or action['capability_id']!='content.prepare':return
+    validate_content_tables(workflow,node,output)
+    def invalid(field,hint):
+        from .service import RuntimeFailure
+        error=RuntimeFailure('ACTION_CONTENT_UNVERIFIED','Generated content must use only supplied source references and verified URLs.',422)
+        error.invalid_model_output=True;error.validation_field=field;error.validation_hint=hint
+        raise error
+    refs=output.get('source_references',[])
+    if not set(refs)<=set(inputs['source_references']) or inputs['source_references'] and not refs:
+        invalid('source_references','Copy the exact supplied source reference tokens. Do not invent references or omit all required citations.')
+    url=inputs.get('artifact_url')
+    if url and url not in output.get('body','') and url not in output.get('summary',''):
+        invalid('body','Include the exact supplied artifact_url in body or summary. Do not shorten, rewrite, replace or invent an artifact URL.')
+    if content_urls(output)-content_urls(inputs):
+        logging.getLogger(__name__).warning('Connected content rejected: unprovided_url')
+        invalid('content_urls','Use only exact URLs present in the supplied inputs or verified upstream receipts. Preserve their host, path and query. Do not invent links or append sharing parameters.')
+
+
 def verify(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
     if not action:return
-    if action['capability_id']=='content.prepare':
-        validate_content_tables(workflow,node,output)
-        refs=output.get('source_references',[])
-        if not set(refs)<=set(inputs['source_references']) or inputs['source_references'] and not refs:
-            logging.getLogger(__name__).warning('Connected content rejected: source_reference_tokens')
-            deny('Content citations must identify supplied evidence.','ACTION_CONTENT_UNVERIFIED')
-        # Artifact URLs are copied from verified inputs, never invented during generation.
-        url=inputs.get('artifact_url')
-        if url and (url not in output.get('body','') and url not in output.get('summary','')):
-            deny('Generated content omitted the verified artifact URL.','ACTION_CONTENT_UNVERIFIED')
-        import re,json
-        allowed=set(re.findall(r'https?://[^\s<>"\)]+',json.dumps(inputs)))
-        for text in (output.get('body',''),output.get('summary','')):
-            if set(re.findall(r'https?://[^\s<>"\)]+',text))-allowed:
-                logging.getLogger(__name__).warning('Connected content rejected: unprovided_url')
-                deny('Generated content invented an artifact/source URL.','ACTION_CONTENT_UNVERIFIED')
+    validate_content(workflow,node,output,inputs)
     if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis
         from workflow_api.service import ApiFailure

@@ -1,0 +1,16 @@
+{
+  "selected_connection": "gc_c0f1b26451b4f65934f91f27023d14e9",
+  "credential_refreshes": 0,
+  "credential_changes": 0,
+  "provider_writes": 0,
+  "checks": {
+    "gmail_profile": {
+      "http_status": 200,
+      "selected_account_matches": true
+    },
+    "primary_calendar_read": {
+      "http_status": 200,
+      "bounded_return_count": 1
+    }
+  }
+}

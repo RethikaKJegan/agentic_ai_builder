@@ -11,7 +11,9 @@ for(const mobile of [false,true]){
    localStorage.setItem('phase3-seeded','1');
   },{id:seedId});
   await page.goto('/app/workflows/'+seedId);
-  const actions=page.getByRole('region',{name:'Workflow actions'});
+  await page.getByText("Manage saved revisions",{exact:true}).click();
+ await page.getByText("Revision actions",{exact:true}).click();
+ const actions=page.getByRole('region',{name:'Workflow actions'});
   await expect(actions.getByRole('button',{name:'Save draft',exact:true})).toBeEnabled();
   await expect(actions.getByRole('button',{name:'Publish',exact:true})).toBeDisabled();
   const operations:string[]=[];page.on('request',request=>{try{const body=request.postDataJSON();if(body?.operation)operations.push(body.operation);}catch{/* GET requests have no JSON body. */}});
@@ -61,7 +63,7 @@ for(const mobile of [false,true]){
   await page.getByRole('button',{name:'Save setting',exact:true}).focus();await page.keyboard.press('Enter');
   await expect(page.getByText('Setting saved on the server.')).toBeVisible();await page.reload();
   await expect(page.getByLabel('Notification preference')).toHaveValue(mobile?'mobile-confirmed':'desktop-confirmed');
-  await page.goto('/app/integrations');await page.getByRole('button',{name:'Check configuration'}).first().click();
+  await page.goto('/app/integrations');await page.getByRole('button',{name:'Refresh Google connections',exact:true}).click();
   await expect(page.getByText('Verified',{exact:true})).toHaveCount(0);
   expect(errors).toEqual([]);
  });

@@ -200,12 +200,13 @@ def test_http_api_compatibility_and_rejected_mutations(foundation):
     from fastapi.testclient import TestClient
     from unittest.mock import patch
     from workflow_api.data_source_routes import install
-    class Service:
-        store=foundation.store
+    from workflow_api.service import WorkflowService
+    from registry import RegistryService, WorkspacePolicy
+    class Service(WorkflowService):
         def envelope(self,ref,status,data):return dict(request_id=ref,status=status,data=data)
         def failure(self,ref,exc):return dict(error=dict(error_code=exc.code,message=str(exc)))
     app=FastAPI()
-    with patch('workflow_api.data_source_routes.DataSources',return_value=foundation.manager):install(app,Service(),auth(),{},lambda:'req_test')
+    with patch('workflow_api.data_source_routes.DataSources',return_value=foundation.manager):install(app,Service(foundation.store,registry=RegistryService(WorkspacePolicy(auth()['subject']['workspace_id']))),auth(),{},lambda:'req_test')
     client=TestClient(app)
     assert client.get('/ontology/v1').status_code==410
     assert client.get('/ontology/v1/metrics').status_code==410

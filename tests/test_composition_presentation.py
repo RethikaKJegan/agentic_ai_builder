@@ -236,3 +236,47 @@ def test_historical_citation_failure_is_presented_without_rewriting_saved_run(co
  assert view['tasks'][0]['errors'][0]['recovery_strategy']=='correct_structured_output'
  assert not view['recovery']['eligible']
  with rt.store.transaction(write=False) as db:assert rt.load(db,created['run_id'],f.x.a)['classified_failures']==[old]
+
+
+def test_projection_discovers_existing_run_without_replaying(composition):
+    f=composition;_,ui,_=setup(f);doc=prepare(f)
+    result,_,rt=run(f,doc)
+    f.general.runtime_runner=GraphRunner(rt,agents=DiagnosticAgents(),connectors=f.connectors)
+    source_reads=len(f.x.reader.calls)
+    with rt.store.transaction(write=False) as db:before=db.execute('SELECT COUNT(*) FROM runtime_runs').fetchone()[0]
+    implicit=ui.view(f.x.a,doc['composition_id'])
+    explicit=ui.view(f.x.a,doc['composition_id'],result['run_id'])
+    assert implicit['run']['run_id']==result['run_id']
+    assert implicit['run']['status']=='completed'
+    assert implicit['tasks']==explicit['tasks']
+    assert len(f.x.reader.calls)==source_reads
+    with rt.store.transaction(write=False) as db:assert db.execute('SELECT COUNT(*) FROM runtime_runs').fetchone()[0]==before
+
+
+from tests.test_connected_action_plans import connected,compile_run
+
+
+def test_connected_database_read_keeps_tool_identity_and_source_results(connected):
+    f=connected;request=deepcopy(f.request)
+    request['action_plan']['actions']=request['action_plan']['actions'][:1]
+    request['action_plan']['completion_criteria']=['read']
+    doc,_,rid=compile_run(f,request)
+    assert f.runner.advance(rid,f.x.a)['status']=='completed'
+    before=len(f.x.reader.calls)
+    view=CompositionPresentation(f.c).view(f.x.a,doc['composition_id'])
+    result=view['tasks'][0]['result']
+    assert result['records']
+    receipt=result['tool_receipts'][0]
+    assert receipt['tool_id']=='business_retrieve_evidence'
+    assert receipt['receipt']['returned_records']==len(result['records'])
+    assert 'tickets' in receipt['receipt']['collections']
+    assert 'action receipt' not in result['summary']
+    assert len(f.x.reader.calls)==before
+    assert view['run']['actions'][0]['receipt']['returned_records']==len(result['records'])
+
+
+def test_tool_receipts_report_zero_results_and_real_provider_identifiers():
+    from workflow_api.composition_presentation import tool_receipt
+    assert tool_receipt({'records':[]})['returned_records']==0
+    assert tool_receipt({'message_id':'actual_message','thread_id':'actual_thread'})=={'message_id':'actual_message','thread_id':'actual_thread'}
+    assert tool_receipt({'custom_result':{'private':'not exposed'}})=={'returned_fields':['custom_result']}

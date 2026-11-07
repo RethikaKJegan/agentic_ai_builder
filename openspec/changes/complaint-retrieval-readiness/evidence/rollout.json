@@ -1,0 +1,9 @@
+{
+  "service": "agentic-builder-simpsons.service",
+  "pid": "1730410",
+  "health": "authenticated session200 client-isolated",
+  "schema_change_in_isolated_startup": false,
+  "source_writes": false,
+  "live_model_calls": 0,
+  "failed_run_replayed": false
+}

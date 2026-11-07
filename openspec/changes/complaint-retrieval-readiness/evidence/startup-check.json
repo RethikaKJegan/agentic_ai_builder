@@ -1,0 +1,9 @@
+{
+  "isolated_startup": "passed",
+  "source_opened_read_only": true,
+  "source_modified": false,
+  "new_or_changed_schema": {},
+  "removed_schema": [],
+  "network_calls": 0,
+  "workers_started": false
+}

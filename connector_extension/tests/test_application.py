@@ -188,3 +188,40 @@ class ExtensionApplicationTests(unittest.TestCase):
         result=service.handle({'request_id':'req_test','operation':'validate_workflow','idempotency_key':'validate_no_gate',
                               'payload':ref},auth)
         self.assertEqual(result['data']['error']['error_code'],'APPROVAL_REQUIRED');self.assertFalse(self.transport.calls)
+
+    def test_approval_submission_uses_shared_validation_without_publishing_or_effects(self):
+        identity='extension_submission'
+        ref={'workflow_id':identity,'workflow_version':1}
+        workflow=connector_workflow('google_sheets_read_rows',{'spreadsheet_id':'sheet_one','range':'Items!A1:B10'},identity)
+        self.mutation('save_workflow_version',{**ref,'base_version':0,'workflow':workflow},f'/workflows/{identity}/versions/1','PUT')
+        self.mutation('validate_workflow',ref,f'/workflows/{identity}/validate')
+        path=f'/workflows/{identity}/submit-for-approval'
+        submitted=self.mutation('submit_workflow_for_approval',ref,path)
+        repeated=self.mutation('submit_workflow_for_approval',ref,path)
+        self.assertEqual(repeated,submitted)
+        self.assertEqual(submitted['workflow']['status'],'validated')
+        self.assertEqual(submitted['workflow']['metadata']['approval_submission']['workflow_version'],1)
+        request={'request_id':'req_submission','operation':'submit_workflow_for_approval','idempotency_key':'submission_mismatch','payload':{**ref,'workflow_id':'other_workflow'}}
+        self.assertEqual(self.client.post(path,json=request).status_code,400)
+        self.app.state.extension_auth['permissions'].remove('workflow.validate')
+        request.update(idempotency_key='submission_revoked',payload=ref)
+        self.assertEqual(self.client.post(path,json=request).status_code,403)
+        self.assertFalse(self.transport.calls)
+
+    def test_release_state_read_is_scoped_and_permission_guarded(self):
+        ref=self.publish('google_sheets_read_rows',{'spreadsheet_id':'sheet_one','range':'Items!A1:B10'},'release_read')
+        path='/workflows/release_read/release-state'
+        before=self.client.get(path)
+        self.assertEqual(before.status_code,200,before.text)
+        self.assertIsNone(before.json()['data']['release'])
+        active=self.mutation('activate_release',{**ref,'expected_release_id':None,'triggers':[]},'/workflows/release_read/releases')
+        response=self.client.get(path)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['data']['release']['release_id'],active['release']['release_id'])
+        self.assertEqual(response.json()['data']['release']['state'],'active')
+        self.app.state.extension_auth['subject']['workspace_id']='another_workspace'
+        scoped=self.client.get(path).json()['data']
+        self.assertIsNone(scoped['release'])
+        self.app.state.extension_auth['permissions'].remove('workflow.view')
+        self.assertEqual(self.client.get(path).status_code,403)
+        self.assertFalse(self.transport.calls)

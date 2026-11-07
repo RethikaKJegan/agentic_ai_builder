@@ -230,7 +230,7 @@ for (const mobile of [false, true]) {
   test(`disabled operation policy on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     const context = await setup(page, "disabled");
-    await expect(page.getByText(/No database operation targets are enabled/)).toBeVisible();
+    await expect(page.getByText(/No available database operation targets are enabled/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Add operation step" })).toHaveCount(0);
     expect(context.executions()).toBe(0);
   });

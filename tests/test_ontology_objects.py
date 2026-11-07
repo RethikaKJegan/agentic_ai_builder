@@ -164,14 +164,15 @@ def test_http_read_routes_and_error_contract(explorer):
     from fastapi.testclient import TestClient
     from unittest.mock import patch
     from workflow_api.data_source_routes import install
+    from workflow_api.service import WorkflowService
+    from registry import RegistryService, WorkspacePolicy
     x=explorer
-    class Service:
-        store=x.foundation.store
+    class Service(WorkflowService):
         def envelope(self,ref,status,data):return {'request_id':ref,'status':status,'data':data}
         def failure(self,ref,exc):return {'request_id':ref,'status':exc.status,'data':{'error':{'error_code':exc.code,'message':str(exc)}}}
     app=FastAPI()
     with patch('workflow_api.data_source_routes.DataSources',return_value=x.foundation.manager):
-        install(app,Service(),x.auth,{},lambda:'req_objects')
+        install(app,Service(x.foundation.store,registry=RegistryService(WorkspacePolicy(x.auth['subject']['workspace_id']))),x.auth,{},lambda:'req_objects')
     client=TestClient(app)
     r=client.post('/ontology/v1/objects',json=request(x,limit=1))
     assert r.status_code==410 and r.json()['data']['error']['error_code']=='LEGACY_ONTOLOGY_RETIRED'

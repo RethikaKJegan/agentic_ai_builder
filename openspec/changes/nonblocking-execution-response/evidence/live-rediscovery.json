@@ -1,0 +1,28 @@
+{
+  "service": "agentic-builder-simpsons.service",
+  "run_id": "run_965172a4784e4c218a48d51ed39c7d8a",
+  "status": "completed",
+  "run_discovered_without_explicit_id": true,
+  "model_calls_during_verification": 0,
+  "source_reads_during_verification": 0,
+  "execution_requests_submitted": 0,
+  "migrations": 0,
+  "task_states": [
+    {
+      "id": "read_complaints",
+      "state": "completed"
+    },
+    {
+      "id": "read_inspection",
+      "state": "completed"
+    },
+    {
+      "id": "compare_complaint_inspection",
+      "state": "completed"
+    },
+    {
+      "id": "prepare_email",
+      "state": "completed"
+    }
+  ]
+}
