@@ -1,0 +1,92 @@
+{
+  "targets": {
+    "lost_jobs": 0,
+    "duplicate_effects": 0,
+    "max_completion_seconds": 180,
+    "p99_seconds": 120
+  },
+  "host_scope": "One development host, PostgreSQL workflow persistence, separate worker processes and controlled 150ms effects; not multi-host qualification. Auxiliary provider double ledger uses SQLite.",
+  "results": [
+    {
+      "workers": 1,
+      "active_workers": 1,
+      "jobs": 96,
+      "elapsed_seconds": 29.661222457885742,
+      "throughput_per_second": 3.2365490038822524,
+      "average_latency_seconds": 14.831839042405287,
+      "p95_latency_seconds": 28.32567048072815,
+      "p50_latency_seconds": 14.645262956619263,
+      "p99_latency_seconds": 29.545150995254517,
+      "average_queue_wait_seconds": 14.676155671477318,
+      "concurrent_effects_peak": 1,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.5038768590979513,
+      "database_metrics": {
+        "reads": 1174,
+        "writes": 976,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 0,
+        "lock_wait_seconds": 0.3024284988641739,
+        "transaction_seconds": 31.244235647842288
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with PostgreSQL workflow persistence; no live effect. Database metrics include parent setup and child execution transactions."
+    },
+    {
+      "workers": 2,
+      "active_workers": 2,
+      "jobs": 96,
+      "elapsed_seconds": 19.024990797042847,
+      "throughput_per_second": 5.045994556534649,
+      "average_latency_seconds": 9.57695890714725,
+      "p95_latency_seconds": 18.19483971595764,
+      "p50_latency_seconds": 9.52256989479065,
+      "p99_latency_seconds": 18.88202428817749,
+      "average_queue_wait_seconds": 9.425303203364214,
+      "concurrent_effects_peak": 2,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.3826269278783136,
+      "database_metrics": {
+        "reads": 792,
+        "writes": 1075,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 0,
+        "lock_wait_seconds": 5.072546039707959,
+        "transaction_seconds": 36.265100510790944
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with PostgreSQL workflow persistence; no live effect. Database metrics include parent setup and child execution transactions."
+    },
+    {
+      "workers": 4,
+      "active_workers": 4,
+      "jobs": 96,
+      "elapsed_seconds": 15.267284154891968,
+      "throughput_per_second": 6.287955279147636,
+      "average_latency_seconds": 6.967728676895301,
+      "p95_latency_seconds": 14.467096328735352,
+      "p50_latency_seconds": 6.895161509513855,
+      "p99_latency_seconds": 15.003822803497314,
+      "average_queue_wait_seconds": 6.817306021849315,
+      "concurrent_effects_peak": 3,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.23646273197495313,
+      "database_metrics": {
+        "reads": 655,
+        "writes": 1275,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 1,
+        "lock_wait_seconds": 21.082770907320082,
+        "transaction_seconds": 57.82205062545836
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with PostgreSQL workflow persistence; no live effect. Database metrics include parent setup and child execution transactions."
+    }
+  ]
+}

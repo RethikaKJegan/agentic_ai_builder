@@ -389,8 +389,8 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
                 return error('SERVICE_UNAVAILABLE', 'The runtime is not connected.', 503)
             runtime = workflow_service.runtime_runner.runtime
             options = query_options(dict(request.query_params), kind)
-            function = runtime.events if kind == 'events' else runtime.list_runs
-            args = (run_id, auth) if kind == 'events' else (auth,)
+            function = runtime.recovery.inspect if kind == 'recovery' else runtime.events if kind == 'events' else runtime.list_runs
+            args = (run_id, auth) if kind in ('events', 'recovery') else (auth,)
             data = await run_in_threadpool(function, *args, **options)
             return JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
         except RuntimeFailure as exc:
@@ -401,6 +401,10 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.get('/runs/{run_id}')
     async def run(run_id: str, request: Request):
         return await dispatch(request, 'get_run', {'run_id': run_id})
+
+    @app.get('/runs/{run_id}/recovery')
+    async def recovery(run_id: str, request: Request):
+        return await runtime_history(request, 'recovery', run_id)
 
     @app.get('/runs')
     async def runs(request: Request):
@@ -467,11 +471,98 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
 
     @app.get('/worker-health')
     async def worker_health():
-        if 'runs.view' not in auth['permissions']:
+        if auth.get('decision')!='allow' or 'admin' not in auth['roles'] or 'runs.view' not in auth['permissions']:
             return error('OPERATION_NOT_AUTHORIZED','Worker monitoring access is required.',403)
         from .worker_control import health
         data = await run_in_threadpool(health,workflow_service.store,auth['subject']['workspace_id'])
+        runtime=getattr(getattr(workflow_service,'runtime_runner',None),'runtime',None)
+        controls=getattr(runtime,'resource_controls',None)
+        if controls:data['account_capacity']=await run_in_threadpool(controls.diagnostics,auth['subject']['workspace_id'],runtime.clock())
+        if graph:=getattr(workflow_service,'account_graph',None):data['account_knowledge']=graph.diagnostics()
         return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
+
+    @app.get('/operational-alerts')
+    async def operational_alerts(request: Request):
+        if 'admin' not in auth['roles'] or 'runs.view' not in auth['permissions']:
+            return error('OPERATION_NOT_AUTHORIZED','Administrative monitoring access is required.',403)
+        if request.query_params:return error('INVALID_REQUEST','Monitoring scope is server-owned.',400)
+        from .operational_alerts import inspect
+        try:
+            data=await run_in_threadpool(inspect,workflow_service,auth['subject']['workspace_id'])
+            return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
+        except Exception:return error('DATABASE_UNAVAILABLE','Monitoring storage is unavailable; retain job identities.',503)
+
+    @app.get('/runs/{run_id}/knowledge')
+    async def run_knowledge(run_id: str, request: Request):
+        from runtime.service import RuntimeFailure
+        try:
+            if request.query_params:return error('INVALID_REQUEST','Run knowledge uses only its saved pins.',400)
+            runner=workflow_service.runtime_runner;graph=getattr(workflow_service,'account_graph',None)
+            if runner is None or graph is None:return error('SERVICE_UNAVAILABLE','Unified run knowledge is not enabled.',503)
+            with workflow_service.store.transaction(write=False) as db:
+                run=runner.runtime.load(db,run_id,auth)
+                workflow=workflow_service.store.get(db,run['workspace_id'],run['workflow_id'],run['workflow_version'])
+                pins=[workflow.get('metadata',{}).get('account_graph_pin')]
+                for checkpoint in run.get('task_checkpoints',{}).values():
+                    pins.extend(e.get('account_graph_pin') for e in checkpoint.get('result',{}).get('source_evidence',[]))
+            projections=[]
+            for pin in [p for p in pins if p][:8]:
+                if any(p['pin']==pin for p in projections):continue
+                doc=graph.get(auth,pin,historical=True)
+                current=False;reason=None
+                try:graph.get(auth,pin);current=True
+                except Exception:reason='Current source authority, revision or freshness requires review.'
+                records=[n for n in doc['nodes'] if n['kind']=='record'][:8]
+                selected={n['node_id'] for n in records}
+                for edge in doc['edges']:
+                    if edge['source'] in selected and len(selected)<32:selected.add(edge['target'])
+                for node in doc['nodes']:
+                    if len(selected)>=32:break
+                    selected.add(node['node_id'])
+                nodes=[n for n in doc['nodes'] if n['node_id'] in selected];ids=set(selected)
+                # Browser receives references/labels and provenance, not row values.
+                nodes=[{k:v[:300] if isinstance(v,str) else v for k,v in n.items() if k in ('node_id','kind','reference','label','status','qualification','read_at')} for n in nodes]
+                edges=[{k:v for k,v in e.items() if k in ('edge_id','source','target','predicate','direction','status','kind','ontology_version','mapping_version','confidence')} for e in doc['edges'] if e['source'] in ids and e['target'] in ids][:32]
+                projections.append(dict(pin=pin,current=current,reason=reason,nodes=nodes,edges=edges))
+            return JSONResponse(workflow_service.envelope(request_reference.get(),200,dict(projections=projections,qualification='Pinned historical references; current actions still require fresh evidence and authorization.')))
+        except RuntimeFailure as exc:return error(exc.code,str(exc),exc.status)
+
+    @app.get('/account-knowledge')
+    async def account_knowledge(request: Request):
+        from runtime.service import RuntimeFailure
+        try:
+            graph=getattr(workflow_service,'account_graph',None)
+            if graph is None:return error('SERVICE_UNAVAILABLE','Unified knowledge is not enabled.',503)
+            if request.query_params:return error('INVALID_REQUEST','Graph listing does not accept query overrides.',400)
+            data=await run_in_threadpool(graph.view,auth)
+            return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
+        except RuntimeFailure as exc:return error(exc.code,str(exc),exc.status)
+
+    @app.post('/account-knowledge/refresh')
+    async def account_refresh(request: Request):
+        from runtime.service import RuntimeFailure
+        try:
+            graph=getattr(workflow_service,'account_graph',None)
+            semantic=getattr(workflow_service,'account_semantic',None)
+            if graph is None or semantic is None:return error('SERVICE_UNAVAILABLE','Unified metadata is not enabled.',503)
+            if request.query_params or await request.body():return error('INVALID_REQUEST','Metadata refresh takes no caller-supplied evidence.',400)
+            pin=await run_in_threadpool(graph.sync_semantic,auth,semantic)
+            return JSONResponse(workflow_service.envelope(request_reference.get(),200,{'pin':pin}))
+        except RuntimeFailure as exc:return error(exc.code,str(exc),exc.status)
+        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
+
+    @app.post('/account-knowledge/traverse')
+    async def account_traverse(request: Request):
+        from runtime.service import RuntimeFailure
+        try:
+            graph=getattr(workflow_service,'account_graph',None)
+            if graph is None:return error('SERVICE_UNAVAILABLE','Unified knowledge is not enabled.',503)
+            body=await request.json()
+            if not isinstance(body,dict) or set(body)!={'pin','seeds','depth','limit'}:return error('INVALID_REQUEST','Use an exact graph pin and bounded traversal options.',400)
+            data=await run_in_threadpool(graph.traverse,auth,body['pin'],body['seeds'],depth=body['depth'],limit=body['limit'])
+            return JSONResponse(workflow_service.envelope(request_reference.get(),200,data))
+        except RuntimeFailure as exc:return error(exc.code,str(exc),exc.status)
+        except (ValueError,TypeError):return error('INVALID_REQUEST','Use valid graph traversal JSON.',400)
 
     @app.get('/workspace/{collection}')
     async def workspace_collection(collection: str, request: Request):

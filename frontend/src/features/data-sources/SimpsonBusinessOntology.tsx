@@ -77,7 +77,7 @@ export default function SimpsonBusinessOntology({canManage}:{canManage:boolean})
         <p className="mt-4 text-sm text-muted-foreground">{data.generation_status==='draft_available'?'Definitions are saved as versioned drafts. Evidence checks do not establish verified business policy.':'Concept generation has not started. The saved foundation contains the layer and module structure, with no generated concepts or rules yet.'}</p>
       </div>}
       {data.workspace&&<BusinessGenerationPanel data={data} canManage={canManage} moduleId={selected?.id??'engines'} onModule={id=>{setLayer('all');setModuleId(id);}} onData={setData} onOpenDraft={(module,versionId)=>{setLayer('all');setModuleId(module);setOpenDraft(previous=>({versionId,request:(previous?.request??0)+1}));}}/>}
-      {data.workspace&&<BusinessPolicyLibrary canManage={canManage} onData={setData} onChanged={()=>setPolicyRefresh(v=>v+1)}/>}
+      {data.workspace&&data.workspace.ontology_id!=='subway'&&<BusinessPolicyLibrary canManage={canManage} onData={setData} onChanged={()=>setPolicyRefresh(v=>v+1)}/>}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <nav aria-label="Business ontology layers" className="space-y-2 rounded-2xl border bg-background p-3">
           <p className="px-2 py-2 text-sm font-semibold"><Layers3 className="mr-2 inline h-4 w-4"/>Ontology layers</p>

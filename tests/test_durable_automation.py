@@ -54,19 +54,27 @@ def automation(connected,google_setup):
     return f
 
 
-def adaptive_case(f,stop_at=None):
+def adaptive_case(f,stop_at=None,*,use_planner=False):
     req=deepcopy(f.request)
     read=action('reply_read','tool.extension_mail_thread',[bind('receipt','thread_id',action='send',path=['thread_id'])],['send'])
     content=action('reply_analysis','content.prepare',[bind('output','data',action='reply_read')],['reply_read'],['reply_read'])
     req['action_plan']['actions'] += [read,content];req['action_plan']['completion_criteria']=['reply_analysis']
+    planned=deepcopy(req['action_plan'])
     caps=list(dict.fromkeys(a['capability_id'] for a in req['action_plan']['actions']))
     definition=process(stage(required_inputs={},required_capabilities=caps,allowed_tools=list(f.connectors),side_effect_classification='write',output_schema={'type':'object'},output_bindings={},timeout_policy={'seconds':600,'action':'block'}))
     f.cases.publish(f.x.a,definition)
     c=f.cases.create(f.x.a,dict(request_key='automation_case_001',process_definition_id=definition['process_definition_id'],process_definition_version=1,original_user_goal=req['objective'],google_connection_id=f.connection,business_request={'inputs':{'identifiers':{'complaint_id':'C123'}}}))
     c=f.cases.command(f.x.a,c['case_id'],'prepare',dict(request_key='automation_prepare_001',expected_revision=c['revision']))
     req.pop('request_key');req.pop('preparation_id')
+    if use_planner:req.pop('action_plan')
     c=AdaptiveOrchestration(f.cases).enable(f.x.a,c['case_id'],dict(request_key='automation_enable_001',expected_revision=c['revision'],stage_instance_id='first',plan_request=req))
     evaluator=Evaluator();asked=[]
+    if use_planner:
+        f.planner_contexts=[]
+        def plan_actions(goal,context):
+            f.planner_contexts.append(deepcopy(context))
+            return deepcopy(planned)
+        evaluator.plan_actions=plan_actions
     def custom(ctx):
         if 'send' in ctx['completed_actions'] and not asked:
             asked.append(True)

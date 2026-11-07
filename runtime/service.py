@@ -155,6 +155,7 @@ class RuntimeService:
                 existing = json.loads(row[1])
                 if on_created is not None:on_created(db, deepcopy(existing))
                 return self.public(existing)
+            if controls:=getattr(self,'resource_controls',None):controls.admit(db,workspace)
             if validator := getattr(self, 'execution_validator', None):
                 validator(workflow, auth, db)
             run = dict(run_id='run_' + uuid4().hex, workflow_id=workflow['workflow_id'], workflow_version=workflow['version'],
@@ -181,6 +182,18 @@ class RuntimeService:
     def public(run):
         return {key: deepcopy(run[key]) for key in ('run_id', 'workflow_id', 'workflow_version', 'status', 'approvals', 'correlation_id', 'trace_reference')}
 
+    def owns_execution(self, run, worker):
+        """An owner token is executable authority only while its lease is live."""
+        return (run['status'] == 'running' and run.get('worker') == worker
+                and run.get('lease_until', 0) > self.clock())
+
+    def check_deadlines(self, run, workflow, agent=None):
+        now = self.clock()
+        if now - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
+            raise RuntimeFailure('RUN_TIMEOUT', 'The workflow duration budget is exhausted.')
+        if agent and now - run.get('agent_started_at', {}).get(agent['agent_id'], now) >= agent['limits']['timeout_seconds']:
+            raise RuntimeFailure('AGENT_TIMEOUT', 'The agent execution duration budget is exhausted.')
+
     def load(self, db, run_id, auth, permission='runs.view'):
         self.authorize(auth, permission, {'admin', 'builder', 'viewer', 'approver'} if permission == 'runs.view' else {'admin', 'builder'})
         row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?' + (' FOR UPDATE' if getattr(db,'write',False) else ''), (auth['subject']['workspace_id'], run_id)).fetchone()
@@ -205,6 +218,7 @@ class RuntimeService:
             from .recovery import evaluate_run
             workflow = self.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}
             run['outcome_evaluation'] = evaluate_run(run, workflow, self.clock())
+            if graph:=getattr(self.workflows,'account_graph',None):graph.record_execution(db,run,workflow)
         self.event(db, run, 'run.' + target, {'status': target})
         self.save(db, run)
 

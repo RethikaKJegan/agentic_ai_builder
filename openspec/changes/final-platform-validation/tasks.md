@@ -1,0 +1,8 @@
+- [x] Inspect instructions, prior reports, staged source and test configurations.
+- [ ] Run complete safe backend/connector suites with all PostgreSQL modules enabled.
+- [ ] Run separately controlled PostgreSQL outage test and source/contract/migration gates.
+- [ ] Run frontend units/types/lint and isolated production build.
+- [ ] Run all applicable browser suites using their proper fixtures and separate artifacts.
+- [ ] Reproduce/fix actual defects with regressions; preserve the user's staging index.
+- [ ] Run load/failure validation and document external/staging/SLO blockers.
+- [ ] Produce final classified release decision and exact evidence.

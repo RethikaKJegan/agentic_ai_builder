@@ -48,6 +48,9 @@ class GraphRunner:
         from shared.llm_feedback import correct_once
         def invoke(item):
             agent = deepcopy(binding)
+            graph=getattr(self.runtime.workflows,'account_graph',None)
+            pin=workflow.get('metadata',{}).get('account_graph_pin')
+            if graph and pin:agent['_account_knowledge']=graph.context(auth,pin,node.get('label',''))
             if item:
                 agent['_validation_feedback'] = item
             output = adapter.invoke(agent, params, reference)
@@ -61,7 +64,7 @@ class GraphRunner:
                 return False
             with self.runtime.store.transaction() as db:
                 run = self.runtime.load(db, run_id, auth, 'workflow.execute')
-                if run['status'] != 'running' or run.get('worker') != worker:
+                if not self.runtime.owns_execution(run, worker):
                     raise RuntimeFailure('DELEGATION_INTERRUPTED', 'The run no longer owns model execution.')
                 self.runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
                 if self.runtime.clock()-run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
@@ -171,14 +174,13 @@ class GraphRunner:
         return digest({'node_id': node['node_id'], 'kind': node['kind'], 'tool_id': node.get('tool_id'),
                        'agent_id': node.get('agent_id'), 'params': self.params(node, run, workflow)})
 
-    def reserve(self, db, run, workflow, agent, amount):
+    def reserve(self, db, run, workflow, agent, amount, provider_id=None, credential_reference=None):
         if set(amount) - {'llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd'}:
             raise RuntimeFailure('INVALID_USAGE', 'The provider reservation contains unsupported usage counters.')
         for key, value in amount.items():
             if type(value) not in (int, float) or value < 0 or value != value or value == float('inf'):
                 raise RuntimeFailure('INVALID_USAGE', 'Provider usage must contain finite nonnegative counters.')
         from .adaptive_control import reserve as adaptive_reserve
-        adaptive_reserve(run,workflow,amount)
         counters = {'llm_calls': 'max_llm_calls', 'tool_calls': 'max_tool_calls', 'tokens': 'max_tokens',
                     'retries': 'max_retries', 'estimated_cost_usd': 'max_estimated_cost_usd'}
         groups = [('workflow', workflow['execution_policy']['limits'])]
@@ -195,6 +197,14 @@ class GraphRunner:
                     continue
                 if usage.get(key, 0) + value > limits.get(counters[key], 0):
                     raise RuntimeFailure('BUDGET_EXHAUSTED', 'The next invocation exceeds an execution budget.')
+        if controls:=getattr(self.runtime,'resource_controls',None):
+            if amount.get('llm_calls',0):
+                controls.reserve_provider(db,run['workspace_id'],agent['model']['provider'],self.runtime.clock())
+            if amount.get('tool_calls',0):
+                node=next((n for n in workflow['nodes'] if n['node_id']==run.get('current_node_id')), {})
+                provider=provider_id or controls.tool_provider(self.runtime,node.get('tool_id'))
+                controls.reserve_provider(db,run['workspace_id'],provider,self.runtime.clock(),credential_reference or controls.tool_credential(self.runtime,node.get('tool_id')))
+        adaptive_reserve(run,workflow,amount)
         for name, _ in groups:
             if name != 'workflow':
                 run.setdefault('agent_started_at', {}).setdefault(name, self.runtime.clock())
@@ -272,7 +282,7 @@ class GraphRunner:
         def renew():
             with self.runtime.store.transaction() as db:
                 run=self.runtime.load(db,run_id,auth,'workflow.execute')
-                if run.get('worker')!=worker or run['status']!='running':return False
+                if not self.runtime.owns_execution(run,worker):return False
                 run['lease_until']=self.runtime.clock()+seconds
                 self.runtime.save(db,run)
             return True
@@ -291,11 +301,19 @@ class GraphRunner:
                 return runtime.public(run)
             if run.get('lease_until', 0) > runtime.clock():
                 return runtime.public(run)
+            if run.get('available_at',0)>runtime.clock():return runtime.public(run)
             if any(state == 'executing' for state in run['node_states'].values()):
                 if run['status'] == 'queued':
                     runtime.transition(db, run, 'running')
                 self.fail(db, run, 'UNKNOWN_INVOCATION_RESULT', blocked=True)
                 return runtime.public(run)
+            if controls:=getattr(runtime,'resource_controls',None):
+                from workflow_api.resource_limits import CapacityDeferred
+                try:controls.claim(db,run,runtime.clock())
+                except CapacityDeferred as error:
+                    try:controls.defer(runtime,db,run,error)
+                    except RuntimeFailure as failure:self.fail(db,run,failure.code,blocked=True)
+                    return runtime.public(run)
             run['worker'] = worker
             run['lease_until'] = runtime.clock() + lease_seconds
             if run['status'] == 'queued':
@@ -305,7 +323,7 @@ class GraphRunner:
             invocation = None
             with runtime.store.transaction() as db:
                 run = runtime.load(db, run_id, auth, 'workflow.execute')
-                if run.get('worker') != worker or run['status'] != 'running':
+                if not runtime.owns_execution(run, worker):
                     return runtime.public(run)
                 try:
                     workflow, grants = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
@@ -408,6 +426,11 @@ class GraphRunner:
                             **({'google_connection': invocation[0].google_connection_info} if getattr(invocation[0], 'google_connection_info', None) else {})})
                         runtime.save(db, run)
                 except (RuntimeFailure, RegistryError) as failure:
+                    from workflow_api.resource_limits import CapacityDeferred
+                    if isinstance(failure,CapacityDeferred):
+                        try:runtime.resource_controls.defer(runtime,db,run,failure)
+                        except RuntimeFailure as error:self.fail(db,run,error.code,blocked=True)
+                        return runtime.public(run)
                     self.fail(db, run, failure.code, blocked=True)
                     return runtime.public(run)
                 except Exception:
@@ -416,6 +439,16 @@ class GraphRunner:
             if invocation:
                 adapter, binding, params = invocation
                 try:
+                    # Intent persistence is not continuing authority. Cancellation,
+                    # lease expiry or Registry revocation may occur at that commit.
+                    with runtime.store.transaction(write=False) as db:
+                        current = runtime.load(db, run_id, auth, 'workflow.execute')
+                        if not runtime.owns_execution(current, worker):
+                            return runtime.public(current)
+                        reviewed, _ = runtime.revision(db, current['workflow_id'], current['workflow_version'], auth, current.get('release_bound', False))
+                        if digest(reviewed) != current['workflow_digest']:
+                            raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed before invocation.')
+                        runtime.check_deadlines(current, reviewed, agent)
                     if kind == 'agent' and node['node_id'] in workflow['metadata'].get('dynamic_delegation', {}):
                         output = DelegationSession(self, run_id, auth, worker, workflow, node, agent, params).execute()
                     elif kind == 'agent':
@@ -447,7 +480,7 @@ class GraphRunner:
                 else:original_code=None
                 with runtime.store.transaction() as db:
                     run = runtime.load(db, run_id, auth, 'workflow.execute')
-                    if run.get('worker') != worker or run['status'] != 'running':
+                    if not runtime.owns_execution(run, worker):
                         return runtime.public(run)
                     if original_code:
                         run['action_instances'][node['node_id']]['verification_error_code']=original_code
@@ -464,6 +497,11 @@ class GraphRunner:
                                 run['node_states'].pop(node['node_id'])
                                 runtime.event(db, run, 'node.retry', {'node_id': node['node_id'], 'attempt': attempts + 1})
                                 runtime.save(db, run)
+                                if getattr(runtime,'resource_controls',None):
+                                    run['available_at']=runtime.clock()+min(2**attempts,60)
+                                    run['lease_until']=0
+                                    runtime.save(db,run)
+                                    return runtime.public(run)
                                 continue
                             except RuntimeFailure:
                                 code = 'BUDGET_EXHAUSTED'
@@ -484,8 +522,12 @@ class GraphRunner:
                         workflow, _ = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
                         if digest(workflow) != run['workflow_digest']:
                             raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed.')
+                        runtime.check_deadlines(run, workflow, agent)
                         self.finish_node(db, run, workflow, node, output)
-                    except Exception:
+                    except Exception as failure:
+                        runtime.event(db, run, 'invocation.revalidation_failed', {
+                            'node_id': node['node_id'], 'invocation_id': invocation_id,
+                            'error_code': failure.code if isinstance(failure, (RuntimeFailure, RegistryError)) else 'INVALID_EXECUTION_DATA'})
                         self.fail(db, run, 'POST_INVOCATION_REVALIDATION_FAILED', blocked=True)
                         return runtime.public(run)
 

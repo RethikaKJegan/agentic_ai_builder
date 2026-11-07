@@ -1,0 +1,2981 @@
+{
+  "status": "passed",
+  "compiler_version": "simpson-owl-shacl-v1",
+  "version_id": "bov_subway_audited_v3",
+  "revision": 3,
+  "checks": {
+    "snapshot": "passed",
+    "rdf_syntax": "passed",
+    "shapes_meta_shacl": "passed",
+    "definition_shacl": "passed"
+  },
+  "definition_conforms": true,
+  "instance_validation": "not_run",
+  "owl_reasoning": "not_run",
+  "business_policy_verified": false,
+  "counts": {
+    "concepts": 158,
+    "relationships": 156,
+    "rules": 28,
+    "ontology_triples": 10676,
+    "instance_shape_triples": 4965
+  },
+  "issues": [],
+  "warnings": [
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_grnreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_poreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:audit_ref_8216af20b51cb15b",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:audit_ref_c5d6c096595f4871",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:candidate_reference_9",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_8d60cc283d53a867",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_8d60cc283d53a867",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_d49ef5a8631d7404",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_d49ef5a8631d7404",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_dd48684ddc9345d9",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_ref_dd48684ddc9345d9",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_delete_pending",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_delete_pending",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_update_pending",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_update_pending",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_manager_location",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_manager_location",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvalconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_cfapprovalmappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_stages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:audit_ref_6d0297c0deb7b293",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:budget_reservation",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:budget_reservation",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_7",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_8",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_0a58f600de837a96",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_0a58f600de837a96",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_5c9b5c821652ba31",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_5c9b5c821652ba31",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_66b289be7a6511f2",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_66b289be7a6511f2",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_8363af442d2f3ec3",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_8363af442d2f3ec3",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_9ea1148d65d99208",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_9ea1148d65d99208",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_bb8ec2a535bff277",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_bb8ec2a535bff277",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_bff2e2691abe62ff",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_ref_bff2e2691abe62ff",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_positive_modification",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_positive_modification",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_reservation_available",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_reservation_available",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgetmodifications",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_lineitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:capex_calculation",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:capex_calculation",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:cf_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:cf_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:code_rule_step_approval",
+      "message": "CF_READ_ONLY is accepted by the shared step-authority helper; intended approve permissions require confirmation."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:code_rule_step_approval",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:code_rule_step_approval",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:code_rule_typed_inputs",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:code_rule_typed_inputs",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:exception_approver_configuration",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:exception_approver_configuration",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:financial_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:financial_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:step_configuration",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "cf_approvals:step_configuration",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:a_o_p_sites",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:a_o_p_sites",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_aop_budget_master",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_aop_budget_master",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_boq_master",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_boq_master",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_input_field_master",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_input_field_master",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_output_line_template",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_output_line_template",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_rate_master",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:capex_rate_master",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:cf_acquired_step_master",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:cf_acquired_step_master",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:comment",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:comment",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:docu_storage_sync",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:docu_storage_sync",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:ordering_platform",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:ordering_platform",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:price_cohort",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:price_cohort",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:report_config",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_1:report_config",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:restaurent",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:restaurent",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:store_code_recipients",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:store_code_recipients",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:upload_form",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_cf_2:upload_form",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:audit_ref_0138e36eaf78ce62",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:audit_ref_d140d8ec6ce09c04",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog_category",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog_category",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog_project",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:blog_project",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:license_expiry_email",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_documents_1:license_expiry_email",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:audit_ref_66d34bb9943b280b",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:extra_charge",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:extra_charge",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:p_r_config",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:p_r_config",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:pr_report",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:pr_report",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:vendor_mapping_history",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_finance_1:vendor_mapping_history",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:address",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:address",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:address_type",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:address_type",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_01dc9cfb9d70da2b",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_2b87d9dc5acd0f38",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_30d2fa8d098c99aa",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_411e01ab6898ca22",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_441437b2800b2f59",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_458b3890a9178ce1",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_950a3c7a58893c02",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:audit_ref_a2009523d418421f",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:basic_fixed",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:basic_fixed",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:catering_attribute",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:catering_attribute",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:communication",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:communication",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:communication_address_type",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:communication_address_type",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:corporation",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:corporation",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:decor_attribute",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:decor_attribute",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:delivery_attribute",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:delivery_attribute",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:memo",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:memo",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:memo_category",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_1:memo_category",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_0057a105654d389f",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_0da89efac0dd6677",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_4fbf673c76bd4b93",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_6cd15a91b5824d23",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_997beb360b64ed32",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_c702f9c811095a53",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_ced922f4dae741f9",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_d4313466ced5e3a9",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_e5d15cb666613fb4",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:audit_ref_fbcf6ba9b3c7d254",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:memo_timeline",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:memo_timeline",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:p_o_s_tech_attribute",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:p_o_s_tech_attribute",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_attribute",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_attribute",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_contact",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_contact",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_drawing",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_drawing",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_hours",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_hours",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_insurance",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_insurance",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_maintenance",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_maintenance",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_rent",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_rent",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_rent_increase",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_lease_rent_increase",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_owner",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_owner",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_worker_insurance",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_2:store_worker_insurance",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_3:user_role",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_3:user_role",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_3:waiver_type",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_franchise_3:waiver_type",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_intranet_1:user_i_d_counter",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_intranet_1:user_i_d_counter",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:approval_config",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:approval_config",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:audit",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:audit",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:audit_ref_055814fb2c932280",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:audit_ref_ca278e86b3f909bb",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:fixed_email_send_to",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:fixed_email_send_to",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:imprest",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:imprest",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:legal_field",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:legal_field",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:petty_cash_certificate",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:petty_cash_certificate",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:store_invoice_approval",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:store_invoice_approval",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_form",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_form",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_invoice",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_invoice",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_onboard",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:vendor_onboard",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:voucher_timeline",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_invoices_1:voucher_timeline",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:audit_ref_461870ed92c276eb",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:audit_ref_4a77f6c54ea80f06",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:ticket_i_d_counter",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:ticket_i_d_counter",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:timeline",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:timeline",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:user_role",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_quality_1:user_role",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:audit_ref_1474fb5a146b4cbe",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:audit_ref_3ca5ef5fab34fa28",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:audit_ref_424dfce167ef68e8",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:audit_ref_836df78f60838451",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration_exception",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration_exception",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration_push",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:sales_integration_push",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:status_timeline",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:status_timeline",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:timeline",
+      "message": "Production release equivalence has not been established."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "code_technical_1:timeline",
+      "message": "Source code establishes a model declaration, not record availability or approved policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_35f8992675076d69",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_35f8992675076d69",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_479f7764f680261b",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_479f7764f680261b",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_ff9afe139db98119",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_ref_ff9afe139db98119",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_document_timeline",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_document_timeline",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_duplicate_document",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_duplicate_document",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_upsert_consistency",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:code_rule_upsert_consistency",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:company_document",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:company_document",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:document",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:document",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:document_timeline",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:document_timeline",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:restaurant_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "document_storage:restaurant_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:audit_ref_277aea622ef8c8de",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:audit_ref_81e5e83dcb042307",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:audit_ref_88c2f6cd4a6a5702",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:audit_ref_a53336666ccc30c1",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:business_record",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocumentcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_apps",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogprojects",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_confirmappdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_43f7e6e01d138523",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_43f7e6e01d138523",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_72a5eda7cf4031b4",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_72a5eda7cf4031b4",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_eb01a4bb0e53baaa",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_ref_eb01a4bb0e53baaa",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_document_department",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_document_department",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_invalidate_confirmations",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_invalidate_confirmations",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_assets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_grnreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_poreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_reportfiles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:object",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:audit_ref_a80fef17589a8c27",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_3a3fb79dbe3f4797",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_3a3fb79dbe3f4797",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_7667e683456fa49d",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_7667e683456fa49d",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_c289917fad449cea",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_c289917fad449cea",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_d10d47f234e86fdb",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_d10d47f234e86fdb",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_d44250e46c0f0d7c",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_d44250e46c0f0d7c",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_ecf9dd41933c4197",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_ecf9dd41933c4197",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_fedf0eb1edc621f7",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_ref_fedf0eb1edc621f7",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_rule_transfer_owner",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_rule_transfer_owner",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_rule_waiver_store",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:code_rule_waiver_store",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:franchise_agreement",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:franchise_agreement",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_lease",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_lease",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_transfer",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:store_transfer",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:waiver",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:waiver",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:waiver_assignment",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "franchise_records:waiver_assignment",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:approval_stage",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:approval_stage",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:audit_ref_a1d3fefe65e2924c",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_718fc3284da76496",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_718fc3284da76496",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_9b15b2074600edbf",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_9b15b2074600edbf",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_9e9fbc9e9a40cc96",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_ref_9e9fbc9e9a40cc96",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_rule_resubmission_routing",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_rule_resubmission_routing",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_rule_vendor_invoice_unique",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:code_rule_vendor_invoice_unique",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:invoice",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:invoice",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:legal_document",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:legal_document",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:vendor",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:vendor",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:voucher",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "invoice_tracking:voucher",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:audit_ref_61c1f18746a2bcf7",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:audit_ref_79ed25835913198c",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:audit_ref_ea3d6ae77c9b2adc",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:audit_ref_ebfd15e79b527ce5",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departmentroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_roles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_stategsts",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_userroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_vendors",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:code_ref_f26487ed30e18045",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:code_ref_f26487ed30e18045",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_companies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_foreigncurrencies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_locations",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_vendormappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:audit_ref_0b83da1873bf60f8",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:audit_ref_bcbcb0b152f7a0c8",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:audit_ref_ee9cb1e3b0a601b1",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_arolds",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plactuals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plaops",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_pluems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:allocation_movement",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:allocation_movement",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_2f0887ae971d6869",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_747c63719a19223f",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_82ac2aa8cb03354c",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_93ffd66754530b88",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_9e62e72dbd08fc38",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:audit_ref_f4ad184131561f18",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_0",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_1",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_0766a840c417fafa",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_0766a840c417fafa",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_08a3c8926d919bca",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_08a3c8926d919bca",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_1f1ad702b82b9580",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_1f1ad702b82b9580",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_25acc5312b073bef",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_25acc5312b073bef",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_2ceb4b29d0f7cd76",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_2ceb4b29d0f7cd76",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_322b6133291ca15a",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_322b6133291ca15a",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_4255edf10750534f",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_4255edf10750534f",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_45c248b4e2ff4f04",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_45c248b4e2ff4f04",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_5f2b7453bde0cb04",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_5f2b7453bde0cb04",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_6f1b25959f9706e9",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_6f1b25959f9706e9",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_77932cd12bd0bb0f",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_77932cd12bd0bb0f",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_7a750c7b359d290a",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_7a750c7b359d290a",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_7ae2a6e28d450b76",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_7ae2a6e28d450b76",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_809528b21f53524d",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_809528b21f53524d",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8353c4d352b2d8e4",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8353c4d352b2d8e4",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8ba9d9469a34d33a",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8ba9d9469a34d33a",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8e425fa6649abcec",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_8e425fa6649abcec",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_93f6f71bd64fc06a",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_93f6f71bd64fc06a",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_943a61fddfec2e77",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_943a61fddfec2e77",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_9b74c567d72b79b4",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_9b74c567d72b79b4",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_9ca634d5abadd7d3",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_9ca634d5abadd7d3",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c117d3d133b1fd2c",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c117d3d133b1fd2c",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c1718fb789731f16",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c1718fb789731f16",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c21716dc56db65f0",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c21716dc56db65f0",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c53c5b0091c07f05",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_c53c5b0091c07f05",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_d6df86bede95d15e",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_d6df86bede95d15e",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_d9c0071a88c776aa",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_d9c0071a88c776aa",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_e009cfa50c67bd40",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_e009cfa50c67bd40",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_fa4da51f686bf16e",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_ref_fa4da51f686bf16e",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_approved_pr",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_approved_pr",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_budget_approval",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_budget_approval",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_creator_short_close",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_creator_short_close",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_independent_department",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_independent_department",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_ticket_category",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_ticket_category",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_categories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_faitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_items",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_purchaseorders",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_subcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:purchase_request",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:purchase_request",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:audit_ref_5e30d53c4d36833b",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:audit_ref_baf1712a687bd535",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_24e71d655a6634fc",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_24e71d655a6634fc",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_392cb6c53168b90d",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_392cb6c53168b90d",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_c7b6f63a81b72c6e",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_c7b6f63a81b72c6e",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_dc6c289684333491",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_ref_dc6c289684333491",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_closure_admin",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_closure_admin",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_credit_authority",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_credit_authority",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_credit_information",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:code_rule_credit_information",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:complaint_case",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:complaint_case",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:complaint_type",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:complaint_type",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:product",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:product",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:product_category",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:product_category",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:store_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "quality_cases:store_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:audit_ref_bbf542a88ff5879c",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_3",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_4",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_5",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_6",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_20c1aeb803768d38",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_20c1aeb803768d38",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_3f90e5d640bc63d0",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_3f90e5d640bc63d0",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_439ea55503056f2f",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_439ea55503056f2f",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_5de3f85dbc035509",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_5de3f85dbc035509",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_c2b9a530db544155",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_c2b9a530db544155",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_d27ffca58a8f81c8",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_d27ffca58a8f81c8",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_febbd855cc4b232c",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_ref_febbd855cc4b232c",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_advance_maximum",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_advance_maximum",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_grn_duplicate",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_grn_duplicate",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_grns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_invoicedatas",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_vendorgrnstagetimelines",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_186ed33f3a646d43",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_2409654e6626c191",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_9d2db8af56779cf5",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_ae43201f3ea4ad5e",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_cb0aa985f4923a5c",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_f2f4d6a8261d0a5b",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:audit_ref_f8eabc0ce783efac",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:candidate_reference_10",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwaregrns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwaregrns",
+      "message": "Supplied smallware GRN approval guard has a precedence defect; approver authority enforcement is not verified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwareitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepoconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepos",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarestages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:audit_ref_1c795f348ad73bfa",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:audit_ref_dbd7ed33b4fea10f",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:candidate_reference_2",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_dcs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_electricityconsumptions",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_storeproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_stores",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:code_ref_161b91da6fbcceba",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:code_ref_161b91da6fbcceba",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:audit_ref_8b114e3ae58e3837",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:audit_ref_8b578b9a7ae73de8",
+      "message": "Model intent does not establish complete native-ID matches or a cross-service identity."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_0e9d992f95f2b753",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_0e9d992f95f2b753",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_4ac96b7a93d1ac9d",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_4ac96b7a93d1ac9d",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_71f3727baae8160c",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_71f3727baae8160c",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7913773b3c8dff1f",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7913773b3c8dff1f",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7e1917abc5cf983c",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7e1917abc5cf983c",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7ec87da949c7157f",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_7ec87da949c7157f",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_90c6bd90e9852272",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_90c6bd90e9852272",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_9685d77175833000",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_9685d77175833000",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_aa37cbe7a1fdc788",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_aa37cbe7a1fdc788",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_c9be8c0b41f73a30",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_c9be8c0b41f73a30",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_e8eb47753dfec2f8",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_e8eb47753dfec2f8",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_f10f0189eb4b74db",
+      "message": "Native identifier and deployed-version compatibility must be checked before traversal."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_ref_f10f0189eb4b74db",
+      "message": "No foreign-key enforcement or executable join authority is granted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_rule_next_sla",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_rule_next_sla",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_rule_sla_selection",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:code_rule_sla_selection",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:complaint_form",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:complaint_form",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:department",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:department",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:escalation",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:escalation",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:store_record",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:store_record",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket_category",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket_category",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket_tag",
+      "message": "Code archive version has not been confirmed as the deployed production release."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "technical_support:ticket_tag",
+      "message": "No matching database snapshot was supplied for this model."
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "approvals",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "budgets",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "cf_approvals",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "cf_approvals",
+      "message": "Which deployed release and data sources match this archived application code?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_cf_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_cf_2",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_documents_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_finance_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_franchise_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_franchise_2",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_franchise_3",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_intranet_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_invoices_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_quality_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "code_technical_1",
+      "message": "Which connected dataset and production release correspond to these source models?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "document_storage",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "document_storage",
+      "message": "Which deployed release and data sources match this archived application code?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "evidence",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "franchise_records",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "franchise_records",
+      "message": "Which deployed release and data sources match this archived application code?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "invoice_tracking",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "invoice_tracking",
+      "message": "Which deployed release and data sources match this archived application code?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "organization",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "performance",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "procurement",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "quality_cases",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "quality_cases",
+      "message": "Which deployed release and data sources match this archived application code?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "receipts",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "smallwares",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "stores",
+      "message": "Which source definitions and approved policies govern this business area?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "technical_support",
+      "message": "Which authoritative policy documents confirm these implemented behaviors?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "technical_support",
+      "message": "Which deployed release and data sources match this archived application code?"
+    }
+  ]
+}

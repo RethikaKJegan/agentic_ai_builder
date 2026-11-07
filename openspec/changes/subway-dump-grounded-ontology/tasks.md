@@ -1,0 +1,5 @@
+- [x] Map restored collections to model and service evidence.
+- [x] Build immutable data-centered definitions without unconnected classes.
+- [x] Verify relationships against metadata and bounded native identifiers.
+- [x] Verify planning, historical reads, isolation and citations.
+- [x] Deploy and document supplied-data coverage and local limitations.

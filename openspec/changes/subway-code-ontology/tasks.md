@@ -1,0 +1,5 @@
+- [x] Extract and fingerprint relevant source evidence from all eight archives.
+- [x] Map models and active service guards to scoped concepts, relationships and rules.
+- [x] Validate the new ontology and maintain historical package/read compatibility.
+- [x] Test grounding, scope, rule nonexecution and planner context.
+- [x] Deploy Subway's immutable version and verify Simpsons preservation.

@@ -86,8 +86,8 @@ def catalogue(preparation,tools,connectors=None):
  return result
 
 
-def validate_tasks(tasks,contracts):
- if not isinstance(tasks,list) or not 1<=len(tasks)<=16:fail('Select between one and sixteen supported tasks.','CAPABILITY_TASK_LIMIT',422)
+def validate_tasks(tasks,contracts,*,max_tasks=16):
+ if not isinstance(tasks,list) or not 1<=len(tasks)<=max_tasks:fail('Select between one and sixteen supported tasks.' if max_tasks==16 else 'The capability catalogue exceeds its supported bound.','CAPABILITY_TASK_LIMIT',422)
  ids=[t.get('task_id') for t in tasks]
  if len(ids)!=len(set(ids)):fail('Duplicate task identifier.','CAPABILITY_TASK_GRAPH',422)
  pending=set(ids);done=set()

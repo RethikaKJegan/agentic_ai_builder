@@ -72,6 +72,10 @@ class CrewAdapter:
             llm.control_context = deepcopy(inputs)
         elif content_schema := content_response_schema(definition,inputs):
             llm.structured_format=dict(type='json_schema',name='connected_evidence_content',strict=True,schema=content_schema)
+        elif (isinstance(inputs.get('context'),dict) and 'subway_query_catalog' in inputs['context']
+              and set(definition['output_schema'].get('properties',{}))=={'query'}
+              and closed_payload(definition['output_schema'])):
+            llm.structured_format=dict(type='json_schema',name='scoped_read_query',strict=True,schema=deepcopy(definition['output_schema']))
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
             llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'],
@@ -128,10 +132,13 @@ class CrewExecutor:
         self.registry_adapter, self.model_factory = registry_adapter, model_factory
         self.knowledge_loader = knowledge_loader
 
-    def _adapter(self, record):
+    def _adapter(self, record, account_knowledge=None):
         knowledge = []
         if self.knowledge_loader is not None and 'data.read' in record['definition'].get('permissions', []):
             knowledge = self.knowledge_loader(record['workspace_id'])
+        if account_knowledge is not None:
+            from .memory import bounded_context
+            knowledge=[*knowledge,dict(source_id='pinned_account_graph',evidence=bounded_context(account_knowledge,max_bytes=12000,max_tokens=12000))]
         return CrewAdapter(self.model_factory, knowledge_context=knowledge)
 
     @staticmethod
@@ -160,7 +167,7 @@ class CrewExecutor:
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         usage = []
         protocol = None if output_schema is None else ('master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool')
-        output = self._adapter(record).execute(definition, inputs, usage_callback=usage.append, protocol=protocol)
+        output = self._adapter(record,agent.get('_account_knowledge')).execute(definition, inputs, usage_callback=usage.append, protocol=protocol)
         if len(usage) != 1 or usage[0]['llm_calls'] != 1:
             raise RuntimeFailure('INVALID_USAGE', 'A delegated model turn must report one confirmed call.')
         return output, usage[0]
@@ -180,7 +187,7 @@ class CrewExecutor:
             definition['instructions']+=' For this evidence analysis return exactly summary, findings and missing_information. Cite supplied record_id/mapping_id pairs for observations and comparisons. Describe coverage and missing evidence as limitation or unverified findings; never invent citations. Do not add source_references, assumptions, state or other fields to this structured result.'
         # The persisted DAG, rather than CrewAI's internal delegation, controls
         # the order and number of agent and tool calls for every workflow.
-        return self._adapter(record).execute(definition, inputs)
+        return self._adapter(record,agent.get('_account_knowledge')).execute(definition, inputs)
 
     def invoke_decision(self, agent, inputs, invocation_id, output_schema):
         record = self.registry_adapter.agents.get(agent['agent_id'])

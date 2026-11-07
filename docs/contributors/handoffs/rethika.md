@@ -1001,3 +1001,64 @@ ownership so stale supervisor rows cannot prevent dedicated-client restart.
 build/types/lint/contracts/OpenSpec. Current Google/data/ontology/workflow rows were
 preserved. No paid model calls or outgoing effects were used. See
 `openspec/changes/simpsons-workspace-audit/verification.md` for evidence and limits.
+
+## Subway source-code ontology — 6 November 2026
+
+Deployed immutable `bov_subway_code_v2` and package revision 2: 89 concepts,
+91 relationships, 28 descriptive non-executable rules, 15 modules. All eight supplied
+application archives remain unchanged; exact excerpts/hashes ground model references
+and active code guards. Code-only concepts remain unconnected, service identities
+remain distinct, and defective guards are documented. Subway planning receives the
+new pinned context while historical revision 1 and read providers remain available.
+Simpsons data, ontology, workflows, credentials, Google accounts and backend process
+were preserved. Both public logins/pages passed desktop/mobile checks. Backend suites
+67/45/74 passed (overlapping); frontend 529 passed plus types/lint/build. All 24 old/new
+bounded package reads passed; controlled workflow completed without model calls or
+source writes. See `docs/subway-code-ontology.md` and
+`openspec/changes/subway-code-ontology/verification.md` for evidence and limitations.
+
+## Subway ontology coverage audit — 6 November 2026
+
+Deployed audited ontology v3/package revision 3: 158 concepts, 156 relationships,
+28 non-executable descriptive rules, 26 modules and 52 bounded collection reads with
+637 field mappings. Full source inventory accounts for 156 business models; 104 are
+code-only. Fixed rule-condition/field retrieval, previously missing source bindings,
+array refs, safe report labels, empty-collection probing and larger sample byte bounds.
+All 76 old/new actual reads, 184 definition lookups and a staged controlled workflow
+passed without model calls or source writes. 121 affected and 23 focused tests passed
+(overlapping), plus contracts and strict OpenSpec. Both clients and historical pins
+remain isolated; Simpsons was not restarted. Selected rule coverage is not exhaustive
+policy coverage. See `docs/subway-ontology-coverage-audit.md` and the corresponding
+OpenSpec verification for complete scope and evidence.
+
+## Subway dump-centered ontology — 6 November 2026
+
+Deployed immutable v4/package revision 4 around the supplied central/finance dumps:
+52 collection concepts plus two parents, 67 qualified data/code relationships,
+13 applicable non-executable rules, nine modules and all 52 readers/637 mappings.
+Removed 104 code-only classes from new planning, keeping prior versions immutable.
+Every collection maps to an exact code model; 48 have direct service-symbol usage.
+Two relevant guards retain task-local absent prerequisites without creating phantom
+classes. Root-schema array paths corrected; actual record probes show 57 fully sampled
+matches, two partial and eight unpopulated references. All 128 historical/current reads,
+65 definition lookups, staged controlled workflow, 76 affected tests and five final
+focused tests passed. No model calls or source writes. Both clients pass public
+desktop/mobile checks; credentials, workflows, Google accounts and Simpsons PID
+preserved. See `docs/subway-dump-grounded-ontology.md` and the matching OpenSpec
+verification for exact scope, evidence and remaining task-local limits.
+
+## Subway full-data evidence — 6 November 2026
+
+Enabled tenant-only `subway_query` and metered query-plan→query→report actions.
+New plans use complete source filters/aggregates and qualified scalar left joins,
+with exact match counts and separate result pagination; historical 25-row inspection
+readers remain available to saved workflow pins. All 43,439 POs counted, currency
+sums/status counts independently verified, late record retrieved, all 213,676 stages
+retained with 213,665 parent matches/11 orphans. Resolved App.properties string 5
+using its Number/ref schema: five matches, one normalization, 19 optional nulls.
+62 affected and 18 final query tests passed (overlapping), plus controlled two-model,
+one-query workflow, contracts/OpenSpec. No external model calls/source writes.
+Fixed a public login asset mismatch by restarting the frontend against its current
+complete build. Subway only backend flag enabled; Simpsons PID/credentials/data,
+old workflows, Google accounts and all package/ontology pins preserved. See
+`docs/subway-full-data-evidence.md` and the corresponding OpenSpec verification.

@@ -20,8 +20,8 @@ def fail(message, code='BUSINESS_SOURCE_INVALID', status=422):
     raise ApiFailure(code,message,status)
 
 
-def fields_for(dataset):
-    return [f for f in dataset['fields'] if safe_name(f['name']) and not any(c in f['name'] for c in '[$\x00')
+def fields_for(dataset,*,allow_report_labels=False):
+    return [f for f in dataset['fields'] if (safe_name(f['name']) or (allow_report_labels and safe_name(f['name'].replace(' ','_')))) and not any(c in f['name'] for c in '[$\x00')
             and set(f['types'])-{'null'} <= {'string','ObjectId','integer','number','boolean','date','datetime','decimal','Decimal128','numeric'}
             and bool(set(f['types'])-{'null'})]
 
@@ -115,7 +115,7 @@ class BusinessSources:
         with self.store.transaction(write=False) as db:self.bound(db,auth,cid)
         return self.evidence.request_profile(auth,cid)
 
-    def binding(self,auth,body):
+    def binding(self,auth,body,*,empty_native_identity=False,allow_report_labels=False):
         auth,_=self.authorize(auth)
         with self.store.transaction(write=False) as db:
             workspace,secret,connection,snapshot=self.bound(db,auth,body['connection_id'])
@@ -125,7 +125,11 @@ class BusinessSources:
             fail('Source metadata changed. Refresh the source list before browsing.','BUSINESS_SOURCE_STALE',409)
         dataset=next((d for d in snapshot['datasets'] if d['dataset_id']==body['dataset_id']),None)
         if not dataset:fail('Dataset is unavailable.','BUSINESS_SOURCE_NOT_FOUND',404)
-        fields=fields_for(dataset)
+        fields=fields_for(dataset,allow_report_labels=allow_report_labels)
+        if (empty_native_identity and connection['engine']=='mongodb' and not fields
+            and dataset.get('sample_count')==0
+            and any(i.get('name')=='_id_' for i in dataset.get('indexes',[]))):
+            fields=[dict(name='_id',field_id='_id',types=['ObjectId'])]
         keys=['_id'] if connection['engine']=='mongodb' else next((c['columns'] for c in dataset.get('constraints',[]) if c['kind']=='primary_key'),[])
         by_name={f['name']:f for f in fields}
         if not keys or not set(keys)<=set(by_name):fail('A supported native identity is required to browse records.')

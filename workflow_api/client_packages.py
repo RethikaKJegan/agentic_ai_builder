@@ -30,8 +30,14 @@ PACKAGE_SCHEMA=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts
 
 
 class ClientPackages:
-    def __init__(self,store,providers=None):
+    def __init__(self,store,providers=None,*,max_package_bytes=100000):
         self.store=store;self.providers=providers or {}
+        # Trusted operator provisioning may need a larger metadata manifest.
+        # Callers cannot increase this through package/request JSON. Execution
+        # permissions, record bounds and the 100 KB evidence limit are unchanged.
+        if type(max_package_bytes) is not int or not 1<=max_package_bytes<=300000:
+            raise ValueError('Use a bounded operator package metadata allowance.')
+        self.max_package_bytes=max_package_bytes
         with store.transaction() as db:
             db.execute('CREATE TABLE IF NOT EXISTS client_knowledge_packages (workspace TEXT NOT NULL, owner TEXT NOT NULL, package_id TEXT NOT NULL, revision INTEGER NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,owner,package_id,revision))')
 
@@ -52,7 +58,7 @@ class ClientPackages:
         if not isinstance(body,dict) or not PACKAGE_KEYS<=set(body) or set(body)-(PACKAGE_KEYS|PACKAGE_OPTIONAL):fail('Supply the complete client knowledge manifest.','CLIENT_PACKAGE_INVALID',422)
         if list(Draft202012Validator(PACKAGE_SCHEMA).iter_errors(body)):fail('Client package does not satisfy its schema.','CLIENT_PACKAGE_INVALID',422)
         reject_secrets(body)
-        if len(canonical(body).encode())>100000:fail('Client package is too large.','CLIENT_PACKAGE_INVALID',422)
+        if len(canonical(body).encode())>self.max_package_bytes:fail('Client package is too large.','CLIENT_PACKAGE_INVALID',422)
         for k in ('package_id','client_id','domain','ontology_version'):
             if not isinstance(body[k],str) or not 1<=len(body[k])<=128:fail('Invalid package identity.','CLIENT_PACKAGE_INVALID',422)
         if type(body['revision']) is not int or body['revision']<1:fail('Use a positive package revision.','CLIENT_PACKAGE_INVALID',422)
@@ -100,7 +106,9 @@ class ClientPackages:
                     for spec in list(stage['required_inputs'].values())+list(stage['optional_inputs'].values()):
                         if spec.get('evidence_mapping') and spec['evidence_mapping'] not in mids:raise ValueError()
             from .capability_contracts import validate_tasks
-            validate_tasks([dict(task_id=k,capability_id=k,depends_on=c['preconditions']) for k,c in body['capability_contracts'].items()],body['capability_contracts'])
+            # A catalog lists available operations, not one executable workflow.
+            # Each actual workflow retains validate_tasks' default 16-task limit.
+            validate_tasks([dict(task_id=k,capability_id=k,depends_on=c['preconditions']) for k,c in body['capability_contracts'].items()],body['capability_contracts'],max_tasks=128)
         except (KeyError,TypeError,ValueError,StopIteration):fail('Package references, schemas or dependencies are invalid.','CLIENT_PACKAGE_INVALID',422)
         document=deepcopy(body);document['sha256']=digest(body)
         with self.store.transaction() as db:
@@ -176,8 +184,14 @@ class ClientPackages:
                 outcomes.append(dict(rule_id=rule['id'],record_id=row['id'],matched=operators[rule['operator']](left,right),classification='configured_rule_result'))
         evidence=dict(request_id='package_'+digest([p['sha256'],inputs])[:24],version_id=p['ontology_version'],knowledge_sha256=p['sha256'],records=records,
                       coverage=dict(state='conflicting_evidence' if conflicting else 'needs_input' if missing else 'ready',conclusion_ready=not missing and not conflicting,blocking_requirements=[{'fact_id':m} for m in sorted(set(missing))]),rule_results=outcomes)
+        if 'row_budget_bytes' in binding:
+            evidence['coverage'].update(basis='bounded_snapshot_sample',complete_dataset=False,
+                returned_rows=len(records),max_rows=binding['limit'],
+                conclusion_ready_scope='Only the returned projected records; not exhaustive findings or totals.')
         reject_secrets(evidence)
         if len(canonical(evidence).encode())>100000:fail('Mapped evidence is too large.','CLIENT_SOURCE_INVALID',422)
+        graph=getattr(self,'account_graph',None)
+        if graph:evidence['account_graph_pin']=graph.sync_package(auth,self,p,evidence,inputs['capability_id'])
         return evidence
 
 

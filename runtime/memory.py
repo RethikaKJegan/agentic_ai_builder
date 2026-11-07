@@ -64,6 +64,12 @@ class WorkingMemory:
         failures = run.get('classified_failures', [])
         common = dict(knowledge_pin=knowledge_pin(workflow),
                       authority='Reference context only; current source and Registry checks remain mandatory.')
+        knowledge_graph=getattr(self.runtime.workflows,'account_graph',None)
+        pin=workflow.get('metadata',{}).get('account_graph_pin')
+        if knowledge_graph and pin:
+            # Never reconstruct roles/scopes from persisted memory. The caller's
+            # live authority is supplied by delegation/graph context instead.
+            common['account_graph_pin']=deepcopy(pin)
         common['verified_execution_recommendations']=[deepcopy(h) for h in workflow.get('metadata',{}).get('memory_recommendations',[])
                                                       if task is None or h['capability_id']==task['capability_id']][:8]
         if workflow.get('metadata',{}).get('lifecycle_context',{}).get('working_memory'):

@@ -25,7 +25,13 @@ for(const mobile of [false,true])test(`real lifecycle API, Simpson and retail on
    await panel.getByRole('button',{name:'Drive / continue',exact:true}).click();await expect(panel.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled({timeout:90000});
    const response=await page.request.get(`/api/backend/business-ontology/v1/cases/${id}`);expect(response.ok()).toBe(true);snapshot=caseSchema.parse((await response.json()).data);
    if(['COMPLETED','COMPLETED_PROVISIONALLY'].includes(snapshot.case_status))break;
-   const waiting=Object.values(snapshot.stages).find(s=>s.execution_status==='WAITING_FOR_AUTHORIZATION');expect(waiting).toBeTruthy();
+   const waiting=Object.values(snapshot.stages).find(s=>s.execution_status==='WAITING_FOR_AUTHORIZATION');
+   if(!waiting){
+    // A bounded driver command may stop before the next approval. Continue via
+    // another explicit UI command; do not increase server execution budgets.
+    await expect(panel.getByText(/Driver stopped: budget exhausted/)).toBeVisible();
+    continue;
+   }
    await panel.getByRole('button',{name:'Agents & tools',exact:true}).click();await panel.getByLabel('Agent stage').selectOption(waiting!.stage_instance_id);
    await expect(panel.getByRole('button',{name:'Validate workflow',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'Validate workflow',exact:true}).click();
    await expect(panel.getByRole('button',{name:'Approve workflow',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'Approve workflow',exact:true}).click();await expect(panel.getByRole('button',{name:'Refresh status',exact:true})).toBeEnabled();

@@ -184,7 +184,11 @@ class BusinessRules:
         rules=catalogue(snapshot)
         compilation=self.compiler.get(auth,version_id)['compilation']
         problem=compilation_problem(snapshot,compilation)
-        reference=question_reference()
+        if snapshot.get('workspace',{}).get('ontology_id')=='subway':
+            questions=[dict(id='subway_question_'+str(i),department=m['label'],question=q,status='requires_instance_mapping',prerequisites=['Matching deployed source version and data mappings','Current owned source access and authoritative business policy where needed']) for i,(m,q) in enumerate((m,q) for m in snapshot['modules'] for q in snapshot.get('questions',{}).get(m['id'],[]))]
+            reference=dict(items=questions,source=dict(title='Subway saved ontology questions',section='Archive and code evidence gaps',sha256=sha256(canonical(questions).encode()).hexdigest()))
+        else:
+            reference=question_reference()
         return dict(version_id=version_id,revision=snapshot['revision'],kind=snapshot['kind'],query_version=QUERY_VERSION,
             rules=rules,counts={basis:sum(r['basis']==basis for r in rules) for basis in BASIS_LABELS},
             queries=[dict(query_id=qid,label=d['label'],description=d['description'],focus_kind=d['focus_kind'],available=problem is None,unavailable_reason=problem) for qid,d in QUERIES.items()],

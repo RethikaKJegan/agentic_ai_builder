@@ -67,15 +67,41 @@ def retrieve(store, auth, objective, version_id=None):
         return result
     check_snapshot(snapshot)
     query = terms(objective)
-    modules = [(m['id'],m['label'],m.get('description',''),m['layers']) for m in snapshot['modules']] if snapshot.get('workspace',{}).get('ontology_id') == 'subway' else MODULES
-    aliases = {} if snapshot.get('workspace',{}).get('ontology_id') == 'subway' else ALIASES
+    subway = snapshot.get('workspace',{}).get('ontology_id') == 'subway'
+    if subway:
+        query -= {'what','how','does','do','explain','happens','happen','when','about'}
+        # Give planning an explicit distinction between code documentation and
+        # connected records. A declared model must not imply a usable dataset.
+        result['source_coverage'] = dict(
+            connected_collection_concepts=[c['id'] for c in snapshot['concepts']
+                if any(':'+role+'_' in c['id'] for role in ('central','finance'))],
+            code_only_concepts=[c['id'] for c in snapshot['concepts']
+                if c.get('data_availability')=='code_only_not_connected'],
+            record_read_basis='Bounded snapshot samples, at most 25 complete rows per collection; byte limits may reduce the returned row count.',
+            unsupported_package_operations=['arbitrary filters','exhaustive totals and aggregates','automatic joins','application business actions'],
+            rule_authority='Selected descriptive code guards; not exhaustive or independently approved policy.')
+    modules = [(m['id'],m['label'],m.get('description',''),m['layers']) for m in snapshot['modules']] if subway else MODULES
+    aliases = {} if subway else ALIASES
     module_scores = {mid: len(query & terms(aliases.get(mid, '') + ' ' + label)) for mid, label, _, _ in modules}
     def score(item):
-        return 5 * len(query & terms(item['label'] + ' ' + item['id'])) + len(query & terms(item['definition']))
+        value = 5 * len(query & terms(item['label'] + ' ' + item['id'])) + len(query & terms(item['definition']))
+        if subway:
+            # A code identifier or guard can be absent from the module/concept
+            # labels. Rank the actual saved rule and field evidence as well.
+            behavior = ' '.join([*item.get('conditions',[]), item.get('outcome','')])
+            fields = ' '.join(p['name'] for p in item.get('properties',[]))
+            fields += ' ' + ' '.join(p['name'] for p in item.get('declared_fields',[]))
+            value += 5 * len(query & terms(behavior + ' ' + fields))
+            value += len(query & terms(' '.join(e['quote'] for e in item['evidence'])))
+        return value
     # Concept labels support organization-specific terms without an alias dictionary.
     for item in snapshot['concepts']:
         module_scores[item['module_id']] += len(query & terms(item['label']))
-    matched = [m for m in sorted(module_scores, key=lambda m: (-module_scores[m], m)) if module_scores[m] > 0][:3]
+    if subway:
+        for kind in ('concepts','relationships','rules'):
+            for item in snapshot[kind]:
+                module_scores[item['module_id']] = max(module_scores[item['module_id']], score(item))
+    matched = [m for m in sorted(module_scores, key=lambda m: (-module_scores[m], m)) if module_scores[m] > 0][:5 if subway else 3]
     if not matched:
         return result
     result['matched_modules'] = matched

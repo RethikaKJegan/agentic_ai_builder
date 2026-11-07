@@ -1,5 +1,6 @@
 """Failure attribution and dependency invalidation on the existing durable run."""
 from copy import deepcopy
+import json
 from .service import RuntimeFailure, digest
 
 # Exact codes take precedence; unknown errors fail closed, never imply retry safety.
@@ -36,6 +37,7 @@ CODES = {
  'CAPABILITY_DEPENDENCY':'workflow_dependency','UNMATCHED_BRANCH':'workflow_dependency',
  'ACTION_EFFECT_UNVERIFIED':'uncertain_external_write','UNKNOWN_INVOCATION_RESULT':'uncertain_external_write','SMTP_DELIVERY_UNCERTAIN':'uncertain_external_write',
  'DELEGATION_INTERRUPTED':'interrupted_read',
+ 'ACCOUNT_GRAPH_STALE':'stale_metadata','ACCOUNT_GRAPH_VERSION':'stale_metadata','ACCOUNT_GRAPH_INTEGRITY':'stale_metadata','ACCOUNT_GRAPH_SOURCE':'revoked_authorization',
 }
 
 
@@ -72,6 +74,51 @@ def affected_tasks(tasks, changes):
 
 class RecoveryService:
     def __init__(self, runtime):self.runtime=runtime
+
+    def inspect(self, run_id, auth):
+        """Read-only operator evidence; never certify a remote outcome from flags."""
+        rt = self.runtime
+        with rt.store.transaction(write=False) as db:
+            run = rt.load(db, run_id, auth)
+            workflow = rt.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}
+            nodes = {n['node_id']: n for n in workflow['nodes']}
+            uncertain = []
+            completed = []
+            not_invoked = []
+            for nid, state in run.get('node_states', {}).items():
+                node = nodes.get(nid, {})
+                identity = dict(node_id=nid, invocation_id=run.get('node_invocations', {}).get(nid))
+                if state == 'completed':
+                    completed.append({**identity, 'output_sha256': digest(run['outputs'][nid]) if nid in run.get('outputs', {}) else None})
+                elif node.get('kind') == 'tool' and state in ('executing', 'blocked', 'failed'):
+                    started = db.execute("SELECT 1 FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='node.started' AND json_extract(document,'$.details.node_id')=? AND json_extract(document,'$.details.invocation_id')=? LIMIT 1",
+                                         (run['workspace_id'], run_id, nid, identity['invocation_id'])).fetchone()
+                    if not started:
+                        not_invoked.append({**identity, 'tool_id': node.get('tool_id'), 'outcome': 'not_invoked'})
+                        continue
+                    # An intent or a failed local checkpoint cannot prove whether
+                    # a provider accepted the call. Keep it explicitly uncertain.
+                    uncertain.append({**identity, 'tool_id': node.get('tool_id'),
+                        'effect_reference': run_id + ':' + nid, 'outcome': 'unknown',
+                        'required_action': 'verify_provider_and_connector_journal'})
+            for nid, state in run.get('delegation_states', {}).items():
+                if nid.startswith('delegated_tool_') and state in ('executing', 'failed'):
+                    # Delegated effect references use the recorded invocation UUID,
+                    # not the dynamically generated tool node ID.
+                    row = db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='node.started' AND json_extract(document,'$.details.node_id')=? ORDER BY sequence DESC LIMIT 1",
+                                     (run['workspace_id'], run_id, nid)).fetchone()
+                    invocation = json.loads(row[0])['details'].get('invocation_id') if row else None
+                    uncertain.append(dict(node_id=nid, invocation_id=invocation,
+                        effect_reference=run_id + ':' + invocation if invocation else None,
+                        outcome='unknown', required_action='verify_provider_and_connector_journal'))
+            lease_active = run.get('lease_until', 0) > rt.clock() and run['status'] == 'running'
+            return dict(run_id=run_id, workflow_id=run['workflow_id'], workflow_version=run['workflow_version'],
+                        status=run['status'], error_code=run.get('error_code'), lease_active=lease_active,
+                        required_action='wait_for_worker' if lease_active else 'operator_reconciliation' if uncertain else 'review_failure' if run['status'] in ('failed', 'blocked') else 'none',
+                        automatic_replay_allowed=False, uncertain_invocations=uncertain,
+                        not_invoked=not_invoked, failure=deepcopy(run.get('classified_failures', [])[-1]) if run.get('classified_failures') else None,
+                        completed_checkpoints=completed, consumed_usage=deepcopy(run.get('usage', {})),
+                        guidance='Preserve the original effect reference and reviewed inputs. Use connector read-back reconciliation where supported; otherwise independently verify the provider outcome. A timeout or missing receipt does not prove failure. This view does not authorize replay or resume.')
 
     @staticmethod
     def observation_signature(evidence):

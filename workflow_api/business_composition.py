@@ -107,6 +107,9 @@ class BusinessComposition:
         elif not package_context:
             view=self.preparation.general_context(auth,body['objective'],body.get('business_request'))
             if view.get('preflight_id'):prepared=self.preparation.checked(auth,view['preflight_id'])
+        account_graph=getattr(self.service,'account_graph',None)
+        graph_pin=account_graph.sync_preparation(auth,self.preparation,prepared['preflight_id']) if account_graph and prepared else None
+        if account_graph and package_context:graph_pin=account_graph.sync_package_definition(auth,self.packages,package_context['package'])
         tools=self.tools(auth);contracts=catalogue(prepared,tools);operations=body.get('operations');mode=body.get('planning_mode','model');planning_calls=0;planning_usage=None;selection_gaps=[]
         dependencies=REVIEW_DEPENDENCIES
         if package_context:
@@ -127,6 +130,7 @@ class BusinessComposition:
             provider=self.service.planner.provider
             selection_context=dict(generation_mode='hierarchy',capability_composition_catalog=contracts,business_preparation=package_context if package_context else self.preparation.context(prepared) if prepared else {},composition_resources=body.get('resources',{}),requested_operations=body.get('operations',[]))
             selection_context['verified_experience_recommendations']=deepcopy(hints)
+            if graph_pin:selection_context['account_knowledge']=account_graph.context(auth,graph_pin,body['objective'])
             selector=getattr(provider,'select_capabilities',None)
             if callable(selector):
                 selected=selector(body['objective'],selection_context)
@@ -249,6 +253,7 @@ class BusinessComposition:
         document=dict(schema_version='business-composition-v1',composition_id=composition_id,scope=dict(workspace=scope[0],owner=scope[1]),objective=body['objective'],state=state,gaps=gaps,tasks=tasks,contracts={cid:contracts[cid] for cid in selected},configurations=configs,master=master,selected_tools={t:{k:deepcopy(r[k]) for k in ('tool_id','version','definition')} for t,r in chosen.items()},resources=resources,google_connection_id=body.get('google_connection_id'),preparation_id=prepared['preflight_id'] if prepared else None,preparation_sha256=prepared['sha256'] if prepared else None,planning=dict(mode=mode,model_calls=planning_calls),created_at=now())
         if isinstance(planning_usage,dict):document['planning']['usage']=deepcopy(planning_usage)
         document['runtime_features_version']=1
+        if graph_pin:document['account_graph_pin']=graph_pin
         document['learning_features_version']=1
         document['memory_recommendations']=deepcopy(hints)
         if lifecycle_context is not None:
@@ -355,6 +360,7 @@ def compile_workflow(doc):
     for field in ('max_llm_calls','max_tool_calls','max_tokens','max_estimated_cost_usd'):limits[field]=sum(a['limits'].get(field,0) for a in agents)
     limits['max_retries']=doc.get('recovery_max_retries',0);limits['timeout_seconds']=max(a['limits']['timeout_seconds'] for a in agents)
     metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=cid,composition_sha256=doc['sha256'],composition_tasks=child_tasks,composition_action_verifiers=actions,dynamic_delegation={'master_orchestrator':dict(max_rounds=master['limits']['max_llm_calls'],max_tasks=len(child_tasks))},unresolved_requirements=[],composition_preparation_id=doc['preparation_id'])
+    if doc.get('account_graph_pin'):metadata['account_graph_pin']=deepcopy(doc['account_graph_pin'])
     if doc.get('learning_features_version'):
         from runtime.service import digest as runtime_digest
         metadata.update(composition_contracts=deepcopy(doc['contracts']),
@@ -389,7 +395,7 @@ def verify_composition(db,auth,workflow):
     doc['sha256']=sha;expected=compile_workflow(doc)
     for key in ('nodes','edges','conditions','tools','approval_gates','execution_policy'):
         if workflow[key]!=expected[key]:fail('Regenerate a composition to change its execution contract.','CAPABILITY_CHANGED',409)
-    for key in ('adaptive_control','connected_action_plan','action_binding_context','connected_contracts','connected_tasks','composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
+    for key in ('account_graph_pin','adaptive_control','connected_action_plan','action_binding_context','connected_contracts','connected_tasks','composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
         if metadata.get(key)!=expected['metadata'].get(key):fail('Composition control metadata changed.','CAPABILITY_CHANGED',409)
     if len(workflow['agents'])!=len(expected['agents']):fail('Composition agents changed.','CAPABILITY_CHANGED',409)
     by_id={a['agent_id']:a for a in expected['agents']}

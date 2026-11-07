@@ -1,5 +1,15 @@
 # Subway source onboarding and business ontology
 
+Current ontology: `bov_subway_dump_v4`, with 54 concepts (52 supplied collection
+concepts and two modelling parents), 67 relationships and 13 applicable code-derived
+rules across nine modules. New planning uses package revision 4 and the full-data query capability.
+Filters, counts, totals and scalar left joins now use complete relevant data; display
+limits are pagination. See [full-data evidence](subway-full-data-evidence.md).
+All 52 historical inspection readers remain available for older workflows. See [dump-grounded ontology](subway-dump-grounded-ontology.md) for the
+exact collection/model/service mappings and actual-record relationship checks.
+Unconnected code-only models remain only in historical versions, outside new planning.
+The archive-only version described below remains available for historical workflows.
+
 Subway retains its existing login, workspace `client-subway` and owner
 `subway-client`. Simpsons keeps its separate identity, store, sources and ontology.
 No Simpsons records or definitions were copied.

@@ -59,7 +59,15 @@ class BusinessReference:
         identity(current,True);return scope
 
     def coverage(self,auth,version_id):
-        scope=identity(auth);version=self.ontology.version(auth,version_id);kit,bundle=load_kit()
+        scope=identity(auth);version=self.ontology.version(auth,version_id)
+        if version.get('workspace',{}).get('ontology_id')=='subway':
+            with self.store.transaction(write=False) as db:documents=BusinessDocuments.rows(db,scope)
+            modules=[]
+            for module in version['modules']:
+                mid=module['id'];counts={kind:sum(i['module_id']==mid for i in version[kind]) for kind in GROUPS}
+                modules.append(dict(module_id=mid,label=module['label'],description=module['description'],counts=counts,status='draft_available' if counts['concepts'] else 'not_started',source_documents=sum(mid in d['module_ids'] for d in version.get('sources',[])),available_documents=sum(mid in d['module_ids'] for d in documents),questions=version.get('questions',{}).get(mid,[]),curated_concepts=0,reference_concepts=0,business_policy_verified=False))
+            return dict(version_id=version_id,revision=version['revision'],kit_version='subway-code-evidence-v2',modules=modules,missing_modules=[m['module_id'] for m in modules if m['status']=='not_started'],import_available=False,unavailable_reason='Subway definitions use its own archive and source-code evidence.',source_basis='subway_archive_and_code_evidence',business_policy_verified=False)
+        kit,bundle=load_kit()
         with self.store.transaction(write=False) as db:
             workspace=self.ontology.document(db,scope)
             documents=BusinessDocuments.rows(db,scope)

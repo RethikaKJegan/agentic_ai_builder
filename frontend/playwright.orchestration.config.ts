@@ -21,7 +21,7 @@ export default defineConfig({
     },
     {
       command: "npm run start -- --hostname 127.0.0.1 --port 3247",
-      cwd: path.resolve(root, ".local/frontend-phase4-stage"),
+      cwd: process.env["BUILDER_E2E_FRONTEND_DIR"] ?? path.resolve(root, ".local/frontend-phase4-stage"),
       url: "http://127.0.0.1:3247",
       timeout: 60000,
       reuseExistingServer: false,

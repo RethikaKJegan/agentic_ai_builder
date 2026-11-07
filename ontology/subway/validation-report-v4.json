@@ -1,0 +1,1171 @@
+{
+  "status": "passed",
+  "compiler_version": "simpson-owl-shacl-v1",
+  "version_id": "bov_subway_dump_v4",
+  "revision": 4,
+  "checks": {
+    "snapshot": "passed",
+    "rdf_syntax": "passed",
+    "shapes_meta_shacl": "passed",
+    "definition_shacl": "passed"
+  },
+  "definition_conforms": true,
+  "instance_validation": "not_run",
+  "owl_reasoning": "not_run",
+  "business_policy_verified": false,
+  "counts": {
+    "concepts": 54,
+    "relationships": 67,
+    "rules": 13,
+    "ontology_triples": 7348,
+    "instance_shape_triples": 4312
+  },
+  "issues": [],
+  "warnings": [
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_grnreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "REFERENCE_TARGET_UNSPECIFIED",
+      "focus": "evidence:finance_poreports",
+      "message": "Reference attribute _id has no declared target class; only an IRI constraint is emitted."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:candidate_reference_9",
+      "message": "Bounded dump check: 189/200 sampled scalar references matched native target IDs; status partial_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:candidate_reference_9",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_delete_pending",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_delete_pending",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_update_pending",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_config_update_pending",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_manager_location",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:code_rule_manager_location",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_08b314e26f4a7768",
+      "message": "Bounded dump check: 30/30 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_08b314e26f4a7768",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_a37ca4e7d4c2f98b",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_a37ca4e7d4c2f98b",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_abe31d23e0a83f9c",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_abe31d23e0a83f9c",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_b231c0ef04857636",
+      "message": "Bounded dump check: 397/397 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_b231c0ef04857636",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_e7d4b1f9a83ce429",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:dump_ref_e7d4b1f9a83ce429",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvalconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_approvals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_cfapprovalmappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "approvals:finance_stages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_7",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_7",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_8",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:candidate_reference_8",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_positive_modification",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_positive_modification",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_reservation_available",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_reservation_available",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:code_rule_reservation_available",
+      "message": "This guard also depends on records absent from the supplied dumps: Budget Reservation record. This does not block unrelated reads or analysis."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_6bac4d2d3a70d823",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_6bac4d2d3a70d823",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_82057b46a17e4fb1",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_82057b46a17e4fb1",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_abb0e0dba146df61",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_abb0e0dba146df61",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_b5f22159e63c350f",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_b5f22159e63c350f",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_d7700366f22d9ad0",
+      "message": "Bounded dump check: 1000/1000 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_d7700366f22d9ad0",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_de4d87cfcc7dd98d",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:dump_ref_de4d87cfcc7dd98d",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgetmodifications",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_budgets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "budgets:finance_lineitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:business_record",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocumentcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_appproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_apps",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogprojects",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_blogs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:central_confirmappdocuments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_document_department",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_document_department",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_invalidate_confirmations",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:code_rule_invalidate_confirmations",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_42972b80b1ecb994",
+      "message": "Bounded dump check: 235/235 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_42972b80b1ecb994",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_81f5adea57212487",
+      "message": "Bounded dump check: 4/5 sampled scalar references matched native target IDs; status partial_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_81f5adea57212487",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_92b8a28f716a81eb",
+      "message": "Bounded dump check: 20/20 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_92b8a28f716a81eb",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_e0e16e824ab9b7da",
+      "message": "Bounded dump check: 150/150 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_e0e16e824ab9b7da",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_e6d88e7517ca4f9d",
+      "message": "Bounded dump check: 78/78 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_e6d88e7517ca4f9d",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_eda64e3ac5ae08b7",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:dump_ref_eda64e3ac5ae08b7",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_advancepaymentreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_assets",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_grnreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_poreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:finance_reportfiles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "evidence:object",
+      "message": "Modelling convention; not an approved client policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departmentroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_departments",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_roles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_stategsts",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_userroles",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:central_vendors",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_284cf587ffb690c1",
+      "message": "Bounded dump check: 1/1 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_284cf587ffb690c1",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_373504b20aa87e33",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_373504b20aa87e33",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_5e7b9dc4ed6424e0",
+      "message": "Bounded dump check: 54/54 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_5e7b9dc4ed6424e0",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_7cdeb24d5ace5a12",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_7cdeb24d5ace5a12",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_c42c452d73d6ecaf",
+      "message": "Bounded dump check: 53/53 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:dump_ref_c42c452d73d6ecaf",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_companies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_foreigncurrencies",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_locations",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "organization:finance_vendormappings",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_arolds",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plactuals",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plaops",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_plreports",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "performance:central_pluems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_0",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_0",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_1",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:candidate_reference_1",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_approved_pr",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_approved_pr",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_approved_pr",
+      "message": "This guard also depends on records absent from the supplied dumps: Purchase Request record. This does not block unrelated reads or analysis."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_budget_approval",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_budget_approval",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_independent_department",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_independent_department",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_ticket_category",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:code_rule_ticket_category",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_10f921d1fb6bef32",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_10f921d1fb6bef32",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_2be69022f3aab927",
+      "message": "Bounded dump check: 246/246 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_2be69022f3aab927",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_3399435a8404102c",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_3399435a8404102c",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_3efe88f77c36cd98",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_3efe88f77c36cd98",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_415d6d4ebd48fc6b",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_415d6d4ebd48fc6b",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_47ae8521e0e2f511",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_47ae8521e0e2f511",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_4cfa55420bb085f1",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_4cfa55420bb085f1",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_5f675ecbf3436468",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_5f675ecbf3436468",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_670b44e7a8543ae9",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_670b44e7a8543ae9",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_69519758c77e8d9b",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_69519758c77e8d9b",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_69729150cd7e9a2f",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_69729150cd7e9a2f",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_826f6e287c32242d",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_826f6e287c32242d",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_8e0a5c22e94e7deb",
+      "message": "Bounded dump check: 246/246 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_8e0a5c22e94e7deb",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_cf415a64076e12e0",
+      "message": "Bounded dump check: 0/0 sampled scalar references matched native target IDs; status no_observed_values."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_cf415a64076e12e0",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_d9a9d56545db274e",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_d9a9d56545db274e",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_f57d83aad0cacaa3",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:dump_ref_f57d83aad0cacaa3",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_categories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_faitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_items",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_purchaseorders",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "procurement:finance_subcategories",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_3",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_3",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_4",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_4",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_5",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_5",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_6",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:candidate_reference_6",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_advance_maximum",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_advance_maximum",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_grn_duplicate",
+      "message": "Code was statically inspected, not executed."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:code_rule_grn_duplicate",
+      "message": "Production release equivalence and authoritative policy approval are unverified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_0853a48c55756824",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_0853a48c55756824",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_2f5443bd6fea7582",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_2f5443bd6fea7582",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_679a0b59d61c749e",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_679a0b59d61c749e",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_69457bb527155e9c",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_69457bb527155e9c",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_6fba324f3c2b0cec",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_6fba324f3c2b0cec",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_b3f14a7d26596ef5",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_b3f14a7d26596ef5",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_ec769e3a07cd4e4f",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_ec769e3a07cd4e4f",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_fcbb21f07dd70702",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:dump_ref_fcbb21f07dd70702",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_grns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_invoicedatas",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "receipts:finance_vendorgrnstagetimelines",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:candidate_reference_10",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:candidate_reference_10",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_0a45566359e3eee4",
+      "message": "Bounded dump check: 280/280 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_0a45566359e3eee4",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_56d6311a414bb774",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_56d6311a414bb774",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_74d03ca08c03478b",
+      "message": "Bounded dump check: 406/406 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_74d03ca08c03478b",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_8df6e4bf40026613",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_8df6e4bf40026613",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_915a1fc6f52bbd92",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_915a1fc6f52bbd92",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_c8804c2bfc26aabe",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_c8804c2bfc26aabe",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_e51b2ef4795f0f77",
+      "message": "Bounded dump check: 248/248 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:dump_ref_e51b2ef4795f0f77",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwaregrns",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwaregrns",
+      "message": "Supplied smallware GRN approval guard has a precedence defect; approver authority enforcement is not verified."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwareitems",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepoconfigs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarepos",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "smallwares:finance_smallwarestages",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:candidate_reference_2",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:candidate_reference_2",
+      "message": "Identifier overlap is possible. This descriptive candidate grants no executable join authority."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_dcs",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_electricityconsumptions",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_storeproperties",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:central_stores",
+      "message": "Sampled fields do not establish completeness, current production state or approved business policy."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_090695a4895aa68a",
+      "message": "Bounded dump check: 49/49 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_090695a4895aa68a",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_e9cf3374d9d44202",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_e9cf3374d9d44202",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_ff3dc7f46dd718c4",
+      "message": "Bounded dump check: 200/200 sampled scalar references matched native target IDs; status sample_matches."
+    },
+    {
+      "code": "UNRESOLVED_INFORMATION",
+      "focus": "stores:dump_ref_ff3dc7f46dd718c4",
+      "message": "Source-code version alignment and complete referential integrity are not established by a bounded sample."
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "approvals",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "budgets",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "evidence",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "organization",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "performance",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "procurement",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "receipts",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "smallwares",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    },
+    {
+      "code": "UNRESOLVED_QUESTION",
+      "focus": "stores",
+      "message": "Which supplied records and corresponding code establish the requested fact, and are any specific fields or external prerequisites absent?"
+    }
+  ]
+}

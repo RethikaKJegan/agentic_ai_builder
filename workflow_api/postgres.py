@@ -22,7 +22,7 @@ class DatabaseFailure(Exception):
 
 def classify(exc):
     state=getattr(exc,'sqlstate',None)
-    category = 'deadlock' if state=='40P01' else 'serialization' if state=='40001' else 'contention' if state in {'55P03','57014'} else 'transaction_state' if state and state.startswith('25') else 'unavailable' if (state and state.startswith('08')) or (state is None and type(exc).__name__ in {'OperationalError','InterfaceError'}) else 'database_failure'
+    category = 'deadlock' if state=='40P01' else 'serialization' if state=='40001' else 'contention' if state in {'55P03','57014'} else 'transaction_state' if state and state.startswith('25') else 'unavailable' if (state and (state.startswith('08') or state in {'57P01','57P02','57P03'})) or (state is None and type(exc).__name__ in {'OperationalError','InterfaceError'}) else 'database_failure'
     return DatabaseFailure(category,state)
 
 
@@ -153,8 +153,11 @@ class PostgresDatabase:
                 connection.execute('SET TRANSACTION READ WRITE' if write else 'SET TRANSACTION READ ONLY')
                 connection.execute("SELECT set_config('lock_timeout',%s,true)",(str(max(1,self.busy_timeout_ms))+'ms',))
                 if write:
+                    waiting=time.monotonic()
                     connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(current_database()||':'||current_schema(),0))")
-                yield Session(connection,write)
+                session=Session(connection,write)
+                session.lock_wait_seconds=time.monotonic()-waiting if write else 0
+                yield session
         except self.psycopg.Error as exc:
             failure=classify(exc)
             logging.getLogger(__name__).warning('PostgreSQL transaction failed',extra={'database_category':failure.category,'database_code':failure.sqlstate,'transaction_write':write})

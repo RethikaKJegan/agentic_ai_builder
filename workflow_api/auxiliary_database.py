@@ -27,7 +27,12 @@ def scoped_dsn(base,path):
     with psycopg.connect(base,autocommit=True,connect_timeout=5) as connection:
         connection.execute(sql.SQL('CREATE SCHEMA IF NOT EXISTS {}').format(sql.Identifier(schema)))
     parsed=urlsplit(base);parameters=dict(parse_qsl(parsed.query));parameters['options']='-csearch_path='+schema
-    return urlunsplit((parsed.scheme,parsed.netloc,parsed.path,urlencode(parameters),parsed.fragment))
+    result=urlunsplit((parsed.scheme,parsed.netloc,parsed.path,urlencode(parameters),parsed.fragment))
+    # urllib omits // for schemes without a known authority when netloc is
+    # empty. PostgreSQL socket URIs still require postgresql:///database.
+    if not parsed.netloc:
+        result=parsed.scheme+'://'+result[len(parsed.scheme)+1:]
+    return result
 
 
 @lru_cache(maxsize=32)

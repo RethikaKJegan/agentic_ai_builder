@@ -1,0 +1,2620 @@
+{
+  "package_id": "subway-business-v1",
+  "revision": 2,
+  "client_id": "subway",
+  "domain": "restaurant_operations",
+  "ontology_version": "bov_subway_code_v2",
+  "concepts": [
+    {
+      "id": "organization:central_departments",
+      "label": "Department",
+      "definition": "Stored central.departments record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:central_departmentroles",
+      "label": "Central departmentroles",
+      "definition": "Stored central.departmentroles record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:central_roles",
+      "label": "Central roles",
+      "definition": "Stored central.roles record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:central_userroles",
+      "label": "Central userroles",
+      "definition": "Stored central.userroles record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:central_stategsts",
+      "label": "Central stategsts",
+      "definition": "Stored central.stategsts record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:central_vendors",
+      "label": "Supplier",
+      "definition": "Stored central.vendors record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:finance_companies",
+      "label": "Legal company",
+      "definition": "Stored finance.companies record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:finance_locations",
+      "label": "Business location",
+      "definition": "Stored finance.locations record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:finance_foreigncurrencies",
+      "label": "Foreign currency",
+      "definition": "Stored finance.foreigncurrencies record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "organization:finance_vendormappings",
+      "label": "Finance vendormappings",
+      "definition": "Stored finance.vendormappings record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "stores:central_stores",
+      "label": "Store",
+      "definition": "Stored central.stores record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "stores:central_storeproperties",
+      "label": "Store property",
+      "definition": "Stored central.storeproperties record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "stores:central_dcs",
+      "label": "Distribution centre",
+      "definition": "Stored central.dcs record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "stores:central_electricityconsumptions",
+      "label": "Central electricityconsumptions",
+      "definition": "Stored central.electricityconsumptions record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:finance_purchaseorders",
+      "label": "Purchase order",
+      "definition": "Stored finance.purchaseorders record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:finance_items",
+      "label": "Procurement item",
+      "definition": "Stored finance.items record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:finance_categories",
+      "label": "Procurement category",
+      "definition": "Stored finance.categories record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:finance_subcategories",
+      "label": "Procurement subcategory",
+      "definition": "Stored finance.subcategories record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:finance_faitems",
+      "label": "FA classification configuration",
+      "definition": "Stored finance.faitems record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "budgets:finance_budgets",
+      "label": "Budget",
+      "definition": "Stored finance.budgets record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "budgets:finance_budgetmodifications",
+      "label": "Budget modification",
+      "definition": "Stored finance.budgetmodifications record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "budgets:finance_lineitems",
+      "label": "Budget line item",
+      "definition": "Stored finance.lineitems record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "receipts:finance_grns",
+      "label": "Goods receipt",
+      "definition": "Stored finance.grns record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "receipts:finance_invoicedatas",
+      "label": "Invoice record",
+      "definition": "Stored finance.invoicedatas record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "receipts:finance_vendorgrnstagetimelines",
+      "label": "Finance vendorgrnstagetimelines",
+      "definition": "Stored finance.vendorgrnstagetimelines record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "approvals:finance_approvals",
+      "label": "Approval record",
+      "definition": "Stored finance.approvals record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "approvals:finance_approvalconfigs",
+      "label": "Approval configuration",
+      "definition": "Stored finance.approvalconfigs record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "approvals:finance_stages",
+      "label": "Approval stage",
+      "definition": "Stored finance.stages record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "approvals:finance_cfapprovalmappings",
+      "label": "Finance cfapprovalmappings",
+      "definition": "Stored finance.cfapprovalmappings record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "smallwares:finance_smallwaregrns",
+      "label": "Smallwares goods receipt",
+      "definition": "Stored finance.smallwaregrns record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "smallwares:finance_smallwareitems",
+      "label": "Finance smallwareitems",
+      "definition": "Stored finance.smallwareitems record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "smallwares:finance_smallwarepoconfigs",
+      "label": "Finance smallwarepoconfigs",
+      "definition": "Stored finance.smallwarepoconfigs record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "smallwares:finance_smallwarepos",
+      "label": "Smallwares purchase order",
+      "definition": "Stored finance.smallwarepos record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "smallwares:finance_smallwarestages",
+      "label": "Finance smallwarestages",
+      "definition": "Stored finance.smallwarestages record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "performance:central_arolds",
+      "label": "Weekly balance record",
+      "definition": "Stored central.arolds record in the Subway archive snapshot. Source acronym and calculation semantics require confirmation.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "performance:central_plactuals",
+      "label": "P&L actual record",
+      "definition": "Stored central.plactuals record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "performance:central_plaops",
+      "label": "P&L AOP record",
+      "definition": "Stored central.plaops record in the Subway archive snapshot. Source acronym and calculation semantics require confirmation.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "performance:central_pluems",
+      "label": "P&L UEM record",
+      "definition": "Stored central.pluems record in the Subway archive snapshot. Source acronym and calculation semantics require confirmation.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "performance:central_plreports",
+      "label": "Central plreports",
+      "definition": "Stored central.plreports record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_appdocumentcategories",
+      "label": "Central appdocumentcategories",
+      "definition": "Stored central.appdocumentcategories record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_appdocuments",
+      "label": "Central appdocuments",
+      "definition": "Stored central.appdocuments record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_appproperties",
+      "label": "Central appproperties",
+      "definition": "Stored central.appproperties record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_apps",
+      "label": "Central apps",
+      "definition": "Stored central.apps record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_blogcategories",
+      "label": "Central blogcategories",
+      "definition": "Stored central.blogcategories record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_blogprojects",
+      "label": "Central blogprojects",
+      "definition": "Stored central.blogprojects record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_blogs",
+      "label": "Central blogs",
+      "definition": "Stored central.blogs record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:central_confirmappdocuments",
+      "label": "Central confirmappdocuments",
+      "definition": "Stored central.confirmappdocuments record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:finance_assets",
+      "label": "Attachment record",
+      "definition": "Stored finance.assets record in the Subway archive snapshot. The observed document URL and description fields identify attachments; physical fixed-asset ownership is not established.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:finance_advancepaymentreports",
+      "label": "Finance advancepaymentreports",
+      "definition": "Stored finance.advancepaymentreports record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:finance_grnreports",
+      "label": "Finance grnreports",
+      "definition": "Stored finance.grnreports record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:finance_poreports",
+      "label": "Finance poreports",
+      "definition": "Stored finance.poreports record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:finance_reportfiles",
+      "label": "Finance reportfiles",
+      "definition": "Stored finance.reportfiles record in the Subway archive snapshot.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "evidence:object",
+      "label": "Object",
+      "definition": "An identifiable model subject."
+    },
+    {
+      "id": "evidence:business_record",
+      "label": "Business record",
+      "definition": "A representation of a stored source document, distinct from the business event or physical object it describes.",
+      "parent": "evidence:object"
+    },
+    {
+      "id": "procurement:purchase_request",
+      "label": "Purchase Request record",
+      "definition": "PurchaseRequest model declared in the finance application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "budgets:budget_reservation",
+      "label": "Budget Reservation record",
+      "definition": "BudgetReservation model declared in the finance application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "procurement:allocation_movement",
+      "label": "Allocation Movement record",
+      "definition": "AllocationMovement model declared in the finance application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "cf_approvals:cf_record",
+      "label": "Cf Approval V2 record",
+      "definition": "CfApprovalV2 model declared in the cf application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "cf_approvals:step_configuration",
+      "label": "Cf Step Master record",
+      "definition": "CfStepMaster model declared in the cf application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "cf_approvals:exception_approver_configuration",
+      "label": "Cf Exception Approvers record",
+      "definition": "CfExceptionApprovers model declared in the cf application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "cf_approvals:capex_calculation",
+      "label": "Capex Calculation record",
+      "definition": "CapexCalculation model declared in the cf application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "cf_approvals:financial_record",
+      "label": "Cf Financial record",
+      "definition": "CfFinancial model declared in the cf application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "document_storage:restaurant_record",
+      "label": "Restaurant record",
+      "definition": "Restaurant model declared in the documents application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "document_storage:document",
+      "label": "Document record",
+      "definition": "Document model declared in the documents application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "document_storage:document_timeline",
+      "label": "Timeline record",
+      "definition": "Timeline model declared in the documents application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "document_storage:company_document",
+      "label": "Company Document record",
+      "definition": "CompanyDocument model declared in the documents application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "invoice_tracking:invoice",
+      "label": "Invoice record",
+      "definition": "Invoice model declared in the invoices application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "invoice_tracking:vendor",
+      "label": "Vendor record",
+      "definition": "Vendor model declared in the invoices application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "invoice_tracking:voucher",
+      "label": "Voucher record",
+      "definition": "Voucher model declared in the invoices application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "invoice_tracking:legal_document",
+      "label": "Legal Doc record",
+      "definition": "LegalDoc model declared in the invoices application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "invoice_tracking:approval_stage",
+      "label": "Stage record",
+      "definition": "Stage model declared in the invoices application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "quality_cases:complaint_case",
+      "label": "Quality complaint case",
+      "definition": "Case model declared in the quality application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "quality_cases:complaint_type",
+      "label": "Complaint Type record",
+      "definition": "ComplaintType model declared in the quality application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "quality_cases:product",
+      "label": "Product record",
+      "definition": "Product model declared in the quality application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "quality_cases:product_category",
+      "label": "Product Category record",
+      "definition": "ProductCategory model declared in the quality application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "quality_cases:store_record",
+      "label": "Store record",
+      "definition": "Store model declared in the quality application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:store_record",
+      "label": "Store record",
+      "definition": "Store model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:store_transfer",
+      "label": "Store Transfer record",
+      "definition": "StoreTransfer model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:store_lease",
+      "label": "Store Lease record",
+      "definition": "StoreLease model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:franchise_agreement",
+      "label": "Franchise Agreement record",
+      "definition": "FranchiseAgreement model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:waiver",
+      "label": "Waiver record",
+      "definition": "Waiver model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "franchise_records:waiver_assignment",
+      "label": "Waiver Assignment record",
+      "definition": "WaiverAssignment model declared in the franchise application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:ticket",
+      "label": "Technical support ticket",
+      "definition": "Ticket model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:department",
+      "label": "Department record",
+      "definition": "Department model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:ticket_category",
+      "label": "Ticket Category record",
+      "definition": "TicketCategory model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:store_record",
+      "label": "Store record",
+      "definition": "Store model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:complaint_form",
+      "label": "Complaint Form record",
+      "definition": "ComplaintForm model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:escalation",
+      "label": "Escalation record",
+      "definition": "Escalation model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    },
+    {
+      "id": "technical_support:ticket_tag",
+      "label": "Ticket Tag record",
+      "definition": "TicketTag model declared in the technical application archive. This is a code-described record, with no corresponding collection connected by this onboarding.",
+      "parent": "evidence:business_record"
+    }
+  ],
+  "relationships": [
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:finance_companies",
+      "predicate": "candidate_company",
+      "description": "Candidate finance.purchaseorders.company -> finance.companies._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:central_departments",
+      "predicate": "candidate_department",
+      "description": "Candidate finance.purchaseorders.department -> central.departments._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "stores:central_stores",
+      "target": "stores:central_dcs",
+      "predicate": "candidate_dc",
+      "description": "Candidate central.stores.dc -> central.dcs._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "receipts:finance_grns",
+      "target": "procurement:finance_purchaseorders",
+      "predicate": "candidate_purchaseorderid",
+      "description": "Candidate finance.grns.purchaseOrderId -> finance.purchaseorders._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "receipts:finance_grns",
+      "target": "receipts:finance_invoicedatas",
+      "predicate": "candidate_invoicedataid",
+      "description": "Candidate finance.grns.invoiceDataId -> finance.invoicedatas._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "procurement:finance_purchaseorders",
+      "predicate": "candidate_poid",
+      "description": "Candidate finance.invoicedatas.poId -> finance.purchaseorders._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "receipts:finance_grns",
+      "predicate": "candidate_grnid",
+      "description": "Candidate finance.invoicedatas.grnId -> finance.grns._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "budgets:finance_lineitems",
+      "target": "budgets:finance_budgets",
+      "predicate": "candidate_budgetid",
+      "description": "Candidate finance.lineitems.budgetId -> finance.budgets._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "budgets:finance_budgetmodifications",
+      "target": "budgets:finance_budgets",
+      "predicate": "candidate_budgetid",
+      "description": "Candidate finance.budgetmodifications.budgetId -> finance.budgets._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "approvals:finance_stages",
+      "target": "approvals:finance_approvals",
+      "predicate": "candidate_approvalid",
+      "description": "Candidate finance.stages.approvalId -> finance.approvals._id: 189 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "smallwares:finance_smallwaregrns",
+      "target": "smallwares:finance_smallwarepos",
+      "predicate": "candidate_smpoid",
+      "description": "Candidate finance.smallwaregrns.smPoId -> finance.smallwarepos._id: 200 of 200 bounded records matched with native identifier types; not a declared foreign key."
+    },
+    {
+      "source": "organization:finance_companies",
+      "target": "organization:finance_companies",
+      "predicate": "references_parent",
+      "description": "The finance application model declares parent with ref Company. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "budgets:finance_lineitems",
+      "predicate": "references_lineitem",
+      "description": "The finance application model declares lineItem with ref LineItem. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "procurement:finance_items",
+      "predicate": "references_item",
+      "description": "The finance application model declares item with ref Item. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "procurement:finance_subcategories",
+      "predicate": "references_subcategory",
+      "description": "The finance application model declares subCategory with ref SubCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_approvalid",
+      "description": "The finance application model declares approvalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:finance_companies",
+      "predicate": "references_company",
+      "description": "The finance application model declares company with ref Company. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "budgets:finance_budgets",
+      "predicate": "references_budget",
+      "description": "The finance application model declares budget with ref Budget. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:finance_locations",
+      "predicate": "references_deliverylocationid",
+      "description": "The finance application model declares deliveryLocationId with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "organization:finance_locations",
+      "predicate": "references_billinglocationid",
+      "description": "The finance application model declares billingLocationId with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_purchaseorders",
+      "target": "procurement:purchase_request",
+      "predicate": "references_purchaserequestid",
+      "description": "The finance application model declares purchaseRequestId with ref PurchaseRequest. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_items",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_items",
+      "target": "procurement:finance_subcategories",
+      "predicate": "references_subcategory",
+      "description": "The finance application model declares subCategory with ref SubCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_items",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares categoryMappings.type.category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_items",
+      "target": "procurement:finance_subcategories",
+      "predicate": "references_subcategory",
+      "description": "The finance application model declares categoryMappings.type.subCategory with ref SubCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:finance_subcategories",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:finance_budgets",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:finance_lineitems",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:finance_lineitems",
+      "target": "budgets:finance_budgets",
+      "predicate": "references_budgetid",
+      "description": "The finance application model declares budgetId with ref Budget. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:finance_budgetmodifications",
+      "target": "budgets:finance_budgets",
+      "predicate": "references_budgetid",
+      "description": "The finance application model declares budgetId with ref Budget. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:finance_budgetmodifications",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_approvalid",
+      "description": "The finance application model declares approvalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_grns",
+      "target": "procurement:finance_purchaseorders",
+      "predicate": "references_purchaseorderid",
+      "description": "The finance application model declares purchaseOrderId with ref PurchaseOrder. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_grns",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_grns",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_approvalid",
+      "description": "The finance application model declares approvalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "procurement:finance_purchaseorders",
+      "predicate": "references_poid",
+      "description": "The finance application model declares poId with ref PurchaseOrder. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "receipts:finance_grns",
+      "predicate": "references_grnid",
+      "description": "The finance application model declares grnId with ref Grn. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_approvalid",
+      "description": "The finance application model declares approvalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "receipts:finance_invoicedatas",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "approvals:finance_approvals",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "approvals:finance_approvals",
+      "target": "approvals:finance_approvalconfigs",
+      "predicate": "references_approvalconfigid",
+      "description": "The finance application model declares approvalConfigId with ref ApprovalConfig. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "approvals:finance_approvals",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_previousapprovalid",
+      "description": "The finance application model declares previousApprovalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "organization:finance_locations",
+      "predicate": "references_storeid",
+      "description": "The finance application model declares storeId with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "budgets:finance_lineitems",
+      "predicate": "references_lineitem",
+      "description": "The finance application model declares lineItem with ref LineItem. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "procurement:finance_items",
+      "predicate": "references_item",
+      "description": "The finance application model declares item with ref Item. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "procurement:finance_categories",
+      "predicate": "references_category",
+      "description": "The finance application model declares category with ref Category. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "procurement:finance_subcategories",
+      "predicate": "references_subcategory",
+      "description": "The finance application model declares subCategory with ref SubCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares storeConsumption.type.site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "organization:finance_locations",
+      "predicate": "references_site",
+      "description": "The finance application model declares site with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "procurement:purchase_request",
+      "predicate": "references_parentprid",
+      "description": "The finance application model declares parentPRId with ref PurchaseRequest. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "organization:finance_companies",
+      "predicate": "references_company",
+      "description": "The finance application model declares company with ref Company. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "budgets:finance_budgets",
+      "predicate": "references_budget",
+      "description": "The finance application model declares budget with ref Budget. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:purchase_request",
+      "target": "approvals:finance_approvals",
+      "predicate": "references_approvalid",
+      "description": "The finance application model declares approvalId with ref Approval. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:budget_reservation",
+      "target": "budgets:finance_budgets",
+      "predicate": "references_budgetid",
+      "description": "The finance application model declares budgetId with ref Budget. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "budgets:budget_reservation",
+      "target": "procurement:purchase_request",
+      "predicate": "references_prid",
+      "description": "The finance application model declares prId with ref PurchaseRequest. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:allocation_movement",
+      "target": "procurement:purchase_request",
+      "predicate": "references_prid",
+      "description": "The finance application model declares prId with ref PurchaseRequest. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "procurement:allocation_movement",
+      "target": "organization:finance_locations",
+      "predicate": "references_storeid",
+      "description": "The finance application model declares storeId with ref Location. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "stores:central_stores",
+      "target": "stores:central_storeproperties",
+      "predicate": "references_properties",
+      "description": "The intranet application model declares properties with ref StoreProperties. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "evidence:central_apps",
+      "target": "evidence:central_appproperties",
+      "predicate": "references_properties",
+      "description": "The intranet application model declares properties with ref AppProperties. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "evidence:central_appdocuments",
+      "target": "evidence:central_appdocumentcategories",
+      "predicate": "references_documentcategory",
+      "description": "The intranet application model declares documentCategory with ref AppDocumentCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "evidence:central_appdocumentcategories",
+      "target": "evidence:central_appdocumentcategories",
+      "predicate": "references_parent",
+      "description": "The intranet application model declares parent with ref AppDocumentCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "document_storage:document",
+      "target": "document_storage:restaurant_record",
+      "predicate": "references_restaurantid",
+      "description": "The documents application model declares restaurantId with ref Restaurant. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "document_storage:document_timeline",
+      "target": "document_storage:restaurant_record",
+      "predicate": "references_restaurantid",
+      "description": "The documents application model declares restaurantId with ref Restaurant. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "document_storage:company_document",
+      "target": "document_storage:restaurant_record",
+      "predicate": "references_restaurantid",
+      "description": "The documents application model declares restaurantId with ref Restaurant. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "invoice_tracking:invoice",
+      "target": "invoice_tracking:vendor",
+      "predicate": "references_vendor",
+      "description": "The invoices application model declares vendor with ref Vendor. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "invoice_tracking:voucher",
+      "target": "invoice_tracking:vendor",
+      "predicate": "references_vendor",
+      "description": "The invoices application model declares vendor with ref Vendor. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "invoice_tracking:approval_stage",
+      "target": "invoice_tracking:legal_document",
+      "predicate": "references_legaldocid",
+      "description": "The invoices application model declares legalDocId with ref LegalDoc. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "quality_cases:complaint_case",
+      "target": "quality_cases:store_record",
+      "predicate": "references_store",
+      "description": "The quality application model declares details.store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "quality_cases:complaint_case",
+      "target": "quality_cases:complaint_type",
+      "predicate": "references_complainttype",
+      "description": "The quality application model declares complaintType with ref ComplaintType. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "quality_cases:complaint_case",
+      "target": "quality_cases:store_record",
+      "predicate": "references_store",
+      "description": "The quality application model declares store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "quality_cases:product",
+      "target": "quality_cases:product_category",
+      "predicate": "references_category",
+      "description": "The quality application model declares category with ref ProductCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:store_transfer",
+      "target": "franchise_records:store_record",
+      "predicate": "references_storeno",
+      "description": "The franchise application model declares storeNo with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:store_transfer",
+      "target": "franchise_records:franchise_agreement",
+      "predicate": "references_franchiseagreement",
+      "description": "The franchise application model declares franchiseAgreement with ref FranchiseAgreement. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:store_transfer",
+      "target": "franchise_records:store_lease",
+      "predicate": "references_storelease",
+      "description": "The franchise application model declares storeLease with ref StoreLease. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:store_lease",
+      "target": "franchise_records:store_record",
+      "predicate": "references_storeno",
+      "description": "The franchise application model declares storeNo with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:waiver",
+      "target": "franchise_records:store_record",
+      "predicate": "references_store",
+      "description": "The franchise application model declares store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:waiver_assignment",
+      "target": "franchise_records:waiver",
+      "predicate": "references_waiver",
+      "description": "The franchise application model declares waiver with ref Waiver. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "franchise_records:waiver_assignment",
+      "target": "franchise_records:store_record",
+      "predicate": "references_store",
+      "description": "The franchise application model declares store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket",
+      "target": "technical_support:department",
+      "predicate": "references_dept",
+      "description": "The technical application model declares dept with ref Department. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket",
+      "target": "technical_support:ticket_category",
+      "predicate": "references_category",
+      "description": "The technical application model declares category with ref TicketCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket",
+      "target": "technical_support:store_record",
+      "predicate": "references_store",
+      "description": "The technical application model declares store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket",
+      "target": "technical_support:complaint_form",
+      "predicate": "references_complaintform",
+      "description": "The technical application model declares complaintForm with ref ComplaintForm. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket_category",
+      "target": "technical_support:department",
+      "predicate": "references_dept",
+      "description": "The technical application model declares dept with ref Department. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:ticket_category",
+      "target": "technical_support:ticket_category",
+      "predicate": "references_parent",
+      "description": "The technical application model declares parent with ref TicketCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:complaint_form",
+      "target": "technical_support:department",
+      "predicate": "references_dept",
+      "description": "The technical application model declares dept with ref Department. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:complaint_form",
+      "target": "technical_support:ticket_category",
+      "predicate": "references_category",
+      "description": "The technical application model declares category with ref TicketCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:complaint_form",
+      "target": "technical_support:store_record",
+      "predicate": "references_store",
+      "description": "The technical application model declares store with ref Store. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:escalation",
+      "target": "technical_support:ticket",
+      "predicate": "references_ticket",
+      "description": "The technical application model declares ticket with ref Ticket. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:escalation",
+      "target": "technical_support:department",
+      "predicate": "references_dept",
+      "description": "The technical application model declares dept with ref Department. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    },
+    {
+      "source": "technical_support:escalation",
+      "target": "technical_support:ticket_category",
+      "predicate": "references_category",
+      "description": "The technical application model declares category with ref TicketCategory. This establishes model intent; MongoDB referential integrity, archive-version alignment and cross-service identity equivalence are not asserted."
+    }
+  ],
+  "source_mappings": [
+    {
+      "id": "subway.central.stores._id",
+      "concept": "stores:central_stores",
+      "field": "_id",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.name",
+      "concept": "stores:central_stores",
+      "field": "name",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.storeNumber",
+      "concept": "stores:central_stores",
+      "field": "storeNumber",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.restaurantName",
+      "concept": "stores:central_stores",
+      "field": "restaurantName",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.region",
+      "concept": "stores:central_stores",
+      "field": "region",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.stores.status",
+      "concept": "stores:central_stores",
+      "field": "status",
+      "source": "subway.central.stores"
+    },
+    {
+      "id": "subway.central.vendors._id",
+      "concept": "organization:central_vendors",
+      "field": "_id",
+      "source": "subway.central.vendors"
+    },
+    {
+      "id": "subway.central.vendors.name",
+      "concept": "organization:central_vendors",
+      "field": "name",
+      "source": "subway.central.vendors"
+    },
+    {
+      "id": "subway.finance.companies._id",
+      "concept": "organization:finance_companies",
+      "field": "_id",
+      "source": "subway.finance.companies"
+    },
+    {
+      "id": "subway.finance.companies.name",
+      "concept": "organization:finance_companies",
+      "field": "name",
+      "source": "subway.finance.companies"
+    },
+    {
+      "id": "subway.finance.purchaseorders._id",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "_id",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.poNumber",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "poNumber",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.poDate",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "poDate",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.vendorName",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "vendorName",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.status",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "status",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.purchaseorders.totalAmount",
+      "concept": "procurement:finance_purchaseorders",
+      "field": "totalAmount",
+      "source": "subway.finance.purchaseorders"
+    },
+    {
+      "id": "subway.finance.grns._id",
+      "concept": "receipts:finance_grns",
+      "field": "_id",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.purchaseOrderId",
+      "concept": "receipts:finance_grns",
+      "field": "purchaseOrderId",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.invoiceDataId",
+      "concept": "receipts:finance_grns",
+      "field": "invoiceDataId",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.grns.status",
+      "concept": "receipts:finance_grns",
+      "field": "status",
+      "source": "subway.finance.grns"
+    },
+    {
+      "id": "subway.finance.invoicedatas._id",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "_id",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.poId",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "poId",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.grnId",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "grnId",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.invoiceNumber",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "invoiceNumber",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.paymentStatus",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "paymentStatus",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.invoicedatas.status",
+      "concept": "receipts:finance_invoicedatas",
+      "field": "status",
+      "source": "subway.finance.invoicedatas"
+    },
+    {
+      "id": "subway.finance.budgets._id",
+      "concept": "budgets:finance_budgets",
+      "field": "_id",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.budgets.storeId",
+      "concept": "budgets:finance_budgets",
+      "field": "storeId",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.budgets.status",
+      "concept": "budgets:finance_budgets",
+      "field": "status",
+      "source": "subway.finance.budgets"
+    },
+    {
+      "id": "subway.finance.lineitems._id",
+      "concept": "budgets:finance_lineitems",
+      "field": "_id",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.budgetId",
+      "concept": "budgets:finance_lineitems",
+      "field": "budgetId",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.category",
+      "concept": "budgets:finance_lineitems",
+      "field": "category",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.lineitems.status",
+      "concept": "budgets:finance_lineitems",
+      "field": "status",
+      "source": "subway.finance.lineitems"
+    },
+    {
+      "id": "subway.finance.approvals._id",
+      "concept": "approvals:finance_approvals",
+      "field": "_id",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.approvals.approvalConfigId",
+      "concept": "approvals:finance_approvals",
+      "field": "approvalConfigId",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.approvals.status",
+      "concept": "approvals:finance_approvals",
+      "field": "status",
+      "source": "subway.finance.approvals"
+    },
+    {
+      "id": "subway.finance.smallwarepos._id",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "_id",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.poNumber",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "poNumber",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.status",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "status",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.finance.smallwarepos.amount",
+      "concept": "smallwares:finance_smallwarepos",
+      "field": "amount",
+      "source": "subway.finance.smallwarepos"
+    },
+    {
+      "id": "subway.central.plactuals._id",
+      "concept": "performance:central_plactuals",
+      "field": "_id",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.storeId",
+      "concept": "performance:central_plactuals",
+      "field": "storeId",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.storeCode",
+      "concept": "performance:central_plactuals",
+      "field": "storeCode",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.plactuals.plItem",
+      "concept": "performance:central_plactuals",
+      "field": "plItem",
+      "source": "subway.central.plactuals"
+    },
+    {
+      "id": "subway.central.arolds._id",
+      "concept": "performance:central_arolds",
+      "field": "_id",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.customerNum",
+      "concept": "performance:central_arolds",
+      "field": "customerNum",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.entity",
+      "concept": "performance:central_arolds",
+      "field": "entity",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.weekEndingDate",
+      "concept": "performance:central_arolds",
+      "field": "weekEndingDate",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.netSales",
+      "concept": "performance:central_arolds",
+      "field": "netSales",
+      "source": "subway.central.arolds"
+    },
+    {
+      "id": "subway.central.arolds.endBalance",
+      "concept": "performance:central_arolds",
+      "field": "endBalance",
+      "source": "subway.central.arolds"
+    }
+  ],
+  "evidence_requirements": [
+    {
+      "capability_id": "subway.read.stores",
+      "mapping_id": "subway.central.stores._id"
+    },
+    {
+      "capability_id": "subway.read.vendors",
+      "mapping_id": "subway.central.vendors._id"
+    },
+    {
+      "capability_id": "subway.read.companies",
+      "mapping_id": "subway.finance.companies._id"
+    },
+    {
+      "capability_id": "subway.read.purchaseorders",
+      "mapping_id": "subway.finance.purchaseorders._id"
+    },
+    {
+      "capability_id": "subway.read.grns",
+      "mapping_id": "subway.finance.grns._id"
+    },
+    {
+      "capability_id": "subway.read.invoicedatas",
+      "mapping_id": "subway.finance.invoicedatas._id"
+    },
+    {
+      "capability_id": "subway.read.budgets",
+      "mapping_id": "subway.finance.budgets._id"
+    },
+    {
+      "capability_id": "subway.read.lineitems",
+      "mapping_id": "subway.finance.lineitems._id"
+    },
+    {
+      "capability_id": "subway.read.approvals",
+      "mapping_id": "subway.finance.approvals._id"
+    },
+    {
+      "capability_id": "subway.read.smallwarepos",
+      "mapping_id": "subway.finance.smallwarepos._id"
+    },
+    {
+      "capability_id": "subway.read.plactuals",
+      "mapping_id": "subway.central.plactuals._id"
+    },
+    {
+      "capability_id": "subway.read.arolds",
+      "mapping_id": "subway.central.arolds._id"
+    }
+  ],
+  "capability_contracts": {
+    "subway.read.stores": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.stores",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Store records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "stores:central_stores"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.vendors": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.vendors",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Supplier records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "organization:central_vendors"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.companies": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.companies",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Legal company records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "organization:finance_companies"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.purchaseorders": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.purchaseorders",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Purchase order records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "procurement:finance_purchaseorders"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.grns": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.grns",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Goods receipt records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "receipts:finance_grns"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.invoicedatas": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.invoicedatas",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Invoice record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "receipts:finance_invoicedatas"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.budgets": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.budgets",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Budget records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "budgets:finance_budgets"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.lineitems": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.lineitems",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Budget line item records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "budgets:finance_lineitems"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.approvals": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.approvals",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Approval record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "approvals:finance_approvals"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.smallwarepos": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.smallwarepos",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Smallwares purchase order records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "smallwares:finance_smallwarepos"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.plactuals": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.plactuals",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 P&L actual record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "performance:central_plactuals"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    },
+    "subway.read.arolds": {
+      "schema_version": "capability-contract-v1",
+      "capability_id": "subway.read.arolds",
+      "supported_operation": "retrieve_bounded_source_records",
+      "business_purpose": "Read up to 25 Weekly balance record records in native ID order. This is a bounded snapshot sample; it cannot answer arbitrary filters, exact totals or exhaustive aggregate questions.",
+      "kind": "tool",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "package_id",
+          "revision",
+          "capability_id"
+        ],
+        "properties": {
+          "package_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capability_id": {
+            "type": "string"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "version_id",
+          "knowledge_sha256",
+          "records",
+          "coverage"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "knowledge_sha256": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "required": [
+              "state",
+              "conclusion_ready"
+            ]
+          }
+        }
+      },
+      "required_ontology": [
+        "performance:central_arolds"
+      ],
+      "required_evidence": [],
+      "preconditions": [],
+      "allowed_tool_operations": [
+        "business.retrieve_package_evidence"
+      ],
+      "side_effect": "read",
+      "verification_method": "mapped_evidence_and_coverage",
+      "completion_criteria": [
+        "Output matches schema",
+        "Required evidence or tool receipt is present",
+        "No inferred business authority"
+      ],
+      "domain_scope": [
+        "restaurant_operations"
+      ],
+      "retrieval_task": null
+    }
+  },
+  "rules": [],
+  "resource_bindings": {
+    "subway.read.stores": {
+      "source_id": "subway.central.stores",
+      "mapping_ids": [
+        "subway.central.stores._id",
+        "subway.central.stores.name",
+        "subway.central.stores.storeNumber",
+        "subway.central.stores.restaurantName",
+        "subway.central.stores.region",
+        "subway.central.stores.status"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "stores",
+      "fields": [
+        "_id",
+        "name",
+        "storeNumber",
+        "restaurantName",
+        "region",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.vendors": {
+      "source_id": "subway.central.vendors",
+      "mapping_ids": [
+        "subway.central.vendors._id",
+        "subway.central.vendors.name"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "vendors",
+      "fields": [
+        "_id",
+        "name"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.companies": {
+      "source_id": "subway.finance.companies",
+      "mapping_ids": [
+        "subway.finance.companies._id",
+        "subway.finance.companies.name"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "companies",
+      "fields": [
+        "_id",
+        "name"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.purchaseorders": {
+      "source_id": "subway.finance.purchaseorders",
+      "mapping_ids": [
+        "subway.finance.purchaseorders._id",
+        "subway.finance.purchaseorders.poNumber",
+        "subway.finance.purchaseorders.poDate",
+        "subway.finance.purchaseorders.vendorName",
+        "subway.finance.purchaseorders.status",
+        "subway.finance.purchaseorders.totalAmount"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "purchaseorders",
+      "fields": [
+        "_id",
+        "poNumber",
+        "poDate",
+        "vendorName",
+        "status",
+        "totalAmount"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.grns": {
+      "source_id": "subway.finance.grns",
+      "mapping_ids": [
+        "subway.finance.grns._id",
+        "subway.finance.grns.purchaseOrderId",
+        "subway.finance.grns.invoiceDataId",
+        "subway.finance.grns.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "grns",
+      "fields": [
+        "_id",
+        "purchaseOrderId",
+        "invoiceDataId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.invoicedatas": {
+      "source_id": "subway.finance.invoicedatas",
+      "mapping_ids": [
+        "subway.finance.invoicedatas._id",
+        "subway.finance.invoicedatas.poId",
+        "subway.finance.invoicedatas.grnId",
+        "subway.finance.invoicedatas.invoiceNumber",
+        "subway.finance.invoicedatas.paymentStatus",
+        "subway.finance.invoicedatas.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "invoicedatas",
+      "fields": [
+        "_id",
+        "poId",
+        "grnId",
+        "invoiceNumber",
+        "paymentStatus",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.budgets": {
+      "source_id": "subway.finance.budgets",
+      "mapping_ids": [
+        "subway.finance.budgets._id",
+        "subway.finance.budgets.storeId",
+        "subway.finance.budgets.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "budgets",
+      "fields": [
+        "_id",
+        "storeId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.lineitems": {
+      "source_id": "subway.finance.lineitems",
+      "mapping_ids": [
+        "subway.finance.lineitems._id",
+        "subway.finance.lineitems.budgetId",
+        "subway.finance.lineitems.category",
+        "subway.finance.lineitems.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "lineitems",
+      "fields": [
+        "_id",
+        "budgetId",
+        "category",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.approvals": {
+      "source_id": "subway.finance.approvals",
+      "mapping_ids": [
+        "subway.finance.approvals._id",
+        "subway.finance.approvals.approvalConfigId",
+        "subway.finance.approvals.status"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "approvals",
+      "fields": [
+        "_id",
+        "approvalConfigId",
+        "status"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.smallwarepos": {
+      "source_id": "subway.finance.smallwarepos",
+      "mapping_ids": [
+        "subway.finance.smallwarepos._id",
+        "subway.finance.smallwarepos.poNumber",
+        "subway.finance.smallwarepos.status",
+        "subway.finance.smallwarepos.amount"
+      ],
+      "connection_id": "dbconn_subway_finance",
+      "collection": "smallwarepos",
+      "fields": [
+        "_id",
+        "poNumber",
+        "status",
+        "amount"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.plactuals": {
+      "source_id": "subway.central.plactuals",
+      "mapping_ids": [
+        "subway.central.plactuals._id",
+        "subway.central.plactuals.storeId",
+        "subway.central.plactuals.storeCode",
+        "subway.central.plactuals.plItem"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "plactuals",
+      "fields": [
+        "_id",
+        "storeId",
+        "storeCode",
+        "plItem"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    },
+    "subway.read.arolds": {
+      "source_id": "subway.central.arolds",
+      "mapping_ids": [
+        "subway.central.arolds._id",
+        "subway.central.arolds.customerNum",
+        "subway.central.arolds.entity",
+        "subway.central.arolds.weekEndingDate",
+        "subway.central.arolds.netSales",
+        "subway.central.arolds.endBalance"
+      ],
+      "connection_id": "dbconn_subway_central",
+      "collection": "arolds",
+      "fields": [
+        "_id",
+        "customerNum",
+        "entity",
+        "weekEndingDate",
+        "netSales",
+        "endBalance"
+      ],
+      "metadata_revision": 1,
+      "generation": 1,
+      "limit": 25
+    }
+  },
+  "validation_requirements": [
+    "acyclic_dependencies",
+    "mapped_evidence",
+    "current_source_authority"
+  ]
+}

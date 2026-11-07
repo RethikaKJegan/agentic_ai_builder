@@ -1,3 +1,4 @@
+import {runKnowledgeSchema,recoveryInspectionSchema,operationalAlertsSchema} from './reliability';
 import { browserSessionCurrent } from '@/lib/browser-session';
 import {actionDocumentSchema,automationSchema,automationListSchema} from './orchestration';
 import {compositionViewSchema,compositionListSchema} from './compositions';
@@ -179,6 +180,9 @@ export class WorkflowClient {
   async clientPackages() {return z.object({items:z.array(z.object({package_id:z.string(),revision:z.number(),client_id:z.string(),domain:z.string(),ontology_version:z.string()}))}).parse(await this.read('business-ontology/v1/client-packages'));}
   async compositionWorkflow(id:string) {const {correlation_id:_correlation,contract_versions:_versions,...workflow}=z.record(z.unknown()).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));return CanonicalWorkflowSchema.parse(workflow);}
   async cancelComposition(id:string,runId:string) {return z.object({run_id:z.string(),status:z.string()}).passthrough().parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));}
+  async runKnowledge(id:string) {return runKnowledgeSchema.parse(await this.read(`runs/${encodeURIComponent(id)}/knowledge`));}
+  async recoveryInspection(id:string) {return recoveryInspectionSchema.parse(await this.read(`runs/${encodeURIComponent(id)}/recovery`));}
+  async operationalAlerts() {return operationalAlertsSchema.parse(await this.read('operational-alerts'));}
   async compositionView(id:string,runId?:string) {return compositionViewSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/view${runId?`?run_id=${encodeURIComponent(runId)}`:''}`));}
   async compositions() {return compositionListSchema.parse(await this.read('business-ontology/v1/compositions'));}
   async deleteComposition(id:string) {return z.object({workflow_id:z.string(),deleted:z.literal(true)}).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmed:true})}));}

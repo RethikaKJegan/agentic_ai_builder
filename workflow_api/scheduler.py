@@ -9,12 +9,13 @@ class TriggerScheduler:
     The scheduler receives all provider access as a server-owned callback. It
     never reads credentials from trigger records or client requests.
     """
-    def __init__(self, service, authenticate, poll_source=None, interval=5):
+    def __init__(self, service, authenticate, poll_source=None, interval=5,dispatch=True):
         self.service = service
         self.authenticate = authenticate
         if not getattr(service,'worker_authenticate',None):service.worker_authenticate=authenticate
         self.poll_source = poll_source
         self.interval = max(1, int(interval))
+        self.dispatch=dispatch
         self.stop_event = Event()
         self.thread = None
         self.last_polled = {}
@@ -82,7 +83,7 @@ class TriggerScheduler:
                             lifecycle.emit(db, workspace, workflow, 'trigger.error')
                     self.last_polled[binding_id] = now
                     continue
-            for _ in range(10):
+            for _ in range(10 if self.dispatch else 0):
                 if self.stop_event.is_set():break
                 jobs=lifecycle.lease(workspace,limit=1,seconds=120)
                 if not jobs:break
@@ -111,6 +112,50 @@ class TriggerScheduler:
         self.stop_event.set()
         if self.thread:
             self.thread.join(timeout=5)
+
+
+class LifecycleDispatchWorker:
+    """Parallel consumers reuse the existing atomic lifecycle claim/fencing path."""
+    def __init__(self,service,concurrency=1,interval=1):
+        if type(concurrency) is not int or not 1<=concurrency<=32:raise ValueError('Dispatch concurrency must be 1–32.')
+        self.service,self.concurrency,self.interval=service,concurrency,interval
+        self.stop_event=Event();self.thread=None;self.cursor=0
+        self.health={'state':'starting','last_success':None,'last_error':None}
+
+    def tick(self):
+        from concurrent.futures import ThreadPoolExecutor
+        lifecycle=self.service.lifecycle
+        with lifecycle.store.transaction(write=False) as db:
+            workspaces=[r[0] for r in db.execute("SELECT DISTINCT workspace FROM lifecycle_jobs WHERE state IN ('queued','leased') ORDER BY workspace LIMIT 1000").fetchall()]
+        if workspaces:
+            offset=self.cursor%len(workspaces);workspaces=workspaces[offset:]+workspaces[:offset]
+        claimed=[]
+        for workspace in workspaces:
+            if self.stop_event.is_set() or len(claimed)>=self.concurrency:break
+            jobs=lifecycle.lease(workspace,limit=1,seconds=120)
+            if jobs:
+                job=jobs[0];claimed.append((job['job_id'],lifecycle.leased_tokens[job['job_id']]))
+        self.cursor+=max(1,len(claimed))
+        def execute(item):
+            return lifecycle.execute_job(item[0],self.service.runtime_runner,claim=item[1])
+        with ThreadPoolExecutor(max_workers=self.concurrency,thread_name_prefix='builder-dispatch') as pool:
+            result=list(pool.map(execute,claimed))
+        self.health={'state':'ready','last_success':time.time(),'last_error':None,'advanced':len(result),'capacity':self.concurrency}
+        return result
+
+    def start(self):
+        if self.thread and self.thread.is_alive():return
+        self.stop_event.clear()
+        def loop():
+            while not self.stop_event.is_set():
+                try:self.tick()
+                except Exception:self.health.update(state='error',last_error='DISPATCH_WORKER_FAILED')
+                self.stop_event.wait(self.interval)
+        self.thread=Thread(target=loop,name='builder-dispatch-worker',daemon=True);self.thread.start()
+
+    def stop(self):
+        self.stop_event.set()
+        if self.thread:self.thread.join(timeout=5)
 
 
 class CronSchedule:

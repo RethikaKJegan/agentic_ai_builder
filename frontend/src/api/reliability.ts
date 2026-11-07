@@ -1,0 +1,5 @@
+import {z} from 'zod';
+const text=z.string();
+export const runKnowledgeSchema=z.object({projections:z.array(z.object({pin:z.object({graph_id:text,source_key:text,revision:z.number(),sha256:text}),current:z.boolean(),reason:text.nullable(),nodes:z.array(z.object({node_id:text,kind:text,reference:text.optional(),label:text.optional(),status:text}).passthrough()),edges:z.array(z.object({edge_id:text,source:text,target:text,predicate:text,status:text}).passthrough())})).max(8),qualification:text});
+export const recoveryInspectionSchema=z.object({run_id:text,status:text,required_action:text,automatic_replay_allowed:z.literal(false),uncertain_invocations:z.array(z.object({node_id:text,effect_reference:text.nullable(),required_action:text}).passthrough()),completed_checkpoints:z.array(z.record(z.unknown())),consumed_usage:z.record(z.unknown()),guidance:text});
+export const operationalAlertsSchema=z.object({observed_at:z.number(),alerts:z.array(z.object({code:text,severity:z.enum(['warning','critical']),count:z.number(),action:text})),counts:z.record(z.number()),qualification:text});

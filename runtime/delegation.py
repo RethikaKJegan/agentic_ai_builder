@@ -164,15 +164,14 @@ class DelegationSession:
                   for target in (metadata.get('sheet_write_targets') or []) if isinstance(target, dict)]
         return {'sources': sources, 'sheet_read_targets': reads, 'sheet_write_targets': writes}
 
-    def current(self, db):
+    def current(self, db, agent=None):
         run = self.runtime.load(db, self.run_id, self.auth, 'workflow.execute')
-        if run['status'] != 'running' or run.get('worker') != self.worker:
+        if not self.runtime.owns_execution(run, self.worker):
             raise RuntimeFailure('DELEGATION_INTERRUPTED', 'The run no longer owns this delegation.')
         workflow, _ = self.runtime.revision(db, run['workflow_id'], run['workflow_version'], self.auth, run.get('release_bound', False))
         if digest(workflow) != run['workflow_digest']:
             raise RuntimeFailure('REVISION_CHANGED', 'The approved delegation revision changed.')
-        if self.runtime.clock() - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
-            raise RuntimeFailure('RUN_TIMEOUT', 'The workflow duration budget is exhausted.')
+        self.runtime.check_deadlines(run, workflow, agent)
         return run
 
     def remaining_binding(self, binding, run, agent):
@@ -280,7 +279,7 @@ class DelegationSession:
                     for key, value in actual.items())):
             raise RuntimeFailure('INVALID_USAGE', 'Confirmed model usage must fit its reservation.')
         with self.runtime.store.transaction() as db:
-            run = self.runtime.load(db, self.run_id, self.auth, 'workflow.execute')
+            run = self.current(db, agent)
             for group in ('workflow', agent['agent_id']):
                 for key, value in actual.items():
                     run['usage'][group][key] = max(0, run['usage'][group][key] - (reservation[key] - value))
@@ -363,6 +362,8 @@ class DelegationSession:
             code = getattr(exc, 'code', 'INVOCATION_FAILED')
             with self.runtime.store.transaction() as db:
                 run = self.runtime.load(db, self.run_id, self.auth, 'workflow.execute')
+                if not self.runtime.owns_execution(run, self.worker):
+                    raise RuntimeFailure('DELEGATION_INTERRUPTED', 'The run no longer owns this delegation.') from None
                 run['delegation_states'][node_id] = 'failed'
                 if self.composition.active:
                     from .recovery import classify
@@ -372,7 +373,7 @@ class DelegationSession:
                 self.runtime.save(db, run)
             raise RuntimeFailure(code, 'Delegated invocation failed.') from None
         with self.runtime.store.transaction() as db:
-            run = self.current(db)
+            run = self.current(db, agent)
             run['delegation_states'][node_id] = 'completed'
             if self.composition.active and not decision:
                 task = self.composition.tasks[agent['agent_id']]
@@ -481,7 +482,10 @@ class DelegationSession:
             run = self.current(db)
             workflow, grants = self.runtime.revision(db, run['workflow_id'], run['workflow_version'], self.auth, run.get('release_bound', False))
             connector, grant, bound_agent, params, reservation = self.runner.prepare_tool(run, workflow, grants, node, self.auth)
-            self.runner.reserve(db, run, workflow, bound_agent, reservation)
+            from workflow_api.resource_limits import ResourceControls
+            self.runner.reserve(db, run, workflow, bound_agent, reservation,
+                                provider_id=ResourceControls.tool_provider(self.runtime,grant['tool_id']),
+                                credential_reference=ResourceControls.tool_credential(self.runtime,grant['tool_id']))
             run.setdefault('delegation_states', {})[node_id] = 'executing'
             self.runtime.event(db, run, 'node.observed', {'node_id': node_id, 'invocation_id': invocation_id,
                 'agent_id': agent['agent_id'], 'tool_id': grant['tool_id'], 'parent_node_id': parent_id,
@@ -503,7 +507,7 @@ class DelegationSession:
             if list(Draft202012Validator(grant['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'Connector output failed its schema.')
             with self.runtime.store.transaction() as db:
-                run = self.current(db)
+                run = self.current(db, agent)
                 run['delegation_states'][node_id] = 'completed'
                 self.runtime.event(db, run, 'node.completed', {'node_id': node_id,
                     'invocation_id': invocation_id, 'output': snapshot(output)})
@@ -518,6 +522,8 @@ class DelegationSession:
             code = getattr(exc, 'code', 'UNKNOWN_INVOCATION_RESULT' if connector.external_write else 'INVOCATION_FAILED')
             with self.runtime.store.transaction() as db:
                 run = self.runtime.load(db, self.run_id, self.auth, 'workflow.execute')
+                if not self.runtime.owns_execution(run, self.worker):
+                    raise RuntimeFailure('DELEGATION_INTERRUPTED', 'The run no longer owns this tool invocation.') from None
                 run['delegation_states'][node_id] = 'failed'
                 if self.composition.active:
                     from .recovery import classify
@@ -532,7 +538,8 @@ class DelegationSession:
             raise RuntimeFailure('DELEGATION_NOT_CONFIGURED', 'Configure a bounded master decision adapter.', 503)
         if list(Draft202012Validator(self.master['input_schema']).iter_errors(self.inputs)):
             raise RuntimeFailure('AGENT_INPUT_INVALID', 'Master inputs do not match its schema.')
-        with ThreadPoolExecutor(max_workers=min(4, self.config['max_tasks']),
+        concurrency=getattr(getattr(self.runtime,'resource_controls',None),'policy',None)
+        with ThreadPoolExecutor(max_workers=min(concurrency.agents_per_workflow if concurrency else 4, self.config['max_tasks']),
                                 thread_name_prefix='subagent') as pool:
             pending = []
             try:
@@ -608,6 +615,9 @@ class DelegationSession:
                 with self.runtime.store.transaction(write=False) as db:
                     memory_run = self.current(db)
                 context['working_memory'] = bounded_context(self.runtime.working_memory.view(memory_run, self.workflow), max_tokens=self.master['limits']['max_tokens'])
+                graph=getattr(self.runtime.workflows,'account_graph',None)
+                pin=self.workflow.get('metadata',{}).get('account_graph_pin')
+                if graph and pin:context['account_knowledge']=graph.context(self.auth,pin,self.workflow.get('description',''))
             decision = self.invoke(self.master, context, self.node['node_id'], decision=True)
             if decision['action'] == 'finish':
                 if pending:

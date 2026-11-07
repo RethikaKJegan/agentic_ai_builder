@@ -1,0 +1,8 @@
+- [x] Inspect repository guidance, runtime, workers, contracts and existing evidence.
+- [x] Execute foundation baseline and attempt isolated PostgreSQL checks; record missing infrastructure explicitly.
+- [x] Reproduce and fix demonstrated dispatch/fencing/settlement/deadline defects with focused tests.
+- [x] Verify crash boundaries, budgets, permissions and tenant isolation.
+- [x] Run controlled planner/CrewAI/approval/event/restart acceptance.
+- [x] Check contracts, generated UI compatibility, syntax, SQL inventory and diff.
+- [x] Record the final durable-suite result and complete the verification report.
+- [ ] Infrastructure follow-up: provide an isolated PostgreSQL test DSN and execute the 157 blocked cases.

@@ -17,6 +17,7 @@ def install(app,service,auth,env,reference):
         adapter=RestoredSubwayAdapters(env)
     manager=DataSources(service.store,env,adapter=adapter)
     app.state.data_sources=manager
+    service.account_semantic=manager.semantic
     from .business_ontology_routes import install as install_business_ontology
     install_business_ontology(app,service,auth,reference,env)
     queries=DataQueries(manager)

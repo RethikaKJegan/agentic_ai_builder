@@ -411,7 +411,7 @@ class LifecycleService:
                 current=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()
                 if not row or row[0]!=claim or not current:return False
                 job=json.loads(current[0])
-                if job['state']!='leased':return False
+                if job['state']!='leased' or not job.get('lease_until') or job['lease_until']<=now_iso(self.clock):return False
                 job['lease_until']=(datetime.fromtimestamp(self.clock(),timezone.utc)+timedelta(seconds=120)).isoformat()
                 db.execute('UPDATE lifecycle_jobs SET lease_until=?,document=? WHERE job_id=?',(job['lease_until'],json.dumps(job),job_id))
             return True
@@ -469,12 +469,14 @@ class LifecycleService:
                 if not token or token[0]!=claim or json.loads(stored[0])['state']!='leased':return json.loads(stored[0])
                 from .postgres import DatabaseFailure
                 import sqlite3
-                transient=isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
+                transient=(isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
+                           or getattr(exc,'code',None)=='QUEUE_CAPACITY_EXCEEDED')
                 state='queued' if run is None and transient and job['attempt']<max_attempts else 'dead_letter'
                 job["lease_until"] = None
                 job["last_error_code"] = "RUNTIME_DISPATCH_FAILED" if transient else "RUNTIME_DISPATCH_UNCERTAIN"
+                available=(datetime.fromtimestamp(self.clock()+min(2**job['attempt'],60),timezone.utc).isoformat() if state=='queued' else now_iso(self.clock))
                 db.execute("UPDATE lifecycle_jobs SET state=?, lease_until=NULL, available_at=?, document=? WHERE job_id=?",
-                           (state, now_iso(self.clock), json.dumps({**job, "state": state}), job_id))
+                           (state, available, json.dumps({**job, "state": state}), job_id))
                 return {**job, "state": state}
 
     def _job_workflow(self, db, job_id):

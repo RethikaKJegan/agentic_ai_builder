@@ -359,6 +359,17 @@ class WorkflowService:
             configuration = node.get('configuration', {})
             if set(configuration) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
                 raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Use the supported node input mappings.', field='nodes.configuration')
+            outgoing = [edge for edge in workflow['edges'] if edge['source'] == node['node_id']]
+            if {'on_timeout', 'timeout_outcome'} & configuration.keys():
+                mode = configuration.get('on_timeout', 'stop')
+                if node['kind'] != 'approval' or mode not in ('stop', 'retry', 'branch'):
+                    raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'Only approval nodes support stop, retry or branch timeout policies.', field='nodes.configuration.on_timeout')
+                if mode == 'branch' and (not isinstance(configuration.get('timeout_outcome'), str) or
+                        not any(edge.get('outcome') == configuration['timeout_outcome'] for edge in outgoing)):
+                    raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'A timeout branch requires an explicit outgoing outcome.', field='nodes.configuration.timeout_outcome')
+            if 'error_outcome' in configuration and (not isinstance(configuration['error_outcome'], str) or
+                    not any(edge.get('outcome') == configuration['error_outcome'] for edge in outgoing)):
+                raise PlannerFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'An error branch requires an explicit outgoing outcome.', field='nodes.configuration.error_outcome')
             if node['kind'] == 'tool' and not node.get('agent_id'):
                 raise PlannerFailure('AGENT_REGISTRATION_REQUIRED', 'Tool nodes require a registered execution agent.', field='nodes.agent_id')
             if node['kind'] == 'agent':

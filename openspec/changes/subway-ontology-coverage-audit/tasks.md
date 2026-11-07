@@ -1,0 +1,5 @@
+- [x] Inventory all archive models, model references and service evidence coverage.
+- [x] Compare restored collections/properties with ontology and workflow bindings.
+- [x] Exercise representative business questions and fix supported retrieval gaps.
+- [x] Validate isolation, historical pins and current data availability.
+- [x] Record coverage, deploy verified corrections and report remaining limitations.

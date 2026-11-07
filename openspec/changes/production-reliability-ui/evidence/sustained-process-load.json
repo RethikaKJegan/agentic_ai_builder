@@ -1,0 +1,92 @@
+{
+  "targets": {
+    "lost_jobs": 0,
+    "duplicate_effects": 0,
+    "max_completion_seconds": 180,
+    "p99_seconds": 120
+  },
+  "host_scope": "One development host, SQLite persistence, separate worker processes, controlled 150ms effects; not a multi-host or PostgreSQL throughput qualification.",
+  "results": [
+    {
+      "workers": 1,
+      "active_workers": 1,
+      "jobs": 96,
+      "elapsed_seconds": 35.697959184646606,
+      "throughput_per_second": 2.689229361920745,
+      "average_latency_seconds": 17.816255311171215,
+      "p95_latency_seconds": 33.84418487548828,
+      "p50_latency_seconds": 17.805370807647705,
+      "p99_latency_seconds": 35.50214624404907,
+      "average_queue_wait_seconds": 17.665578049918015,
+      "concurrent_effects_peak": 1,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.40520571513590303,
+      "database_metrics": {
+        "reads": 1357,
+        "writes": 491,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 0,
+        "lock_wait_seconds": 0.13851687218993902,
+        "transaction_seconds": 25.5136074796319
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with SQLite; no live effect. Database metrics cover the parent only for process runs."
+    },
+    {
+      "workers": 2,
+      "active_workers": 2,
+      "jobs": 96,
+      "elapsed_seconds": 18.53242826461792,
+      "throughput_per_second": 5.180109083885301,
+      "average_latency_seconds": 9.226438420514265,
+      "p95_latency_seconds": 17.405308723449707,
+      "p50_latency_seconds": 9.267186522483826,
+      "p99_latency_seconds": 18.36875081062317,
+      "average_queue_wait_seconds": 9.075936198234558,
+      "concurrent_effects_peak": 2,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.38980896438801904,
+      "database_metrics": {
+        "reads": 687,
+        "writes": 492,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 0,
+        "lock_wait_seconds": 0.24684292636811733,
+        "transaction_seconds": 22.041706344112754
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with SQLite; no live effect. Database metrics cover the parent only for process runs."
+    },
+    {
+      "workers": 4,
+      "active_workers": 4,
+      "jobs": 96,
+      "elapsed_seconds": 15.093860149383545,
+      "throughput_per_second": 6.360202032474826,
+      "average_latency_seconds": 7.335385111471017,
+      "p95_latency_seconds": 14.041547775268555,
+      "p50_latency_seconds": 7.40406346321106,
+      "p99_latency_seconds": 14.66664981842041,
+      "average_queue_wait_seconds": 7.1851115102569265,
+      "concurrent_effects_peak": 3,
+      "duplicate_effects": 0,
+      "lost_jobs": 0,
+      "retry_events": 0,
+      "effect_busy_fraction": 0.23894261596729324,
+      "database_metrics": {
+        "reads": 612,
+        "writes": 494,
+        "contention": 0,
+        "failures": 0,
+        "slow_transactions": 0,
+        "lock_wait_seconds": 0.129603766836226,
+        "transaction_seconds": 24.774794182740152
+      },
+      "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; processes on one host with SQLite; no live effect. Database metrics cover the parent only for process runs."
+    }
+  ]
+}

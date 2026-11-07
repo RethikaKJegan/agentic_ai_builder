@@ -7,10 +7,11 @@ from uuid import uuid4
 
 
 class WorkerSupervisor:
-    def __init__(self,store,workers,role='combined',clock=time.time,ttl=30,shutdown_timeout=180):
+    def __init__(self,store,workers,role='combined',clock=time.time,ttl=30,shutdown_timeout=180,parallel_workers=()):
         if role not in {'api','worker','combined'}:raise ValueError('Use api, worker or combined process role.')
         self.store,self.workers,self.role,self.clock,self.ttl=store,list(workers),role,clock,ttl
         self.shutdown_timeout=shutdown_timeout
+        self.parallel_workers=list(parallel_workers);self.parallel_started=False
         self.owner='worker_'+uuid4().hex;self.key='builder-live-workers'
         self.stop_event=Event();self.thread=None;self.owned=False
         with store.transaction() as db:
@@ -25,12 +26,12 @@ class WorkerSupervisor:
             allowed=row is None or row[0]==self.owner or row[1]<=now
             if allowed:
                 db.execute('INSERT INTO builder_worker_leases VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires=excluded.expires',(self.key,self.owner,now+self.ttl))
-            db.execute('INSERT INTO builder_worker_health VALUES (?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET state=excluded.state,heartbeat=excluded.heartbeat',(self.owner,self.role,'active' if allowed else 'standby',now))
-            if allowed:
-                for worker in self.workers:
+            db.execute('INSERT INTO builder_worker_health VALUES (?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET state=excluded.state,heartbeat=excluded.heartbeat',(self.owner,self.role,'active' if allowed or self.parallel_workers else 'standby',now))
+            if allowed or self.parallel_workers:
+                for worker in [*(self.workers if allowed else []),*self.parallel_workers]:
                     state=getattr(worker,'health',None)
                     if isinstance(state,dict):
-                        document={key:state[key] for key in ('state','last_success','last_error') if key in state}
+                        document={key:state[key] for key in ('state','last_success','last_error','selected','advanced','capacity') if key in state}
                         document['heartbeat']=now
                         db.execute('INSERT INTO builder_worker_component_health VALUES (?,?,?) ON CONFLICT(worker_id,name) DO UPDATE SET document=excluded.document',(self.owner,type(worker).__name__,json.dumps(document)))
         return allowed
@@ -38,6 +39,14 @@ class WorkerSupervisor:
     def tick(self):
         if self.role=='api':return False
         acquired=self.acquire()
+        if self.parallel_workers and not self.parallel_started:
+            started=[]
+            try:
+                for worker in self.parallel_workers:worker.start();started.append(worker)
+                self.parallel_started=True
+            except Exception:
+                self._stop_workers(started)
+                raise
         if acquired and not self.owned:
             started=[]
             try:
@@ -69,21 +78,28 @@ class WorkerSupervisor:
                     if self.owned:
                         self._stop_workers()
                         self.owned=False
+                    if self.parallel_started:
+                        self._stop_workers(self.parallel_workers)
+                        self.parallel_started=False
         self.thread=Thread(target=loop,name='builder-worker-supervisor',daemon=True);self.thread.start()
 
-    def _stop_workers(self):
+    def _stop_workers(self,workers=None):
+        workers=self.workers if workers is None else workers
         deadline=time.monotonic()+self.shutdown_timeout
-        for worker in self.workers:
+        for worker in workers:
             event=getattr(worker,'stop_event',None)
             if event is not None:event.set()
-        for worker in reversed(self.workers):worker.stop()
-        for worker in self.workers:
+        for worker in reversed(workers):worker.stop()
+        for worker in workers:
             thread=getattr(worker,'thread',None)
             if thread and thread.is_alive():thread.join(timeout=max(0,deadline-time.monotonic()))
 
     def stop(self):
         self.stop_event.set()
         if self.thread:self.thread.join(timeout=5)
+        if self.parallel_started:
+            self._stop_workers(self.parallel_workers)
+            self.parallel_started=False
         if self.owned:
             # Retain group ownership during a graceful drain so a standby cannot
             # enter the coordinator while this process finishes existing work.

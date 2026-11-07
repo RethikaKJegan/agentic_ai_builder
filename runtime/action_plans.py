@@ -34,7 +34,7 @@ def params(workflow,node,run):
             if upstream:result['data']={'primary':result['data'],'upstream_results':upstream}
         result['instructions']=action['instructions']
         result['source_references']=deepcopy(action['evidence_references'])
-    if node['kind']=='agent' and action['capability_id']!='content.prepare':
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query'}:
         from workflow_api.investigation_agents import packet
         sources=[e for dep in action['depends_on'] for e in run.get('task_checkpoints',{}).get(dep,{}).get('result',{}).get('source_evidence',[])]
         result.setdefault('context',{})['evidence']=packet(sources)
@@ -80,7 +80,7 @@ def verify(workflow,node,output,inputs):
             if set(re.findall(r'https?://[^\s<>"\)]+',text))-allowed:
                 logging.getLogger(__name__).warning('Connected content rejected: unprovided_url')
                 deny('Generated content invented an artifact/source URL.','ACTION_CONTENT_UNVERIFIED')
-    if node['kind']=='agent' and action['capability_id']!='content.prepare':
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis
         from workflow_api.service import ApiFailure
         try:checked=validate_analysis(output,inputs['context']['evidence'])

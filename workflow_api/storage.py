@@ -23,7 +23,8 @@ class WorkflowStore:
         self.busy_timeout_ms = int(os.getenv('BUILDER_DATABASE_BUSY_TIMEOUT_MS', '3000')) if busy_timeout_ms is None else busy_timeout_ms
         if type(self.busy_timeout_ms) is not int or not 0 <= self.busy_timeout_ms <= 30000:
             raise ValueError('Database busy timeout must be between 0 and 30000 milliseconds.')
-        self.metrics = {'reads': 0, 'writes': 0, 'contention': 0, 'failures': 0, 'slow_transactions': 0}
+        self.metrics = {'reads': 0, 'writes': 0, 'contention': 0, 'failures': 0, 'slow_transactions': 0,
+                        'lock_wait_seconds':0.0,'transaction_seconds':0.0}
         self.metrics_lock = Lock()
         self.path = str(path)
         self.database = None
@@ -51,6 +52,7 @@ class WorkflowStore:
             started=time.monotonic()
             try:
                 with self.database.transaction(write=write) as connection:
+                    with self.metrics_lock:self.metrics['lock_wait_seconds']+=getattr(connection,'lock_wait_seconds',0)
                     yield connection
             except Exception as exc:
                 from .postgres import DatabaseFailure
@@ -60,16 +62,20 @@ class WorkflowStore:
             finally:
                 with self.metrics_lock:
                     self.metrics['writes' if write else 'reads']+=1
+                    self.metrics['transaction_seconds']+=time.monotonic()-started
                     if time.monotonic()-started>=1:self.metrics['slow_transactions']+=1
             return
         db = sqlite3.connect(self.path, timeout=self.busy_timeout_ms / 1000)
         started = time.monotonic()
         category = None
+        lock_wait=0
         try:
             db.execute(f'PRAGMA busy_timeout={self.busy_timeout_ms}')
             if not write:
                 db.execute('PRAGMA query_only=ON')
+            waiting=time.monotonic()
             db.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
+            lock_wait=time.monotonic()-waiting
             yield db
             db.commit()
         except Exception as exc:
@@ -89,6 +95,8 @@ class WorkflowStore:
             elapsed = time.monotonic() - started
             with self.metrics_lock:
                 self.metrics['writes' if write else 'reads'] += 1
+                self.metrics['lock_wait_seconds']+=lock_wait
+                self.metrics['transaction_seconds']+=elapsed
                 if category:
                     self.metrics['contention' if category == 'contention' else 'failures'] += 1
                 if elapsed >= 1:

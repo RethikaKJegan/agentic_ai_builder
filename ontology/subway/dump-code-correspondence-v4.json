@@ -1,0 +1,2722 @@
+[
+  {
+    "concept_id": "organization:central_departments",
+    "role": "central",
+    "collection": "departments",
+    "model": {
+      "application": "intranet",
+      "name": "Department",
+      "schema": "departmentSchema",
+      "member_sha256": "647660b5b3da3c27840eae089c43d54c632ee338e8aa6ca7b920d92c2840f938"
+    },
+    "model_member": "subway-intranet-api-master/src/models/department.model.js",
+    "exported_symbols": [
+      "Department"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/department-service2.js",
+        "member_sha256": "b34334a6d3b26a58280500c44f79bb8af8cfb7dd7c549d3bc6f464d77e009a1c",
+        "reference_lines": [
+          15
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/departments.service.js",
+        "member_sha256": "383ea670000fcb62a5e31603af2fb7eccb6654b5b89c218b7a6350d7ea469dc1",
+        "reference_lines": [
+          45,
+          72,
+          100,
+          113,
+          117,
+          138,
+          146,
+          150,
+          158,
+          166
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/other-app-service2.js",
+        "member_sha256": "45d5204d383c0859b27e6929db9f350885a191b27c1087df8df0c6b58b2bcfa2",
+        "reference_lines": [
+          8
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-service/department-validation.js",
+        "member_sha256": "70f49b62d1c01fa24362331fc6cf3979504ce83afc958992a93949bfc02b40f2",
+        "reference_lines": [
+          27,
+          48
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:central_departmentroles",
+    "role": "central",
+    "collection": "departmentroles",
+    "model": {
+      "application": "intranet",
+      "name": "DepartmentRole",
+      "schema": "departmentRoleSchema",
+      "member_sha256": "5d9346439c3f9463e6605d78c684c967189fbfe7ebcdd27624d350e0999251d7"
+    },
+    "model_member": "subway-intranet-api-master/src/models/department-role.model.js",
+    "exported_symbols": [
+      "DepartmentRole"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/departments.service.js",
+        "member_sha256": "383ea670000fcb62a5e31603af2fb7eccb6654b5b89c218b7a6350d7ea469dc1",
+        "reference_lines": [
+          28,
+          80,
+          91,
+          111,
+          135
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:central_roles",
+    "role": "central",
+    "collection": "roles",
+    "model": {
+      "application": "intranet",
+      "name": "Role",
+      "schema": "roleSchema",
+      "member_sha256": "e14ebe4c86ab6d5f36f2999dbc9b05b9cfcfa6fbea0adaa653293c018b011e36"
+    },
+    "model_member": "subway-intranet-api-master/src/models/role.model.js",
+    "exported_symbols": [
+      "Role"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/admin.service.js",
+        "member_sha256": "1fd9b90744d4956d7685acf18f6acb15afc88c6d72d08388632627fe9b84d665",
+        "reference_lines": [
+          45
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/app-document.service.js",
+        "member_sha256": "242e4ac2be38873f780d48b91735e0d1e7eec0282cd045fa1328f5ad4460e178",
+        "reference_lines": [
+          107
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/common-service.js",
+        "member_sha256": "0b17c4bf48b753bce32bc57958f27c694bb59257fffa51dbc0b948025925edf8",
+        "reference_lines": [
+          7,
+          31,
+          33
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-role.service.js",
+        "member_sha256": "c747fc972b70e278f84d2dddded71190ad6a3480ae61e218b37551d2904661eb",
+        "reference_lines": [
+          76
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-service/index.js",
+        "member_sha256": "ae630597e478cbcd353ad9c7da5516a8c7177a8659ddc683210134832b75d32f",
+        "reference_lines": [
+          699
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:central_userroles",
+    "role": "central",
+    "collection": "userroles",
+    "model": {
+      "application": "intranet",
+      "name": "UserRole",
+      "schema": "userRoleSchema",
+      "member_sha256": "14bb7e014d4b0d893875449c784c1204dd196aca666d17e830420d439712942d"
+    },
+    "model_member": "subway-intranet-api-master/src/models/user-role.model.js",
+    "exported_symbols": [
+      "UserRole"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/admin.service.js",
+        "member_sha256": "1fd9b90744d4956d7685acf18f6acb15afc88c6d72d08388632627fe9b84d665",
+        "reference_lines": [
+          27,
+          89
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/common-service.js",
+        "member_sha256": "0b17c4bf48b753bce32bc57958f27c694bb59257fffa51dbc0b948025925edf8",
+        "reference_lines": [
+          10
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/other-app-dependency-services/finance-service/index.js",
+        "member_sha256": "dbf78ce1fe8675acfb4413438436206443aa960fb7532bc435c87e8cc73ad817",
+        "reference_lines": [
+          17
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/role.service.js",
+        "member_sha256": "d2f6ae3796308c275879a4168ae7f4d3099b6ebcc0e3cb6df6c4580173a0d180",
+        "reference_lines": [
+          8
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-role.service.js",
+        "member_sha256": "c747fc972b70e278f84d2dddded71190ad6a3480ae61e218b37551d2904661eb",
+        "reference_lines": [
+          6,
+          10,
+          62,
+          66
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-service/user-service2.js",
+        "member_sha256": "c55f01607494d823bb28b1187d1cd7c2ee83611be2c87ed2183fcbb40843beb5",
+        "reference_lines": [
+          48,
+          74
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:central_stategsts",
+    "role": "central",
+    "collection": "stategsts",
+    "model": {
+      "application": "intranet",
+      "name": "StateGst",
+      "schema": "stateGstSchema",
+      "member_sha256": "0020fc0e41b93ebc793d772c4c07a536aa0032cb518f91d2a71286b6aaa64e5e"
+    },
+    "model_member": "subway-intranet-api-master/src/models/state-gst.model.js",
+    "exported_symbols": [
+      "StateGst"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/state-gst.service.js",
+        "member_sha256": "72d62714d9e208d0a17bbf78f97f36a871f01df51437f9cee1d5d670536bd65b",
+        "reference_lines": [
+          6,
+          11,
+          16,
+          27,
+          42
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:central_vendors",
+    "role": "central",
+    "collection": "vendors",
+    "model": {
+      "application": "intranet",
+      "name": "Vendor",
+      "schema": "vendorSchema",
+      "member_sha256": "032d4f919c97b673f9706329873dc4f58893756169fe88ee05a28162135ca360"
+    },
+    "model_member": "subway-intranet-api-master/src/models/vendor.model.js",
+    "exported_symbols": [
+      "Vendor"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/vendor.service.js",
+        "member_sha256": "047b4736ab4ed6c38b2503e9541e9f3f376cba58a4b6e73223d5aa403651ddbf",
+        "reference_lines": [
+          6,
+          11,
+          13,
+          17,
+          21,
+          26,
+          28,
+          32,
+          36
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:finance_companies",
+    "role": "finance",
+    "collection": "companies",
+    "model": {
+      "application": "finance",
+      "name": "Company",
+      "schema": "companySchema",
+      "member_sha256": "ac83af972e23a3bc35c5bede6b348b112daa7d2a49da91ef464e652ffb32dec2"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/company.model.js",
+    "exported_symbols": [
+      "Company"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/company-service/index.js",
+        "member_sha256": "079e021641472e3f675a18241b877bedc08bee5d128182a8e5f211180e3d3c36",
+        "reference_lines": [
+          6,
+          14,
+          25,
+          28,
+          34,
+          44,
+          49,
+          61,
+          71,
+          78,
+          101,
+          111,
+          114
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/company-service/upload-validation/index.js",
+        "member_sha256": "96d3e8d9ab34abbfe629578885ca82811c95c82eb3d3b635caa41b0df82a2a7c",
+        "reference_lines": [
+          49
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/service3.js",
+        "member_sha256": "4323ce1000a653287772b7ab1dd8f479c441b3b4bbded2a77c3bb09e581575b0",
+        "reference_lines": [
+          7
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/bulk-po-allocation-upload.service.js",
+        "member_sha256": "97af599a76763ae49317fb91361e1c004c81f1765d67296df4a9605bdc83739d",
+        "reference_lines": [
+          29
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:finance_locations",
+    "role": "finance",
+    "collection": "locations",
+    "model": {
+      "application": "finance",
+      "name": "Location",
+      "schema": "locationSchema",
+      "member_sha256": "4960568a8d11712c3cb81247e6de133c4f8720ee4a08a494de3a09ab8bde3b8c"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/location.model.js",
+    "exported_symbols": [
+      "Location"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/approval-checks/index.js",
+        "member_sha256": "986f2c1fff6322dfaedca17ec4c09e5ed9374a04c6dfb6478a4cde1c778b9f95",
+        "reference_lines": [
+          30,
+          72
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/index.js",
+        "member_sha256": "9f937127c1be7e490a9e7f00260fbe55a164c624949d88e12bee67b2a3a07c11",
+        "reference_lines": [
+          314,
+          597,
+          773
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/intranet-approval/bulk-pending-update.js",
+        "member_sha256": "3780263b52e0d961a3e84fef220a9c3e4ddce23fa362c72afe3b5d86a2c981cb",
+        "reference_lines": [
+          19
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/service2.js",
+        "member_sha256": "f73d25a51b6f3e78e0fc1942e6a5fd6e2d32e20cc1d1c446d5ec2d3c72c1bc7f",
+        "reference_lines": [
+          18,
+          47
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget.service.js",
+        "member_sha256": "9b1a3207f7c99eda10b0cf902001774b9b4a63913cfa23007a376389dd903293",
+        "reference_lines": [
+          47
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/internal.service.js",
+        "member_sha256": "3a682e626804f36be1c8c418fe8eefcbc5781d87f0347e4c820669ecb671ad42",
+        "reference_lines": [
+          9,
+          19,
+          25,
+          29,
+          34,
+          38
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/index.js",
+        "member_sha256": "90f5228827c6c9445c286d4a7280b3b34dc5d66bdcc8cfa1542b5bfba2188151",
+        "reference_lines": [
+          14,
+          22,
+          25,
+          29,
+          33,
+          38,
+          49,
+          95,
+          131,
+          196,
+          211,
+          229,
+          230,
+          246
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          129,
+          163
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/pdf-service/index.js",
+        "member_sha256": "8af99c4f4955ec1ffc6dd977f646011f902ae9a431cd6e0e7d3749a8c4f8a94a",
+        "reference_lines": [
+          131
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/service3.js",
+        "member_sha256": "4323ce1000a653287772b7ab1dd8f479c441b3b4bbded2a77c3bb09e581575b0",
+        "reference_lines": [
+          23
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/budget-summary.service.js",
+        "member_sha256": "7da4cfa8a1648060830704095744d757d40dea29b2f7c5caa6ab15a241f0defd",
+        "reference_lines": [
+          81
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/bulk-po-allocation-upload.service.js",
+        "member_sha256": "97af599a76763ae49317fb91361e1c004c81f1765d67296df4a9605bdc83739d",
+        "reference_lines": [
+          26,
+          27
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/bulk-upload.service.js",
+        "member_sha256": "5c9bae7d7122fc115ad627d732e2673383781e00e75c4c83c7de536e39c1baad",
+        "reference_lines": [
+          43
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/index.js",
+        "member_sha256": "73b0154c02b6da02f03bd326b69c89d6f376020bc1b0ebfb8da6cbbb167141e1",
+        "reference_lines": [
+          418
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/state-split.service.js",
+        "member_sha256": "b50553eebd0eb6034db7ba443fc8f79b8cd8ed671bded649164b235dc3dcf66a",
+        "reference_lines": [
+          14,
+          16,
+          18,
+          20,
+          22
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/site-filter.service.js",
+        "member_sha256": "7f84e6d59414229feee76d26cf1f7b3dcdc11984cc4b078f268f115fe2357dca",
+        "reference_lines": [
+          22
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-po.service.js",
+        "member_sha256": "8b1378c6c04f19ca20d31689f0e6fa3e9a4f033a5bf964b3c76617ecdf4bb17e",
+        "reference_lines": [
+          47,
+          69
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/store-role.service.js",
+        "member_sha256": "8833cd764b847b0371f8bb768af1330db87cf9da56233bd59101e6108127dcad",
+        "reference_lines": [
+          162
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:finance_foreigncurrencies",
+    "role": "finance",
+    "collection": "foreigncurrencies",
+    "model": {
+      "application": "finance",
+      "name": "ForeignCurrency",
+      "schema": "ForeignCurrencySchema",
+      "member_sha256": "6576a0d01c0a8cc9c6ee0da14d9b21cfcaf350aa9a2bd1a4c060e76af63c67b7"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/foreign-currency.model.js",
+    "exported_symbols": [
+      "ForeignCurrency"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/foreign-currency.service.js",
+        "member_sha256": "a9d09d776a0d089babf6fa7b626c766efcd5cf85e45b79fba524d31c514267f3",
+        "reference_lines": [
+          11,
+          20,
+          24,
+          29,
+          32,
+          36,
+          43,
+          53,
+          64,
+          90,
+          132
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/service3.js",
+        "member_sha256": "4323ce1000a653287772b7ab1dd8f479c441b3b4bbded2a77c3bb09e581575b0",
+        "reference_lines": [
+          11
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "organization:finance_vendormappings",
+    "role": "finance",
+    "collection": "vendormappings",
+    "model": {
+      "application": "finance",
+      "name": "Vendormapping",
+      "schema": "vendorMappingSchema",
+      "member_sha256": "2f95ee917227ddde8f7449d663f27079f36bda12f17359103197fbcf65d1e7aa"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/vendormapping.model.js",
+    "exported_symbols": [
+      "VendorMapping"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          258
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          157,
+          191
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/excel-upload.service.js",
+        "member_sha256": "03f7b7217f4046a86e1e556b35587147b3fada318b96856bec3d46c44add04f1",
+        "reference_lines": [
+          46
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/price-resolution.service.js",
+        "member_sha256": "e4a3277766216ca40500849ca4d025c885fd784c19576503095dead970c958a8",
+        "reference_lines": [
+          35
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/index.js",
+        "member_sha256": "c0f5d721ae03d3692d7af3ac90e0e8aec00caa280300c1e920323f945c9d7d9b",
+        "reference_lines": [
+          34,
+          55,
+          59,
+          64,
+          68,
+          161,
+          248,
+          272
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/upload-validation.js",
+        "member_sha256": "abfd553cd61043e5fb0df41ce097b9b30388dfe40277bfb10aef12b1a52e6dfc",
+        "reference_lines": [
+          60
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "stores:central_stores",
+    "role": "central",
+    "collection": "stores",
+    "model": {
+      "application": "intranet",
+      "name": "Store",
+      "schema": "storeSchema",
+      "member_sha256": "8c7e9a69828bad3fcf3e98f3194fed250fa2e34ce43eb1da27bdadbcfe2aaac2"
+    },
+    "model_member": "subway-intranet-api-master/src/models/store.model.js",
+    "exported_symbols": [
+      "Store"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/blog.service.js",
+        "member_sha256": "44f5692dde9873b4200a5fbffac208d51909ac35162b8c96dba83993268396ca",
+        "reference_lines": [
+          59,
+          66,
+          74
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/other-app.service.js",
+        "member_sha256": "479427699e1984b7e1536618fd747555e22c747589e3822b8b6d224f58bddabb",
+        "reference_lines": [
+          242,
+          246
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/pl-report.service.js",
+        "member_sha256": "a22a8b13068c6fe4611ebba94c974e17810b687ae92ae3689814d34374e8e6d5",
+        "reference_lines": [
+          579,
+          645,
+          667,
+          684,
+          685,
+          686,
+          687,
+          688,
+          689,
+          690,
+          691
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/store-service/finance-service.js",
+        "member_sha256": "1c4b094fd798dbdc7c844ffac87dbb3ae8180dca6f8d1d0db36b7d43da7197ea",
+        "reference_lines": [
+          6
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/store-service/index.js",
+        "member_sha256": "64254fe45bc06597f9f7f5a6848ecb2fe6ea715b52290bf984d876159b4a5f03",
+        "reference_lines": [
+          27,
+          31,
+          40,
+          48,
+          75,
+          76,
+          98,
+          100,
+          104,
+          108,
+          111,
+          115,
+          140,
+          167,
+          192,
+          194,
+          230,
+          232,
+          242,
+          292,
+          554,
+          617,
+          621,
+          626,
+          631,
+          636,
+          647,
+          652,
+          657,
+          662,
+          667
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-service/index.js",
+        "member_sha256": "ae630597e478cbcd353ad9c7da5516a8c7177a8659ddc683210134832b75d32f",
+        "reference_lines": [
+          167,
+          172,
+          344,
+          349,
+          357,
+          388,
+          393
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "stores:central_storeproperties",
+    "role": "central",
+    "collection": "storeproperties",
+    "model": {
+      "application": "intranet",
+      "name": "StoreProperties",
+      "schema": "StorePropertiesSchema",
+      "member_sha256": "40061ad18ac641ad39916ec59631c7457bf0f40a230be066beeb7e442e791174"
+    },
+    "model_member": "subway-intranet-api-master/src/models/store-properties.js",
+    "exported_symbols": [
+      "StoreProperties"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/store-service/index.js",
+        "member_sha256": "64254fe45bc06597f9f7f5a6848ecb2fe6ea715b52290bf984d876159b4a5f03",
+        "reference_lines": [
+          46,
+          124,
+          127,
+          128,
+          563
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "stores:central_dcs",
+    "role": "central",
+    "collection": "dcs",
+    "model": {
+      "application": "intranet",
+      "name": "Dc",
+      "schema": "dcSchema",
+      "member_sha256": "e3dac96e1877ff5da3c963eb6ab69ee0f127da06f692e3293a6cec8ddb4a441b"
+    },
+    "model_member": "subway-intranet-api-master/src/models/dc.model.js",
+    "exported_symbols": [
+      "Dc"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/dc.service.js",
+        "member_sha256": "522562b785d30fd77ae9cfae60ea9d150f77d6a98e9225544609ed5a7cbf0196",
+        "reference_lines": [
+          11,
+          15,
+          19,
+          24,
+          26,
+          30,
+          35,
+          37,
+          72,
+          74,
+          85
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "stores:central_electricityconsumptions",
+    "role": "central",
+    "collection": "electricityconsumptions",
+    "model": {
+      "application": "intranet",
+      "name": "ElectricityConsumption",
+      "schema": "electricityConsumptionSchema",
+      "member_sha256": "64dfe7288c4961dad73dfd7e962abee78f6acc85c9d366ae6bd0ced0fd8b9413"
+    },
+    "model_member": "subway-intranet-api-master/src/models/electricity-consumption.model.js",
+    "exported_symbols": [
+      "ElectricityConsumption"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/electricity-consumption.service.js",
+        "member_sha256": "13cb33a7ea5ee87cb6a45ea1cfda0ad96f15910f3fd86896bef58ebca18c526a",
+        "reference_lines": [
+          13,
+          46,
+          71,
+          93,
+          137,
+          172,
+          178,
+          184,
+          199,
+          205,
+          211,
+          219,
+          234,
+          245,
+          269,
+          277,
+          328,
+          347,
+          386,
+          407,
+          415,
+          466,
+          598
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "procurement:finance_purchaseorders",
+    "role": "finance",
+    "collection": "purchaseorders",
+    "model": {
+      "application": "finance",
+      "name": "PurchaseOrder",
+      "schema": "purchaseOrderSchema",
+      "member_sha256": "7018c620095cdf4d5b036c45b6a6cabbdb34625124754c7ef16131ca2d0c1846"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/purchase-order.model.js",
+    "exported_symbols": [
+      "PurchaseOrder"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/approval-checks/resend-check.js",
+        "member_sha256": "c4a7887ec6cab5d67230fba0a0baf3c8e621e84533f0b4fb9a36e222dc24ea3c",
+        "reference_lines": [
+          65,
+          81,
+          131
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/company-service/index.js",
+        "member_sha256": "079e021641472e3f675a18241b877bedc08bee5d128182a8e5f211180e3d3c36",
+        "reference_lines": [
+          105
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/dashboard-service/index.js",
+        "member_sha256": "e4a1015c271f094be71ed7ecb5ebd3c54deca2701ca89aca84f7cc689a64586a",
+        "reference_lines": [
+          166,
+          178,
+          187,
+          237,
+          241,
+          245
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/foreign-currency.service.js",
+        "member_sha256": "a9d09d776a0d089babf6fa7b626c766efcd5cf85e45b79fba524d31c514267f3",
+        "reference_lines": [
+          47
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/grn-service/index.js",
+        "member_sha256": "eec0fff12b4d868f373881bea9b23aa994a8559dc4ce2dcda6f7ee33ab35ee66",
+        "reference_lines": [
+          95,
+          432
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          180,
+          196,
+          261
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/upload-validation/validation-message.js",
+        "member_sha256": "b7a008b54ab14d0bac84f5dafaf130a3bb5a43aa92f9320723563db1aae66357",
+        "reference_lines": [
+          29
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/po-line-item-check.js",
+        "member_sha256": "523e2b52d144e99925c560b9bbd6d6facb557bb28db695f39ac5ff91784ba214",
+        "reference_lines": [
+          38,
+          72
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/index.js",
+        "member_sha256": "90f5228827c6c9445c286d4a7280b3b34dc5d66bdcc8cfa1542b5bfba2188151",
+        "reference_lines": [
+          88
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          169
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          19,
+          24,
+          31,
+          35,
+          43,
+          49,
+          53,
+          58,
+          245,
+          265
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/po-visibility.service.js",
+        "member_sha256": "890c656090d1325af0023f0e47d7060376aa869ee98164142bf4b063babd7847",
+        "reference_lines": [
+          107
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/service2.js",
+        "member_sha256": "7187a3a96dc7750aa870e3d3623dc7280fbcdd43f526c297645ea974036dcd94",
+        "reference_lines": [
+          29,
+          35,
+          52,
+          61,
+          89,
+          127,
+          136,
+          165,
+          196
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/convert-to-po.service.js",
+        "member_sha256": "63066954260506968517597a9369736585292f49f3771fe5617641f7ff6dbf44",
+        "reference_lines": [
+          317,
+          348,
+          363,
+          378,
+          386,
+          410
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          378
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "procurement:finance_items",
+    "role": "finance",
+    "collection": "items",
+    "model": {
+      "application": "finance",
+      "name": "Item",
+      "schema": "itemSchema",
+      "member_sha256": "90dfedd2d623a1e9d810b41519834ad2e23178749f0b3abb6df627e3a73e3be9"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/item.model.js",
+    "exported_symbols": [
+      "Item"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/category.service.js",
+        "member_sha256": "ffe2905b8fe4730aec538e981d84451f48e6636b851998ed8e8fc0589f243859",
+        "reference_lines": [
+          75
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          18,
+          92,
+          108,
+          127,
+          146,
+          154,
+          230,
+          264,
+          279,
+          310
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/upload-validation/validation-message.js",
+        "member_sha256": "b7a008b54ab14d0bac84f5dafaf130a3bb5a43aa92f9320723563db1aae66357",
+        "reference_lines": [
+          17
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/po-line-item-check.js",
+        "member_sha256": "523e2b52d144e99925c560b9bbd6d6facb557bb28db695f39ac5ff91784ba214",
+        "reference_lines": [
+          119
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          127,
+          137
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/bulk-upload.service.js",
+        "member_sha256": "5c9bae7d7122fc115ad627d732e2673383781e00e75c4c83c7de536e39c1baad",
+        "reference_lines": [
+          44
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/excel-upload.service.js",
+        "member_sha256": "03f7b7217f4046a86e1e556b35587147b3fada318b96856bec3d46c44add04f1",
+        "reference_lines": [
+          40
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/index.js",
+        "member_sha256": "73b0154c02b6da02f03bd326b69c89d6f376020bc1b0ebfb8da6cbbb167141e1",
+        "reference_lines": [
+          18,
+          72
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/price-resolution.service.js",
+        "member_sha256": "e4a3277766216ca40500849ca4d025c885fd784c19576503095dead970c958a8",
+        "reference_lines": [
+          24
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/index.js",
+        "member_sha256": "c55b5f68b7b6ae8bdfa210e9110d3179fad2ad48493d7d69e8e4d5ee86b771ab",
+        "reference_lines": [
+          44,
+          77
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/upload-validation.js",
+        "member_sha256": "0ba92bf87fdc3059bed9f694a6d7334b64978e07e3bdf9c91c59f15116c9a8e7",
+        "reference_lines": [
+          70
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/department-scope.js",
+        "member_sha256": "ecc8a702b32b778b0254d2fcd6bba5911398eef4b318e5224521cdb38788ad57",
+        "reference_lines": [
+          47,
+          55,
+          70
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/index.js",
+        "member_sha256": "c0f5d721ae03d3692d7af3ac90e0e8aec00caa280300c1e920323f945c9d7d9b",
+        "reference_lines": [
+          38,
+          266
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/upload-validation.js",
+        "member_sha256": "abfd553cd61043e5fb0df41ce097b9b30388dfe40277bfb10aef12b1a52e6dfc",
+        "reference_lines": [
+          87
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "procurement:finance_categories",
+    "role": "finance",
+    "collection": "categories",
+    "model": {
+      "application": "finance",
+      "name": "Category",
+      "schema": "categorySchema",
+      "member_sha256": "16791970c5707b9e26d451598c1815d76a3c2d273f8a4cacb63f0ce7e49b9094"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/category.model.js",
+    "exported_symbols": [
+      "Category"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/category.service.js",
+        "member_sha256": "ffe2905b8fe4730aec538e981d84451f48e6636b851998ed8e8fc0589f243859",
+        "reference_lines": [
+          13,
+          17,
+          21,
+          26,
+          34,
+          38,
+          52,
+          86,
+          129,
+          170,
+          177
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/cf-approval-mapping.service.js",
+        "member_sha256": "2c56de1d6efa791cb4b6382f6e922c4b98c2cc93cda1f29c7237f359194ba4b5",
+        "reference_lines": [
+          17,
+          37
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          57
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/upload-validation/validation-message.js",
+        "member_sha256": "b7a008b54ab14d0bac84f5dafaf130a3bb5a43aa92f9320723563db1aae66357",
+        "reference_lines": [
+          53
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/resolve-department.js",
+        "member_sha256": "5bc42889a72cf0c32dda2a2a3586e1b8d3f2f326b0b1c448ba007234f6f0c4c6",
+        "reference_lines": [
+          9
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/excel-upload.service.js",
+        "member_sha256": "03f7b7217f4046a86e1e556b35587147b3fada318b96856bec3d46c44add04f1",
+        "reference_lines": [
+          61
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/index.js",
+        "member_sha256": "c55b5f68b7b6ae8bdfa210e9110d3179fad2ad48493d7d69e8e4d5ee86b771ab",
+        "reference_lines": [
+          14,
+          52
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/upload-validation.js",
+        "member_sha256": "0ba92bf87fdc3059bed9f694a6d7334b64978e07e3bdf9c91c59f15116c9a8e7",
+        "reference_lines": [
+          48
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/vendormapping-service/department-scope.js",
+        "member_sha256": "ecc8a702b32b778b0254d2fcd6bba5911398eef4b318e5224521cdb38788ad57",
+        "reference_lines": [
+          30
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "procurement:finance_subcategories",
+    "role": "finance",
+    "collection": "subcategories",
+    "model": {
+      "application": "finance",
+      "name": "SubCategory",
+      "schema": "subCategorySchema",
+      "member_sha256": "13e2468421236e5b850b35e19a4b62e0e43ef7093d83c810ef713e1a8da39147"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/subcategory.model.js",
+    "exported_symbols": [
+      "SubCategory"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/category.service.js",
+        "member_sha256": "ffe2905b8fe4730aec538e981d84451f48e6636b851998ed8e8fc0589f243859",
+        "reference_lines": [
+          69
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          58
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/upload-validation/validation-message.js",
+        "member_sha256": "b7a008b54ab14d0bac84f5dafaf130a3bb5a43aa92f9320723563db1aae66357",
+        "reference_lines": [
+          66
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/index.js",
+        "member_sha256": "c55b5f68b7b6ae8bdfa210e9110d3179fad2ad48493d7d69e8e4d5ee86b771ab",
+        "reference_lines": [
+          11,
+          19,
+          23,
+          28,
+          107
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/subCategory-service/upload-validation.js",
+        "member_sha256": "0ba92bf87fdc3059bed9f694a6d7334b64978e07e3bdf9c91c59f15116c9a8e7",
+        "reference_lines": [
+          58
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "procurement:finance_faitems",
+    "role": "finance",
+    "collection": "faitems",
+    "model": {
+      "application": "finance",
+      "name": "FaItems",
+      "schema": "faItemsSchema",
+      "member_sha256": "f137bdf030f8cefcd4713715adcfdc2aea4428e1f1c50019f1c68b0b276e38f6"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/fa-items.model.js",
+    "exported_symbols": [
+      "FaItems"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/item-service/service-1.js",
+        "member_sha256": "18f6dd68fb2ac3ecbd741d5bf5d21b54fbb8dbf70800423294958da609590fed",
+        "reference_lines": [
+          314,
+          318,
+          330,
+          334
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "budgets:finance_budgets",
+    "role": "finance",
+    "collection": "budgets",
+    "model": {
+      "application": "finance",
+      "name": "Budget",
+      "schema": "budgetSchema",
+      "member_sha256": "f8b3f2b87621ce0f04bdefbc50148a3e27189e17068c04104900f0885c8503ef"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/budget.model.js",
+    "exported_symbols": [
+      "Budget"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget.service.js",
+        "member_sha256": "9b1a3207f7c99eda10b0cf902001774b9b4a63913cfa23007a376389dd903293",
+        "reference_lines": [
+          14,
+          22,
+          57,
+          61,
+          64,
+          69,
+          73,
+          81,
+          85,
+          89,
+          94,
+          107
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/index.js",
+        "member_sha256": "90f5228827c6c9445c286d4a7280b3b34dc5d66bdcc8cfa1542b5bfba2188151",
+        "reference_lines": [
+          83
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          157
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          110
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/budget-summary.service.js",
+        "member_sha256": "7da4cfa8a1648060830704095744d757d40dea29b2f7c5caa6ab15a241f0defd",
+        "reference_lines": [
+          10
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/bulk-upload.service.js",
+        "member_sha256": "5c9bae7d7122fc115ad627d732e2673383781e00e75c4c83c7de536e39c1baad",
+        "reference_lines": [
+          52
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/state-split.service.js",
+        "member_sha256": "b50553eebd0eb6034db7ba443fc8f79b8cd8ed671bded649164b235dc3dcf66a",
+        "reference_lines": [
+          43
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/store-role.service.js",
+        "member_sha256": "8833cd764b847b0371f8bb768af1330db87cf9da56233bd59101e6108127dcad",
+        "reference_lines": [
+          180
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "budgets:finance_budgetmodifications",
+    "role": "finance",
+    "collection": "budgetmodifications",
+    "model": {
+      "application": "finance",
+      "name": "BudgetModification",
+      "schema": "budgetModificationSchema",
+      "member_sha256": "4f44c94dfc3405939de6087eb09417b22f27032833b9bedb7411bbc5e1dd2375"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/budget-modification.model.js",
+    "exported_symbols": [
+      "BudgetModification"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget-modification.service.js",
+        "member_sha256": "9bea1aeff0e6c844fa40e1abf7e5c24744766fda9a60a930d69b52a4b600109d",
+        "reference_lines": [
+          12,
+          35,
+          63,
+          67
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/index.js",
+        "member_sha256": "772778b7df787f98870efaafd8d0eb88f2a8a60f3efdbafe32430b598dff1b7f",
+        "reference_lines": [
+          157
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "budgets:finance_lineitems",
+    "role": "finance",
+    "collection": "lineitems",
+    "model": {
+      "application": "finance",
+      "name": "LineItem",
+      "schema": "lineItemSchema",
+      "member_sha256": "72a53dc95fa9b46149935da018c2ba6a24dc64c131304a3ac49c7b9b71062f3a"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/line-item.model.js",
+    "exported_symbols": [
+      "LineItem"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/index.js",
+        "member_sha256": "9f937127c1be7e490a9e7f00260fbe55a164c624949d88e12bee67b2a3a07c11",
+        "reference_lines": [
+          315,
+          774
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget-reservation.service.js",
+        "member_sha256": "d900e06efda0480ba417e31a48ede8de0be7498676d9af25b10b7ca81a56b52d",
+        "reference_lines": [
+          19,
+          32,
+          51,
+          85,
+          97,
+          127
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget.service.js",
+        "member_sha256": "9b1a3207f7c99eda10b0cf902001774b9b4a63913cfa23007a376389dd903293",
+        "reference_lines": [
+          101,
+          128,
+          131
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/category.service.js",
+        "member_sha256": "ffe2905b8fe4730aec538e981d84451f48e6636b851998ed8e8fc0589f243859",
+        "reference_lines": [
+          82
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/index.js",
+        "member_sha256": "772778b7df787f98870efaafd8d0eb88f2a8a60f3efdbafe32430b598dff1b7f",
+        "reference_lines": [
+          15,
+          68,
+          110,
+          145,
+          149,
+          153,
+          192
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/line-item-service/po-line-item-check.js",
+        "member_sha256": "523e2b52d144e99925c560b9bbd6d6facb557bb28db695f39ac5ff91784ba214",
+        "reference_lines": [
+          30,
+          47,
+          101,
+          225
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          86
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/budget-summary.service.js",
+        "member_sha256": "7da4cfa8a1648060830704095744d757d40dea29b2f7c5caa6ab15a241f0defd",
+        "reference_lines": [
+          20
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/convert-to-po.service.js",
+        "member_sha256": "63066954260506968517597a9369736585292f49f3771fe5617641f7ff6dbf44",
+        "reference_lines": [
+          86
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/index.js",
+        "member_sha256": "73b0154c02b6da02f03bd326b69c89d6f376020bc1b0ebfb8da6cbbb167141e1",
+        "reference_lines": [
+          22,
+          73,
+          203,
+          212
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/store-role.service.js",
+        "member_sha256": "8833cd764b847b0371f8bb768af1330db87cf9da56233bd59101e6108127dcad",
+        "reference_lines": [
+          89
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "receipts:finance_grns",
+    "role": "finance",
+    "collection": "grns",
+    "model": {
+      "application": "finance",
+      "name": "Grn",
+      "schema": "grnSchema",
+      "member_sha256": "6e97622acb2b945f036222225268d71ce5b4e9295e7b9e8cbe852db5a1c0644c"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/grn.model.js",
+    "exported_symbols": [
+      "GRN"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/approval-checks/resend-check.js",
+        "member_sha256": "c4a7887ec6cab5d67230fba0a0baf3c8e621e84533f0b4fb9a36e222dc24ea3c",
+        "reference_lines": [
+          66
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/dashboard-service/index.js",
+        "member_sha256": "e4a1015c271f094be71ed7ecb5ebd3c54deca2701ca89aca84f7cc689a64586a",
+        "reference_lines": [
+          151
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/grn-service/index.js",
+        "member_sha256": "eec0fff12b4d868f373881bea9b23aa994a8559dc4ce2dcda6f7ee33ab35ee66",
+        "reference_lines": [
+          19,
+          21,
+          28,
+          41,
+          45,
+          53,
+          100,
+          116,
+          249,
+          348,
+          420,
+          556,
+          644,
+          692,
+          705,
+          718,
+          731,
+          744
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/invoice-data-service/index.js",
+        "member_sha256": "f27f9baba978ea5b2738e072e43d911803602115668229ef4b016922c56622b3",
+        "reference_lines": [
+          219,
+          229
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/service2.js",
+        "member_sha256": "7187a3a96dc7750aa870e3d3623dc7280fbcdd43f526c297645ea974036dcd94",
+        "reference_lines": [
+          62,
+          137
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          382
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "receipts:finance_invoicedatas",
+    "role": "finance",
+    "collection": "invoicedatas",
+    "model": {
+      "application": "finance",
+      "name": "Invoicedata",
+      "schema": "invoicedataSchema",
+      "member_sha256": "baaf21430ab44f426ad158a12db352d1a55d344218bdcda705e81e0c41c00135"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/invoicedata.model.js",
+    "exported_symbols": [
+      "InvoiceData"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/approval-checks/resend-check.js",
+        "member_sha256": "c4a7887ec6cab5d67230fba0a0baf3c8e621e84533f0b4fb9a36e222dc24ea3c",
+        "reference_lines": [
+          55
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/grn-service/index.js",
+        "member_sha256": "eec0fff12b4d868f373881bea9b23aa994a8559dc4ce2dcda6f7ee33ab35ee66",
+        "reference_lines": [
+          110,
+          753
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/invoice-data-service/index.js",
+        "member_sha256": "f27f9baba978ea5b2738e072e43d911803602115668229ef4b016922c56622b3",
+        "reference_lines": [
+          16,
+          20,
+          25,
+          89,
+          123,
+          127,
+          137,
+          143,
+          147,
+          235
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "receipts:finance_vendorgrnstagetimelines",
+    "role": "finance",
+    "collection": "vendorgrnstagetimelines",
+    "model": {
+      "application": "finance",
+      "name": "VendorGrnStageTimeLine",
+      "schema": "vendorGrnStageTimelineSchema",
+      "member_sha256": "bcf853628b656d2b4c70d2103fbfb5a5a087de53a1615a766647e70147d9785f"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/vendor-grn-stage-timeline.model.js",
+    "exported_symbols": [
+      "VendorGrnStageTimeline"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/grn-service/index.js",
+        "member_sha256": "eec0fff12b4d868f373881bea9b23aa994a8559dc4ce2dcda6f7ee33ab35ee66",
+        "reference_lines": [
+          674,
+          685
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "approvals:finance_approvals",
+    "role": "finance",
+    "collection": "approvals",
+    "model": {
+      "application": "finance",
+      "name": "Approval",
+      "schema": "approvalSchema",
+      "member_sha256": "77d74916382892bc772401b2ae0ec5106107a854b6ad169cc286a76ddaa82b85"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/approval.model.js",
+    "exported_symbols": [
+      "Approval"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-config.service.js",
+        "member_sha256": "a430855a0849f4a85d53388a13570815a8463906c0f1af35f10c614dec5aeb23",
+        "reference_lines": [
+          55,
+          100
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/approval-checks/resend-check.js",
+        "member_sha256": "c4a7887ec6cab5d67230fba0a0baf3c8e621e84533f0b4fb9a36e222dc24ea3c",
+        "reference_lines": [
+          34
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/index.js",
+        "member_sha256": "9f937127c1be7e490a9e7f00260fbe55a164c624949d88e12bee67b2a3a07c11",
+        "reference_lines": [
+          23,
+          234,
+          346,
+          350,
+          519,
+          573,
+          820,
+          829
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/intranet-approval/bulk-pending-update.js",
+        "member_sha256": "3780263b52e0d961a3e84fef220a9c3e4ddce23fa362c72afe3b5d86a2c981cb",
+        "reference_lines": [
+          37,
+          52
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/intranet-approval/index.js",
+        "member_sha256": "d7398a3f9d557a0793143b98730c996587d7a2dd289559bb90faf162b4b02bdf",
+        "reference_lines": [
+          32,
+          75
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/dashboard-service/index.js",
+        "member_sha256": "e4a1015c271f094be71ed7ecb5ebd3c54deca2701ca89aca84f7cc689a64586a",
+        "reference_lines": [
+          162
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/grn-service/index.js",
+        "member_sha256": "eec0fff12b4d868f373881bea9b23aa994a8559dc4ce2dcda6f7ee33ab35ee66",
+        "reference_lines": [
+          230,
+          328
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          154
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/index.js",
+        "member_sha256": "b257be3e3bd1cd9eff2d9fb136148243ce2abd1f2c4508fd47ffd547490bfeec",
+        "reference_lines": [
+          252
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/po-visibility.service.js",
+        "member_sha256": "890c656090d1325af0023f0e47d7060376aa869ee98164142bf4b063babd7847",
+        "reference_lines": [
+          26
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/edit-reapproval.service.js",
+        "member_sha256": "692aa85d8664f68ad054d8a795a471a33c628d1fdac1d5cee3e02c981775a743",
+        "reference_lines": [
+          88,
+          100
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-request-service/index.js",
+        "member_sha256": "73b0154c02b6da02f03bd326b69c89d6f376020bc1b0ebfb8da6cbbb167141e1",
+        "reference_lines": [
+          387
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          386
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/stage.service.js",
+        "member_sha256": "35bed03de6ce9ce274efec984412abd9550ec064b35e9c5a2fdbfe3f4222c2b4",
+        "reference_lines": [
+          26,
+          30
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "approvals:finance_approvalconfigs",
+    "role": "finance",
+    "collection": "approvalconfigs",
+    "model": {
+      "application": "finance",
+      "name": "ApprovalConfig",
+      "schema": "approvalConfigSchema",
+      "member_sha256": "c760e159ae25d23fad73dd970f450f13efe7464479565f814e091e6e520cbdb2"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/approval-config.model.js",
+    "exported_symbols": [
+      "ApprovalConfig"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-config.service.js",
+        "member_sha256": "a430855a0849f4a85d53388a13570815a8463906c0f1af35f10c614dec5aeb23",
+        "reference_lines": [
+          48,
+          52,
+          61,
+          65,
+          70,
+          75,
+          83,
+          92,
+          95,
+          107
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "approvals:finance_stages",
+    "role": "finance",
+    "collection": "stages",
+    "model": {
+      "application": "finance",
+      "name": "Stage",
+      "schema": "stageSchema",
+      "member_sha256": "3bce07849ddf9b1441cef847fc3bc9b6e404b32fc0323ea9e969143ec68a59cb"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/stage.model.js",
+    "exported_symbols": [
+      "Stage"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/intranet-approval/bulk-pending-update.js",
+        "member_sha256": "3780263b52e0d961a3e84fef220a9c3e4ddce23fa362c72afe3b5d86a2c981cb",
+        "reference_lines": [
+          71,
+          80
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/approval-service/intranet-approval/index.js",
+        "member_sha256": "d7398a3f9d557a0793143b98730c996587d7a2dd289559bb90faf162b4b02bdf",
+        "reference_lines": [
+          36,
+          79
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/stage.service.js",
+        "member_sha256": "35bed03de6ce9ce274efec984412abd9550ec064b35e9c5a2fdbfe3f4222c2b4",
+        "reference_lines": [
+          7,
+          25,
+          43,
+          47,
+          51
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "approvals:finance_cfapprovalmappings",
+    "role": "finance",
+    "collection": "cfapprovalmappings",
+    "model": {
+      "application": "finance",
+      "name": "CFApprovalMapping",
+      "schema": "cfApprovalMappingSchema",
+      "member_sha256": "df246501f5a74369a7a2bf688638042b2e9dd85f6e6ba970170a896bc2389a03"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/cf-approval-mapping.model.js",
+    "exported_symbols": [
+      "CFApprovalMapping"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/category.service.js",
+        "member_sha256": "ffe2905b8fe4730aec538e981d84451f48e6636b851998ed8e8fc0589f243859",
+        "reference_lines": [
+          97,
+          103
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/cf-approval-mapping.service.js",
+        "member_sha256": "2c56de1d6efa791cb4b6382f6e922c4b98c2cc93cda1f29c7237f359194ba4b5",
+        "reference_lines": [
+          6,
+          10,
+          14,
+          20,
+          24,
+          29,
+          40,
+          47,
+          51
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "smallwares:finance_smallwaregrns",
+    "role": "finance",
+    "collection": "smallwaregrns",
+    "model": {
+      "application": "finance",
+      "name": "SmallwareGrn",
+      "schema": "smallwareGrnSchema",
+      "member_sha256": "9896be35c50de0ab7b15b147c032affc8565e6e3611f69da126bc45a58c92162"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/smallware-grn.model.js",
+    "exported_symbols": [
+      "SmallwareGrn"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-grn.service.js",
+        "member_sha256": "38371bc37011e431a525a138b5c458a9e93448cc4e98bdaa727297c7daf0bd08",
+        "reference_lines": [
+          88,
+          93,
+          136,
+          141,
+          146,
+          179
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "smallwares:finance_smallwareitems",
+    "role": "finance",
+    "collection": "smallwareitems",
+    "model": {
+      "application": "finance",
+      "name": "SmallwareItem",
+      "schema": "smallwareItemSchema",
+      "member_sha256": "86e3edbd4dcfb10310027c5d5a4fd43f7379b32894e3c0bb6bf5e263a4380862"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/smallware-item.model.js",
+    "exported_symbols": [
+      "SmallwareItem"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-grn.service.js",
+        "member_sha256": "38371bc37011e431a525a138b5c458a9e93448cc4e98bdaa727297c7daf0bd08",
+        "reference_lines": [
+          41
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-item.service.js",
+        "member_sha256": "80d1938cb470165b54d666316a878bd5054bd5b307dd9a07b82e3dd0d34a62f2",
+        "reference_lines": [
+          6,
+          10,
+          36,
+          51,
+          75,
+          98,
+          103,
+          151,
+          156,
+          164,
+          183
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-po.service.js",
+        "member_sha256": "8b1378c6c04f19ca20d31689f0e6fa3e9a4f033a5bf964b3c76617ecdf4bb17e",
+        "reference_lines": [
+          65
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "smallwares:finance_smallwarepoconfigs",
+    "role": "finance",
+    "collection": "smallwarepoconfigs",
+    "model": {
+      "application": "finance",
+      "name": "SmallwarePoConfig",
+      "schema": "smallwarePoConfigSchema",
+      "member_sha256": "d4171cf8d0bc1805ccfd49d8ca1366eea60d3afd7dbd9b461a11cfc0477eec7d"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/smallware-config.model.js",
+    "exported_symbols": [
+      "SmallwareConfig"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-po-config.service.js",
+        "member_sha256": "d693040301124eac6b9feb697388e055faa99b6612cbeef7c72540755d25c434",
+        "reference_lines": [
+          6,
+          10,
+          15,
+          20,
+          25,
+          39,
+          50
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "smallwares:finance_smallwarepos",
+    "role": "finance",
+    "collection": "smallwarepos",
+    "model": {
+      "application": "finance",
+      "name": "SmallwarePo",
+      "schema": "smallwarePoSchema",
+      "member_sha256": "03ab8936b3c147e4f85aeba7085326f4c06d1802ce4a7a7d149197ade93d12a3"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/smallware-po.model.js",
+    "exported_symbols": [
+      "SmallwarePo"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-po.service.js",
+        "member_sha256": "8b1378c6c04f19ca20d31689f0e6fa3e9a4f033a5bf964b3c76617ecdf4bb17e",
+        "reference_lines": [
+          56,
+          89,
+          127,
+          240,
+          245,
+          251,
+          287,
+          295,
+          314,
+          341,
+          364,
+          420,
+          424
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "smallwares:finance_smallwarestages",
+    "role": "finance",
+    "collection": "smallwarestages",
+    "model": {
+      "application": "finance",
+      "name": "SmallwareStage",
+      "schema": "smallwareStageSchema",
+      "member_sha256": "dc7f5306d2ca89e4cf38f1bb42b1e5312e9eedde9fe4e1402113e03343e784eb"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/smallware-stage.model.js",
+    "exported_symbols": [
+      "SmallwareStage"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-grn.service.js",
+        "member_sha256": "38371bc37011e431a525a138b5c458a9e93448cc4e98bdaa727297c7daf0bd08",
+        "reference_lines": [
+          98,
+          119,
+          130
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-po.service.js",
+        "member_sha256": "8b1378c6c04f19ca20d31689f0e6fa3e9a4f033a5bf964b3c76617ecdf4bb17e",
+        "reference_lines": [
+          371,
+          375,
+          379
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/smallware-stage.service.js",
+        "member_sha256": "73ea80029165fe3eec28d533d795fde44b91067508ef81c9b8524b899b2ba743",
+        "reference_lines": [
+          19,
+          23,
+          31,
+          65
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "performance:central_arolds",
+    "role": "central",
+    "collection": "arolds",
+    "model": {
+      "application": "intranet",
+      "name": "ARold",
+      "schema": "arOldSchema",
+      "member_sha256": "ad484b35d19c320ae37a05540ef0dea28fbda3e2d22157077d76031758a09c41"
+    },
+    "model_member": "subway-intranet-api-master/src/models/ar-old.model.js",
+    "exported_symbols": [
+      "ArOld"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/ar.service.js",
+        "member_sha256": "708767fa58d0b1996ace6a943884ba9a3b005f69a1f3a68bb70397ab2a2e3f93",
+        "reference_lines": [
+          8,
+          18,
+          29
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "performance:central_plactuals",
+    "role": "central",
+    "collection": "plactuals",
+    "model": {
+      "application": "intranet",
+      "name": "PlActual",
+      "schema": "plActualSchema",
+      "member_sha256": "0f53e2e722a532d4d40e52b16957c46519683155751f0c4b88f4e4950975ef64"
+    },
+    "model_member": "subway-intranet-api-master/src/models/pl-actual.model.js",
+    "exported_symbols": [
+      "PlActual"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/pl-report.service.js",
+        "member_sha256": "a22a8b13068c6fe4611ebba94c974e17810b687ae92ae3689814d34374e8e6d5",
+        "reference_lines": [
+          109,
+          112,
+          145,
+          151,
+          185,
+          191,
+          1672,
+          1879
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "performance:central_plaops",
+    "role": "central",
+    "collection": "plaops",
+    "model": {
+      "application": "intranet",
+      "name": "PlAop",
+      "schema": "plAopSchema",
+      "member_sha256": "7e87668ca281d49a2a5a2cbdc21d343447c0b6ca81c9c161eaac87e48ddcb938"
+    },
+    "model_member": "subway-intranet-api-master/src/models/pl-aop.model.js",
+    "exported_symbols": [
+      "PlAop"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed.",
+    "service_limitation": "No direct model-symbol service usage found; model declaration and dump schema remain mapped."
+  },
+  {
+    "concept_id": "performance:central_pluems",
+    "role": "central",
+    "collection": "pluems",
+    "model": {
+      "application": "intranet",
+      "name": "PlUem",
+      "schema": "plUemSchema",
+      "member_sha256": "00f7629c29c7fd30bd904d0bcaf67746556b467085c405850aad668405936b19"
+    },
+    "model_member": "subway-intranet-api-master/src/models/pl-uem.model.js",
+    "exported_symbols": [
+      "PlUem"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed.",
+    "service_limitation": "No direct model-symbol service usage found; model declaration and dump schema remain mapped."
+  },
+  {
+    "concept_id": "performance:central_plreports",
+    "role": "central",
+    "collection": "plreports",
+    "model": {
+      "application": "intranet",
+      "name": "PlReport",
+      "schema": "plReportSchema",
+      "member_sha256": "e84568548e3a49bc3a42efeef818fba259f4360e9969c11a0dd950ed5fb19704"
+    },
+    "model_member": "subway-intranet-api-master/src/models/pl-report.model.js",
+    "exported_symbols": [
+      "PlReport"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/pl-report.service.js",
+        "member_sha256": "a22a8b13068c6fe4611ebba94c974e17810b687ae92ae3689814d34374e8e6d5",
+        "reference_lines": [
+          701,
+          709
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_appdocumentcategories",
+    "role": "central",
+    "collection": "appdocumentcategories",
+    "model": {
+      "application": "intranet",
+      "name": "AppDocumentCategory",
+      "schema": "appDocumentCategorySchema",
+      "member_sha256": "60ad25cf0c85616bb3128a1709fd65773d3303e79d71f4261879d0eea18db696"
+    },
+    "model_member": "subway-intranet-api-master/src/models/app-document-category.model.js",
+    "exported_symbols": [
+      "AppDocumentCategory"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/app-document-category.service.js",
+        "member_sha256": "89651433937a440244ef3102907e3177d8a7321df1f5b221d04389c84f2506f2",
+        "reference_lines": [
+          9,
+          17,
+          40,
+          49,
+          53,
+          57,
+          64,
+          68,
+          72
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_appdocuments",
+    "role": "central",
+    "collection": "appdocuments",
+    "model": {
+      "application": "intranet",
+      "name": "AppDocument",
+      "schema": "appDocumentSchema",
+      "member_sha256": "609b6223763f24bf4932f1cf8bbbf04040b2f8d4a32fd4e466f2902823c422bf"
+    },
+    "model_member": "subway-intranet-api-master/src/models/app-document.model.js",
+    "exported_symbols": [
+      "AppDocument"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/app-document.service.js",
+        "member_sha256": "242e4ac2be38873f780d48b91735e0d1e7eec0282cd045fa1328f5ad4460e178",
+        "reference_lines": [
+          18,
+          22,
+          57,
+          63,
+          68,
+          75,
+          130
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_appproperties",
+    "role": "central",
+    "collection": "appproperties",
+    "model": {
+      "application": "intranet",
+      "name": "AppProperties",
+      "schema": "appPropertiesSchema",
+      "member_sha256": "67d621da9823906b9760cf2374cf0ee0288d9c1271f2adbe5094e651a1e03a6a"
+    },
+    "model_member": "subway-intranet-api-master/src/models/app-properties.model.js",
+    "exported_symbols": [
+      "AppProperties"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed.",
+    "service_limitation": "No direct model-symbol service usage found; model declaration and dump schema remain mapped."
+  },
+  {
+    "concept_id": "evidence:central_apps",
+    "role": "central",
+    "collection": "apps",
+    "model": {
+      "application": "intranet",
+      "name": "App",
+      "schema": "AppSchema",
+      "member_sha256": "37331d41d3f84c2672d002d1a8eb297d98bdc5059aa20944619b094f50628fc1"
+    },
+    "model_member": "subway-intranet-api-master/src/models/app.model.js",
+    "exported_symbols": [
+      "App"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/admin.service.js",
+        "member_sha256": "1fd9b90744d4956d7685acf18f6acb15afc88c6d72d08388632627fe9b84d665",
+        "reference_lines": [
+          7,
+          46,
+          53,
+          55,
+          74,
+          77,
+          82,
+          86,
+          92,
+          97
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/app-document.service.js",
+        "member_sha256": "242e4ac2be38873f780d48b91735e0d1e7eec0282cd045fa1328f5ad4460e178",
+        "reference_lines": [
+          14,
+          138
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/blog.service.js",
+        "member_sha256": "44f5692dde9873b4200a5fbffac208d51909ac35162b8c96dba83993268396ca",
+        "reference_lines": [
+          13
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/common-service.js",
+        "member_sha256": "0b17c4bf48b753bce32bc57958f27c694bb59257fffa51dbc0b948025925edf8",
+        "reference_lines": [
+          14,
+          16,
+          21,
+          26
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-role.service.js",
+        "member_sha256": "c747fc972b70e278f84d2dddded71190ad6a3480ae61e218b37551d2904661eb",
+        "reference_lines": [
+          58
+        ]
+      },
+      {
+        "member": "subway-intranet-api-master/src/services/user-service/index.js",
+        "member_sha256": "ae630597e478cbcd353ad9c7da5516a8c7177a8659ddc683210134832b75d32f",
+        "reference_lines": [
+          74,
+          451,
+          691
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_blogcategories",
+    "role": "central",
+    "collection": "blogcategories",
+    "model": {
+      "application": "intranet",
+      "name": "BlogCategory",
+      "schema": "blogCategorySchema",
+      "member_sha256": "36b74f627c32e59b85c71a3792edcc19cbc2cd7628c794a3dc2085a7927bd172"
+    },
+    "model_member": "subway-intranet-api-master/src/models/blog-category.model.js",
+    "exported_symbols": [
+      "BlogCategory"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/blog.service.js",
+        "member_sha256": "44f5692dde9873b4200a5fbffac208d51909ac35162b8c96dba83993268396ca",
+        "reference_lines": [
+          7,
+          36,
+          40
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_blogprojects",
+    "role": "central",
+    "collection": "blogprojects",
+    "model": {
+      "application": "intranet",
+      "name": "BlogProject",
+      "schema": "blogProjectSchema",
+      "member_sha256": "84385fefa679438793a0c21df30cb591652bcc8b6cf1125d0b1d6f8ad5fa5ed9"
+    },
+    "model_member": "subway-intranet-api-master/src/models/blog-project.model.js",
+    "exported_symbols": [
+      "BlogProject"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/blog.service.js",
+        "member_sha256": "44f5692dde9873b4200a5fbffac208d51909ac35162b8c96dba83993268396ca",
+        "reference_lines": [
+          43,
+          47
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_blogs",
+    "role": "central",
+    "collection": "blogs",
+    "model": {
+      "application": "intranet",
+      "name": "Blog",
+      "schema": "blogSchema",
+      "member_sha256": "f53de4bd7ab6df13aadd111dab064423be1ec12f3effcbd7e0f7a760727d071f"
+    },
+    "model_member": "subway-intranet-api-master/src/models/blog.model.js",
+    "exported_symbols": [
+      "Blog"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/blog.service.js",
+        "member_sha256": "44f5692dde9873b4200a5fbffac208d51909ac35162b8c96dba83993268396ca",
+        "reference_lines": [
+          20,
+          24,
+          28,
+          50,
+          172
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:central_confirmappdocuments",
+    "role": "central",
+    "collection": "confirmappdocuments",
+    "model": {
+      "application": "intranet",
+      "name": "ConfirmAppDocument",
+      "schema": "confirmAppDocumentSchema",
+      "member_sha256": "50f75f2208e82155969b5173d9a1514ae1c6ee73cf7e2405c92a31245bed7ec5"
+    },
+    "model_member": "subway-intranet-api-master/src/models/confirm-app-document.model.js",
+    "exported_symbols": [
+      "ConfirmAppDocument"
+    ],
+    "export_member": "subway-intranet-api-master/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-intranet-api-master/src/services/app-document.service.js",
+        "member_sha256": "242e4ac2be38873f780d48b91735e0d1e7eec0282cd045fa1328f5ad4460e178",
+        "reference_lines": [
+          54,
+          88,
+          91,
+          99
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:finance_assets",
+    "role": "finance",
+    "collection": "assets",
+    "model": {
+      "application": "finance",
+      "name": "Asset",
+      "schema": "assetSchema",
+      "member_sha256": "c90918b9c20f9f41411abdcd5a32d0e3b2658d04925ac41692f6fead18246832"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/asset.model.js",
+    "exported_symbols": [
+      "Asset"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/asset.service.js",
+        "member_sha256": "62f5d1fc8ea99bb7e106e11b40480c059c818c7bfa07b264f191d2ddf5d7b0ff",
+        "reference_lines": [
+          6,
+          10,
+          15,
+          19,
+          43
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:finance_advancepaymentreports",
+    "role": "finance",
+    "collection": "advancepaymentreports",
+    "model": {
+      "application": "finance",
+      "name": "AdvancePaymentReport",
+      "schema": "advancePaymentReportSchema",
+      "member_sha256": "a08853d3f3fdb03a108bd457c818f2555c602ceb8bc12c78545ead2afc14bafe"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/advance-payment-report.model.js",
+    "exported_symbols": [
+      "AdvancePaymentReport"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          151
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          94,
+          273,
+          304,
+          512,
+          515
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:finance_grnreports",
+    "role": "finance",
+    "collection": "grnreports",
+    "model": {
+      "application": "finance",
+      "name": "GrnReport",
+      "schema": "grnReportSchema",
+      "member_sha256": "97fac9d46e4d225d435746d867ad46892352854dd9336864420f18b512e489dd"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/grn-report.model.js",
+    "exported_symbols": [
+      "GrnReport"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          160
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          93,
+          193,
+          236,
+          489,
+          492
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:finance_poreports",
+    "role": "finance",
+    "collection": "poreports",
+    "model": {
+      "application": "finance",
+      "name": "PoReport",
+      "schema": "poReportSchema",
+      "member_sha256": "9c46246298971bd335a5fdead66f5ce0f3d1fc08c128cc82f8dfc3ad09b6bb98"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/po-report.model.js",
+    "exported_symbols": [
+      "PoReport"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/location-service/location2.service.js",
+        "member_sha256": "1db4411cb8f0c3edf364afca0b93dc468ca10d78ea563fce0e7d4b14b1b8ee0a",
+        "reference_lines": [
+          166
+        ]
+      },
+      {
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/reports/report.services.js",
+        "member_sha256": "a94563d674fff7d0fa749237c89b63b0110347ba0f11f5515d8d8aab7d19e76c",
+        "reference_lines": [
+          92,
+          105,
+          153,
+          480,
+          499,
+          502
+        ]
+      }
+    ],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed."
+  },
+  {
+    "concept_id": "evidence:finance_reportfiles",
+    "role": "finance",
+    "collection": "reportfiles",
+    "model": {
+      "application": "finance",
+      "name": "ReportFile",
+      "schema": "reportFileSchema",
+      "member_sha256": "bfffd1be42229e259aedaa33104571717acb2412a676c2ad0046b6fb716f730a"
+    },
+    "model_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/report-file.model.js",
+    "exported_symbols": [
+      "ReportFile"
+    ],
+    "export_member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/index.js",
+    "service_files": [],
+    "service_evidence_basis": "Static model/export-symbol call and constructor references; not a claim that every branch executes or all guards are reviewed.",
+    "service_limitation": "No direct model-symbol service usage found; model declaration and dump schema remain mapped."
+  }
+]

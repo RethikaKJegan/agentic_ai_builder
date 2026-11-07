@@ -1,0 +1,5 @@
+- [x] Investigate complete relationship mismatches using corresponding code and data.
+- [x] Implement validated full-source filters, aggregates and qualified relationships.
+- [x] Integrate query planning and execution with normal metered chat/workflow actions.
+- [x] Test real totals, noninitial records, joins, type failures and tenant isolation.
+- [x] Deploy and verify compatibility, query provenance and client state preservation.

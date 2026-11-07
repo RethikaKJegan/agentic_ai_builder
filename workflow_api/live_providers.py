@@ -54,6 +54,10 @@ def registry_configuration(env):
             from .client_packages import package_tool_definition
             config['tools'].append({'definition':package_tool_definition()})
             config['policy']['remaining_quota']['client_package_read']=10000
+            if env.get('BUILDER_SUBWAY_QUERY_ENABLED')=='1':
+                from .subway_queries import definition as subway_query_definition
+                config['tools'].append({'definition':subway_query_definition()})
+                config['policy']['remaining_quota']['subway_query']=10000
         if env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
             from .tenant_google import extend_registry
             extend_registry(config)
@@ -472,6 +476,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     if isolation and isolation.client == 'subway' and isolation.data_enabled:
         from .subway_onboarding import install_package_sources
         install_package_sources(app, auth, env)
+        if env.get('BUILDER_SUBWAY_QUERY_ENABLED')=='1':
+            from .subway_queries import install as install_subway_queries
+            install_subway_queries(app,auth)
     if procurement_settings:
         from .procurement import install
         procurement_worker = install(app, procurement_settings, env, client, model, auth)
@@ -527,7 +534,20 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         service.reply_monitor_health = {'state': 'starting'}
     lookup = lambda workspace, subject: authenticate(service, auth, workspace, subject)
     service.worker_authenticate=lookup
-    workers = [TriggerScheduler(service, lookup, interval=1), RuntimeWorker(runner, lookup)]
+    worker_mode=env.get('BUILDER_WORKER_MODE','active-standby')
+    if worker_mode not in ('active-standby','multi-active'):raise ValueError('Configure active-standby or multi-active worker mode.')
+    multi_active=worker_mode=='multi-active'
+    if env.get('BUILDER_UNIFIED_KNOWLEDGE','1' if multi_active else '0')=='1':
+        from .account_knowledge import AccountKnowledge
+        service.account_graph=AccountKnowledge(service.store,service)
+        if hasattr(service,'business_composition'):service.business_composition.packages.account_graph=service.account_graph
+    concurrency=int(env.get('BUILDER_WORKER_CONCURRENCY','1'))
+    if multi_active:
+        from .resource_limits import ResourcePolicy,ResourceControls
+        from .scheduler import LifecycleDispatchWorker
+        runner.runtime.resource_controls=ResourceControls(service.store,ResourcePolicy.from_environment(env))
+    workers = [TriggerScheduler(service, lookup, interval=1,dispatch=not multi_active), RuntimeWorker(runner, lookup,concurrency=concurrency if multi_active else 1,fair=multi_active)]
+    if multi_active:workers.append(LifecycleDispatchWorker(service,concurrency=concurrency))
     if procurement_worker:
         workers.append(procurement_worker)
     reply_stop = Event()
@@ -564,7 +584,11 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     from .worker_control import WorkerSupervisor
     components=[*workers,app.state.planning_jobs,app.state.data_source_worker,app.state.data_query_jobs,app.state.business_generation,app.state.investigation_jobs]
     if hasattr(service,'reply_cases'):components.append(ReplyWorker())
-    supervisor=WorkerSupervisor(service.store,components,role=process_role)
+    if hasattr(service,'account_graph'):
+        from .knowledge_sync import KnowledgeSyncWorker
+        components.append(KnowledgeSyncWorker(service,lookup))
+    parallel=[w for w in workers if isinstance(w,(RuntimeWorker,LifecycleDispatchWorker))] if multi_active else []
+    supervisor=WorkerSupervisor(service.store,[c for c in components if c not in parallel],role=process_role,parallel_workers=parallel)
     app.state.worker_supervisor=supervisor
     app.state.process_role=process_role
 

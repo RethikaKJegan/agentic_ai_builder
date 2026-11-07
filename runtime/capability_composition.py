@@ -84,6 +84,12 @@ class CompositionGuard:
         memory=self.session.runtime.working_memory.view(memory_run,self.session.workflow,task=task,dependencies=context['dependency_results'],permitted_tools=[task['selected_tool_id']] if task['selected_tool_id'] else [])
         memory.pop('dependency_outputs',None)  # Already supplied exactly once above.
         context['working_memory']=bounded_context(memory)
+        graph=getattr(self.session.runtime.workflows,'account_graph',None)
+        pin=self.session.workflow.get('metadata',{}).get('account_graph_pin')
+        if graph:
+            observed_pins=[e['account_graph_pin'] for e in evidence if e.get('account_graph_pin')]
+            selected=observed_pins[-1] if observed_pins else pin
+            if selected:context['account_knowledge']=graph.context(self.session.auth,selected,task.get('instructions',task['task_id']))
         if 'lifecycle_context' in self.session.workflow['metadata']:
             context['business_case']=bounded_context(deepcopy(self.session.workflow['metadata']['lifecycle_context']))
         failures=[f for f in memory_run.get('classified_failures',[]) if f.get('affected_task')==task['task_id']]

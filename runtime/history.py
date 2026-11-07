@@ -21,6 +21,8 @@ def query_options(query, kind):
     allowed = {'limit', 'after_sequence'} if kind == 'events' else {'limit', 'cursor', 'workflow_id', 'status', 'from_date', 'to_date', 'pending_only'}
     if kind == 'monitoring':
         allowed = {'limit', 'source_cursor', 'policy_cursor'}
+    if kind == 'recovery':
+        allowed = set()
     if set(query) - allowed - {'request_id'}:
         raise RuntimeFailure('INVALID_REQUEST', 'This history filter is unsupported.', 400)
     result = {key: value for key, value in query.items() if key in allowed}

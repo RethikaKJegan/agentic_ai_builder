@@ -1,0 +1,65 @@
+[
+  {
+    "workers": 1,
+    "active_workers": 1,
+    "jobs": 16,
+    "elapsed_seconds": 6.618234395980835,
+    "throughput_per_second": 2.4175632113780354,
+    "average_latency_seconds": 3.5237659960985184,
+    "p95_latency_seconds": 6.4524619579315186,
+    "average_queue_wait_seconds": 3.3734335750341415,
+    "concurrent_effects_peak": 1,
+    "duplicate_effects": 0,
+    "lost_jobs": 0,
+    "database_metrics": {
+      "reads": 296,
+      "writes": 173,
+      "contention": 0,
+      "failures": 0,
+      "slow_transactions": 0
+    },
+    "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; threads on one host; no live effect."
+  },
+  {
+    "workers": 2,
+    "active_workers": 1,
+    "jobs": 16,
+    "elapsed_seconds": 5.954432725906372,
+    "throughput_per_second": 2.687073771173477,
+    "average_latency_seconds": 2.950959652662277,
+    "p95_latency_seconds": 5.7933337688446045,
+    "average_queue_wait_seconds": 2.8005203008651733,
+    "concurrent_effects_peak": 1,
+    "duplicate_effects": 0,
+    "lost_jobs": 0,
+    "database_metrics": {
+      "reads": 274,
+      "writes": 176,
+      "contention": 0,
+      "failures": 0,
+      "slow_transactions": 0
+    },
+    "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; threads on one host; no live effect."
+  },
+  {
+    "workers": 4,
+    "active_workers": 1,
+    "jobs": 16,
+    "elapsed_seconds": 5.421624422073364,
+    "throughput_per_second": 2.95114503595238,
+    "average_latency_seconds": 2.8469323366880417,
+    "p95_latency_seconds": 5.305318593978882,
+    "average_queue_wait_seconds": 2.6967031061649323,
+    "concurrent_effects_peak": 1,
+    "duplicate_effects": 0,
+    "lost_jobs": 0,
+    "database_metrics": {
+      "reads": 255,
+      "writes": 182,
+      "contention": 0,
+      "failures": 0,
+      "slow_transactions": 0
+    },
+    "qualification": "Actual runtime/Registry/approval transactions; controlled 150ms provider latency; threads on one host; no live effect."
+  }
+]
