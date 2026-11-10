@@ -458,6 +458,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         from .tenant_google import install as install_tenant_google
         install_tenant_google(app,env)
     runner.connectors.update(app.state.database_workflows.connectors())
+    runner.connectors['workflow_data_query'] = service.workflow_queries
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
     from .source_context import knowledge_documents

@@ -363,11 +363,43 @@ class DataQueries:
                 self.active.discard(identity)
                 self.slot_available.notify_all()
 
-    def _plan(self, auth, body, identity):
-        if not isinstance(body,dict) or set(body) != {'question'} or not isinstance(body.get('question'),str) or not 1 <= len(body['question'].strip()) <= 2000:
-            fail('Supply a question between 1 and 2,000 characters.')
+    def catalogue(self, auth, objective=None):
+        """Metadata only, scoped by current account/source authorization."""
+        GoogleConnections.identity(auth, True)
         context = self.context(auth)
+        discovery = None
+        selected = None
+        retrieval = getattr(self, 'retrieval', None)
+        if objective and retrieval:
+            # Reuse the existing ontology index/ranking/path expansion. The query
+            # planner supports scalar fields only; omit non-executable array/object
+            # descriptors before retrieval's existing byte budget, never scalar fields.
+            def executable_source(source):
+                return {**source, 'fields':[f for f in source['fields'] if f['field_id'] in context[2]]}
+            preview, relevant = retrieval.retrieve(auth, objective, planning=True,
+                source_projection=executable_source)
+            selected = {source['dataset_id'] for source in relevant['sources']}
+            if not selected:
+                fail('No authorized source metadata matches this objective. Specify the business entity or a reviewed source name.', 'DATA_QUERY_MAPPING_REQUIRED', 422)
+            discovery = dict(revision=preview['revision'], source_ids=sorted(selected),
+                warnings=preview['warnings'], semantic_relationships=preview['semantic_relationships'],
+                coverage=preview['coverage'], query_terms=preview['query_terms'])
+        catalog, _ = self._catalogue(auth, context, dataset_ids=selected)
+        if discovery:
+            catalog['discovery'] = discovery
+        catalog.update(context_hash=fingerprint(context[0]), graph_revision=context[0]['revision'])
+        if len(json.dumps(catalog).encode()) > 120000:
+            fail('Relevant metadata exceeds the 120 KB planning bound. Narrow the business objective or selected source schema.', 'DATA_QUERY_LIMIT', 422)
+        return catalog
+
+    def _catalogue(self, auth, context, *, dataset_ids=None, enforce_limit=True):
         graph,datasets,fields,relationships = context
+        if dataset_ids is not None:
+            if not dataset_ids <= set(datasets):
+                fail('Selected metadata is no longer authorized.', 'DATA_QUERY_STALE', 409)
+            datasets = {k:v for k,v in datasets.items() if k in dataset_ids}
+            fields = {k:v for k,v in fields.items() if v['dataset_id'] in dataset_ids}
+            relationships = {k:v for k,v in relationships.items() if {v['source_dataset_id'],v['target_dataset_id']} <= dataset_ids}
         detailed = self.manager.relationships.detailed.get(auth)
         if detailed['stale'] or not detailed['graph'] or detailed['graph']['revision'] != graph['revision']:
             fail('Metadata or business review changed during planning. Plan again.', 'DATA_QUERY_STALE', 409)
@@ -378,11 +410,27 @@ class DataQueries:
         catalog = dict(datasets=[dict(dataset_id=did,name=d['name'],schema=d['schema'],connection=d['connection']['name'],engine=d['connection']['engine'],description=descriptions.get(did,''),
                     fields=[dict(field_id=fid,name=f['name'],types=f['types'],description=descriptions.get(fid,'')) for fid,f in fields.items() if f['dataset_id']==did]) for did,d in datasets.items()],
                     relationships=list(relationships.values()), confirmed_business_mappings=mappings)
-        if len(json.dumps(catalog).encode()) > 120000: fail('The catalog is too large for this planner. Connect a smaller dataset scope.', 'DATA_QUERY_LIMIT', 422)
+        if enforce_limit and len(json.dumps(catalog).encode()) > 120000: fail('The catalog is too large for this planner. Connect a smaller dataset scope.', 'DATA_QUERY_LIMIT', 422)
+        return catalog, mappings
+
+    def _plan(self, auth, body, identity):
+        if not isinstance(body,dict) or set(body) != {'question'} or not isinstance(body.get('question'),str) or not 1 <= len(body['question'].strip()) <= 2000:
+            fail('Supply a question between 1 and 2,000 characters.')
+        context = self.context(auth)
+        catalog = self.catalogue(auth, body['question'].strip())
         plan = self.planner.generate(body['question'].strip(),catalog)
+        return self.save_typed_plan(auth, body['question'].strip(), plan, context=context)
+
+    def save_typed_plan(self, auth, question, plan, *, context=None, context_hash=None, plan_id=None):
+        identity = GoogleConnections.identity(auth, True)
+        context = context or self.context(auth)
+        graph,datasets,fields,relationships = context
+        if context_hash is not None and fingerprint(graph)!=context_hash:
+            fail('Reviewed query metadata changed. Review the workflow again.', 'DATA_QUERY_STALE',409)
+        _, mappings = self._catalogue(auth, context, enforce_limit=False)
         needed, joins, expressions = self.validate(plan, context)
         if fingerprint(self.context(auth)[0]) != fingerprint(graph): fail('Metadata or relationship review changed during planning. Plan again.', 'DATA_QUERY_STALE',409)
-        result = dict(plan_id='dq_'+secrets.token_hex(16),question=body['question'].strip(),plan=plan,
+        result = dict(plan_id=plan_id or 'dq_'+secrets.token_hex(16),question=question,plan=plan,
                       graph_revision=graph['revision'],created_at=now(),expires_at=time.time()+600,
                       field_labels={fid:dataset_label(datasets[f['dataset_id']])+' / '+f['name'] for fid,f in fields.items()},
                       dataset_labels={did:dataset_label(d) for did,d in datasets.items()})
@@ -391,7 +439,13 @@ class DataQueries:
         document = {**result,'context_hash':fingerprint(graph)}
         with self.store.transaction() as db:
             db.execute('DELETE FROM data_query_plans WHERE expires<?',(time.time(),))
-            db.execute('INSERT INTO data_query_plans VALUES (?,?,?,?,?)',(result['plan_id'],*identity,result['expires_at'],json.dumps(document)))
+            db.execute('INSERT INTO data_query_plans VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING',(result['plan_id'],*identity,result['expires_at'],json.dumps(document)))
+            existing_row=db.execute('SELECT document FROM data_query_plans WHERE plan_id=? AND workspace=? AND owner=?',(result['plan_id'],*identity)).fetchone()
+            if existing_row is None:fail('Query identity is unavailable.', 'DATA_QUERY_CONFLICT',409)
+            existing=json.loads(existing_row[0])
+            if existing['plan']!=plan or existing['context_hash']!=document['context_hash']:
+                fail('Query identity was reused with different semantics.', 'DATA_QUERY_CONFLICT',409)
+            result={k:v for k,v in existing.items() if k!='context_hash'}
             # Keep only the latest 20 plans for this owner, without retaining business results.
             rows=db.execute('SELECT plan_id FROM data_query_plans WHERE workspace=? AND owner=? ORDER BY expires DESC',identity).fetchall()
             for row in rows[20:]: db.execute('DELETE FROM data_query_plans WHERE plan_id=?',(row[0],))

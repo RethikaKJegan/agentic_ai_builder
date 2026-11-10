@@ -1,0 +1,19 @@
+# Grouped-query model-output verification — 10 November 2026
+
+## Confirmed cause and correction
+Saved Simpson run run_6a9d55ba611c494a943c736f41e160f6 returned status in both fields and group_by while metrics were present. Strict validation correctly rejected that shape. It also labelled a duplicate per-status count overall_total, although grouped count metrics remain per-group.
+
+Only generic query model output is canonicalized, after schema/secret validation and before persistence: redundant fields that are already grouping keys are omitted. Non-group fields, nongrouped queries, other agent types, explicit tool/query requests and clarifications are not reinterpreted. No saved/approved query is modified, preserving durable identity and exact recurring consent. Query-engine validation remains strict. Trusted query/report guidance now uses group_by for aggregate output keys and engine matched_rows for the overall matched record population; a label does not turn a grouped metric into a global total. Null/absent and blank-string status groups remain distinct as supported by the engine.
+
+## Controlled regression evidence
+126 tests passed, plus a separately added pagination test and 18 subtests. Coverage includes canonicalization/idempotency and rejected variants, strict explicit-query rejection, real CrewAI message delivery, durable query/restart/clarification/evidence and core runtime behavior. A 603-record query-to-report-to-spreadsheet fixture passed existing exact-payload approval and real adapter code, with counts for closed/open/null-or-absent/blank statuses and an independent global total. A two-group displayed page counted 402 records while engine matched_rows correctly remained 603; four result groups were reported. No real provider writes occurred in these tests.
+
+## Authorized live read-only qualification
+The original saved query was loaded from a verified snapshot and canonicalized without changing grouping or metrics. Application startup/persistence used an isolated copied Simpson store, verified through PRAGMA database_list. Model calls and Mongo write APIs were blocked; aggregation rejected any $out/$merge stage. The existing query engine performed one read-only aggregate against the authorized Simpson source.
+
+Result at 2026-11-10T07:58:47.327088+00:00: 5810 tickets across 3 recorded-status groups; limited=false. Group counts summed to the independent matched population. Null/absent count: 0; blank-string count: 0. All duplicate grouped count labels remained equal per group, confirming why they must not be interpreted as global totals. Execution used a MongoDB single-statement snapshot. Aggregate evidence is private in live-readonly.json. No source mutation, paid model call, live workflow submission, email or real spreadsheet write was performed. This proves structured-query execution for this source snapshot; unrestricted live natural-language generation and real Sheets delivery are not claimed.
+
+## Deployment qualification
+Fresh main/Simpson/Subway online snapshots passed quick_check; 53 configuration/credential files, nine provider-state files, source and active frontend were preserved. Six baseline/candidate copied-store startup/auth/API rehearsals passed with networking/workers disabled and protected records unchanged. Contracts, strict OpenSpec and whitespace checks passed. Authenticated public checks, six read-only browser journeys and data/credential preservation passed after deployment. All five services remain active with zero automatic restarts and no critical backend/worker logs during monitoring. No destructive migration or database restore occurred.
+
+Existing failed runs remain unchanged; generate a new workflow to obtain canonical model output. Historical shared-store audit and intermittent SQLite-contention qualification remain separate limitations.

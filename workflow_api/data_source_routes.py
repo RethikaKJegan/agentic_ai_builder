@@ -30,12 +30,15 @@ def install(app,service,auth,env,reference):
     manager.semantic.authenticate=current_authority
     jobs=DataQueryJobs(queries,current_authority)
     app.state.data_query_jobs=jobs
+    from .workflow_queries import install as install_workflow_queries
+    install_workflow_queries(service,queries,jobs,auth)
     app.state.data_source_worker=DataSourceWorker(manager)
     operations = DataOperations(manager, current_authority)
     app.state.data_operations = operations
     from .database_workflows import DatabaseWorkflows
     database_workflows = DatabaseWorkflows(service, operations, queries, current_authority)
     app.state.database_workflows = service.database_workflows = database_workflows
+    queries.retrieval = database_workflows.retrieval
     database_workflows.register(auth)
     if getattr(service, 'runtime_runner', None) is not None:
         service.runtime_runner.connectors.update(database_workflows.connectors())

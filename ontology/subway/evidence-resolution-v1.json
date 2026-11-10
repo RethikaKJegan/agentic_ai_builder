@@ -1,0 +1,192 @@
+{
+  "resolution_version": "subway-evidence-resolution-v1",
+  "ontology_version": "bov_subway_dump_v4",
+  "definition_sha256": "03af7fa412133bd232e23735a124db11a10bed711de993bc88e5c0391c96ee02",
+  "scope": {
+    "workspace_id": "client-subway",
+    "subject_id": "subway-client"
+  },
+  "sources": [
+    {
+      "source_id": "subway_resolution_budget_check",
+      "title": "Subway src/services/budget-reservation.service.js",
+      "kind": "application_code",
+      "text": "// Aggregate estimatedTotalAmount per lineItem from a PR items array.\nconst _aggregateTotals = (items) =>\n  (items || []).reduce((map, item) => {\n    if (!item.lineItem) return map;\n    const id = String(item.lineItem._id !== undefined ? item.lineItem._id : item.lineItem);\n    map[id] = (map[id] || 0) + (item.estimatedTotalAmount || 0);\n    return map;\n  }, {});\n\n/**\n * Reserve budget at the line-item level on PR submission.\n *\n * For each PR line item, checks that LineItem.availableAmount covers the\n * estimated total. On success, reduces availableAmount and creates an active\n * BudgetReservation record. On any insufficiency, throws an ApiError with a\n * `detail` object identifying the breaching line item and rolls back all\n * changes made in the call via session transaction.\n */\nconst reserveBudget = async (prId, prNumber, lineItems) => {\n  const lineItemTotals = _aggregateTotals(lineItems);\n\n  const session = await mongoose.startSession();\n  try {\n    await session.withTransaction(async () => {\n      for (const [lineItemId, amount] of Object.entries(lineItemTotals)) {\n        const li = await LineItem.findById(Number(lineItemId)).session(session);\n        if (!li) {\n          throw new ApiError(httpStatus.NOT_FOUND, `Line item ${lineItemId} not found`);\n        }\n\n        if ((li.availableAmount || 0) < amount) {\n          const err = new ApiError(\n            httpStatus.UNPROCESSABLE_ENTITY,\n            `Insufficient budget: \"${li.name}\" has ${li.availableAmount} available, ${amount} required`\n          );\n          err.detail = {\n            lineItemId: li._id,\n            lineItemName: li.name,\n            available: li.availableAmount,\n            required: amount,\n          };\n          throw err;\n        }",
+      "sha256": "864e4c11c3356dae249ae0c6c0550e9cf57bc2a8f577b92b5f75501b3104f8aa",
+      "origin": {
+        "archive": "subway-finance-api-v2-gowtham-finance-v2-pr.zip",
+        "archive_sha256": "e21565f0c637d34e6dce51c0e08f2f634b98407bab5a799bdd5fda68e229de2b",
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/budget-reservation.service.js",
+        "member_sha256": "d900e06efda0480ba417e31a48ede8de0be7498676d9af25b10b7ca81a56b52d",
+        "start_line": 7,
+        "end_line": 50
+      }
+    },
+    {
+      "source_id": "subway_resolution_conditional_pr",
+      "title": "Subway src/services/purchase-order-service/create-po-core.service.js",
+      "kind": "application_code",
+      "text": "  let linkedPR = null;\n  try {\n    if (body.purchaseRequestId) {\n      linkedPR = await PurchaseRequest.findById(body.purchaseRequestId);\n      if (!linkedPR || linkedPR.status !== statusEnums.APPROVED) {\n        throw new ApiError(httpStatus.BAD_REQUEST, 'PO can only be created from an approved PR');\n      }\n      if (!(await canConvertPRToPO(user, linkedPR))) {\n        throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to create a Purchase Order from this Purchase Requisition');\n      }\n      body.department = user.department ?? (await getProcurementDepartmentId());\n      validateDeliveryStoreAgainstPR(linkedPR, body.deliveryLocationId);\n      body.items = resolvePOItemsAgainstPR(linkedPR, body.items, body.deliveryLocationId);\n      await validateRateContractItems(body.items, body.vendorCode, body.poDate || new Date());\n    } else {\n      if (!body.department) {\n        throw new ApiError(httpStatus.BAD_REQUEST, 'Department is required');\n      }\n      // if (!(await isProcurementUser(user)) && (await poItemsHaveRestrictedCategory(body.items))) {\n      //   throw new ApiError(",
+      "sha256": "3fe6f734a5555907116003ab581d231466ff07fba1f1dfe6651a4d74389f8716",
+      "origin": {
+        "archive": "subway-finance-api-v2-gowtham-finance-v2-pr.zip",
+        "archive_sha256": "e21565f0c637d34e6dce51c0e08f2f634b98407bab5a799bdd5fda68e229de2b",
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/services/purchase-order-service/create-po-core.service.js",
+        "member_sha256": "d8e1cd99aa1736f04316627ae084dd0e1463a94dfc4aa8773320875c8de79d53",
+        "start_line": 41,
+        "end_line": 60
+      }
+    },
+    {
+      "source_id": "subway_resolution_stage_facts",
+      "title": "Subway src/models/stage.model.js",
+      "kind": "application_code",
+      "text": "    _id: Number,\n    approvalId: {\n      type: Number,\n      required: true,\n    },\n    status: {\n      type: String,\n      enum: statusEnums,\n      default: statusEnums.APPROVAL_IN_PROGRESS,\n    },\n    approverName: {\n      type: String,\n    },\n    stageName: {\n      type: String,\n      required: true,\n    },\n    stageUserName: {\n      type: String,\n      required: true,\n    },\n    stageRoleName: {\n      type: String,\n      required: true,\n    },\n    StageNumber: {\n      type: Number,\n      required: true,\n    },\n    allowedRole: {\n      type: Number,\n      required: true,\n    },\n    approved: {\n      type: Boolean,\n      default: false,\n    },\n    approvedBy: {\n      type: Number,\n    },\n    rejectedBy: {\n      type: Number,\n    },\n    cancelledBy: {\n      type: Number,\n    },\n    cancelledByName: {\n      type: String,\n    },\n    rejectedByName: {\n      type: String,\n    },\n    stageDate: {\n      type: Date,\n    },\n    receivedConfirmation: {\n      type: Boolean,\n    },\n    approvalComments: String,\n    rejectionReason: String,\n    reconsideredComments: String,\n    // Recorded on the closed-out stage when it is reconsidered: which stage it was sent back\n    // to (0/'Creator' for the default reset-to-creator fallback), so history UIs can show\n    // \"sent back to X\" without needing to correlate this stage with the next one in the array.\n    reconsiderTargetStageNumber: Number,\n    reconsiderTargetStageName: String,\n    holdComments: String,\n    // Recorded on the closed-out stage when its approval cycle is superseded by an edited PR\n    // resubmission (status becomes REPLACED) -- mirrors reconsideredComments/rejectionReason.\n    replacedComments: String,\n    updatedBy: {\n      type: Number,\n      ref: 'User',\n    },\n    updatedAt: {\n      type: Date,\n    },\n    archive: {\n      type: Boolean,\n      default: false,\n      private: true,\n    },\n  },\n  {\n    timestamps: true,\n  }\n);\n\nstageSchema.plugin(toJSON);\nstageSchema.plugin(paginate);\nstageSchema.plugin(AutoIncrement, { id: 'stage_id' });\n// Hooks for setting archive as false, and populating necessary data\nstageSchema.pre('findOne', async function (next) {\n  this._conditions.archive = false;\n  next();",
+      "sha256": "0bb3dfbdad7786d556df8942a02d1a9398afa4f58e9fa8c7f5d9ca335e99fd73",
+      "origin": {
+        "archive": "subway-finance-api-v2-gowtham-finance-v2-pr.zip",
+        "archive_sha256": "e21565f0c637d34e6dce51c0e08f2f634b98407bab5a799bdd5fda68e229de2b",
+        "member": "subway-finance-api-v2-gowtham-finance-v2-pr/src/models/stage.model.js",
+        "member_sha256": "3bce07849ddf9b1441cef847fc3bc9b6e404b32fc0323ea9e969143ec68a59cb",
+        "start_line": 13,
+        "end_line": 107
+      }
+    }
+  ],
+  "entries": {
+    "budgets:code_rule_reservation_available": {
+      "finding": "Budget feasibility can be checked from an existing line item and requested amounts; a historical BudgetReservation record is not an input to this comparison.",
+      "applicability": "For a proposed request, aggregate its estimatedTotalAmount values by lineItem and compare with the freshly read LineItem.availableAmount (the code uses zero when the stored value is missing). This is a source-backed comparison, not transaction execution or proof of the balance at a past date.",
+      "available_evidence": [
+        {
+          "concept_id": "budgets:finance_lineitems",
+          "collection": "lineitems",
+          "fields": [
+            "_id",
+            "budgetId",
+            "availableAmount",
+            "currentAmount",
+            "initialAmount"
+          ],
+          "role": "Current balance and budget identity"
+        }
+      ],
+      "request_inputs": [
+        "Requested line-item IDs and corresponding amounts. These are request inputs, not missing database collections."
+      ],
+      "conditional_requirements": [
+        "Actual BudgetReservation records are needed only to identify individual historical reservations, their PR ownership, or active/released/converted lifecycle. Current availableAmount alone does not reconstruct them."
+      ],
+      "source_ids": [
+        "subway_resolution_budget_check"
+      ]
+    },
+    "procurement:code_rule_approved_pr": {
+      "finding": "The requisition guard runs only inside if (body.purchaseRequestId). An independent purchase order follows the department branch without requiring a requisition record.",
+      "applicability": "First read the actual purchase order or supplied request to establish whether it has purchaseRequestId. Only a populated link triggers requisition-specific approval validation; do not demand a PR for ordinary PO totals, vendor, amount, status, budget or receipt questions.",
+      "available_evidence": [
+        {
+          "concept_id": "procurement:finance_purchaseorders",
+          "collection": "purchaseorders",
+          "fields": [
+            "_id",
+            "poNumber",
+            "status",
+            "budget",
+            "department"
+          ],
+          "role": "Direct PO facts; inspect a requisition link only when supplied or actually present"
+        }
+      ],
+      "conditional_requirements": [
+        "A genuinely linked PR requires its own approval evidence; a PO approval is not a substitute for PR approval. Absence of the field in historical records does not prove why that historical application omitted it."
+      ],
+      "source_ids": [
+        "subway_resolution_conditional_pr"
+      ]
+    },
+    "approvals:finance_stages": {
+      "finding": "A stage is independently recorded evidence. Its history remains usable even when its approval parent cannot be retrieved.",
+      "applicability": "Read stages using approvalId, retaining each source _id. Report recorded StageNumber, status, approved flag, actor fields, stageDate and comments directly. Try exact approvals._id, inverse approvals.stages, document approvalId backlinks and embedded report snapshots before requiring parent-only fields.",
+      "available_evidence": [
+        {
+          "concept_id": "approvals:finance_stages",
+          "collection": "stages",
+          "fields": [
+            "_id",
+            "approvalId",
+            "StageNumber",
+            "status",
+            "approved",
+            "approvedBy",
+            "rejectedBy",
+            "stageDate",
+            "approvalComments",
+            "rejectionReason"
+          ],
+          "role": "Stage facts and recorded action history"
+        },
+        {
+          "concept_id": "approvals:finance_approvals",
+          "collection": "approvals",
+          "fields": [
+            "_id",
+            "stages",
+            "documentId",
+            "document",
+            "status"
+          ],
+          "role": "Exact parent/inverse relationship when available"
+        }
+      ],
+      "conditional_requirements": [
+        "An approved stage does not establish final parent approval. Never infer a document identity, configuration, final decision, approver identity beyond the stored actor, or unrecorded date from a coincident numeric ID."
+      ],
+      "source_ids": [
+        "subway_resolution_stage_facts"
+      ]
+    },
+    "approvals:candidate_reference_9": {
+      "finding": "A stage is independently recorded evidence. Its history remains usable even when its approval parent cannot be retrieved.",
+      "applicability": "Read stages using approvalId, retaining each source _id. Report recorded StageNumber, status, approved flag, actor fields, stageDate and comments directly. Try exact approvals._id, inverse approvals.stages, document approvalId backlinks and embedded report snapshots before requiring parent-only fields.",
+      "available_evidence": [
+        {
+          "concept_id": "approvals:finance_stages",
+          "collection": "stages",
+          "fields": [
+            "_id",
+            "approvalId",
+            "StageNumber",
+            "status",
+            "approved",
+            "approvedBy",
+            "rejectedBy",
+            "stageDate",
+            "approvalComments",
+            "rejectionReason"
+          ],
+          "role": "Stage facts and recorded action history"
+        },
+        {
+          "concept_id": "approvals:finance_approvals",
+          "collection": "approvals",
+          "fields": [
+            "_id",
+            "stages",
+            "documentId",
+            "document",
+            "status"
+          ],
+          "role": "Exact parent/inverse relationship when available"
+        }
+      ],
+      "conditional_requirements": [
+        "An approved stage does not establish final parent approval. Never infer a document identity, configuration, final decision, approver identity beyond the stored actor, or unrecorded date from a coincident numeric ID."
+      ],
+      "source_ids": [
+        "subway_resolution_stage_facts"
+      ]
+    }
+  },
+  "sha256": "170cb1f08efc983d3d6f79bc30dae2566bb182c994ace94073928e2e79e19600"
+}

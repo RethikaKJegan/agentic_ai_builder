@@ -25,6 +25,15 @@ BOOL = {'boolean', 'bool'}
 DATE = {'date', 'timestamp without time zone', 'timestamp with time zone'}
 
 
+def mongo_numeric_types(field):
+    """Reviewed numeric BSON families; no numeric-string coercion."""
+    mapping={**{t:['int','long'] for t in NUMERIC-{'numeric','decimal'}},
+             'numeric':['decimal'],'decimal':['decimal'],
+             'number':['double'],'double':['double']}
+    types=set(field['types'])
+    return sorted({kind for t in types for kind in mapping[t]}) if types and types<=mapping.keys() else None
+
+
 def physical_plan(plan, needed, datasets, expressions, joins=None, *, sampled_evidence=False):
     engines = {datasets[d]['connection']['engine'] for d in needed}
     connections = {datasets[d]['connection']['connection_id'] for d in needed}
@@ -47,8 +56,9 @@ def physical_plan(plan, needed, datasets, expressions, joins=None, *, sampled_ev
         isinstance(n, ast.Div) for tree in expressions.values() for n in ast.walk(tree)
     ):
         reason = 'Per-row division retains the application decimal arithmetic semantics.'
-    elif any(len(f['types']) != 1 or f['types'][0] not in NUMERIC | TEXT | BOOL | DATE
-             for fields in needed.values() for f in fields):
+    elif any(not (datasets[did]['connection']['engine']=='mongodb' and mongo_numeric_types(f))
+             and (len(f['types']) != 1 or f['types'][0] not in NUMERIC | TEXT | BOOL | DATE)
+             for did,fields in needed.items() for f in fields):
         reason = 'One or more field types require application scalar validation.'
     elif engines == {'mongodb'} and (plan['joins'] or any(
         f['types'][0] in DATE for fields in needed.values() for f in fields
@@ -267,11 +277,18 @@ class MongoCompiler:
             value, native = '$' + f['name'], f['types'][0]
             kind = {'$type': value}
             missing = {'$in': [kind, ['missing', 'null']]}
-            allowed = (['decimal'] if native in {'numeric', 'decimal'} else ['int', 'long']) if native in NUMERIC else ['bool'] if native in BOOL else ['string']
+            numeric_types = mongo_numeric_types(f)
+            allowed = numeric_types or (['bool'] if native in BOOL else ['string'])
             checks.append({'$not': [{'$or': [missing, {'$in': [kind, allowed]}]}]})
-            if native in NUMERIC:
-                projection[fid] = self.convert(value) if native in {'numeric', 'decimal'} else {'$ifNull': [value, None]}
+            if numeric_types:
+                projection[fid] = self.convert(value) if set(numeric_types)&{'decimal','double'} else {'$ifNull': [value, None]}
                 checks.append(self.numeric_guard(self.convert(value)))
+                if 'double' in numeric_types:
+                    # Mongo's decimal conversion must not silently round a double.
+                    # Keep the existing fixed decimal envelope and fail closed if
+                    # converting back does not recover the exact binary operand.
+                    restored={'$convert': {'input':self.convert(value),'to':'double','onError':None,'onNull':None}}
+                    checks.append({'$and':[{'$eq':[kind,'double']},{'$ne':[value,restored]}]})
             else:
                 projection[fid] = {'$ifNull': [value, None]}
                 if native in TEXT:
@@ -284,9 +301,10 @@ class MongoCompiler:
                 conditions.append({'$eq' if op == 'is_null' else '$ne': [value, None]})
             else:
                 native = self.fields[item['field_id']]['types'][0]
-                valid = (type(constant) in (int, float) if native in NUMERIC else type(constant) is bool if native in BOOL else isinstance(constant, str))
+                numeric = bool(mongo_numeric_types(self.fields[item['field_id']]))
+                valid = (type(constant) in (int, float) if numeric else type(constant) is bool if native in BOOL else isinstance(constant, str))
                 if not valid: fail('Filter value type does not match the source field.', 'DATA_QUERY_TYPE', 422)
-                rhs = self.decimal(constant) if native in NUMERIC else {'$literal': constant}
+                rhs = self.decimal(constant) if numeric else {'$literal': constant}
                 conditions.append({'$and': [{'$ne': [value, None]}, {'$' + op: [value, rhs]}]})
         filtered = [{'$project': projection}]
         if conditions: filtered.append({'$match': {'$expr': {'$and': conditions}}})

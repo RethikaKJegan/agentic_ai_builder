@@ -9,6 +9,54 @@ from registry.safety import reject_secrets
 from .service import RuntimeFailure
 
 
+QUERY_CLARIFICATION_GUIDANCE = (
+    '\nTrusted query-planning rules: Set query.clarification to an empty string when an authorized read query '
+    'can represent the requested data operation. Use clarification only for a specific unresolved business input, '
+    'ambiguous source/field/meaning, missing required relationship or unsupported query operation. '
+    'Metadata sampling or limited schema discovery is not result sampling and, by itself, is not a missing user input. '
+    'Execution-time completeness evidence is produced by the query engine after execution; do not require it before '
+    'planning, and never claim a query has already executed or its results are complete. '
+    'Put relevant planned caveats in query.explanation, not query.clarification. '
+    'Counting records in a user-specified dataset requires no measurement field, measurement unit, date filter or join. '
+    'Use the count metric with an empty expression to count rows across the accessible matching population. '
+    'Display limits do not define the count denominator. Preserve explicit filters and do not guess among ambiguous datasets. '
+    'For grouped aggregates, fields must be empty: group_by already declares the output grouping keys. '
+    'All metrics in a grouped query are per-group, including a metric named overall_total. '
+    'Use the executor result.matched_rows for the overall matched record population, or prepare a separate ungrouped count. '
+    'Keep null/absent status values as the null group and blank strings as their separate recorded group. '
+    'Downstream reporting, email and spreadsheet steps are separate reviewed workflow actions; their presence does not '
+    'make an otherwise executable read query require clarification. These rules never grant access, authorize joins, '
+    'invent business definitions or bypass actual ambiguity.\n'
+)
+
+
+GROUPED_REPORT_GUIDANCE = (
+    '\nFor query evidence with group_by, every metric is per-group regardless of its label. '
+    'The overall matched record population is engine result.matched_rows, not a metric labelled overall_total '
+    'or the sum of a displayed page. Use only actual engine evidence. If limited/has_more is true, disclose that '
+    'the displayed breakdown omits groups and do not claim the breakdown is complete. '
+    'Describe null/absent statuses as not recorded when they share a null group; preserve blank strings separately. '
+    'Do not merge or invent status meanings.\n'
+)
+
+
+def canonical_query_output(definition,inputs,output):
+    """Canonicalize redundant model projection, before persistence/consent.
+
+    Explicit tool inputs and saved query payloads never pass this boundary.
+    Unknown or non-group fields are left for the strict query validator.
+    """
+    context=inputs.get('context')
+    if (not isinstance(context,dict) or 'data_query_catalog' not in context
+            or set(definition.get('output_schema',{}).get('properties',{}))!={'query'}):return output
+    query=output.get('query',{})
+    if not isinstance(query,dict):return output
+    if (not query.get('clarification') and query.get('metrics') and query.get('group_by') and query.get('fields')
+            and set(query['fields'])<=set(query['group_by'])):
+        query['fields']=[]
+    return output
+
+
 def capability_context(inputs):
     context=inputs.get('context') if isinstance(inputs,dict) else None
     task=context.get('task') if isinstance(context,dict) else None
@@ -66,19 +114,23 @@ class CrewAdapter:
         llm = self.llm_factory(deepcopy(definition))
         if not isinstance(llm, BoundedLLM):
             raise RuntimeFailure('BOUNDED_MODEL_REQUIRED', 'The trusted model factory must return a bounded CrewAI model.', 503)
+        query_guidance = ''
         if protocol is not None:
             from .model_protocol import response_format
             llm.control_format = response_format(protocol, inputs)
             llm.control_context = deepcopy(inputs)
         elif content_schema := content_response_schema(definition,inputs):
             llm.structured_format=dict(type='json_schema',name='connected_evidence_content',strict=True,schema=content_schema)
-        elif (isinstance(inputs.get('context'),dict) and 'subway_query_catalog' in inputs['context']
+            query_guidance = GROUPED_REPORT_GUIDANCE
+        elif (isinstance(inputs.get('context'),dict) and {'subway_query_catalog','data_query_catalog'} & set(inputs['context'])
               and set(definition['output_schema'].get('properties',{}))=={'query'}
               and closed_payload(definition['output_schema'])):
             llm.structured_format=dict(type='json_schema',name='scoped_read_query',strict=True,schema=deepcopy(definition['output_schema']))
+            if 'data_query_catalog' in inputs['context']:
+                query_guidance = QUERY_CLARIFICATION_GUIDANCE
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
             llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
-        agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions'],
+        agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions']+query_guidance,
                       llm=llm, tools=[], allow_delegation=False, allow_code_execution=False,
                       max_iter=1, max_retry_limit=0, max_execution_time=definition['limits']['timeout_seconds'],
                       cache=False, verbose=False, memory=False, respect_context_window=False)
@@ -118,6 +170,7 @@ class CrewAdapter:
             reject_secrets(output)
             if list(Draft202012Validator(definition['output_schema']).iter_errors(output)):
                 raise ValueError()
+            output=canonical_query_output(definition,inputs,output)
             if usage_callback is not None:
                 usage_callback(deepcopy(crew.agents[0].llm.actual_usage))
             return output

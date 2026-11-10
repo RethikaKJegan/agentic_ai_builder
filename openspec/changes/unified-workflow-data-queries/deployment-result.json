@@ -1,0 +1,18 @@
+{
+  "release_id": "unified-query-20261109-e0846ca024af",
+  "target": "https://praxi.bellcorpstudio.com/",
+  "result": "deployed; authenticated HTTPS, live desktop/mobile UI and preservation checks passed",
+  "frontend_build": "R8TbH84dyZ9o_1FPkIAkL",
+  "previous_frontend_build": "KQHhQpTBedkYc5z5IxDWh",
+  "base_commit": "36fc5cee6c7abf19107a1563064c72ffceedfad0",
+  "source_manifest_sha256": "e0846ca024af8af059d5b8dc24b1709235178fd9f3b373e6879f625855c4fa1c",
+  "finished_at": "2026-11-09T17:17:15.199942+00:00",
+  "live_browser_checks_passed": 6,
+  "database_restore": false,
+  "external_tool_actions": false,
+  "remaining_limitations": [
+    "Current account catalogues exceed generic planner 120 KB catalogue limit (DATA_QUERY_LIMIT).",
+    "Natural-language schedule creation and runtime query clarification/resume remain incomplete.",
+    "Historical shared-store incident audit remains unresolved."
+  ]
+}

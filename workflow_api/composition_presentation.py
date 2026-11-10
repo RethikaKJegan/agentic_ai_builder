@@ -84,6 +84,8 @@ class CompositionPresentation:
             if failure.get('error_code') in ('INVESTIGATION_AGENT_REFERENCE','INVESTIGATION_AGENT_OUTPUT','ACTION_CONTENT_UNVERIFIED'):
                 failure.update(classify(failure['error_code'],task=failure.get('affected_task'),source=failure.get('source_or_tool')))
 
+        from .workflow_queries import query_clarifications
+        clarifications=query_clarifications(run,workflow)
         spawned={e['details']['agent_id']:e['details']['node_id'] for e in events if e['event_type']=='agent.spawned' and e['details'].get('agent_id')}
         for task in doc['tasks']:
             config=next((c for c in doc['configurations'] if c['assigned_task']==task['task_id']),None)
@@ -113,6 +115,11 @@ class CompositionPresentation:
                     else:
                         output=dict(summary='Tool execution completed; recorded result details follow.',findings=[],missing_information=[],records=[],rule_results=[])
                     output['tool_receipts']=[dict(tool_id=tool_id,receipt=tool_receipt(receipt))]
+            if task['task_id'] in clarifications:
+                state='needs_input'
+                output=dict(summary='This query needs a business definition before it can run.',
+                    classification='query_clarification',state='needs_input',
+                    missing_information=[clarifications[task['task_id']]],records=[],rule_results=[],tool_receipts=[])
             tasks.append(dict(id=task['task_id'],label=contract['business_purpose'],kind='action' if contract['side_effect'] in ('write','draft') else 'retrieval' if contract['kind']=='tool' else 'agent',state=state,depends_on=task['depends_on'],capability_id=task['capability_id'],agent_id=config['configuration_id'] if config else None,tools=[doc['selected_tools'][task['task_id']]['tool_id']] if task['task_id'] in doc['selected_tools'] else [],condition=task['condition'],result=output,errors=[f for f in failures if f.get('affected_task')==task['task_id']],required_evidence=config.get('required_evidence_facts',[]) if config else contract['required_evidence'],completion_criteria=contract['completion_criteria'],approval_gate=dict(id=gate['node_id'],label=gate['label'],state=(run or {}).get('node_states',{}).get(gate['node_id'],'pending')) if gate else None))
         knowledge={}
         if doc.get('preparation_id'):
@@ -144,13 +151,16 @@ class CompositionPresentation:
 
     @staticmethod
     def recovery_view(run,workflow,clock):
-        from runtime.recovery import classify
+        from runtime.recovery import classify,node_external_write
         if not run or not workflow or run['status'] not in ('failed','blocked'):return dict(eligible=False,reason='No failed execution requires recovery.')
         failure=classify(run.get('error_code','UNKNOWN_INVOCATION_RESULT'))
         if run.get('error_code')=='INVESTIGATION_AGENT_REFERENCE':
             return dict(eligible=False,reason='The agent summary contained an unsupported or missing source citation. Review the retrieved records and evidence gaps, then start a new run with the corrected result schema. Source reads may already have completed; this error does not mean an agent ID is missing.',failure=failure)
-        writes=[n for n in workflow['nodes'] if n['kind']=='tool' and workflow['execution_policy'].get('allow_external_writes')]
-        if any(run['node_states'].get(n['node_id']) in ('executing','completed','blocked','failed') for n in writes):return dict(eligible=False,reason='Reconcile the external action before preparing another attempt.',failure=failure)
+        writes=[n for n in workflow['nodes'] if node_external_write(workflow,n)]
+        if any(run['node_states'].get(n['node_id']) in ('executing','completed','blocked','failed') for n in writes):return dict(eligible=False,can_clarify=False,reason='Reconcile the external action before preparing another attempt.',failure=failure)
+        from .workflow_queries import query_clarifications
+        questions=query_clarifications(run,workflow)
+        if questions:return dict(eligible=False,can_clarify=True,reason='Clarification needed: '+' '.join(questions.values())+' Supply the intended definition to generate a new reviewable workflow. This query has not executed.',failure=failure)
         if run.get('error_code')=='UNKNOWN_INVOCATION_RESULT' and workflow['metadata'].get('composition_tasks'):failure=classify('DELEGATION_INTERRUPTED')
         if not failure['retry_eligible']:return dict(eligible=False,reason='The service could not identify a recoverable failure. Inspect its diagnostic reference before retrying.' if failure['category']=='internal_execution_failure' else 'Resolve the evidence, knowledge or authorization issue and prepare a new workflow.',failure=failure)
         if run.get('lease_until',0)>clock:return dict(eligible=False,reason='Waiting for the previous worker lease to expire.',failure=failure)

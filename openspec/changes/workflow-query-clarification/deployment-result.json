@@ -1,0 +1,42 @@
+{
+  "target": "https://praxi.bellcorpstudio.com/",
+  "started_at": "2026-11-10T06:25:36.361708+00:00",
+  "previous_frontend_build": "C038xXGULZ07Dhwu_uq7R",
+  "frontend_build": "73n0K7eciFUQ8gCNaRgsi",
+  "base_commit": "36fc5cee6c7abf19107a1563064c72ffceedfad0",
+  "source_manifest_sha256": "fc82d6cf5e08ea008ec0b9c4d87741a1237d1892f2be22f5fc27987390ec0465",
+  "database_restore": false,
+  "external_tool_actions": false,
+  "services": {
+    "agentic-builder-backend": {
+      "MainPID": "2024073",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-simpsons": {
+      "MainPID": "2024100",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-subway": {
+      "MainPID": "2024134",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-worker": {
+      "MainPID": "2024180",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-frontend": {
+      "MainPID": "2024192",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    }
+  },
+  "result": "deployed; actual saved-run clarification verified on public desktop/mobile",
+  "release_id": "query-clarification-20261110-fc82d6cf5e08",
+  "finished_at": "2026-11-10T06:29:16.413298+00:00",
+  "paid_model_calls": false,
+  "historical_run_rewritten": false
+}

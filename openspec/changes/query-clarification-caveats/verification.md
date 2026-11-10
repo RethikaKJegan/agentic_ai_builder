@@ -1,0 +1,13 @@
+# Query caveat guidance verification
+
+The user repeatedly received a clarification containing metadata/coverage limitations despite specifying a record count. Nonempty query clarification intentionally stops reads. The generic model guidance did not explicitly distinguish schema-discovery warnings from missing business inputs.
+
+Added trusted execution-time guidance only for closed generic data-query CrewAI actions. It applies to newly generated and saved agent definitions without mutating them. It directs representable queries to leave clarification empty, explains that row counts need no measurement unit, separates metadata sampling from query-result sampling, leaves completeness determination to the executor, and separates downstream delivery from read-query meaning. It preserves genuine source/field/join/meaning ambiguities. No heuristic clears clarification text, no query/result is invented, and the actual stop guard is unchanged. No shared contracts, database schemas, Questions planner or frontend artifact changed.
+
+Verification: 82 tests passed plus 18 subtests, covering the new real CrewAI message check and 603-row count independent of display limit one, genuine clarification with no reads, durable query/report/approval execution, evidence references and core runtime. The controlled count includes records with a missing numeric field and requires no measure/unit. These are controlled model/provider tests and do not prove live-model interpretation of the user's prompt.
+
+Fresh online snapshots passed quick_check for all three stores. Fifty-three credential/configuration files, nine provider-state files, source and frontend artifact were backed up. Six baseline/candidate copied-store startup/auth/API rehearsals passed with networking/workers disabled and protected rows unchanged. Canonical contracts, strict OpenSpec and whitespace checks passed.
+
+One pre-activation public health check returned 503 due to SQLite database contention. Deployment was held; all-account health recheck passed and all active-run counts were zero before activation. No database setting or record repair was attempted. This transient contention remains a separate operational limitation, not a claim of permanent resolution.
+
+Hosted health, six read-only desktop/mobile browser journeys, history counts and encrypted-credential/configuration preservation passed after deployment. All five services are active with zero automatic restarts; no critical backend/worker entries appeared during post-activation monitoring. No paid model call, live workflow submission, real email or Sheets write occurred. Existing blocked runs are unchanged and need a newly reviewed workflow for retesting.

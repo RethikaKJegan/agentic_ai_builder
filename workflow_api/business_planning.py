@@ -66,6 +66,10 @@ def retrieve(store, auth, objective, version_id=None):
         result['state'] = 'no_definitions'
         return result
     check_snapshot(snapshot)
+    from .subway_evidence_resolution import load as load_resolutions, annotate
+    resolutions = load_resolutions(scope, snapshot)
+    if resolutions:
+        result['evidence_resolution_sha256'] = resolutions['sha256']
     query = terms(objective)
     subway = snapshot.get('workspace',{}).get('ontology_id') == 'subway'
     if subway:
@@ -113,7 +117,7 @@ def retrieve(store, auth, objective, version_id=None):
                                   source_sha256=sources[e['source_id']]['sha256'],
                                   source_kind=sources[e['source_id']]['kind'],
                                   title=sources[e['source_id']]['title']) for e in item['evidence']]
-        return value
+        return annotate(value, resolutions)
     candidates = []
     selected = sorted([c for c in snapshot['concepts'] if c['module_id'] in matched], key=lambda c: (-score(c), c['id']))[:18]
     concept_ids = {c['id'] for c in selected}

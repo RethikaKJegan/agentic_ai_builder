@@ -100,9 +100,17 @@ def binding_value(binding,context,actions,run=None):
         if kind=='generated' and entry.get('provenance_type')!='INFERRED':deny('Generated binding must reference a content result.')
         return traverse(entry['output'],binding['path'])
     section={'literal':'user_values','context':'validated_context','evidence':'evidence','configuration':'configuration'}[kind]
-    if binding['key'] not in context.get(section,{}):deny('Required binding input is missing.','ACTION_INPUT_REQUIRED')
+    if binding['key'] not in context.get(section,{}):
+        error=RuntimeFailure('ACTION_INPUT_REQUIRED',f"Missing {section} input: {binding['key']}.",422)
+        error.binding_issue=dict(section=section,key=binding['key'],path=deepcopy(binding['path']),
+            target=deepcopy(binding['target']),rule='missing_binding_input')
+        raise error
     entry=context[section][binding['key']]
-    return traverse(entry,binding['path'])
+    try:return traverse(entry,binding['path'])
+    except RuntimeFailure as exc:
+        exc.binding_issue=dict(section=section,key=binding['key'],path=deepcopy(binding['path']),
+            target=deepcopy(binding['target']),rule='invalid_binding_path')
+        raise
 
 
 def resolve_inputs(action,context,actions,run):
@@ -179,7 +187,12 @@ def validate_plan(plan,contracts,context,scope):
                         error.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(b['target']),source_action_id=b['action_id'],source_path=deepcopy(b['path']),rule='explicit_authority_required')
                         raise error
             else:
-                value=binding_value(b,context,actions)
+                try:
+                    value=binding_value(b,context,actions)
+                except RuntimeFailure as exc:
+                    if hasattr(exc,'binding_issue'):
+                        exc.binding_issue.update(action_id=action['action_id'],capability_id=cid)
+                    raise
                 source=value_schema(value)
                 violations=list(Draft202012Validator(target).iter_errors(value))
                 if violations:
@@ -195,7 +208,13 @@ def validate_plan(plan,contracts,context,scope):
                 narrowed=deepcopy(source)
                 if b['kind']=='receipt' and isinstance(source.get('type'),list) and 'null' in source['type']:
                     narrowed['type']=[t for t in source['type'] if t!='null']
-                if narrowed==source or not compatible(narrowed,target):deny('Binding input/output types are incompatible.')
+                if narrowed==source or not compatible(narrowed,target):
+                    error=RuntimeFailure('ACTION_BINDING_INVALID','Binding input/output types are incompatible.',422)
+                    error.binding_issue=dict(action_id=action['action_id'],capability_id=cid,
+                        side='target',path=deepcopy(b['target']),source_action_id=b.get('action_id'),
+                        source_path=deepcopy(b['path']),source_schema=deepcopy(source),target_schema=deepcopy(target),
+                        rule='incompatible_binding_types')
+                    raise error
         # Required top-level fields must be fully supplied; nested required fields are checked on resolution.
         if c['supported_operation'].startswith('calendar.') and c['supported_operation']!='calendar.discover' and ['calendar_id'] not in targets:deny('Calendar identity must be explicit.','ACTION_INPUT_REQUIRED')
         if set(c['input_schema'].get('required',[]))-{p[0] for p in targets}:deny('A required action input has no binding.','ACTION_INPUT_REQUIRED')

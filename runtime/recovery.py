@@ -25,6 +25,9 @@ CATEGORIES = {
 CODES = {
  'DATABASE_BUSY':'storage_contention','INVOCATION_FAILED':'internal_execution_failure',
  'ACTION_CONTENT_UNVERIFIED':'invalid_model_output',
+ 'DATA_QUERY_STALE':'stale_metadata','DATA_QUERY_RESULT_EXPIRED':'stale_metadata',
+ 'DATA_QUERY_INVALID':'invalid_model_output','DATA_QUERY_INCOMPLETE':'missing_evidence',
+ 'DATA_QUERY_SCOPE_REQUIRED':'revoked_authorization','ACTION_INPUT_REQUIRED':'missing_evidence',
  'INVESTIGATION_AGENT_REFERENCE':'invalid_model_output','INVESTIGATION_AGENT_OUTPUT':'invalid_model_output',
  'AGENT_OUTPUT_INVALID':'invalid_model_output','MODEL_OUTPUT_SCHEMA_INVALID':'invalid_model_output',
  'MODEL_OUTPUT_TRUNCATED':'invalid_model_output','CAPABILITY_RESULT_INVALID':'invalid_model_output',
@@ -41,6 +44,24 @@ CODES = {
  'DELEGATION_INTERRUPTED':'interrupted_read',
  'ACCOUNT_GRAPH_STALE':'stale_metadata','ACCOUNT_GRAPH_VERSION':'stale_metadata','ACCOUNT_GRAPH_INTEGRITY':'stale_metadata','ACCOUNT_GRAPH_SOURCE':'revoked_authorization',
 }
+
+
+
+def node_external_write(workflow, node):
+    """Use the reviewed per-node contract; unknown legacy tools fail closed."""
+    if node.get('kind')!='tool':return False
+    metadata=workflow.get('metadata',{})
+    plan=metadata.get('connected_action_plan')
+    contracts=metadata.get('connected_contracts')
+    actions=plan.get('actions',[]) if isinstance(plan,dict) else []
+    if not isinstance(actions,list):actions=[]
+    action=next((a for a in actions if isinstance(a,dict) and a.get('action_id')==node.get('node_id')),None)
+    contract=contracts.get(action.get('capability_id')) if action and isinstance(contracts,dict) else None
+    if isinstance(contract,dict):
+        effect=contract.get('side_effect')
+        if effect in ('read','none'):return False
+        if effect in ('write','draft'):return True
+    return bool(workflow.get('execution_policy',{}).get('allow_external_writes',False))
 
 
 def classify(code, *, task=None, source=None, external_write=False):
@@ -92,7 +113,7 @@ class RecoveryService:
                 identity = dict(node_id=nid, invocation_id=run.get('node_invocations', {}).get(nid))
                 if state == 'completed':
                     completed.append({**identity, 'output_sha256': digest(run['outputs'][nid]) if nid in run.get('outputs', {}) else None})
-                elif node.get('kind') == 'tool' and state in ('executing', 'blocked', 'failed'):
+                elif node.get('kind') == 'tool' and node_external_write(workflow,node) and state in ('executing', 'blocked', 'failed'):
                     started = db.execute("SELECT 1 FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='node.started' AND json_extract(document,'$.details.node_id')=? AND json_extract(document,'$.details.invocation_id')=? LIMIT 1",
                                          (run['workspace_id'], run_id, nid, identity['invocation_id'])).fetchone()
                     if not started:

@@ -34,7 +34,7 @@ def params(workflow,node,run):
             if upstream:result['data']={'primary':result['data'],'upstream_results':upstream}
         result['instructions']=action['instructions']
         result['source_references']=deepcopy(action['evidence_references'])
-    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query'}:
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import packet
         sources=[e for dep in action['depends_on'] for e in run.get('task_checkpoints',{}).get(dep,{}).get('result',{}).get('source_evidence',[])]
         result.setdefault('context',{})['evidence']=packet(sources)
@@ -94,7 +94,7 @@ def verify(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
     if not action:return
     validate_content(workflow,node,output,inputs)
-    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query'}:
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis
         from workflow_api.service import ApiFailure
         try:checked=validate_analysis(output,inputs['context']['evidence'])

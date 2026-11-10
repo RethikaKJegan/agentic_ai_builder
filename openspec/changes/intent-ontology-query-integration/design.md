@@ -1,0 +1,12 @@
+# Design
+
+DataQueries.catalogue accepts the goal and calls the existing DatabaseWorkflows KnowledgeRetrieval. Its persistent metadata-only lexical index already indexes reviewed concept names, descriptions, field vocabulary and semantic predicates. Existing bounded ranking, candidate discovery and declared/accepted relationship path traversal remain authoritative. OpenAI action planning and existing CrewAI query planning interpret the objective using this context; no new interpreter, graph or scheduler is added.
+
+An internal projection removes only fields the existing query engine cannot execute, before the retrieval budget. This matters for nested MongoDB arrays: raw profiling descriptors are much larger than supported scalar metadata. Complete executable descriptors remain intact; the existing candidate omission warnings remain visible. Query catalogue validation still caps the entire planner document at 120000 bytes. Backend typed-plan validation runs against fresh full authorized metadata without incorrectly applying the model transport byte cap. Workflow execution additionally pins the candidate dataset IDs; legacy pinned workflows without this list remain compatible.
+
+The observed failing content.prepare node used context key validated_context with path [validated_context]. That key does not exist inside the validated_context namespace. Binding validation now returns structured diagnostics and one metered internal correction. User literal input absence is not automatically corrected or filled. Shared contracts and downstream execution are unchanged.
+
+Important limits: lexical discovery relies on existing names/reviewed vocabulary, not arbitrary paraphrase recognition. A field with a similar name does not establish operating-hours semantics; missing/ambiguous business definitions require clarification. Paid live interpretation is not exercised.
+
+## Follow-up: scalar self-path binding
+The live Simpson diagnostic at 05:50:05 UTC shows email_findings referencing user_values.recipient with path [recipient], although that entry is already a scalar email string. Goal-mode normalization will collapse only an exact redundant self-path on an existing scalar value. A context reference may resolve to an existing explicit user value when the context key is absent; unknown keys, structured objects/arrays and other paths retain strict validation. Traversal failures gain structured diagnostics for existing bounded correction. No email will be sent by qualification.

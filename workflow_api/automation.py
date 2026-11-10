@@ -138,6 +138,15 @@ class DurableAutomation:
             if tid not in tools:fail('Authorization names an unavailable registered operation.')
             self.schema(schema)
             # Bound authority fields explicitly; OAuth is not business consent.
+            if tid=='workflow_data_query':
+                # A fresh executable plan may be prepared each day, but the model
+                # cannot expand the reviewed query meaning under recurring consent.
+                query_scope=schema.get('properties',{}).get('query',{})
+                if 'query' not in schema.get('required',[]) or not isinstance(query_scope.get('const'),dict):
+                    fail('Recurring queries require the exact reviewed query in the operation schema properties.query.const.','AUTOMATION_QUERY_SCOPE_REQUIRED',403)
+                from .data_queries import CHECKER
+                if list(CHECKER.iter_errors(query_scope['const'])) or query_scope['const'].get('clarification'):
+                    fail('Resolve and validate the recurring query before authorizing it.','AUTOMATION_QUERY_SCOPE_REQUIRED',403)
             fields=['to'] if tid in ('extension_mail_send','smtp_send_email') else ['message_id'] if tid=='extension_mail_reply' else ['project_id'] if tid=='extension_sheets_create_report' else ['calendar_id'] if tid.startswith('extension_calendar_') else []
             fields=list(set(fields)|({k for k in tools[tid]['definition']['input_schema'].get('properties',{}) if k in {'to','recipient','destination','url','spreadsheet_id','calendar_id','project_id','connection_id','package_id'}}))
             for field in fields:

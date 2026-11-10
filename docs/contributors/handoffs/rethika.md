@@ -1062,3 +1062,15 @@ Fixed a public login asset mismatch by restarting the frontend against its curre
 complete build. Subway only backend flag enabled; Simpsons PID/credentials/data,
 old workflows, Google accounts and all package/ontology pins preserved. See
 `docs/subway-full-data-evidence.md` and the corresponding OpenSpec verification.
+
+
+## Subway ontology evidence resolution — 10 November 2026
+
+Corrected blanket prerequisite guidance using a separately hashed, owner/version-
+scoped evidence supplement. Budget feasibility uses existing line-item balances and
+request amounts; PR approval applies only to linked requests; stage facts remain
+usable without a parent. Original records, v4 definitions and historical pins are
+preserved. No workflow implementation or live workflow changed. Subway alone
+reloaded; live isolation/preservation checks pass. 12 focused and 36 affected tests
+passed (overlapping), plus all 13 rule cases and 65 definitions. See
+`docs/subway-evidence-resolution.md` and its OpenSpec verification for exact scope.

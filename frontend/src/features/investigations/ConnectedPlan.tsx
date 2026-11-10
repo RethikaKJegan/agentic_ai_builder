@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { QueryClarification } from './QueryClarification';
+import { QueryEvidence } from "./QueryEvidence";
 import { api } from "@/api/client";
 import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { useBackend } from "@/api/state";
@@ -120,6 +122,7 @@ export function ConnectedPlan({
     });
   }
   const disabled = command.busy || stale || command.unknown;
+  const needsQueryDefinition=!!view?.recovery.can_clarify&&view.tasks.some(t=>t.result?.classification==='query_clarification');
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -232,7 +235,8 @@ export function ConnectedPlan({
                 </button>
               )}
           </div>
-          {view.run?.error_code && (
+          {needsQueryDefinition && doc && <QueryClarification doc={doc} view={view}/>}
+          {view.run?.error_code && !needsQueryDefinition && (
             <p role="alert">
               Execution: {view.run.error_code}. {view.recovery.reason}
             </p>
@@ -298,6 +302,7 @@ export function ConnectedPlan({
           {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={view} onSelect={setPanel}/></div>}
           {tab==='report'&&<div role="tabpanel" aria-label="Investigation report">
             <CompositionReport view={view}/>
+            {Object.entries(view.run?.action_instances??{}).map(([id,instance])=><QueryEvidence key={id} instance={instance}/>)}
             {Object.values(view.run?.action_instances??{}).flatMap(instance=>receiptLinks(instance)).map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="mx-5 block break-all text-sm text-primary underline">Open verified artifact: {url}</a>)}
             {doc.action_plan.actions.filter(a=>a.capability_id==='content.prepare').map(a=>{const output=view.run?.action_instances?.[a.action_id]?.output;return output&&typeof output['body']==='string'&&output['body']?<article key={a.action_id} className="mx-auto max-w-5xl space-y-3 p-5"><h3 className="font-semibold">Generated report content</h3><p className="whitespace-pre-wrap break-words text-sm">{output['body']}</p></article>:null;})}
           </div>}
@@ -320,6 +325,7 @@ export function ConnectedPlan({
                     {a.depends_on.join(", ") || "None"}
                   </p>
                   <p className="text-sm">{a.instructions}</p>
+                  <QueryEvidence instance={instance}/>
                   <SavedDetails
                     label="Inputs, evidence and expected outputs"
                     value={{

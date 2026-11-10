@@ -96,6 +96,7 @@ class GraphRunner:
 
     def finish_node(self, db, run, workflow, node, output=None, outcome=None, evidence=None):
         node_id = node['node_id']
+        run.get('query_waits',{}).pop(node_id,None)
         from .action_plans import completed as action_completed
         action_completed(workflow,node,run,output)
         run['node_states'][node_id] = 'completed'
@@ -143,10 +144,10 @@ class GraphRunner:
     def fail(self, db, run, code, blocked=False):
         run['error_code'] = code
         node_id = run.get('current_node_id')
-        from .recovery import classify
+        from .recovery import classify,node_external_write
         workflow = self.runtime.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}
         node = next((n for n in workflow['nodes'] if n['node_id'] == node_id), {})
-        run.setdefault('classified_failures', []).append(classify(code, task=node_id, source=node.get('tool_id'), external_write=node.get('kind') == 'tool' and workflow['execution_policy'].get('allow_external_writes', False)))
+        run.setdefault('classified_failures', []).append(classify(code, task=node_id, source=node.get('tool_id'), external_write=node_external_write(workflow,node)))
         if node_id:
             entry=run.get('action_instances',{}).get(node_id)
             if entry is not None:entry.update(state='blocked' if blocked else 'failed',error_code=code,external_effect_status='requires_reconciliation' if code in {'UNKNOWN_INVOCATION_RESULT','SMTP_DELIVERY_UNCERTAIN','POST_INVOCATION_REVALIDATION_FAILED','ACTION_EFFECT_UNVERIFIED'} else 'failed',retry_decision='explicit_review_required')
@@ -267,7 +268,7 @@ class GraphRunner:
         if list(Draft202012Validator(grant['input_schema']).iter_errors(params)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
         automation=getattr(runtime.workflows,'automation',None)
-        if automation and run.get('automation_reference') and connector.external_write:
+        if automation and run.get('automation_reference') and (connector.external_write or getattr(connector,'durable_query',False)):
             with runtime.store.transaction(write=False) as db:automation.check_action(db,auth,run,workflow,node,params)
         if workflow.get('metadata',{}).get('connected_action_plan'):
             from .action_plans import preflight
@@ -306,6 +307,15 @@ class GraphRunner:
             if run.get('lease_until', 0) > runtime.clock():
                 return runtime.public(run)
             if run.get('available_at',0)>runtime.clock():return runtime.public(run)
+            # Durable read-only query submissions can reattach by run/node identity
+            # after a worker crash. All other uncertain invocations keep the guard.
+            if any(state == 'executing' for state in run['node_states'].values()):
+                reviewed,_=runtime.revision(db,run['workflow_id'],run['workflow_version'],auth,run.get('release_bound',False))
+                for pending_node in reviewed['nodes']:
+                    connector=self.connectors.get(pending_node.get('tool_id'))
+                    if (run['node_states'].get(pending_node['node_id'])=='executing' and
+                            pending_node['kind']=='tool' and getattr(connector,'durable_query',False) and not connector.external_write):
+                        run['node_states'].pop(pending_node['node_id'])
             if any(state == 'executing' for state in run['node_states'].values()):
                 if run['status'] == 'queued':
                     runtime.transition(db, run, 'running')
@@ -429,8 +439,11 @@ class GraphRunner:
                             connector, grant, agent, params, reservation = self.prepare_tool(run, workflow, grants, node, auth)
                             invocation = (connector, grant, params)
                         dynamic = kind == 'agent' and node['node_id'] in workflow['metadata'].get('dynamic_delegation', {})
-                        if not dynamic:
+                        durable_query=kind=='tool' and getattr(invocation[0],'durable_query',False) and not invocation[0].external_write
+                        already_reserved=durable_query and node['node_id'] in run.get('durable_query_reservations',[])
+                        if not dynamic and not already_reserved:
                             self.reserve(db, run, workflow, agent, reservation)
+                            if durable_query:run.setdefault('durable_query_reservations',[]).append(node['node_id'])
                         run['node_states'][node['node_id']] = 'executing'
                         runtime.event(db, run, 'node.started', {'node_id': node['node_id'], 'invocation_id': invocation_id,
                             **({'google_connection': invocation[0].google_connection_info} if getattr(invocation[0], 'google_connection_info', None) else {})})
@@ -447,6 +460,7 @@ class GraphRunner:
                     self.fail(db, run, 'INVALID_EXECUTION_DATA', blocked=True)
                     return runtime.public(run)
             if invocation:
+                from workflow_api.workflow_queries import QueryPending,QueryClarification
                 adapter, binding, params = invocation
                 try:
                     # Intent persistence is not continuing authority. Cancellation,
@@ -478,6 +492,34 @@ class GraphRunner:
                     verify_connected(workflow,node,output,params)
                     reject_secrets(output)
                     code = None
+                except QueryClarification as clarification:
+                    if kind!='tool' or not getattr(adapter,'durable_query',False) or adapter.external_write:
+                        raise
+                    with runtime.store.transaction() as db:
+                        run=runtime.load(db,run_id,auth,'workflow.execute')
+                        if not runtime.owns_execution(run,worker):return runtime.public(run)
+                        self.fail(db,run,clarification.code,blocked=True)
+                        run['action_instances'][node['node_id']].update(state='needs_input',
+                            clarification=clarification.question,external_effect_status='not_performed',
+                            retry_decision='supply_definition_and_prepare_new_workflow')
+                        runtime.event(db,run,'query.clarification_required',dict(node_id=node['node_id'],question=clarification.question,source_read_performed=False))
+                        runtime.save(db,run)
+                        return runtime.public(run)
+                except QueryPending as pending:
+                    if kind!='tool' or not getattr(adapter,'durable_query',False) or adapter.external_write:
+                        raise
+                    with runtime.store.transaction() as db:
+                        run=runtime.load(db,run_id,auth,'workflow.execute')
+                        if not runtime.owns_execution(run,worker):return runtime.public(run)
+                        run['node_states'].pop(node['node_id'],None)
+                        run['lease_until']=0
+                        run['available_at']=runtime.clock()+1
+                        run.setdefault('query_waits',{})[node['node_id']]=pending.job
+                        if node['node_id'] in run.get('action_instances',{}):
+                            run['action_instances'][node['node_id']].update(state='waiting_for_query',query_job=dict(job_id=pending.job['job_id'],state=pending.job['state'],progress=pending.job['progress']))
+                        runtime.event(db,run,'query.waiting',dict(node_id=node['node_id'],job_id=pending.job['job_id'],state=pending.job['state'],progress=pending.job['progress']))
+                        runtime.save(db,run)
+                        return runtime.public(run)
                 except RetryableInvocation:
                     output, code = None, 'RETRYABLE_INVOCATION_FAILED'
                 except RuntimeFailure as failure:

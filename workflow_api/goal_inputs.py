@@ -69,6 +69,18 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
                     elif rest and rest[0] in context[section]:
                         satisfied.add(key)
                         binding.update(kind=sections[section],key=rest[0],path=rest[1:])
+            # The model sometimes repeats a scalar variable name as its child
+            # path. Resolve only already supplied values; never manufacture inputs
+            # or reinterpret a real object/array traversal.
+            key=binding.get('key')
+            if (binding.get('kind')=='context' and key not in context['validated_context']
+                    and key in context['user_values'] and binding.get('path') in ([],[key])
+                    and not isinstance(context['user_values'][key],(dict,list))):
+                binding.update(kind='literal',path=[])
+            section=next((name for name,kind in sections.items() if kind==binding.get('kind')),None)
+            if (section and key in context[section] and binding.get('path')==[key]
+                    and not isinstance(context[section][key],(dict,list))):
+                binding['path']=[]
             if action.get('capability_id')=='content.prepare' and binding.get('kind')=='context' and binding.get('target')==['data'] and binding.get('path')==[binding.get('key')]:
                 value=context['validated_context'].get(binding.get('key'))
                 if isinstance(value,dict) and binding['key'] not in value:binding['path']=[]
@@ -106,6 +118,7 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
             replace_binding(action,field,'configuration',key,satisfied)
     from .action_bindings import content_target
     by_id={a.get('action_id'):a for a in actions}
+    normalize_query_envelopes(actions,contracts,by_id)
     for action in actions:
         c=contracts.get(action.get('capability_id'),{})
         for binding in action.get('bindings',[]):
@@ -119,7 +132,7 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
                         satisfied.add(binding['key'])
                         binding.update(kind='generated',action_id=parents[-1]['action_id'],path=[field]);binding.pop('key',None)
             if binding.get('kind') in ('generated','output','receipt') and binding.get('target'):satisfied.add(binding['target'][0])
-    complete_binding_dependencies(actions)
+    complete_binding_dependencies(actions,pinned_evidence=context['evidence'])
     # Exact duplicate assignments carry no extra input or authority.
     for action in actions:
         unique=[]
@@ -143,8 +156,28 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
             action['bindings']=[b for b in unique if b not in data]+[first]
     calendar_bindings(actions,contracts,context,satisfied)
     research_queries(actions,contracts,context)
-    complete_binding_dependencies(actions)
+    complete_binding_dependencies(actions,pinned_evidence=context['evidence'])
     return satisfied
+
+
+def normalize_query_envelopes(actions,contracts,by_id):
+    """Select the known query child; never coerce arbitrary model output.
+
+    The query planner returns {query: typed_query}, while the tool's query
+    field accepts typed_query. This server-owned handoff is independent of
+    model adherence to path guidance. Full plan validation still follows.
+    """
+    for action in actions:
+        if action.get('capability_id')!='tool.workflow_data_query':continue
+        target=contracts.get('tool.workflow_data_query',{}).get('input_schema',{}).get('properties',{}).get('query')
+        for binding in action.get('bindings',[]):
+            if binding.get('kind')!='output' or binding.get('path')!=[] or binding.get('target')!=['query']:continue
+            parent=by_id.get(binding.get('action_id'),{})
+            if parent.get('capability_id')!='data.plan_query' or parent.get('action_id') not in action.get('depends_on',[]):continue
+            envelope=contracts.get('data.plan_query',{}).get('output_schema',{})
+            if (target and envelope.get('type')=='object' and 'query' in envelope.get('required',[])
+                    and envelope.get('properties',{}).get('query')==target):
+                binding['path']=['query']
 
 
 def replace_binding(action,field,kind,key,satisfied):
@@ -225,7 +258,7 @@ def research_queries(actions,contracts,context):
     actions[:0]=additions
 
 
-def complete_binding_dependencies(actions):
+def complete_binding_dependencies(actions,*,pinned_evidence=()):
     """Materialize data edges before validating and reviewing a new goal-mode plan.
 
     A reference to an existing action already declares that its result is needed.
@@ -239,4 +272,10 @@ def complete_binding_dependencies(actions):
         for binding in bindings:
             source=binding.get('action_id')
             if binding.get('kind') in ('output','generated','receipt') and source in known and source!=action['action_id'] and source not in action['depends_on']:
+                action['depends_on'].append(source)
+        # Citing a real action result declares a data dependency just as a
+        # binding does. Preserve pinned evidence and reject unknown references
+        # later; never discard a citation or manufacture an evidence identity.
+        for source in action.get('evidence_references',[]):
+            if source in known and source not in pinned_evidence and source!=action['action_id'] and source not in action['depends_on']:
                 action['depends_on'].append(source)

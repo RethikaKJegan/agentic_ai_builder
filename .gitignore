@@ -10,3 +10,19 @@ token.json
 .venv-integrations/
 .local/
 .pip-cache/
+
+# Local npm cache
+.npm-cache/
+
+# Next.js build backups
+/frontend/.next-before-*/
+
+# Local database dumps and downloaded source archives
+/*_dump_*.tar.gz
+/subway-*.zip
+
+# Generated test output
+/test-results/
+
+# Temporary database folders
+/user=*/

@@ -1,0 +1,5 @@
+- [x] Inspect original source records, histories, report snapshots and corresponding code.
+- [x] Add a source-cited, immutable ontology evidence resolution supplement.
+- [x] Attach it only to the exact Subway v4 scope and snapshot during ontology retrieval.
+- [x] Verify positive recovery, conditional requirements, citations, isolation and historical preservation.
+- [x] Record deployment status without loading unrelated pending workflow changes.

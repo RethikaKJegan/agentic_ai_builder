@@ -110,7 +110,7 @@ class KnowledgeRetrieval:
             return revision, state
         raise ApiFailure('KG_RETRIEVAL_CHANGED','Metadata changed while preparing the source preview. Retry the preview.',409)
 
-    def retrieve(self, auth, objective, selection=None, *, planning=False, required_source_ids=()):
+    def retrieve(self, auth, objective, selection=None, *, planning=False, required_source_ids=(), source_projection=None):
         auth = self.c.current(auth)
         if not isinstance(objective,str) or not 1 <= len(objective.strip()) <= 12000:
             raise ApiFailure('KG_RETRIEVAL_INPUT','Provide a workflow description of 1–12000 characters.',400)
@@ -162,7 +162,8 @@ class KnowledgeRetrieval:
                 if did not in candidates:candidates.append(did)
             def load(did):
                 row=db.execute('SELECT document FROM kg_retrieval_sources WHERE workspace=? AND owner=? AND dataset_id=?',(workspace,owner,did)).fetchone()
-                return json.loads(row[0])
+                source=json.loads(row[0])
+                return source_projection(source) if source_projection else source
             indexed={did:load(did) for did in candidates}
         warnings=list(state['warnings'])
         if state['graph_stale']:warnings.append('The relationship graph is stale; refresh it before planning joined database operations.')
@@ -200,7 +201,8 @@ class KnowledgeRetrieval:
                 with self.store.transaction(write=False) as db:
                     row=db.execute('SELECT document FROM kg_retrieval_sources WHERE workspace=? AND owner=? AND dataset_id=?',(workspace,owner,did)).fetchone()
                 if row:
-                    indexed[did]=json.loads(row[0])
+                    source=json.loads(row[0])
+                    indexed[did]=source_projection(source) if source_projection else source
                     if did not in candidates:candidates.append(did)
                     chosen.append(did)
                     reasons[did].add('Required intermediate dataset on a declared/accepted relationship path.')

@@ -1,0 +1,40 @@
+{
+  "target": "https://praxi.bellcorpstudio.com/",
+  "started_at": "2026-11-10T05:56:58.088454+00:00",
+  "frontend_build": "C038xXGULZ07Dhwu_uq7R",
+  "base_commit": "36fc5cee6c7abf19107a1563064c72ffceedfad0",
+  "source_manifest_sha256": "9a9ac6fa551f7b2f821f3d0b547d8619326c4349f46e681a54ed9a9d1e52591d",
+  "database_restore": false,
+  "external_tool_actions": false,
+  "services": {
+    "agentic-builder-backend": {
+      "MainPID": "2015837",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-worker": {
+      "MainPID": "2015956",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-simpsons": {
+      "MainPID": "2015870",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-subway": {
+      "MainPID": "2015921",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "agentic-builder-frontend": {
+      "MainPID": "2013243",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    }
+  },
+  "result": "deployed; public HTTPS, desktop/mobile and preservation checks passed",
+  "release_id": "scalar-binding-20261110-9a9ac6fa551f",
+  "finished_at": "2026-11-10T05:58:31.685738+00:00",
+  "live_paid_model_test": false
+}
