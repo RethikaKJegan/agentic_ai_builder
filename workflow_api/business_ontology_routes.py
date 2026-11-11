@@ -86,6 +86,8 @@ def install(app, service, auth, reference, env=None):
     from .automation import DurableAutomation
     automation=DurableAutomation(service)
     app.state.automation=automation
+    from .overview_automation import OverviewAutomation
+    service.overview_automation=OverviewAutomation(service,env)
     from .simpson_lifecycle import SimpsonLifecycle, definition as simpson_process
     from .lifecycle_driver import LifecycleDriver
     simpson_lifecycle=SimpsonLifecycle(service.business_cases)
@@ -106,7 +108,10 @@ def install(app, service, auth, reference, env=None):
 
     @app.post('/business-ontology/v1/action-plans')
     async def prepare_action_plan(request:Request):
-        return await call(service.business_composition.prepare_actions,await body(request))
+        value=await body(request)
+        if isinstance(value,dict) and value.get('overview') is True:
+            return await call(service.overview_automation.handle,{k:v for k,v in value.items() if k!='overview'})
+        return await call(service.business_composition.prepare_actions,value)
 
     @app.get('/business-ontology/v1/action-plans/{composition_id}')
     async def get_action_plan(composition_id:str):

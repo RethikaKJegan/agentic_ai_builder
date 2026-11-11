@@ -30,19 +30,18 @@ it('submits the main goal and selected account to connected planning with no con
  expect(legacy).not.toHaveBeenCalled();
  expect(navigate).toHaveBeenCalledWith({to:'/app/workflows/investigate',search:{connected:'1',composition:'composition_goal'}});
 });
-it('asks for a real missing recipient and preserves the goal/account on explicit retry',async()=>{
- const create=vi.spyOn(api,'createActionPlan').mockRejectedValueOnce(new ApiError({error_code:'ACTION_INPUT_REQUIRED',message:'Recipient needed.',request_id:'req_goal',retryable:false,details:{required_inputs:{recipient:{type:'string',format:'email'}}}},undefined,{outcome:'rejected'})).mockResolvedValueOnce({composition_id:'composition_goal'} as never);
+it('preserves the goal and account without showing follow-up recipient fields',async()=>{
+ const create=vi.spyOn(api,'createActionPlan').mockRejectedValue(new ApiError({error_code:'ACTION_INPUT_REQUIRED',message:'Recipient needed.',request_id:'req_goal',retryable:false,details:{required_inputs:{recipient:{type:'string',format:'email'}}}},undefined,{outcome:'rejected'}));
  render(<Overview/>);await screen.findByText(/owner@example.com/);
  fireEvent.change(screen.getByLabelText('Workflow Google account'),{target:{value:'gc_owned'}});
  const goal='Investigate complaint C123 and email the findings to the engineer.';
  fireEvent.change(screen.getByLabelText('Process description'),{target:{value:goal}});
  fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
- const field=await screen.findByLabelText('Email recipient');
- fireEvent.change(field,{target:{value:'engineer@example.com'}});
- fireEvent.click(screen.getByRole('button',{name:'Retry generation'}));
- await waitFor(()=>expect(create).toHaveBeenCalledTimes(2));
- expect(create.mock.calls[1]![0]).toMatchObject({objective:goal,google_connection_id:'gc_owned',user_values:{recipient:'engineer@example.com'}});
- expect(screen.queryByLabelText('Explicit user values')).not.toBeInTheDocument();
+ await screen.findByText('Recipient needed.');
+ expect(screen.queryByLabelText('Email recipient')).toBeNull();
+ expect(screen.getByLabelText('Process description')).toHaveValue(goal);
+ expect(screen.getByLabelText('Workflow Google account')).toHaveValue('gc_owned');
+ expect(create).toHaveBeenCalledTimes(1);
 });
 it('retains the original planning key when retrying an unconfirmed unchanged request',async()=>{
  const create=vi.spyOn(api,'createActionPlan').mockRejectedValueOnce(new ApiError({error_code:'API_UNAVAILABLE',message:'Unconfirmed.',request_id:'req_goal',retryable:true},undefined,{outcome:'unknown'})).mockResolvedValueOnce({composition_id:'composition_goal'} as never);

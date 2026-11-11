@@ -1,0 +1,5 @@
+- [ ] Persist scoped ontology version and exact field mapping identities in plans.
+- [ ] Persist verified query/read usage and actual report evidence consumption.
+- [ ] Render saved usage with per-step explanations and clear empty-state guidance.
+- [ ] Verify tenant isolation, zero results, failures, synthetic evidence and version mismatch.
+- [ ] Record validation and deployment status.

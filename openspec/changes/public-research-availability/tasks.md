@@ -1,0 +1,3 @@
+- [x] Correct explicit opt-in registration and connector definitions generically.
+- [x] Cover tenant availability, template immutability and privacy regressions.
+- [x] Verify real public search/page retrieval and deploy for both tenants.

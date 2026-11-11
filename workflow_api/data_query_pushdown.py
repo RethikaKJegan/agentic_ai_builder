@@ -25,6 +25,10 @@ BOOL = {'boolean', 'bool'}
 DATE = {'date', 'timestamp without time zone', 'timestamp with time zone'}
 
 
+def mongo_datetime(field):
+    return bool(set(field['types'])-{'null'}) and set(field['types'])-{'null'} <= {'datetime'}
+
+
 def mongo_numeric_types(field):
     """Reviewed numeric BSON families; no numeric-string coercion."""
     mapping={**{t:['int','long'] for t in NUMERIC-{'numeric','decimal'}},
@@ -56,7 +60,7 @@ def physical_plan(plan, needed, datasets, expressions, joins=None, *, sampled_ev
         isinstance(n, ast.Div) for tree in expressions.values() for n in ast.walk(tree)
     ):
         reason = 'Per-row division retains the application decimal arithmetic semantics.'
-    elif any(not (datasets[did]['connection']['engine']=='mongodb' and mongo_numeric_types(f))
+    elif any(not (datasets[did]['connection']['engine']=='mongodb' and (mongo_numeric_types(f) or mongo_datetime(f)))
              and (len(f['types']) != 1 or f['types'][0] not in NUMERIC | TEXT | BOOL | DATE)
              for did,fields in needed.items() for f in fields):
         reason = 'One or more field types require application scalar validation.'
@@ -278,7 +282,7 @@ class MongoCompiler:
             kind = {'$type': value}
             missing = {'$in': [kind, ['missing', 'null']]}
             numeric_types = mongo_numeric_types(f)
-            allowed = numeric_types or (['bool'] if native in BOOL else ['string'])
+            allowed = numeric_types or (['date'] if mongo_datetime(f) else ['bool'] if native in BOOL else ['string'])
             checks.append({'$not': [{'$or': [missing, {'$in': [kind, allowed]}]}]})
             if numeric_types:
                 projection[fid] = self.convert(value) if set(numeric_types)&{'decimal','double'} else {'$ifNull': [value, None]}
@@ -290,7 +294,8 @@ class MongoCompiler:
                     restored={'$convert': {'input':self.convert(value),'to':'double','onError':None,'onNull':None}}
                     checks.append({'$and':[{'$eq':[kind,'double']},{'$ne':[value,restored]}]})
             else:
-                projection[fid] = {'$ifNull': [value, None]}
+                projection[fid] = ({'$cond':[{'$eq':[kind,'date']},{'$dateToString': {'date':value,'format':'%Y-%m-%dT%H:%M:%S.%L+00:00','timezone':'UTC','onNull':None}},None]}
+                                   if mongo_datetime(f) else {'$ifNull': [value, None]})
                 if native in TEXT:
                     checks.append({'$cond': [{'$eq': [kind, 'string']}, {'$gt': [{'$strLenBytes': value}, 16000]}, False]})
         conditions = []
@@ -304,6 +309,14 @@ class MongoCompiler:
                 numeric = bool(mongo_numeric_types(self.fields[item['field_id']]))
                 valid = (type(constant) in (int, float) if numeric else type(constant) is bool if native in BOOL else isinstance(constant, str))
                 if not valid: fail('Filter value type does not match the source field.', 'DATA_QUERY_TYPE', 422)
+                if mongo_datetime(self.fields[item['field_id']]):
+                    try:
+                        parsed=datetime.datetime.fromisoformat(constant.replace('Z','+00:00'))
+                        if parsed.tzinfo is None or parsed.microsecond%1000: raise ValueError()
+                    except (ValueError,TypeError):fail('Timestamp filters need an explicit timezone.','DATA_QUERY_TYPE',422)
+                    # Projection and constants share one UTC representation so
+                    # comparisons preserve chronological order and missing nulls.
+                    constant=parsed.astimezone(datetime.timezone.utc).isoformat(timespec='milliseconds')
                 rhs = self.decimal(constant) if numeric else {'$literal': constant}
                 conditions.append({'$and': [{'$ne': [value, None]}, {'$' + op: [value, rhs]}]})
         filtered = [{'$project': projection}]

@@ -11,6 +11,7 @@ import { InvestigationContext, type InvestigationContextValue } from "./Investig
 import { ConnectedPlan, actionButton } from "./ConnectedPlan";
 import { AutomationPanel } from "./DurableAutomation";
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
+import {OverviewWorkflowReview} from './OverviewWorkflowReview';
 
 export default function ConnectedInvestigation() {
   const backend = useBackend();
@@ -25,6 +26,7 @@ function ConnectedWorkspace() {
   const router = useRouter();
   const id = search.get("composition");
   const run = search.get("run");
+  const overview = search.get("overview");
   const backend = useBackend();
   const command = useOrchestrationCommand();
   const [goal, setGoal] = useState("");
@@ -35,7 +37,7 @@ function ConnectedWorkspace() {
   const navigate = (cid: string, rid?: string) =>
     router.replace(
       "/app/workflows/investigate?" +
-        new URLSearchParams({ connected: "1", composition: cid, ...(rid ? { run: rid } : {}) }),
+        new URLSearchParams({ connected: "1", composition: cid, ...(overview?{overview}:{}), ...(rid ? { run: rid } : {}) }),
     );
   return (
     <div className="h-full overflow-auto bg-background p-4 md:p-6">
@@ -43,10 +45,10 @@ function ConnectedWorkspace() {
         <Link to="/app/workflows" className="text-sm text-primary">
           Back to workflows
         </Link>
-        <h1 className="text-xl font-semibold">Business investigation</h1>
+        {!id&&<><h1 className="text-xl font-semibold">Business investigation</h1>
         <p className="text-sm text-muted-foreground">
           Review the workflow graph, inspect each step and open the investigation report.
-        </p>
+        </p></>}
         {!id ? (
           <form
             className="space-y-4 rounded-xl border p-4"
@@ -112,7 +114,7 @@ function ConnectedWorkspace() {
             </button>
           </form>
         ) : (
-          <ConnectedPlan id={id} runId={run ?? undefined} onRun={(rid) => navigate(id, rid)} />
+          overview?<OverviewWorkflowReview key={overview+':'+id} requestKey={overview} compositionId={id} runId={run??undefined} onRun={rid=>navigate(id,rid)}/>:<ConnectedPlan id={id} runId={run ?? undefined} onRun={(rid) => navigate(id, rid)} />
         )}
         <AutomationPanel />
       </div>

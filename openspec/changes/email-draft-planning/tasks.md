@@ -1,0 +1,4 @@
+- [x] Trace actual saved oil-leak intent and connector draft semantics.
+- [x] Apply content-draft defaults and narrowly classify advisory caveats.
+- [x] Test normal drafts, explicit mailbox actions and genuine blockers.
+- [x] Rehearse copied account, deploy backend and verify preservation.

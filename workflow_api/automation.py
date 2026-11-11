@@ -147,6 +147,11 @@ class DurableAutomation:
                 from .data_queries import CHECKER
                 if list(CHECKER.iter_errors(query_scope['const'])) or query_scope['const'].get('clarification'):
                     fail('Resolve and validate the recurring query before authorizing it.','AUTOMATION_QUERY_SCOPE_REQUIRED',403)
+                from .temporal_queries import ANNOTATION,validate_pin
+                if ANNOTATION in schema:
+                    validate_pin(schema[ANNOTATION],query_scope['const'])
+                    if schema[ANNOTATION]['timezone']!=body['schedule']['timezone']:
+                        fail('Relative-query timezone must match the authorized schedule.','AUTOMATION_QUERY_SCOPE_REQUIRED',403)
             fields=['to'] if tid in ('extension_mail_send','smtp_send_email') else ['message_id'] if tid=='extension_mail_reply' else ['project_id'] if tid=='extension_sheets_create_report' else ['calendar_id'] if tid.startswith('extension_calendar_') else []
             fields=list(set(fields)|({k for k in tools[tid]['definition']['input_schema'].get('properties',{}) if k in {'to','recipient','destination','url','spreadsheet_id','calendar_id','project_id','connection_id','package_id'}}))
             for field in fields:
@@ -455,6 +460,7 @@ class DurableAutomation:
         auth=self._fresh(auth);scope=self.scope(auth,True);ref=run.get('automation_reference')
         if not ref:return None
         occurrence=self._get(db,scope,ref['occurrence_id'],'occurrence');schedule=self._get(db,scope,occurrence['schedule_id'],'schedule');policy=self._get(db,scope,schedule['request']['authorization_id'],'authorization')
+        if 'scheduled_due' in ref and ref['scheduled_due']!=occurrence['due']:fail('Logical occurrence time changed.','AUTOMATION_SCOPE_DENIED',403)
         if schedule['state']!='active' or policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Recurring business authority is inactive.','AUTOMATION_AUTH_REVOKED',403)
         if run['workflow_id']!=schedule['request']['workflow']['workflow_id'] or run['workflow_version']!=schedule['request']['workflow']['workflow_version']:fail('Recurring workflow pin differs.','AUTOMATION_SCOPE_DENIED',403)
         return policy,schedule,occurrence
@@ -465,6 +471,13 @@ class DurableAutomation:
         self.service.registry_adapter.execution_assignments(workflow,self._fresh(auth))
         if digest(workflow)!=schedule['workflow_sha256'] or workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Recurring workflow/account changed.','AUTOMATION_SCOPE_DENIED',403)
         schema=policy['request']['operations'].get(node['tool_id'])
+        from .temporal_queries import ANNOTATION,consent_schema
+        if schema and ANNOTATION in schema:
+            overview=workflow.get('metadata',{}).get('overview_intent',{})
+            if (node['tool_id']!='workflow_data_query' or schema[ANNOTATION]!=overview.get('temporal_pin')
+                    or schema.get('properties',{}).get('query',{}).get('const')!=overview.get('query')):
+                fail('Relative query differs from the approved workflow.','AUTOMATION_SCOPE_DENIED',403)
+            schema=consent_schema(schema,occurrence['due'])
         if schema is None or list(Draft202012Validator(schema).iter_errors(inputs)):fail('Action exceeds recurring business consent.','AUTOMATION_APPROVAL_REQUIRED',403)
         if len(run.get('automation_approvals',{}))>policy['request']['limits']['max_actions_per_occurrence']:fail('Recurring action limit exceeded.','AUTOMATION_ACTION_LIMIT',403)
 
@@ -511,7 +524,7 @@ class DurableAutomation:
                             if current['run_id']!=created['run_id']:fail('Occurrence run identity changed.','AUTOMATION_CONFLICT',409)
                             return
                         current.update(state='running',run_id=created['run_id']);self._save(db,current)
-                        run=runner.runtime.load(db,created['run_id'],auth);run['automation_reference']=dict(occurrence_id=current['id']);runner.runtime.save(db,run)
+                        run=runner.runtime.load(db,created['run_id'],auth);run['automation_reference']=dict(occurrence_id=current['id'],scheduled_due=current['due']);runner.runtime.save(db,run)
                     created=runner.runtime.create_automation_run(dict(request_id='occurrence_'+occurrence['id'],idempotency_key=occurrence['id'],payload={**schedule['request']['workflow'],'inputs':schedule['request']['inputs']}),auth,on_created=attach)
                     for _ in range(17):
                         result=runner.advance(created['run_id'],auth)

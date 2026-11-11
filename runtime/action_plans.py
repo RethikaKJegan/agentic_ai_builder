@@ -28,12 +28,33 @@ def params(workflow,node,run):
     action=actions.get(node['node_id'])
     if not action:return None
     result=resolve_inputs(action,context,actions,run)
+    overview=metadata.get('overview_intent',{})
+    if action['capability_id']=='tool.workflow_data_query' and overview.get('query'):
+        if result.get('query')!=overview['query']:deny('Query differs from the reviewed automation template.','AUTOMATION_SCOPE_DENIED')
+        if overview.get('temporal_pin'):
+            from workflow_api.temporal_queries import resolve
+            reference=run.get('automation_reference')
+            due=reference.get('scheduled_due') if reference else overview['prepared_at']
+            if due is None:deny('Logical occurrence time is missing.','AUTOMATION_SCOPE_DENIED')
+            result['query']=resolve(overview['query'],overview['temporal_pin'],due)
     if action['capability_id']=='content.prepare':
         if metadata.get('goal_planning'):
             upstream={aid:deepcopy(run['action_instances'][aid]['output']) for aid in action['depends_on'] if run['action_instances'][aid]['output']!=result.get('data')}
             if upstream:result['data']={'primary':result['data'],'upstream_results':upstream}
         result['instructions']=action['instructions']
         result['source_references']=deepcopy(action['evidence_references'])
+        from .aggregate_math import percentages,GUIDANCE
+        derived=percentages([run['action_instances'][aid] for aid in action['depends_on']],
+            dict(workspace_id=run['workspace_id'],subject_id=run['subject_id']))
+        if derived:
+            result['data']={'primary':result['data'],'verified_aggregate_math':derived}
+            result['instructions']+=' '+GUIDANCE
+        from .report_tables import context as table_context,GUIDANCE as TABLE_GUIDANCE
+        tables=table_context(plan,action,run.get('action_instances',{}),metadata['connected_contracts'])
+        if tables:
+            data=result['data']
+            result['data']={**data,'report_table_context':tables} if isinstance(data,dict) else {'primary':data,'report_table_context':tables}
+            result['instructions']+=' '+TABLE_GUIDANCE
     if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import packet
         sources=[e for dep in action['depends_on'] for e in run.get('task_checkpoints',{}).get(dep,{}).get('result',{}).get('source_evidence',[])]
@@ -72,7 +93,30 @@ def content_urls(value):
 
 def validate_content(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
+    if action and action['capability_id']=='data.plan_query' and isinstance(output,dict) and 'query' in output:
+        from workflow_api.data_queries import canonical_model_projection,DataQueries
+        from workflow_api.service import ApiFailure
+        output['query']=canonical_model_projection(output['query'])
+        catalog=inputs.get('context',{}).get('data_query_catalog',{})
+        datasets={d['dataset_id']:d for d in catalog.get('datasets',[])}
+        fields={f['field_id']:{**f,'dataset_id':d['dataset_id']} for d in datasets.values() for f in d['fields']}
+        relationships={r['relationship_id']:r for r in catalog.get('relationships',[])}
+        try:DataQueries.validate(None,output['query'],({},datasets,fields,relationships))
+        except ApiFailure as exc:
+            from .service import RuntimeFailure
+            error=RuntimeFailure('AGENT_OUTPUT_INVALID','Generated query does not match the reviewed catalogue.',422)
+            error.invalid_model_output=True;error.validation_field='query'
+            error.validation_hint=('Typed-query validation: '+str(exc)+
+                ' Correct that rule using the supplied catalogue. Fields must belong to the base or authorized join target. '
+                'Preserve requested scope; never invent IDs, joins or filters. Use clarification for unsupported requirements.')[:400]
+            raise error
+        return
     if not action or action['capability_id']!='content.prepare':return
+    from .report_tables import normalize,validate
+    data=inputs.get('data',{})
+    tables=data.get('report_table_context') if isinstance(data,dict) else None
+    normalize(output,tables)
+    validate(output,tables)
     validate_content_tables(workflow,node,output)
     def invalid(field,hint):
         from .service import RuntimeFailure
@@ -138,6 +182,8 @@ def completed(workflow,node,run,output):
     item.update(state='completed',output=deepcopy(output),output_fingerprint=digest(output),
         verified_receipt=node['kind']=='tool',provenance_type='SYNTHETIC' if scenario and source_read else 'ACTUAL' if node['kind']=='tool' else 'INFERRED',
         source_references=deepcopy(action['evidence_references']),assumptions=[dict(value=v,provenance_type='SYNTHETIC',permitted_uses=['analytical_continuation']) for v in (output or {}).get('assumptions',[])],external_effect_status='connector_confirmed' if action['required_approvals'] else 'not_applicable')
+    from workflow_api.workflow_knowledge import completed_usage
+    item['ontology_usage']=completed_usage(workflow,action,run)
     # Existing checkpoint/recovery storage is reused with stable action-specific keys.
     checkpoint_result=deepcopy(output)
     checkpoint_result['state']='completed'

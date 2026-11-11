@@ -8,8 +8,9 @@ from workflow_api.public_research import PublicResearch,enabled,extend_registry,
 from workflow_api.live_providers import registry_configuration
 
 
-def test_public_research_is_explicit_and_uses_existing_bounded_definitions():
-    env={'BUILDER_CLIENT_ID':'simpsons'}
+@pytest.mark.parametrize('client',['simpsons','subway','another-client'])
+def test_public_research_is_explicit_and_uses_existing_bounded_definitions(client):
+    env={'BUILDER_CLIENT_ID':client}
     assert not enabled(env)
     assert not {'supplier_web_search','supplier_read_page'} & {t['definition']['tool_id'] for t in registry_configuration(env)['tools']}
     env['BUILDER_CLIENT_WEB_ENABLED']='1'
@@ -19,7 +20,18 @@ def test_public_research_is_explicit_and_uses_existing_bounded_definitions():
     service=SimpleNamespace(runtime_runner=SimpleNamespace(connectors={}))
     install(service)
     assert all(isinstance(c,SupplierSearchConnector) and not c.external_write for c in service.runtime_runner.connectors.values())
-    assert service.runtime_runner.connectors['supplier_web_search'].definition==SEARCH
+    registered={t['definition']['tool_id']:t['definition'] for t in config['tools']}
+    for template in (SEARCH,PAGE):
+        actual=registered[template['tool_id']]
+        assert actual['availability']=='enabled'
+        assert actual['input_schema']==template['input_schema']
+        assert actual['output_schema']==template['output_schema']
+        assert actual['authentication']=={'mode':'none','credential_reference_required':False,'scopes':[]}
+        assert service.runtime_runner.connectors[template['tool_id']].definition==actual
+        assert template['availability']=='needs_configuration'
+        actual['input_schema']['description']='Mutation in one tenant'
+        other=registry_configuration(env)
+        assert all('description' not in t['definition']['input_schema'] for t in other['tools'])
     with pytest.raises(ValueError):enabled({'BUILDER_CLIENT_WEB_ENABLED':'yes'})
 
 

@@ -1,0 +1,4 @@
+- [x] Trace the saved faulty request and distinguish the actual approval-only cause.
+- [x] Add conservative normalization and planning guidance for all tool combinations.
+- [x] Verify real gaps, authorization, approval gates and request idempotency remain intact.
+- [x] Rehearse copied-account preparation, deploy backend correction and verify preservation.

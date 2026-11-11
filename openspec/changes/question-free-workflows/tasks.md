@@ -1,0 +1,6 @@
+- [x] Trace existing question/blocked-state handling and verify actual saved report coverage.
+- [x] Add question-free Overview policy and deterministic blocked-draft fallback.
+- [x] Preserve immutable approval blockers and authorization boundaries.
+- [x] Add bounded qualitative-review guidance without weakening exact analytics.
+- [x] Replace clarification forms with declarative limitations in automatic workflows.
+- [x] Test, build, deploy and verify preservation and hosted pages.

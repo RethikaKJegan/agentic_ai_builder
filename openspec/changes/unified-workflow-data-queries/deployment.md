@@ -1,4 +1,26 @@
+> Latest release: [empty-query report tables](../empty-query-report-tables/deployment.md) is deployed as `empty-report-20261111-cb5425fdfdac`. Earlier details below are historical.
+
+> Latest release: [verified aggregate percentages](../verified-aggregate-percentages/deployment.md) is deployed as `aggregate-percent-20261111-19ec7bd63922`. Earlier details below are historical.
+
+> Latest release: [scoped query model output](../scoped-query-output/deployment.md) is deployed as `scoped-query-20261110-ce2917824f4b`. Earlier details below are historical.
+
+> Latest release: [generic email planning correction](../email-draft-planning/deployment.md) is deployed as `mail-planning-20261110-a13b9929c6de`. Earlier details below are historical.
+
+> Latest release: [query validation and worker lease correction](../query-projection-worker-release/deployment.md) is deployed as `query-worker-20261110-957b64db5e4f`. Earlier release details below are historical.
+
+> Latest release: [execution-approval routing correction](../execution-approval-routing/deployment.md) is deployed as `execution-approval-20261110-c86221afff7e`. Earlier release details below are historical.
+
+> Latest release: [question-free workflows](../question-free-workflows/deployment.md) is deployed as `question-free-20261110-69a3569eb75f`. The release details below are historical.
+
+> Latest backend: [immediate-work default](../immediate-workflow-default/deployment.md) is deployed as `immediate-default-20261110-6e8a3a832db1`. Frontend retains [Overview-to-Workflows navigation](../overview-workflow-navigation/deployment.md). Earlier release details below are historical.
+
 Latest hosted query release: [mixed-numeric HMR fix](../mongodb-mixed-numeric-queries/deployment.md).
+
+Latest hosted frontend release: [tenant-isolated workflow Knowledge Map](../workflow-knowledge-map/deployment.md).
+
+Latest hosted backend update: [evidence continuation and Calendar timing](../workflow-evidence-continuation/deployment.md).
+
+Latest hosted public research fix: [tenant web-search availability](../public-research-availability/deployment.md).
 
 Latest hosted runtime release: [grouped query fix](../grouped-query-model-output/deployment.md).
 
@@ -6,7 +28,7 @@ Latest hosted runtime update: [query clarification guidance](../query-clarificat
 
 Latest hosted backend release: [evidence-reference validation fix](../action-evidence-reference-validation/deployment.md).
 
-> Latest release: [query clarification handling](../workflow-query-clarification/deployment.md) is deployed as `query-clarification-20261110-fc82d6cf5e08`. Earlier release details below are historical.
+> Earlier release: [query clarification handling](../workflow-query-clarification/deployment.md) is deployed as `query-clarification-20261110-fc82d6cf5e08`. Earlier release details below are historical.
 
 > Updated release: the 10 November intent/ontology discovery and binding correction is now deployed. See [current deployment](../intent-ontology-query-integration/deployment.md). The catalogue limitation below records the 9 November release state.
 

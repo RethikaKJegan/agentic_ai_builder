@@ -1,0 +1,5 @@
+- [x] Inspect the actual failed query, terminal lease and hosted worker settings.
+- [x] Canonicalize model projections and release finished worker leases with owner checks.
+- [x] Honor bounded runtime concurrency in active-standby mode.
+- [x] Verify duplicate-query regression, concurrency, ownership and uncertain-write safety.
+- [x] Rehearse copied account, deploy and verify preservation and account health.

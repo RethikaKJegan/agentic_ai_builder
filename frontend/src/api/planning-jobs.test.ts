@@ -33,6 +33,20 @@ it('uses a durable job only when advertised and retrieves its confirmed result',
   expect(transport.mock.calls.some(([url]) => String(url).endsWith('/workflows/plan'))).toBe(false);
 });
 
+it('prepares Overview through the same durable queue with a versioned internal marker',async()=>{
+  const proposal={version:'overview-intent-v1',state:'prepared',request_key:'overview_queued_test',composition_id:'composition_one'};
+  const submitted:Record<string,unknown>[]=[];
+  const transport=vi.fn<typeof fetch>(async(url,options)=>{
+    if(String(url).endsWith('/session'))return response(session());
+    submitted.push(JSON.parse(String(options?.body)));
+    return response({job_id:'plan_overview',state:'succeeded',result:wrap(proposal)},202);
+  });
+  const client=new WorkflowClient(transport);await client.session();
+  expect(await client.overviewIntent({operation:'prepare',objective:'Daily source report',request_key:'overview_queued_test'})).toMatchObject(proposal);
+  expect(submitted[0]).toMatchObject({operation:'plan_workflow',idempotency_key:'overview_queued_test',payload:{context:{praxi_overview_request_v1:{objective:'Daily source report'}}}});
+  expect(transport.mock.calls.some(([url])=>String(url).includes('action-plans'))).toBe(false);
+});
+
 it('keeps a retry key after an unknown submission outcome', async () => {
   const keys: string[] = [];
   const transport = vi.fn<typeof fetch>(async (url, options) => {

@@ -309,10 +309,11 @@ def test_action_plan_case_attachment_cas_persistence_and_existing_execution(conn
 
 def test_research_search_to_public_fetch_preserves_actual_provenance(connected,monkeypatch):
     from runtime.supplier_search import SEARCH,PAGE,SupplierSearchConnector
+    from workflow_api.public_research import definitions
     import hashlib
     f=connected
-    for definition in (SEARCH,PAGE):
-        tool=deepcopy(definition);tool['availability']='enabled'
+    for definition in definitions():
+        tool=deepcopy(definition);assert tool['availability']=='enabled'
         policy=deepcopy(f.registry._policy);policy.version+=1;policy.approved_providers.add(tool['provider_id']);policy.agent_permissions.update(tool['permission_scopes']);policy.remaining_quota[tool['tool_id']]=20
         for a in (f.x.a,f.x.current):a['permissions']=sorted(set(a['permissions'])|set(tool['permission_scopes']));a['scopes']=sorted(set(a['scopes'])|set(tool['permission_scopes']))
         assert f.registry.update_policy(policy,f.x.a)['status']==200
@@ -568,3 +569,23 @@ def test_repeated_conditional_completion_stops_after_one_correction(connected):
     assert error.value.code=='ACTION_BINDING_INVALID' and len(calls)==2
     assert draft['actions'][-1]['optional'] is True and draft['actions'][-1]['when'] is not None
     assert not f.http.sent and f.http.write_count==0
+
+
+def test_ontology_usage_pin_and_verified_read_survive_saved_plan_and_run(connected):
+    f=connected
+    doc,w,rid=compile_run(f)
+    pin=doc['binding_context']['validated_context']['ontology_usage']
+    assert pin['version_id']==f.prepared['version_id']
+    assert pin['scope']==dict(workspace_id='one',owner_id='alice')
+    assert w['metadata']['action_binding_context']['validated_context']['ontology_usage']==pin
+    assert f.c.get(f.x.a,doc['composition_id'])['binding_context']['validated_context']['ontology_usage']==pin
+    run=complete(f,w,rid)
+    assert run['status']=='completed'
+    saved=stored(f,rid);instances=saved['action_instances']
+    assert instances['read']['ontology_usage']
+    assert {u['version_id'] for u in instances['read']['ontology_usage']}=={pin['version_id']}
+    assert instances['analysis']['ontology_usage']
+    assert instances['send']['ontology_usage']==[]
+    from workflow_api.composition_presentation import CompositionPresentation
+    public=CompositionPresentation(f.c).view(f.x.a,doc['composition_id'],rid)
+    assert public['run']['action_instances']['read']['ontology_usage']==instances['read']['ontology_usage']

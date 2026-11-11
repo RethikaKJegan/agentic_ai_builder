@@ -1,0 +1,4 @@
+- [x] Trace actual missing-percentage run and verified aggregate counts.
+- [x] Add deterministic Decimal math and source-qualified report guidance.
+- [x] Test percentage, zero denominator, scope/coverage failures and spreadsheet integration.
+- [x] Replay copied evidence, deploy and verify preservation.

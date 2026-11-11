@@ -40,15 +40,12 @@ for(const mobile of [false,true])for(const clarify of [false,true])test(`no-ID w
  expect(submitted).toMatchObject({objective:goal,google_connection_id:doc.google_connection_id,automatic_inputs:true,user_values:{}});
  await expect(page.getByLabel('Workflow Google account')).toHaveValue(doc.google_connection_id);
  if(clarify){
-  await expect(page.getByRole('heading',{name:'Clarification needed',exact:true})).toBeVisible();
-  await expect(page.getByText(question,{exact:true})).toBeVisible();
-  await expect(page.getByText(/Reconcile the external action/)).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Generate clarified workflow'})).toBeDisabled();
-  await page.reload();await expect(page.getByText(question,{exact:true})).toBeVisible();
-  await page.getByLabel('Business definition').fill('Use the numeric recorded meter reading in hours.');
-  await page.getByRole('button',{name:'Generate clarified workflow'}).click();
-  await expect.poll(()=>submitted?.['objective']).toContain('Business definition supplied by the user: Use the numeric recorded meter reading in hours.');
-  expect(submitted?.['google_connection_id']).toBe(doc.google_connection_id);
+  await expect(page.getByRole('heading',{name:'Query blocked',exact:true})).toBeVisible();
+  await expect(page.getByText(question,{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Generate clarified workflow'})).toHaveCount(0);
+  await page.reload();await expect(page.getByRole('heading',{name:'Query blocked',exact:true})).toBeVisible();
+  expect(submitted?.['objective']).toBe(goal);expect(submitted?.['google_connection_id']).toBe(doc.google_connection_id);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);return;
  }

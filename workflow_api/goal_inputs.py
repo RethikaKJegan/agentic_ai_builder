@@ -23,8 +23,13 @@ def configure(context,composition,auth,body,contracts,connectors,tool_id):
         for field,role in getattr(connector,'planning_input_roles',{}).items():
             if role not in ('workflow_key','action_key') or field not in c['input_schema'].get('properties',{}):continue
             context['configuration'][default_key(cid,field)]='goal_'+digest([base,cid,field])[:32]
-    calendar_context(context,body['objective'],bool(body.get('google_connection_id')))
-    # Only explicit addresses in the user's goal become candidate recipient inputs.
+    calendar_context(context,body['objective'],bool(body.get('google_connection_id')),now=composition.service.lifecycle.clock())
+    recipient_context(context,composition,auth,body)
+
+
+def recipient_context(context,composition,auth,body):
+    """Reuse exact scoped account and explicit recipient resolution before routing."""
+    # Only explicit addresses or explicit self-mail become recipient inputs.
     addresses=list(dict.fromkeys(re.findall(r'(?<![\w.+-])[A-Za-z0-9.!#$%&\'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+',body['objective'])))
     if len(addresses)==1:context['user_values'].setdefault('recipient',addresses[0].rstrip('.'))
     if body.get('google_connection_id'):
@@ -189,27 +194,38 @@ def replace_binding(action,field,kind,key,satisfied):
     satisfied.add(field)
 
 
-def calendar_context(context,goal,selected):
+def calendar_context(context,goal,selected,*,now=None):
     """Interpret fully specified local scheduling facts; never guess missing times."""
     if not selected:return
-    if re.search(r'\bprimary\s+calendar\b',goal,re.I):
+    if re.search(r'\bprimary\s+calendar\b|\bmy\s+calendar\b(?=\s*(?:[,.!?]|$|today\b|tomorrow\b|on\b|at\b|with\b|for\b))',goal,re.I):
         context['validated_context']['primary_calendar_id']='primary'
+    # Separate the event clause from an earlier requested workflow execution time.
+    clause=re.search(r'\b(?:add|create|book|schedule)\b[^.!?\n]*?\b(?:review|meeting|event|appointment)\b',goal,re.I)
+    if clause and re.search(r'\bcalendar\b',goal,re.I):goal=goal[clause.start():]
     date_match=re.search(r'\b(\d{4}-\d{2}-\d{2})\b',goal)
     words=re.search(r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b',goal,re.I)
-    clock=re.search(r'\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}):(\d{2})\b',goal,re.I)
+    clocks=list(re.finditer(r'\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}):(\d{2})\b',goal,re.I))
+    clock=clocks[0] if len(clocks)==1 else None
     zone=re.search(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',goal)
     zone_name=zone[1] if zone else 'Asia/Kolkata' if re.search(r'\b(?:India(?:n)? (?:standard )?time)\b',goal,re.I) else None
     duration=re.search(r'\b(\d{1,3})[- ]minute\b',goal,re.I)
-    if not (date_match or words) or not clock or not zone_name or not duration:return
+    relative=re.search(r'\b(today|tomorrow)\b',goal,re.I)
+    if not (date_match or words or relative) or not clock or not zone_name or not duration:return
     from datetime import datetime,timedelta
     from zoneinfo import ZoneInfo,ZoneInfoNotFoundError
     try:
-        day=datetime.strptime(date_match[1],'%Y-%m-%d') if date_match else datetime.strptime(' '.join(words.groups()),'%d %B %Y')
+        timezone=ZoneInfo(zone_name)
+        if date_match:day=datetime.strptime(date_match[1],'%Y-%m-%d')
+        elif words:day=datetime.strptime(' '.join(words.groups()),'%d %B %Y')
+        else:
+            from datetime import timezone as utc_timezone
+            instant=datetime.now(utc_timezone.utc) if now is None else datetime.fromtimestamp(now,utc_timezone.utc)
+            day=instant.astimezone(timezone)+timedelta(days=int(relative[1].lower()=='tomorrow'))
         hour=int(clock[1] or clock[4]);minute=int(clock[2] or clock[5] or 0);period=clock[3]
         if period:
             if not 1<=hour<=12:return
             hour=hour%12+(12 if period.upper()=='PM' else 0)
-        timezone=ZoneInfo(zone_name);start=day.replace(hour=hour,minute=minute,tzinfo=timezone)
+        start=day.replace(hour=hour,minute=minute,second=0,microsecond=0,tzinfo=timezone)
         if start.utcoffset()!=start.replace(fold=1).utcoffset():return
         if not 1<=int(duration[1])<=999:return
         end=start+timedelta(minutes=int(duration[1]))

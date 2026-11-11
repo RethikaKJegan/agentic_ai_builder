@@ -1,5 +1,7 @@
 import {runKnowledgeSchema,recoveryInspectionSchema,operationalAlertsSchema} from './reliability';
+import {knowledgeSnapshotSchema} from './knowledge-map';
 import { browserSessionCurrent } from '@/lib/browser-session';
+import {overviewResultSchema,overviewActivationSchema} from './overview-automation';
 import {actionDocumentSchema,automationSchema,automationListSchema} from './orchestration';
 import {compositionViewSchema,compositionListSchema} from './compositions';
 import {caseSchema,caseIndexSchema,processDefinitionSchema,processIndexSchema,packageDetailsSchema,driveResultSchema,type CaseOperation} from './business-lifecycle';
@@ -56,7 +58,7 @@ const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.st
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
-const sessionData = z.object({ reply_monitor_available: z.boolean().optional(), planning_jobs_available: z.boolean().optional(), dynamic_composition_available:z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
+const sessionData = z.object({ reply_monitor_available: z.boolean().optional(), planning_jobs_available: z.boolean().optional(), dynamic_composition_available:z.boolean().optional(), overview_routing_available:z.boolean().optional(), auth: AuthContextSchema, mode: z.string(), planning_available: z.boolean(), runtime_available: z.boolean(), approval_service_available: z.boolean(), ...metadata });
 export const workflowOverviewSchema = z.object({ workflow_id: z.string(), name: z.string(), draft_version: z.number().int().positive().nullable(),
   published_version: z.number().int().positive().nullable(), release_id: z.string().nullable(),
   activation_state: z.enum(["preparing", "active", "failed", "disabled", "deleting"]).nullable(),
@@ -154,6 +156,14 @@ async function retryKey(operation: string, payload: unknown, reset = false): Pro
 
 export class WorkflowClient {
   async createActionPlan(body:Record<string,unknown>) {return actionDocumentSchema.parse(await this.read('business-ontology/v1/action-plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
+  async overviewIntent(body:Record<string,unknown>) {
+    if(this.planningJobsAvailable&&(body['operation']??'prepare')==='prepare') {
+      const request={operation:'plan_workflow',request_id:crypto.randomUUID(),idempotency_key:body['request_key'],payload:{objective:body['objective'],context:{praxi_overview_request_v1:body}}};
+      return overviewResultSchema.parse(await this.planJob({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)}));
+    }
+    return overviewResultSchema.parse(await this.read('business-ontology/v1/action-plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,overview:true})}));
+  }
+  async activateOverview(key:string) {return overviewActivationSchema.parse(await this.read('business-ontology/v1/action-plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({overview:true,operation:'activate',request_key:key})}));}
   async actionPlan(id:string) {return actionDocumentSchema.parse(await this.read(`business-ontology/v1/action-plans/${encodeURIComponent(id)}`));}
   async adaptiveCommand(id:string,operation:'enable'|'supply'|'revise',body:Record<string,unknown>) {return caseSchema.parse(await this.read(`business-ontology/v1/cases/${encodeURIComponent(id)}/adaptive${operation==='enable'?'':'/'+operation}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async automationRecords(before?:string) {return automationListSchema.parse(await this.read('business-ontology/v1/automation'+queryString({before,limit:50})));}
@@ -201,6 +211,7 @@ export class WorkflowClient {
   async saveBusinessRuleEvidence(vid:string,gid:string,body:BusinessRuleEvidenceRequest) {return businessRuleEvidenceSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rule-evidence`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async executeBusinessRule(vid:string,gid:string,body:BusinessRuleExecuteRequest) {return businessRuleExecutionResultSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(vid)}/graphs/${encodeURIComponent(gid)}/rules/execute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));}
   async businessOntology() { return businessOntologySchema.parse(await this.read("business-ontology/v1")); }
+  async knowledgeSnapshot(versionId:string) {return knowledgeSnapshotSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/knowledge`));}
   async businessMonitoring(versionId:string,graphId:string,body:BusinessMonitoringRequest) { return businessMonitoringSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/monitoring-readiness`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
   async assessBusinessWarranty(versionId:string,graphId:string,body:BusinessWarrantyAssessmentRequest) { return businessWarrantyAssessmentSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/warranty-assessment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})); }
   async businessAssociations(versionId:string,graphId:string,ticketNodeId:string) { return businessAssociationsSchema.parse(await this.read(`business-ontology/v1/versions/${encodeURIComponent(versionId)}/graphs/${encodeURIComponent(graphId)}/associations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket_node_id:ticketNodeId})})); }

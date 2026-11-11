@@ -75,9 +75,10 @@ def compatible(source,target):
     return bool(a and b and (a<=b or a=={'integer'} and 'number' in b)) or source==target
 
 
-def content_target(path):
+def content_target(path, capability_id=None):
     # Event descriptions are content; event times, attendees and IDs are authority.
-    return path[0] in CONTENT_FIELDS or path[:2] in (['event','summary'],['event','description'])
+    return (path[0] in CONTENT_FIELDS or path[:2] in (['event','summary'],['event','description'])
+            or capability_id=='tool.google_sheets_update_row' and path==['values'])
 
 
 def put(result,path,value):
@@ -181,7 +182,7 @@ def validate_plan(plan,contracts,context,scope):
                 source=checked_field(pc['output_schema'],b['path'],action['action_id'],'source')
                 if b['kind']=='receipt' and pc['kind']!='tool':deny('Only connector results can supply receipts.')
                 if b['kind']=='generated' and parent['capability_id']!='content.prepare':deny('Generated binding requires content preparation.')
-                if not conditional and c['kind']=='tool' and not content_target(b['target']):
+                if not conditional and c['kind']=='tool' and not content_target(b['target'],cid):
                     if not (b['kind']=='receipt' and c['supported_operation']=='research.fetch' and pc['supported_operation']=='research.search' and b['path']==['results',0,'url']) and (b['kind']!='receipt' or b['path'] not in (['spreadsheet_id'],['spreadsheet_url'],['event_id'],['message_id'],['draft_id'],['thread_id'],['artifact_id'])):
                         error=RuntimeFailure('ACTION_AUTHORITY_DENIED','Generated or interpreted values cannot supply execution authority.',422)
                         error.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(b['target']),source_action_id=b['action_id'],source_path=deepcopy(b['path']),rule='explicit_authority_required')
@@ -199,7 +200,7 @@ def validate_plan(plan,contracts,context,scope):
                     error=RuntimeFailure('ACTION_BINDING_INVALID','Literal/context value violates its destination schema.',422)
                     error.binding_issue=dict(action_id=action['action_id'],side='target',path=deepcopy(b['target']),rule=violations[0].validator)
                     raise error
-                if b['kind']=='evidence' and c['kind']=='tool' and not content_target(b['target']) and b['path'] not in context.get('authority_evidence_paths',{}).get(b['key'],[]):
+                if b['kind']=='evidence' and c['kind']=='tool' and not content_target(b['target'],cid) and b['path'] not in context.get('authority_evidence_paths',{}).get(b['key'],[]):
                     deny('Mapped evidence is not approved as identity authority.','ACTION_AUTHORITY_DENIED')
             if not compatible(source,target):
                 # Provider receipts may omit an identifier. Admit explicit non-null

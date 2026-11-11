@@ -554,7 +554,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         from .resource_limits import ResourcePolicy,ResourceControls
         from .scheduler import LifecycleDispatchWorker
         runner.runtime.resource_controls=ResourceControls(service.store,ResourcePolicy.from_environment(env))
-    workers = [TriggerScheduler(service, lookup, interval=1,dispatch=not multi_active), RuntimeWorker(runner, lookup,concurrency=concurrency if multi_active else 1,fair=multi_active)]
+    workers = [TriggerScheduler(service, lookup, interval=1,dispatch=not multi_active), RuntimeWorker(runner, lookup,concurrency=concurrency,fair=multi_active)]
     if multi_active:workers.append(LifecycleDispatchWorker(service,concurrency=concurrency))
     if procurement_worker:
         workers.append(procurement_worker)

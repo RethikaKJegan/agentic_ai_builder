@@ -184,7 +184,8 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.get('/session')
     def get_session():
         data = dict(auth=auth, reply_monitor_available=getattr(workflow_service,'reply_cases',None) is not None, mode='client-isolated' if isolation else 'local-development', planning_jobs_available=True, planning_available=bool(os.getenv('OPENAI_API_KEY')) if planning_available is None else planning_available,
-                    runtime_available=workflow_service.runtime_runner is not None, approval_service_available=workflow_service.runtime_runner is not None, dynamic_composition_available=hasattr(workflow_service,'business_composition'))
+                    runtime_available=workflow_service.runtime_runner is not None, approval_service_available=workflow_service.runtime_runner is not None, dynamic_composition_available=hasattr(workflow_service,'business_composition'),
+                    overview_routing_available=bool(getattr(workflow_service,'overview_automation',None) and workflow_service.overview_automation.enabled(auth)))
         response = JSONResponse(workflow_service.envelope(request_reference.get() or f'req_{uuid4().hex}', 200, data))
         if not isolation:
             response.set_cookie(COOKIE, session, httponly=True, samesite='strict', path='/api/backend', max_age=28800)

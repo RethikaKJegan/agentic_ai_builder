@@ -1,0 +1,5 @@
+- [x] Trace the exact hosted clarification.
+- [x] Share summary/access defaults across routing, query and action planning.
+- [x] Resolve explicit self-mail before routing using existing account validation.
+- [x] Verify small prompts and genuine missing-detail boundaries.
+- [x] Deploy backend fix and verify hosted read-only health and preservation.

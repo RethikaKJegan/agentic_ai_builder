@@ -12,8 +12,16 @@ def enabled(env):
     return value=='1'
 
 
+def definitions():
+    """Configured copies; reusable templates must remain unconfigured by default."""
+    tools=[deepcopy(definition) for definition in (SEARCH,PAGE)]
+    for tool in tools:tool['availability']='enabled'
+    tools[0]['description']='Search public web sources without an API key. Queries must use public terms only.'
+    return tools
+
+
 def extend_registry(config):
-    for definition in (SEARCH,PAGE):
+    for definition in definitions():
         config['tools'].append({'definition':deepcopy(definition)})
         config['policy']['remaining_quota'][definition['tool_id']]=10000
     config['policy']['approved_providers']=sorted(set(config['policy']['approved_providers'])|{'ddgs'})
@@ -48,4 +56,4 @@ class PublicResearch(SupplierSearchConnector):
 
 
 def install(service):
-    for definition in (SEARCH,PAGE):service.runtime_runner.connectors[definition['tool_id']]=PublicResearch(definition,service)
+    for definition in definitions():service.runtime_runner.connectors[definition['tool_id']]=PublicResearch(definition,service)

@@ -161,6 +161,8 @@ class CompositionPresentation:
         from .workflow_queries import query_clarifications
         questions=query_clarifications(run,workflow)
         if questions:return dict(eligible=False,can_clarify=True,reason='Clarification needed: '+' '.join(questions.values())+' Supply the intended definition to generate a new reviewable workflow. This query has not executed.',failure=failure)
+        if run.get('error_code')=='DATA_QUERY_INVALID' and workflow.get('metadata',{}).get('overview_intent',{}).get('route',{}).get('intent_type')=='knowledge':
+            return dict(eligible=False,reason='This knowledge question was incorrectly prepared as a record query. Generate a new workflow from the original prompt to use the workspace knowledge. The failed run is preserved.',failure=failure)
         if run.get('error_code')=='UNKNOWN_INVOCATION_RESULT' and workflow['metadata'].get('composition_tasks'):failure=classify('DELEGATION_INTERRUPTED')
         if not failure['retry_eligible']:return dict(eligible=False,reason='The service could not identify a recoverable failure. Inspect its diagnostic reference before retrying.' if failure['category']=='internal_execution_failure' else 'Resolve the evidence, knowledge or authorization issue and prepare a new workflow.',failure=failure)
         if run.get('lease_until',0)>clock:return dict(eligible=False,reason='Waiting for the previous worker lease to expire.',failure=failure)

@@ -393,9 +393,11 @@ def verify_composition(db,auth,workflow):
     doc=json.loads(row[0]);sha=doc.pop('sha256')
     if digest(doc)!=sha or metadata.get('composition_sha256')!=sha:fail('Composition integrity failed.','CAPABILITY_CHANGED',409)
     doc['sha256']=sha;expected=compile_workflow(doc)
+    if doc.get('overview_intent',{}).get('question_free') and metadata.get('unresolved_requirements')!=expected['metadata']['unresolved_requirements']:
+        fail('Blocked workflow requirements changed.','CAPABILITY_CHANGED',409)
     for key in ('nodes','edges','conditions','tools','approval_gates','execution_policy'):
         if workflow[key]!=expected[key]:fail('Regenerate a composition to change its execution contract.','CAPABILITY_CHANGED',409)
-    for key in ('account_graph_pin','adaptive_control','connected_action_plan','action_binding_context','connected_contracts','connected_tasks','composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
+    for key in ('overview_intent','account_graph_pin','adaptive_control','connected_action_plan','action_binding_context','connected_contracts','connected_tasks','composition_tasks','composition_action_verifiers','dynamic_delegation','composition_preparation_id','google_connection_id','sheet_read_targets','sheet_write_targets','client_package_pin','client_package_context','client_domain','lifecycle_context','composition_contracts','composition_tool_fingerprints','memory_recommendations'):
         if metadata.get(key)!=expected['metadata'].get(key):fail('Composition control metadata changed.','CAPABILITY_CHANGED',409)
     if len(workflow['agents'])!=len(expected['agents']):fail('Composition agents changed.','CAPABILITY_CHANGED',409)
     by_id={a['agent_id']:a for a in expected['agents']}

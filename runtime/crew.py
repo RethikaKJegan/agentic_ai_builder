@@ -31,6 +31,8 @@ QUERY_CLARIFICATION_GUIDANCE = (
 
 
 GROUPED_REPORT_GUIDANCE = (
+    '\nUse supplied verified_aggregate_math percentages when present: these are deterministic derived '
+    'values from complete compatible counts. Preserve denominator scope and supplied query references. '
     '\nFor query evidence with group_by, every metric is per-group regardless of its label. '
     'The overall matched record population is engine result.matched_rows, not a metric labelled overall_total '
     'or the sum of a displayed page. Use only actual engine evidence. If limited/has_more is true, disclose that '
@@ -57,6 +59,33 @@ def canonical_query_output(definition,inputs,output):
     return output
 
 
+def scoped_query_schema(definition,inputs):
+    """Constrain projections without choosing a source or changing permissions."""
+    schema=deepcopy(definition['output_schema'])
+    catalog=inputs.get('context',{}).get('data_query_catalog',{})
+    datasets=catalog.get('datasets',[])
+    if (not datasets or catalog.get('relationships') or len(datasets)>12
+            or sum(len(d.get('fields',[])) for d in datasets)>700):return schema
+    query=schema.get('properties',{}).get('query',{})
+    if not {'base_dataset_id','fields','joins'}<=set(query.get('properties',{})):return schema
+    branches=[]
+    for dataset in datasets:
+        branch=deepcopy(query);props=branch['properties']
+        props['base_dataset_id']['enum']=[dataset['dataset_id']]
+        ids=list(dict.fromkeys(f['field_id'] for f in dataset['fields']))
+        if ids:props['fields']['items']['enum']=ids
+        else:props['fields']['maxItems']=0
+        props['joins']['maxItems']=0
+        branches.append(branch)
+    clarification=deepcopy(query);clarification['properties']['base_dataset_id']['enum']=['']
+    for name in ('fields','joins','filters','group_by','metrics','order_by'):
+        clarification['properties'][name]['maxItems']=0
+    branches.append(clarification)
+    schema['properties']['query']={'anyOf':branches}
+    # Keep provider schema transport bounded independently of catalogue size.
+    return schema if len(json.dumps(schema).encode())<=100000 else deepcopy(definition['output_schema'])
+
+
 def capability_context(inputs):
     context=inputs.get('context') if isinstance(inputs,dict) else None
     task=context.get('task') if isinstance(context,dict) else None
@@ -69,6 +98,11 @@ def content_response_schema(definition,inputs):
     refs=inputs.get('source_references') if isinstance(inputs,dict) else None
     if not {'data','instructions','source_references'}<=set(fields) or not {'tabs','body','source_references','assumptions'}<=set(schema.get('properties',{})) or not isinstance(refs,list):return None
     result=deepcopy(schema)
+    data=inputs.get('data',{})
+    table_context=data.get('report_table_context',{}) if isinstance(data,dict) else {}
+    contracts=table_context.get('contracts',[])
+    if contracts and all(c==contracts[0] for c in contracts):
+        result['properties']['tabs']=deepcopy(contracts[0])
     result['required']=list(result['properties'])
     reference_schema=result['properties']['source_references']
     if refs:
@@ -78,7 +112,7 @@ def content_response_schema(definition,inputs):
     def scalar_unions(node):
         if isinstance(node,list):return [scalar_unions(v) for v in node]
         if not isinstance(node,dict):return node
-        value={k:scalar_unions(v) for k,v in node.items()}
+        value={k:scalar_unions(v) for k,v in node.items() if k!='uniqueItems'}
         if isinstance(value.get('type'),list):
             kinds=value.pop('type');return {'anyOf':[dict(value,type=kind) for kind in kinds]}
         return value
@@ -125,7 +159,7 @@ class CrewAdapter:
         elif (isinstance(inputs.get('context'),dict) and {'subway_query_catalog','data_query_catalog'} & set(inputs['context'])
               and set(definition['output_schema'].get('properties',{}))=={'query'}
               and closed_payload(definition['output_schema'])):
-            llm.structured_format=dict(type='json_schema',name='scoped_read_query',strict=True,schema=deepcopy(definition['output_schema']))
+            llm.structured_format=dict(type='json_schema',name='scoped_read_query',strict=True,schema=scoped_query_schema(definition,inputs))
             if 'data_query_catalog' in inputs['context']:
                 query_guidance = QUERY_CLARIFICATION_GUIDANCE
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):

@@ -1,0 +1,4 @@
+- [x] Inspect actual saved unsolicited time clarifications.
+- [x] Add immediate-default guidance and bounded empty-schedule normalization.
+- [x] Verify reported prompts, explicit schedules, data windows and approval gates.
+- [x] Deploy backend fix and verify hosted health and existing automation preservation.

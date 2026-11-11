@@ -116,7 +116,7 @@ it("links only completed verified connector URLs, never generated or unsafe URLs
 it("shows actual dependencies, agent assignments, provenance and verified artifacts", async () => {
   render(<ConnectedPlan id={doc().composition_id} />);
   expect(await screen.findByLabelText('Dynamic investigation workflow canvas')).toBeVisible();
-  fireEvent.click(screen.getByRole('tab',{name:'steps'}));
+  fireEvent.click(screen.getByRole('tab',{name:'Steps'}));
   expect(await screen.findByText("1. read")).toBeVisible();
   expect(screen.getByText(/business.read.complaints · Agent: actual_agent/)).toBeVisible();
   expect(screen.getAllByText("INFERRED").length).toBeGreaterThan(0);
@@ -390,7 +390,7 @@ it('prepares a goal-mode plan without approving or executing it automatically',a
  vi.mocked(api.actionPlan).mockResolvedValue(document);
  vi.mocked(api.compositionView).mockResolvedValue({...view(),run:null,workflow_status:'draft'});
  render(<ConnectedPlan id={document.composition_id}/>);
- const review=await screen.findByRole('button',{name:/^Review plan$/});
+ const review=await screen.findByRole('button',{name:/^Validate$/});
  expect(screen.queryByRole('button',{name:'Save workflow draft'})).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Validate workflow'})).not.toBeInTheDocument();
  fireEvent.click(review);
@@ -402,11 +402,12 @@ it('prepares a goal-mode plan without approving or executing it automatically',a
 it('restores the visual graph, report tab and saved-context inspector',async()=>{
  render(<ConnectedPlan id={doc().composition_id}/>);
  expect(await screen.findByLabelText('Dynamic investigation workflow canvas')).toBeVisible();
- expect(screen.getByRole('tab',{name:'workflow'})).toHaveAttribute('aria-selected','true');
- fireEvent.click(screen.getByRole('button',{name:'Agents and tools'}));
+ expect(screen.getByRole('tab',{name:'Workflow'})).toHaveAttribute('aria-selected','true');
+ fireEvent.click(screen.getByRole('tab',{name:'Background'}));
+ fireEvent.click(screen.getByRole('button',{name:/Agents and tools/}));
  expect(await screen.findByRole('heading',{name:'Agents and tools'})).toBeVisible();
  fireEvent.keyDown(document,{key:'Escape'});
- fireEvent.click(screen.getByRole('tab',{name:'report'}));
+ fireEvent.click(screen.getByRole('tab',{name:'Reports'}));
  expect(await screen.findByRole('tabpanel',{name:'Investigation report'})).toBeVisible();
 });
 
@@ -440,4 +441,37 @@ it("allows a scoped adaptive read while a command is pending without replaying i
   expect(advance).toBeDisabled();
   expect(api.businessCaseCommand).toHaveBeenCalledTimes(1);
   await act(async()=>finish());
+});
+
+it('shows a blocked automatic draft without follow-up fields or enabled review/execution',async()=>{
+ const draft=doc();draft['state']='blocked';draft['interaction_mode']='goal';draft['overview_intent']={question_free:true,blocked_requirements:[{requirement:'UNRESOLVED_REQUEST'}]};
+ const blocked=view();blocked.state='blocked';blocked.run=null;blocked.workflow_status=null;blocked.gaps=[{description:'No verified destination is available.'}];
+ vi.spyOn(api,'actionPlan').mockResolvedValue(draft);vi.spyOn(api,'compositionView').mockResolvedValue(blocked);
+ const request=vi.spyOn(api,'request');render(<ConnectedPlan id={draft.composition_id}/>);
+ await screen.findByText('Workflow draft blocked');
+ expect(screen.getByRole('button',{name:'Validate'})).toBeDisabled();
+ expect(screen.queryByRole('textbox')).toBeNull();expect(screen.queryByText(/Which|Supply the intended/)).toBeNull();
+ expect(request).not.toHaveBeenCalled();
+});
+
+it('runs only after explicit review, preserving workflow approval and preventing duplicate submissions',async()=>{
+ const current={...view(),run:null,workflow_status:'validated'};
+ vi.mocked(api.compositionView).mockResolvedValue(current);
+ vi.mocked(api.request).mockImplementation(async operation=>operation==='execute_workflow'?{run:{run_id:'run_confirmed'}} as never:{} as never);
+ const onRun=vi.fn();render(<ConnectedPlan id={doc().composition_id} onRun={onRun}/>);
+ await screen.findByLabelText('Dynamic investigation workflow canvas');
+ expect(api.request).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Run'}));
+ expect(await screen.findByRole('dialog')).toBeVisible();expect(api.request).not.toHaveBeenCalled();
+ const confirm=screen.getByRole('button',{name:'Confirm and run'});fireEvent.click(confirm);fireEvent.click(confirm);
+ await waitFor(()=>expect(onRun).toHaveBeenCalledExactlyOnceWith('run_confirmed'));
+ expect(vi.mocked(api.request).mock.calls.map(([op])=>op)).toEqual(['approve_workflow','execute_workflow']);
+});
+
+it('does not execute while approving a workflow for its separate schedule',async()=>{
+ vi.mocked(api.compositionView).mockResolvedValue({...view(),run:null,workflow_status:'validated'});
+ render(<ConnectedPlan id={doc().composition_id} scheduled/>);await screen.findByLabelText('Dynamic investigation workflow canvas');
+ fireEvent.click(screen.getByRole('button',{name:'Run'}));fireEvent.click(await screen.findByRole('button',{name:'Approve workflow'}));
+ await waitFor(()=>expect(api.request).toHaveBeenCalledWith('approve_workflow',expect.anything(),expect.any(String)));
+ expect(vi.mocked(api.request).mock.calls.some(([op])=>op==='execute_workflow')).toBe(false);
 });

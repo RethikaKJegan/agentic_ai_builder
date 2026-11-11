@@ -1,0 +1,4 @@
+- [x] Inspect saved failed run and establish diagnostic limits.
+- [x] Add scoped output schema and exact trusted feedback.
+- [x] Test source ownership, clarification, aggregates, joins and existing workflows.
+- [x] Rehearse copied account and deploy with preservation checks.

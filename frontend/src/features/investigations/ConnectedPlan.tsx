@@ -1,5 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import {KnowledgeMap} from "./KnowledgeMap";
+import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/components/ui/sheet";
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@/components/ui/dialog";
+import {Info,Play,CheckCircle2,RefreshCw,Settings2,Network} from "lucide-react";
 import { QueryClarification } from './QueryClarification';
 import { QueryEvidence } from "./QueryEvidence";
 import { api } from "@/api/client";
@@ -14,16 +18,22 @@ import { CompositionInspector, CompositionReport } from './CompositionPanels';
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
 
 export const actionButton = "rounded-lg border px-3 py-2 text-sm disabled:opacity-40";
-export function ConnectedPlan({
+export function ConnectedPlan(props:{id:string;runId?:string|undefined;onRun?:((id:string)=>void)|undefined;adaptive?:boolean;scheduled?:boolean}) {
+  const subject=useBackend(s=>s.session?.auth.subject);
+  return <ScopedConnectedPlan key={JSON.stringify([subject?.workspace_id,subject?.subject_id,props.id,props.runId])} {...props}/>;
+}
+function ScopedConnectedPlan({
   id,
   runId,
   onRun,
   adaptive = false,
+  scheduled = false,
 }: {
   id: string;
   runId?: string | undefined;
-  onRun?: (id: string) => void;
+    onRun?: ((id: string) => void) | undefined;
   adaptive?: boolean;
+  scheduled?: boolean;
 }) {
   const backend = useBackend();
   const command = useOrchestrationCommand();
@@ -32,8 +42,10 @@ export function ConnectedPlan({
   const [error, setError] = useState<Error | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [stale, setStale] = useState(true);
-  const [tab,setTab]=useState<'workflow'|'steps'|'report'>('workflow');
+  const [tab,setTab]=useState<'workflow'|'steps'|'report'|'knowledge'|'background'>('workflow');
   const [panel,setPanel]=useState<string|null>(null);
+  const [reviewRun,setReviewRun]=useState(false);
+  const [details,setDetails]=useState(false);
   const scope = backend.session
     ? backend.session.auth.subject.workspace_id + ":" + backend.session.auth.subject.subject_id
     : "";
@@ -47,7 +59,7 @@ export function ConnectedPlan({
       try {
         const [d, v] = await Promise.all([api.actionPlan(id), api.compositionView(id, runId)]);
         if (!live) return;
-        if (d.scope.workspace + ":" + d.scope.owner !== scope)
+        if (d.composition_id!==id || v.composition_id!==id || (runId&&v.run?.run_id!==runId) || d.scope.workspace + ":" + d.scope.owner !== scope || d.action_plan.scope.workspace_id+":"+d.action_plan.scope.owner_id!==scope)
           throw new Error("Plan is outside the selected workspace.");
         setDoc(d);
         setView(v);
@@ -69,44 +81,6 @@ export function ConnectedPlan({
     };
   }, [id, runId, refresh, scope]);
   const update = () => setRefresh((n) => n + 1);
-  async function workflowAction(
-    operation:
-      "save_workflow_version" | "validate_workflow" | "approve_workflow" | "execute_workflow",
-  ) {
-    if (!view) return;
-    const ref = { workflow_id: view.workflow_id, workflow_version: view.workflow_version ?? 1 };
-    await command.act(
-      id + ":" + operation,
-      { ...ref, run_id: view.run?.run_id ?? null },
-      async (body) => {
-        if (operation === "save_workflow_version") {
-          const workflow = await api.compositionWorkflow(id);
-          await api.request(
-            operation,
-            {
-              workflow_id: workflow.workflow_id,
-              workflow_version: workflow.version,
-              base_version: 0,
-              workflow,
-            },
-            String(body["request_key"]),
-          );
-        } else if (operation === "validate_workflow") await api.request(operation, ref);
-        else if (operation === "approve_workflow")
-          await api.request(operation, { ...ref, action: "approve" });
-        else {
-          const result = await api.request(
-            operation,
-            { ...ref, inputs: {} },
-            String(body["request_key"]),
-          );
-          onRun?.(result.run.run_id);
-        }
-        update();
-      },
-    );
-  }
-  const goalMode=doc?.['interaction_mode']==='goal';
   async function prepareReview() {
     await command.act('prepare-review:'+id,{composition_id:id},async body=>{
       const key=String(body['request_key']);
@@ -121,17 +95,33 @@ export function ConnectedPlan({
       update();
     });
   }
-  const disabled = command.busy || stale || command.unknown;
+  async function startReviewed() {
+    if(!view)return;
+    await command.act('review-run:'+id,{workflow_id:view.workflow_id,workflow_version:view.workflow_version??1},async body=>{
+      const current=await api.compositionView(id);
+      const ref={workflow_id:current.workflow_id,workflow_version:current.workflow_version??1};
+      if(ref.workflow_id!==view.workflow_id||ref.workflow_version!==(view.workflow_version??1))throw new Error('The workflow version changed. Refresh and review again.');
+      if(current.workflow_status==='validated')await api.request('approve_workflow',{...ref,action:'approve'},String(body['request_key'])+'_approve');
+      else if(!['approved','published'].includes(current.workflow_status??''))throw new Error('Validate this workflow before running it.');
+      if(!scheduled&&!adaptive){const result=await api.request('execute_workflow',{...ref,inputs:{}},String(body['request_key'])+'_execute');onRun?.(result.run.run_id);}
+      setReviewRun(false);update();
+    });
+  }
+  const disabled = command.busy || stale || command.unknown || view?.state==='blocked';
   const needsQueryDefinition=!!view?.recovery.can_clarify&&view.tasks.some(t=>t.result?.classification==='query_clarification');
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold">Investigation workflow</h2>
-        <button className={actionButton} disabled={command.busy} onClick={update}>
-          Refresh plan
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+        <div className="min-w-0"><p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Workflow workspace</p><h1 className="text-xl font-semibold">{view?.display_name??'Investigation workflow'}</h1><p className="mt-1 text-xs text-muted-foreground">{view?.run?.status?.replaceAll('_',' ')??view?.workflow_status??'Preparing'}{doc&&` · Plan revision ${doc.action_plan.revision}`}</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className={actionButton} disabled={!view} onClick={()=>setDetails(true)}><Info size={14} className="mr-2 inline"/>Details</button>
+          <button className={actionButton} disabled={disabled||!view||!backend.can('workflow.edit')||!backend.can('workflow.validate')||!!view.workflow_status&&view.workflow_status!=='draft'} onClick={()=>void prepareReview()}><CheckCircle2 size={14} className="mr-2 inline"/>Validate</button>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-40" disabled={disabled||!view||!!view.run||!['validated','approved','published'].includes(view.workflow_status??'')||!backend.can('workflow.execute')||!backend.session?.runtime_available||view.workflow_status==='validated'&&!backend.can('workflow.approve')} onClick={()=>setReviewRun(true)}><Play size={14}/>Run</button>
+          <button className={actionButton} aria-label="Refresh plan" disabled={command.busy} onClick={update}><RefreshCw size={14}/></button>
+        </div>
       </div>
       <ApiFeedback error={error ?? command.error} />
+      {view?.state==='blocked'&&<div role="status" className="rounded-lg border border-warning/50 p-3 text-sm"><p className="font-medium">Workflow draft blocked</p><p>This workflow is saved, but unresolved execution requirements prevent approval or execution. No follow-up answer is requested and no action has been performed.</p>{view.gaps.map((gap,i)=>typeof gap['description']==='string'?<p key={i} className="mt-2">{gap['description']}</p>:null)}</div>}
       {command.unknown && (
         <p role="alert">
           Command outcome is unconfirmed. Refresh the saved state before continuing. Do not submit a
@@ -149,75 +139,14 @@ export function ConnectedPlan({
         </p>
       ) : (
         <>
-          <p className="break-words text-sm">{doc.action_plan.goal}</p>
-          <p className="text-xs">
-            Plan revision {doc.action_plan.revision} ·{" "}
-            {view.run?.status ?? view.workflow_status ?? "Not saved"}
-          </p>
-          <GoogleAccountSelect
-            value={doc.google_connection_id ?? ""}
-            onChange={() => {}}
-            disabled
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <div role="tablist" aria-label="Investigation views" className="inline-flex rounded-lg border p-0.5">
-              {(['workflow','steps','report'] as const).map(value=><button key={value} role="tab" aria-selected={tab===value} disabled={value==='report'&&!view.run&&!view.tasks.some(t=>t.result)} onClick={()=>setTab(value)} className={`rounded-md px-3 py-1.5 text-sm capitalize disabled:opacity-40 ${tab===value?'bg-muted font-medium':''}`}>{value}</button>)}
-            </div>
-            <button className={actionButton} onClick={()=>setPanel('knowledge')}>Business knowledge</button>
-            <button className={actionButton} onClick={()=>setPanel('agents')}>Agents and tools</button>
-            <button className={actionButton} onClick={()=>setPanel('memory')}>Memory and recovery</button>
+          <div role="tablist" aria-label="Investigation views" className="flex max-w-full gap-1 overflow-x-auto border-b pb-1">
+            {(['workflow','steps','report','knowledge','background'] as const).map(value=><button key={value} role="tab" aria-label={value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)} aria-selected={tab===value} disabled={value==='report'&&!view.run&&!view.tasks.some(t=>t.result)} onClick={()=>setTab(value)} className={`shrink-0 rounded-lg px-4 py-2.5 text-sm disabled:opacity-40 ${tab===value?'bg-primary/10 font-semibold text-primary':'text-muted-foreground hover:bg-muted'}`}>{value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)}</button>)}
           </div>
-          <SavedDetails
-            label="Completion criteria and missing inputs"
-            value={{
-              completion_criteria: doc.action_plan.completion_criteria,
-              missing_inputs: doc.action_plan.missing_inputs,
-            }}
-          />
+          {tab==='knowledge'&&<KnowledgeMap doc={doc} view={view}/>}
+          {tab==='background'&&<section className="space-y-4" aria-label="Workflow background"><div><h3 className="font-semibold">Behind the workflow</h3><p className="mt-1 text-sm text-muted-foreground">Inspect the agents, tools and saved execution details supporting this workflow.</p></div><div className="grid gap-3 sm:grid-cols-2"><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('agents')}><Network className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Agents and tools</p><p className="mt-1 text-xs text-muted-foreground">Task assignments and connected capabilities</p></button><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('memory')}><Settings2 className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Memory and recovery</p><p className="mt-1 text-xs text-muted-foreground">Saved context, failures and recovery history</p></button></div><SavedDetails label="Execution diagnostics" value={{run:view.run,planning:view.planning}}/></section>}
+          <Sheet open={details} onOpenChange={setDetails}><SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Workflow details</SheetTitle><SheetDescription>Saved request, account and execution settings.</SheetDescription></SheetHeader><div className="mt-6 space-y-5"><section><h3 className="text-sm font-semibold">Your request</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{doc.action_plan.goal}</p></section><GoogleAccountSelect value={doc.google_connection_id??''} onChange={()=>{}} disabled/><SavedDetails label="Completion criteria and missing inputs" value={{completion_criteria:doc.action_plan.completion_criteria,missing_inputs:doc.action_plan.missing_inputs}}/><SavedDetails label="Schedule and request context" value={{overview:doc['overview_intent'],request:view.request_context}}/><SavedDetails label="Workflow references" value={{workflow_id:view.workflow_id,version:view.workflow_version,plan_revision:doc.action_plan.revision,run_id:view.run?.run_id}}/></div></SheetContent></Sheet>
+          <Dialog open={reviewRun} onOpenChange={setReviewRun}><DialogContent><DialogHeader><DialogTitle>{view.workflow_status==='validated'?'Review and run workflow':'Run workflow'}</DialogTitle><DialogDescription>{scheduled?'Approve this workflow for the separately reviewed schedule. Scheduling authorization remains below.':adaptive?'Approve this workflow for the existing orchestration controller.':'Start the saved workflow using its connected account and configured actions. External writes still require their exact-payload approvals.'}</DialogDescription></DialogHeader><p className="text-sm">{doc.action_plan.goal}</p><p className="text-xs text-muted-foreground">Workflow version {view.workflow_version??1} · {doc.action_plan.actions.length} steps</p><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40" disabled={disabled} onClick={()=>void startReviewed()}>{scheduled||adaptive?'Approve workflow':'Confirm and run'}</button></DialogContent></Dialog>
           <div className="flex flex-wrap gap-2">
-            {goalMode&&(!view.workflow_status||view.workflow_status==='draft')&&<button className={actionButton} disabled={disabled||!backend.can('workflow.edit')||!backend.can('workflow.validate')} onClick={()=>void prepareReview()}>Review plan</button>}
-            {!goalMode&&!view.workflow_status && (
-              <button
-                className={actionButton}
-                disabled={disabled || !backend.can("workflow.edit")}
-                onClick={() => void workflowAction("save_workflow_version")}
-              >
-                Save workflow draft
-              </button>
-            )}
-            {!goalMode&&view.workflow_status === "draft" && (
-              <button
-                className={actionButton}
-                disabled={disabled || !backend.can("workflow.validate")}
-                onClick={() => void workflowAction("validate_workflow")}
-              >
-                Validate workflow
-              </button>
-            )}
-            {view.workflow_status === "validated" && (
-              <button
-                className={actionButton}
-                disabled={disabled || !backend.can("workflow.approve")}
-                onClick={() => void workflowAction("approve_workflow")}
-              >
-                Approve workflow
-              </button>
-            )}
-            {!adaptive &&
-              !view.run &&
-              ["approved", "published"].includes(view.workflow_status ?? "") && (
-                <button
-                  className={actionButton}
-                  disabled={
-                    disabled ||
-                    !backend.can("workflow.execute") ||
-                    !backend.session?.runtime_available
-                  }
-                  onClick={() => void workflowAction("execute_workflow")}
-                >
-                  Run reviewed plan
-                </button>
-              )}
             {!adaptive &&
               view.run &&
               ["running", "queued", "paused_for_approval"].includes(view.run.status) && (

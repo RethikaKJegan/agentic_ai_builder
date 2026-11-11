@@ -1,0 +1,4 @@
+- [x] Trace saved failed action and spreadsheet rows constraint.
+- [x] Add trusted empty-result report context and compatible table generation.
+- [x] Verify no fabricated metrics, complete empty delivery and unchanged nonempty paths.
+- [x] Rehearse saved context, deploy and verify preservation.

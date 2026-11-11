@@ -7,7 +7,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "@/lib/navigation";
 import { useMesh } from "@/domain/store";
 import { createWorkflow } from "@/api/create-workflow";
-import { api, type PlanningJob } from "@/api/client";
+import { api, ApiError, type PlanningJob } from "@/api/client";
 import { toast } from "sonner";
 import { useBackend } from "@/api/state";
 import { hasWorkflowEdits } from "@/api/mapping";
@@ -16,10 +16,15 @@ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import {isInvestigationPrompt} from '@/api/investigations';
 import {InvestigationContext,type InvestigationContextValue} from '@/features/investigations/InvestigationContext';
 import {CompositionOptions,emptyCompositionOptions} from '@/features/investigations/CompositionOptions';
-import {BusinessInputs} from '@/features/investigations/BusinessInputs';
 import {InvestigationList} from '@/features/investigations/InvestigationList';
+import {OverviewAutomationReview} from '@/features/investigations/OverviewAutomationReview';
+import {overviewStorageKey,type OverviewResult} from '@/api/overview-automation';
 
 export default function Overview() {
+  const backend=useBackend();
+  const [overview,setOverview]=useState<OverviewResult|null>(null);
+  const openWhenPrepared=useRef(false);
+  const restoreGeneration=useRef(0);
   const navigate = useNavigate();
   const workflows = useMesh((s) => s.workflows);
   const [description, setDescription] = useState("");
@@ -32,8 +37,10 @@ export default function Overview() {
   const generationLock = useRef(false);
   const [planning, setPlanning] = useState(false);
   const [planningJob, setPlanningJob] = useState<PlanningJob | null>(null);
+  const latestPlanningJob = useRef<PlanningJob | null>(null);
+  const currentPlanningState = () => latestPlanningJob.current?.state;
   const [cancelling, setCancelling] = useState(false);
-  useEffect(() => api.subscribePlanning(setPlanningJob), []);
+  useEffect(() => api.subscribePlanning(job=>{latestPlanningJob.current=job;setPlanningJob(job);}), []);
   const cancel = async () => {
     if (!planningJob || cancelling) return;
     setCancelling(true);
@@ -42,11 +49,33 @@ export default function Overview() {
     finally { setCancelling(false); }
   };
   const [apiError, setApiError] = useState<Error | null>(null);
+  const overviewScope=backend.session?.overview_routing_available?backend.session.auth.subject:undefined;
+  const reviewStorage=overviewScope?overviewStorageKey(overviewScope.workspace_id,overviewScope.subject_id):null;
+  useEffect(()=>{
+    let live=true;
+    const generation=restoreGeneration.current;
+    openWhenPrepared.current=false;
+    setOverview(null);
+    if(reviewStorage){
+      const key=localStorage.getItem(reviewStorage);
+      if(key)void api.overviewIntent({operation:'get',request_key:key}).then(value=>{if(live&&generation===restoreGeneration.current){openWhenPrepared.current=value.state==='planning';setOverview(value);}}).catch(error=>{if(live&&generation===restoreGeneration.current)setApiError(error as Error);});
+    }
+    return ()=>{live=false;};
+  },[reviewStorage]);
+  useEffect(()=>{
+    if(!openWhenPrepared.current||overview?.state!=='prepared'||!overview.composition_id)return;
+    if(overview.workspace&&(overview.workspace.workspace_id!==overviewScope?.workspace_id||overview.workspace.subject_id!==overviewScope?.subject_id))return;
+    openWhenPrepared.current=false;
+    navigate({to:'/app/workflows/investigate',search:{connected:'1',composition:overview.composition_id,overview:overview.request_key}});
+  },[overview,overviewScope?.workspace_id,overviewScope?.subject_id,navigate]);
   const generate = async () => {
     const prompt = description.trim();
     if (generationLock.current || !prompt) return;
     generationLock.current = true;
-    setPlanning(true); setPlanningJob(null); setApiError(null);
+    restoreGeneration.current++;
+    latestPlanningJob.current=null;
+    openWhenPrepared.current=false;
+    setOverview(null);setPlanning(true); setPlanningJob(null); setApiError(null);
     try {
       const context = {
         generation_mode: "hierarchy",
@@ -58,6 +87,19 @@ export default function Overview() {
       if (currentBackend.status !== "connected") throw currentBackend.error ?? new InputError("Could not connect to the workflow API. Retry when it is connected.");
       if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
       if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
+      if(currentBackend.session.overview_routing_available&&workflowMode==='auto') {
+        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(businessValues);
+        if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
+        const key=investigationKey.current.key;
+        const subject=currentBackend.session.auth.subject;
+        localStorage.setItem(overviewStorageKey(subject.workspace_id,subject.subject_id),key);
+        const result=await api.overviewIntent({operation:'prepare',objective:prompt,request_key:key,business_request:evidenceContext,user_values:businessValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
+        if(result.state!=='legacy') {
+          openWhenPrepared.current=true;
+          setOverview(result);
+          return;
+        }
+      }
       if(isInvestigationPrompt(prompt,workflowMode)||(workflowMode!=='automation'&&currentBackend.session?.dynamic_composition_available===true)||toolOptions.packageId) {
         const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(businessValues);
         if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
@@ -72,7 +114,11 @@ export default function Overview() {
       const current = state.workflows.find(workflow => workflow.id === saved.workflow.workflow_id);
       if (!current || !hasWorkflowEdits(current, state.agents)) state.acceptWorkflow(saved.workflow);
       navigate({to: "/app/workflows/$id", params: {id: saved.workflow.workflow_id}});
-    } catch (caught) { setApiError(caught instanceof Error ? caught : new InputError("Workflow generation failed.")); }
+    } catch (caught) {
+      if((caught instanceof ApiError&&caught.error.error_code==='PLANNING_CANCELLED')
+          ||['failed','cancelled'].includes(currentPlanningState()??''))investigationKey.current=null;
+      setApiError(caught instanceof Error ? caught : new InputError("Workflow generation failed."));
+    }
     finally { generationLock.current = false; setPlanning(false); }
   };
   return <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
@@ -82,7 +128,6 @@ export default function Overview() {
           <textarea value={description} disabled={planning} onChange={(e) => {setDescription(e.target.value);setBusinessValues({});setApiError(null);}} rows={10} placeholder="e.g. When a customer complaint arrives, analyse severity, look up the account, draft a reply and escalate critical cases for approval." className="min-h-[280px] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80" aria-label="Process description" />
       <p className="mt-4 text-sm text-muted-foreground">Describe what you need. Supported data queries and engine, complaint, inspection and warranty investigations generate workflows you can run and inspect. Multi-record queries do not require a complaint ID. Other automation requests use the existing workflow builder.</p>
       <CompositionOptions value={toolOptions} onChange={value=>{setToolOptions(value);setBusinessValues({});setApiError(null);}}/>
-      <BusinessInputs error={apiError} values={businessValues} onChange={setBusinessValues}/>
       <details onToggle={e=>setOptionsOpen(e.currentTarget.open)} className="mt-4 text-xs text-muted-foreground"><summary className="cursor-pointer">Workflow options</summary>{optionsOpen && <label className="mt-2 inline-flex items-center gap-2">Workflow type<select aria-label="Workflow type" disabled={planning} value={workflowMode} onChange={e=>setWorkflowMode(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm text-foreground"><option value="auto">Choose automatically</option><option value="investigation">Business investigation</option><option value="automation">Automation</option></select></label>}{optionsOpen&&<InvestigationContext value={evidenceContext} onChange={setEvidenceContext} objective={description}/>}</details>
       <div className="mt-6 flex flex-wrap items-center gap-3">
       {planning && planningJob && ["queued", "running"].includes(planningJob.state) &&
@@ -93,6 +138,7 @@ export default function Overview() {
       {planningJob && <p role="status" className="mt-3 break-all text-xs text-muted-foreground">Generation {planningJob.state} · Job {planningJob.job_id}</p>}
       {planningJob?.state === "cancelled" && <p className="mt-1 text-xs text-muted-foreground">Cancellation discards the result. Model usage already incurred cannot be undone.</p>}
       <ApiFeedback error={apiError} />
+      {overview&&!planning&&<OverviewAutomationReview value={overview} onChange={setOverview} compact/>}
     </section>
     <section className="mt-12"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium">Recent workflows</h2><Link to="/app/workflows" className="text-sm text-primary">View all</Link></div>{workflows.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Generate a workflow above to see it here.</p> : <div className="divide-y divide-border rounded-xl border border-border">{workflows.slice(0, 5).map((w) => <Link key={w.id} to="/app/workflows/$id" params={{ id: w.id }} className="flex items-center justify-between px-4 py-3 hover:bg-canvas"><span><span className="block font-medium">{displayText(w.name)}</span><span className="text-xs text-muted-foreground">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : "local draft"}</span></span><ArrowRight className="h-4 w-4 text-primary" /></Link>)}</div>}</section>
     <InvestigationList/>

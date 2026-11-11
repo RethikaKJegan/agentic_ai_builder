@@ -44,6 +44,17 @@ def ready_frontier(nodes, edges, node_states, edge_states):
 
 
 class GraphRunner:
+    @staticmethod
+    def model_pass_binding(binding,action):
+        agent=deepcopy(binding)
+        if action and action['capability_id'] in {'content.prepare','data.plan_query'}:
+            agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
+        if action and action['capability_id']=='data.plan_query' and binding['limits']['max_llm_calls']>=2:
+            # Two pure-model attempts share the already reviewed token/cost cap.
+            agent['limits']['max_tokens']=binding['limits']['max_tokens']//2
+            agent['limits']['max_estimated_cost_usd']=binding['limits'].get('max_estimated_cost_usd',0)/2
+        return agent
+
     def invoke_agent_with_feedback(self, adapter, binding, params, run_id, auth, worker, workflow, node, reference):
         from shared.llm_feedback import correct_once
         def invoke(item):
@@ -55,13 +66,21 @@ class GraphRunner:
                 agent['_validation_feedback'] = item
             from .action_plans import action_for
             action=action_for(workflow,node['node_id'])
-            if action and action['capability_id']=='content.prepare':
-                agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
+            agent=self.model_pass_binding(agent,action)
             output = adapter.invoke(agent, params, reference)
             if list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
             from .action_plans import validate_content
-            validate_content(workflow,node,output,params)
+            try:validate_content(workflow,node,output,params)
+            except RuntimeFailure as error:
+                if action and action['capability_id']=='data.plan_query' and getattr(error,'invalid_model_output',False):
+                    with self.runtime.store.transaction() as db:
+                        run=self.runtime.load(db,run_id,auth,'workflow.execute')
+                        if self.runtime.owns_execution(run,worker):
+                            self.runtime.event(db,run,'agent.output_rejected',dict(node_id=node['node_id'],
+                                error_code=error.code,field=getattr(error,'validation_field','query'),
+                                validation_rule=getattr(error,'validation_hint','')[:400]))
+                raise
             return output
         def prepare(item):
             if getattr(adapter, 'external_write', False):
@@ -77,7 +96,8 @@ class GraphRunner:
                        for group, limits in ((binding['agent_id'], binding['limits']),
                                              ('workflow', workflow['execution_policy']['limits']))):
                     return False
-                amount = adapter.reservation(binding)
+                from .action_plans import action_for
+                amount = adapter.reservation(self.model_pass_binding(binding,action_for(workflow,node['node_id'])))
                 amount['llm_calls'] = 1
                 self.reserve(db, run, workflow, binding, amount)
                 self.runtime.event(db, run, 'agent.correction', {'node_id': node['node_id'],
@@ -292,7 +312,16 @@ class GraphRunner:
                 self.runtime.save(db,run)
             return True
         with LeaseHeartbeat(renew,interval=max(1,seconds/3)):
-            return self._advance(run_id,auth,worker,seconds)
+            try:
+                return self._advance(run_id,auth,worker,seconds)
+            finally:
+                # Only the returning owner can relinquish a stopped execution.
+                # Keep a still-running/uncertain invocation and all effect state.
+                with self.runtime.store.transaction() as db:
+                    run=self.runtime.load(db,run_id,auth,'workflow.execute')
+                    if run.get('worker')==worker and run['status'] not in {'queued','running'}:
+                        run['lease_until']=0
+                        self.runtime.save(db,run)
 
     def _advance(self, run_id, auth, worker, lease_seconds):
         runtime = self.runtime
@@ -430,9 +459,7 @@ class GraphRunner:
                             reservation_agent=agent
                             from .action_plans import action_for
                             action=action_for(workflow,node['node_id'])
-                            if action and action['capability_id']=='content.prepare':
-                                reservation_agent=deepcopy(agent)
-                                reservation_agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
+                            reservation_agent=self.model_pass_binding(agent,action)
                             reservation = self.agents.reservation(reservation_agent)
                             reservation['llm_calls'] = max(1, reservation.get('llm_calls', 0))
                         else:

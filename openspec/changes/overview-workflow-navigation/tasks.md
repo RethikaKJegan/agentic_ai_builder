@@ -1,0 +1,5 @@
+- [x] Inspect generation and workflow review routes.
+- [x] Navigate all newly prepared Overview compositions to Workflows.
+- [x] Restore scoped review and schedule controls on the workflow detail page.
+- [x] Verify success, clarification, cancellation, refresh and account boundaries.
+- [x] Build and deploy the frontend; verify hosted read-only pages.

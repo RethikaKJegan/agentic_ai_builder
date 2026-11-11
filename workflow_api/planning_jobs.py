@@ -15,6 +15,7 @@ from jsonschema import Draft202012Validator
 from registry.contracts import schema
 from registry.safety import reject_secrets
 from .service import ApiFailure
+from runtime.service import RuntimeFailure
 
 
 class PlanningJobs:
@@ -102,8 +103,23 @@ class PlanningJobs:
             auth = self.authenticate(row[1], row[2])
             if auth is None:
                 raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Planning authority is no longer available.', 403)
-            result = self.service.handle(json.loads(row[3]), deepcopy(auth))
-        except ApiFailure as exc:
+            request=json.loads(row[3])
+            context=request.get('payload',{}).get('context',{})
+            overview=context.get('praxi_overview_request_v1') if isinstance(context,dict) else None
+            if overview is not None:
+                adapter=getattr(self.service,'overview_automation',None)
+                if (not adapter or not adapter.enabled(auth) or not isinstance(overview,dict)
+                        or overview.get('operation','prepare')!='prepare'
+                        or overview.get('objective')!=request['payload']['objective']
+                        or overview.get('request_key')!=request['idempotency_key']):
+                    raise ApiFailure('OVERVIEW_ROUTING_UNAVAILABLE','Overview routing is unavailable or the queued request changed.',409)
+                result=self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
+            else:
+                result = self.service.handle(request, deepcopy(auth))
+        except (ApiFailure,RuntimeFailure) as exc:
+            if isinstance(exc,RuntimeFailure):
+                required=getattr(exc,'required_inputs',None)
+                exc=ApiFailure(exc.code,str(exc),exc.status,details={'required_inputs':required} if required else None)
             result = self.service.failure('req_planning', exc)
         except Exception:
             result = self.service.failure('req_planning', ApiFailure('PLANNING_FAILED', 'Planning failed. Check the service and start a new generation request.', 503))

@@ -1,0 +1,4 @@
+- [x] Resolve relative calendar event dates and distinguish event time from workflow time.
+- [x] Replace recoverable blocked-new-draft fallback with a scoped evidence/limitations report.
+- [x] Verify exact reported prompt, explicit execution schedules, missing evidence and access denial.
+- [x] Record validation and release scope.

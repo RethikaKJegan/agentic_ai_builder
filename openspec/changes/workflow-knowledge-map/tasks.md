@@ -1,0 +1,7 @@
+- [x] Inspect existing APIs, authorization, graph components and execution controls.
+- [x] Implement generic authorized ontology adapter and exact-reference evidence rules.
+- [x] Build interactive grouped graph, step filter and readable concept inspector.
+- [x] Integrate clean tabs, Details, Background and Validate/Run review.
+- [x] Verify tenant/cache isolation, history, evidence states and workflow regression.
+- [x] Run frontend types/lint/build, backend authorization checks and desktop/mobile acceptance.
+- [x] Deploy frontend with rollback and verify separate authorized accounts.

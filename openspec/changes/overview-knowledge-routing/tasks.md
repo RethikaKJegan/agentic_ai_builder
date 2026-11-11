@@ -1,0 +1,5 @@
+- [x] Inspect the exact failed hosted proposal and run.
+- [x] Add pinned knowledge input and capability/grounding guards.
+- [x] Verify the exact prompt against copied Simpson knowledge with controlled models.
+- [x] Run relevant routing, retrieval, query and runtime regressions.
+- [x] Back up and deploy the backend hotfix; verify public accounts and preservation.

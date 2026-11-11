@@ -1,0 +1,4 @@
+- [x] Confirm hosted contradictory-intent failure.
+- [x] Canonicalize valid analysis plus delivery and clarify model instructions.
+- [x] Verify exact prompt, schedules, negations and approval boundaries.
+- [x] Deploy backend-only fix and verify public health and preservation.
