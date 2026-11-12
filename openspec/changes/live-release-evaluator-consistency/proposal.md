@@ -1,0 +1,3 @@
+# Verify active release evaluator consistency
+
+The previous wrapper fix landed in the workspace but systemd launches Subway from workflow-ui-release-20261112/app. That release deliberately excluded the concurrent evaluator patch. Restarting the backend therefore retained the missing method and old diagnostics. Patch only the three affected modules in the actual release, preserve its other presentation/deployment adaptations, remove the release preparation exclusions, and verify module origins and behavior from its service working directory. Deployment must assert actual systemd ExecStart/WorkingDirectory and loaded-module path, not assume the repository root is the runtime source.

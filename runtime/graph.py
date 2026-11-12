@@ -45,12 +45,13 @@ def ready_frontier(nodes, edges, node_states, edge_states):
 
 class GraphRunner:
     @staticmethod
-    def model_pass_binding(binding,action,workflow=None,run=None):
+    def model_pass_binding(binding,action,workflow=None,run=None,*,enforce_usage_budgets=True):
         agent=deepcopy(binding)
         if (workflow or {}).get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation':
             usage=(run or {}).get('usage',{}).get(agent['agent_id'],{})
-            agent['limits']['max_tokens']=max(0,agent['limits']['max_tokens']-usage.get('tokens',0))
-            agent['limits']['max_estimated_cost_usd']=max(0,agent['limits'].get('max_estimated_cost_usd',0)-usage.get('estimated_cost_usd',0))
+            if enforce_usage_budgets:
+                agent['limits']['max_tokens']=max(0,agent['limits']['max_tokens']-usage.get('tokens',0))
+                agent['limits']['max_estimated_cost_usd']=max(0,agent['limits'].get('max_estimated_cost_usd',0)-usage.get('estimated_cost_usd',0))
             agent['limits']['max_llm_calls']=1
         if action and action['capability_id'] in {'content.prepare','data.plan_query'}:
             agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
@@ -72,13 +73,13 @@ class GraphRunner:
                 agent['_validation_feedback'] = item
             from .action_plans import action_for
             action=action_for(workflow,node['node_id'])
-            agent=self.model_pass_binding(agent,action,workflow)
+            agent=self.model_pass_binding(agent,action,workflow,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
             accounted=getattr(adapter,'invoke_accounted',None)
             if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation' and callable(accounted):
                 reservation=adapter.reservation(agent)
                 output,actual=accounted(agent,params,reference)
-                if set(actual)!=set(reservation) or actual.get('llm_calls')!=1 or any(type(v) not in (int,float) or v<0 or v!=v or v>reservation[k] for k,v in actual.items()):
-                    raise RuntimeFailure('INVALID_USAGE','Confirmed model usage must fit the reviewed reservation.')
+                from .model_usage import validate_confirmed
+                validate_confirmed(actual,reservation,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
                 with self.runtime.store.transaction() as db:
                     saved=self.runtime.load(db,run_id,auth,'workflow.execute')
                     if not self.runtime.owns_execution(saved,worker):raise RuntimeFailure('DELEGATION_INTERRUPTED','Execution ownership changed.')
@@ -118,7 +119,7 @@ class GraphRunner:
                     return False
                 from .action_plans import action_for
                 root=next(a for a in workflow['agents'] if a['agent_id']==binding['agent_id'])
-                attempt_binding=self.model_pass_binding(root,action_for(workflow,node['node_id']),workflow,run)
+                attempt_binding=self.model_pass_binding(root,action_for(workflow,node['node_id']),workflow,run,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
                 amount = adapter.reservation(attempt_binding)
                 amount['llm_calls'] = 1
                 self.reserve(db, run, workflow, binding, amount)
@@ -506,7 +507,7 @@ class GraphRunner:
                             reservation_agent=agent
                             from .action_plans import action_for
                             action=action_for(workflow,node['node_id'])
-                            reservation_agent=self.model_pass_binding(agent,action,workflow,run)
+                            reservation_agent=self.model_pass_binding(agent,action,workflow,run,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
                             if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation':
                                 invocation=(self.agents,reservation_agent,self.params(node,run,workflow))
                             reservation = self.agents.reservation(reservation_agent)

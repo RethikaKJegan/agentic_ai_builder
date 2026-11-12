@@ -1,3 +1,5 @@
+> Latest workflow UI release: [simplified workflow list, titles and backgrounds](../workflow-ui-simplification/deployment.md) is deployed as `workflow-ui-20261112-8a29d2f2ef9a`.
+
 Latest hosted Knowledge Map visual update: [direct connected-context highlighting](../knowledge-map-connected-context/deployment.md).
 
 Latest hosted ontology usage release: [recorded concept highlights and source evidence](../workflow-ontology-usage/deployment.md).

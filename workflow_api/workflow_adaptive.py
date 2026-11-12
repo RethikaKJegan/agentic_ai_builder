@@ -156,6 +156,10 @@ def context(runtime, db, run, workflow, auth):
     ctx = dict(evaluation_kind=KIND, original_objective=a['objective'],
         scope=deepcopy(plan['scope']), constraints=deepcopy(plan['constraints']),
         automation_trigger=brief(run.get('automation_reference',{})),
+        execution_scope=dict(kind='automation_occurrence' if run.get('automation_reference') else 'reviewed_workflow',
+            business_requirements='Source-backed findings and requested analysis only. Do not include report drafting, mail delivery or schedule creation as business evidence requirements.',
+            schedule_management='The durable scheduler validates the owned schedule, occurrence and recurring authorization before this evaluator runs. This occurrence does not create a schedule. Do not request schedule creation receipts from query/report actions.',
+            delivery_management='Report and delivery actions remain in plan.actions and completion_criteria. Business completion_eligible permits their reviewed execution; final complete still requires their actual completed action states and approvals.'),
         plan=deepcopy(plan), frozen_requirements=deepcopy(a['requirements']),
         evidence={k:{**v, 'output':brief(v['output'])} for k,v in ev.items()},
         deterministic_limitations=limitations, previous_assessment=a['assessment'],
@@ -406,6 +410,9 @@ def _drive(runner, run_id, auth, raw_advance):
             else:
                 resume = False
                 a.pop('execution_permission', None)
+                if not callable(getattr(service.planner.provider,'evaluate_actions',None)):
+                    block(runtime,db,run,'ADAPTIVE_PROVIDER_UNAVAILABLE')
+                    return runtime.public(run)
                 ctx, ev, limitations = context(runtime, db, run, workflow, auth)
                 a['deterministic_limitations']=deepcopy(limitations)
                 reservation = len(json.dumps(dict(schema=CONTRACT, context=ctx)).encode()) + a['limits']['evaluator_output_tokens']
@@ -502,6 +509,7 @@ def _drive(runner, run_id, auth, raw_advance):
                     if current['adaptive'].get('claim',{}).get('token') not in (None,token):
                         return runtime.public(current)
                     current['adaptive'].pop('claim', None)
+                    runtime.event(db,current,'adaptive.evaluation_failed',dict(exception_type=type(exc).__name__))
                     # Explicit provider rejection is safe to retry. Unknown
                     # outcomes remain blocked; their usage reservation is kept.
                     if getattr(exc,'status_code',None) in (429,503):

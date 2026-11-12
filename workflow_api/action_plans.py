@@ -71,6 +71,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if row:
         if row[0]!=fingerprint:deny('Plan request key was reused.','ACTION_PLAN_CONFLICT')
         return composition.get(auth,json.loads(row[1])['composition_id'])
+    from .workflow_display import title_before_planning, display_title
+    display_name=display_title(dict(objective=objective,overview_intent=_overview)) if _overview else title_before_planning(objective,composition.service.planner.provider if body.get('action_plan') is None else None)
     knowledge_only=bool(_overview and _overview['route']['intent_type']=='knowledge')
     prepared=composition.preparation.checked(auth,body['preparation_id']) if body.get('preparation_id') else None
     if not knowledge_only and not prepared and body.get('business_request') is not None:
@@ -453,6 +455,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         doc['adaptive_control']=dict(kind='workflow-investigation',limits=dict(
             max_seconds=plan['constraints']['max_seconds'],max_llm_calls=plan['constraints']['max_llm_calls'],
             max_tool_calls=plan['constraints']['max_tool_calls']))
+    doc['display_name']=display_name
     doc['sha256']=digest(doc)
     from planner.validation import validate_workflow
     validate_workflow(compile_workflow(doc))
@@ -466,8 +469,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
 
 
 def compile_workflow(doc):
+    from .workflow_display import display_title
     w=dict(workflow_id='cw_'+doc['composition_id'].removeprefix('composition_'),version=1,
-        name='Connected action workflow',description=doc['objective'],status='draft',inputs=[],outputs=[],stakeholders=[],agents=[],tools=[],nodes=[],edges=[],conditions=[],approval_gates=[],
+        name=display_title(doc),description=doc['objective'],status='draft',inputs=[],outputs=[],stakeholders=[],agents=[],tools=[],nodes=[],edges=[],conditions=[],approval_gates=[],
         execution_policy=dict(limits={},requires_review_before_execution=True,allow_external_writes=False),
         error_policy=dict(on_validation_error='reject',on_runtime_error='stop',max_retries=0),
         metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=doc['composition_id'],composition_sha256=doc['sha256'],

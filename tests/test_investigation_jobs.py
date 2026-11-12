@@ -86,7 +86,8 @@ def test_rename_persists_without_changing_plan_and_delete_retains_history(jobs):
 def test_rename_rejects_invalid_names(jobs,name):
  x=jobs;p=management_plan(x)
  with pytest.raises(ApiFailure):x.service.manage(x.a,p['workflow_id'],{'display_name':name})
- assert x.jobs.list(x.a)['items'][0]['display_name']==OBJECTIVE
+ assert x.jobs.list(x.a)['items'][0]['display_name']==p['display_name']
+ assert x.jobs.list(x.a)['items'][0]['objective']==OBJECTIVE
 
 
 def test_management_owner_permissions_and_active_run_protection(jobs):

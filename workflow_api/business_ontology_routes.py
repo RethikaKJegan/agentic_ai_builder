@@ -157,7 +157,7 @@ def install(app, service, auth, reference, env=None):
         return await call(simpson_lifecycle.create,await body(request))
 
     @app.get('/business-ontology/v1/automation')
-    async def automation_listing(kind:str|None=None,before:str|None=None,limit:int=100):return await call(automation.listing,kind,before,limit)
+    async def automation_listing(kind:str|None=None,before:str|None=None,limit:int=100,workflow_id:str|None=None):return await call(automation.listing,kind,before,limit,workflow_id)
 
     @app.get('/business-ontology/v1/automation/{identifier}')
     async def automation_get(identifier:str):return await call(automation.get,identifier)
@@ -363,6 +363,11 @@ def install(app, service, auth, reference, env=None):
     @app.put('/business-ontology/v1/compositions/{composition_id}/display-name')
     async def composition_rename(composition_id:str,request:Request):return await call(presentation.rename,composition_id,await body(request))
 
+    @app.post('/business-ontology/v1/compositions/{composition_id}/duplicate')
+    async def composition_duplicate(composition_id:str,request:Request):
+        from .workflow_duplicates import composition_copy
+        return await call(lambda current,body:composition_copy(presentation,current,composition_id,body),await body(request))
+
     @app.delete('/business-ontology/v1/compositions/{composition_id}')
     async def composition_delete(composition_id:str,request:Request):return await call(presentation.delete,composition_id,await body(request))
 
@@ -389,6 +394,11 @@ def install(app, service, auth, reference, env=None):
 
     @app.put('/business-ontology/v1/investigations/plans/{workflow_id}')
     async def investigation_rename(workflow_id:str,request:Request):return await call(investigations.manage,workflow_id,await body(request))
+
+    @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/duplicate')
+    async def investigation_duplicate(workflow_id:str,request:Request):
+        from .workflow_duplicates import investigation_copy
+        return await call(lambda current,body:investigation_copy(investigations,current,workflow_id,body),await body(request))
 
     @app.delete('/business-ontology/v1/investigations/plans/{workflow_id}')
     async def investigation_delete(workflow_id:str):return await call(investigations.manage,workflow_id,{},True)

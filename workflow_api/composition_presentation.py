@@ -4,6 +4,7 @@ import json
 from uuid import uuid4
 from .investigation_graph import fail
 from .google_connections import now
+from .workflow_display import display_title
 
 
 def tool_receipt(output):
@@ -54,7 +55,7 @@ class CompositionPresentation:
             doc=json.loads(row[0]);wid='cw_'+doc['composition_id'].removeprefix('composition_');meta=metadata.get(wid,{})
             if wid in deleted or meta.get('deleted'):continue
             run=next((r for r in runs if r['workflow_id']==wid),None)
-            items.append(dict(workflow_id=wid,composition_id=doc['composition_id'],display_name=meta.get('name') or doc['objective'],objective=doc['objective'],created_at=doc['created_at'],node_count=len(doc['tasks']),run_id=run['run_id'] if run else None,status=run['status'] if run else doc['state'],kind='composition'))
+            items.append(dict(workflow_id=wid,composition_id=doc['composition_id'],display_name=meta.get('name') or display_title(doc),objective=doc['objective'],created_at=doc['created_at'],node_count=len(doc['tasks']),run_id=run['run_id'] if run else None,status=run['status'] if run else doc['state'],kind='composition'))
         return items
 
     def view(self,auth,cid,run_id=None):
@@ -157,7 +158,7 @@ class CompositionPresentation:
             if prepared.get('evidence_context'):request_context['business_request']['evidence_context']={k:prepared['evidence_context'][k] for k in ('dataset_id','case_id')}
         if doc.get('client_package_context'):
             package=doc['client_package_context']['package'];request_context.update(client_package_id=package['package_id'],client_package_revision=package['revision'])
-        return dict(composition_id=cid,workflow_id=wid,display_name=meta[0] if meta and meta[0] else 'Business investigation',objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=doc['master'],workflow_status=workflow['status'] if workflow else None,workflow_version=workflow['version'] if workflow else None,run=public_run,knowledge=knowledge,memory=memory,recovery=recovery,planning=doc['planning'],resources=doc['resources'],request_context=request_context)
+        return dict(composition_id=cid,workflow_id=wid,display_name=meta[0] if meta and meta[0] else display_title(doc),objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=doc['master'],workflow_status=workflow['status'] if workflow else None,workflow_version=workflow['version'] if workflow else None,run=public_run,knowledge=knowledge,memory=memory,recovery=recovery,planning=doc['planning'],resources=doc['resources'],request_context=request_context)
 
     @staticmethod
     def recovery_view(run,workflow,clock):
@@ -168,6 +169,8 @@ class CompositionPresentation:
             return dict(eligible=False,reason='The agent summary contained an unsupported or missing source citation. Review the retrieved records and evidence gaps, then start a new run with the corrected result schema. Source reads may already have completed; this error does not mean an agent ID is missing.',failure=failure)
         writes=[n for n in workflow['nodes'] if node_external_write(workflow,n)]
         if any(run['node_states'].get(n['node_id']) in ('executing','completed','blocked','failed') for n in writes):return dict(eligible=False,can_clarify=False,reason='Reconcile the external action before preparing another attempt.',failure=failure)
+        if run.get('error_code') in ('ADAPTIVE_PROVIDER_UNAVAILABLE','ADAPTIVE_EVALUATION_FAILED'):
+            return dict(eligible=False,reason='The workflow evaluator is unavailable or failed internally. Inspect the backend evaluation diagnostic and correct the service before starting a new run.',failure=failure)
         from .workflow_queries import query_clarifications
         questions=query_clarifications(run,workflow)
         if questions:return dict(eligible=False,can_clarify=True,reason='Clarification needed: '+' '.join(questions.values())+' Supply the intended definition to generate a new reviewable workflow. This query has not executed.',failure=failure)

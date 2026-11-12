@@ -155,7 +155,7 @@ def test_configured_ai_transport_uses_bounded_structured_context_without_executi
     provider=SimpleNamespace(_client=SimpleNamespace(responses=SimpleNamespace(create=create)),model='configured-model',timeout_seconds=180)
     router=OverviewAutomation(SimpleNamespace(planner=SimpleNamespace(provider=provider)))
     context={'workspace':{'workspace_id':'future_tenant'},'catalog':{'datasets':[]}}
-    assert router.interpret('Daily mapped business report',context)==route
+    assert router.interpret('Daily mapped business report',context)==dict(route,display_name='Daily mapped business report')
     assert len(calls)==1
     request=calls[0]
     assert request['model']=='configured-model' and request['store'] is False

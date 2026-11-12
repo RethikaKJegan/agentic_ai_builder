@@ -54,3 +54,16 @@ it('shows direct context separately and clears it when another step is selected'
  fireEvent.change(screen.getByLabelText('Knowledge workflow step'),{target:{value:'other'}});
  expect(screen.getByRole('button',{name:'Related Complaint'})).toHaveAttribute('data-state','available');
 });
+
+it.each(['simpsons','subway'])('omits unrelated module cards from This workflow for %s',async tenant=>{
+ scope(tenant);const f=knowledgeFixture(tenant);
+ const unrelated={...f.snapshot.concepts[0]!,id:'unrelated',label:'Unrelated concept',module_id:'unrelated_module'};
+ f.snapshot.concepts.push(unrelated);f.ontology.modules.push({...f.ontology.modules[0]!,id:'unrelated_module',label:'Unrelated module'});
+ vi.spyOn(api,'businessOntology').mockResolvedValue(f.ontology);vi.spyOn(api,'knowledgeSnapshot').mockResolvedValue(f.snapshot);
+ render(<KnowledgeMap doc={f.doc} view={f.view}/>);
+ await screen.findByRole('button',{name:'Complaint'});
+ expect(screen.queryByRole('button',{name:'Unrelated module'})).toBeNull();
+ expect(screen.queryByRole('button',{name:'Unrelated concept'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Full ontology'}));
+ expect(screen.getByRole('button',{name:'Unrelated concept'})).toBeVisible();
+});

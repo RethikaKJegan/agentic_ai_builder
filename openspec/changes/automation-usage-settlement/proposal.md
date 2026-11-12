@@ -1,0 +1,5 @@
+# Consistent model usage settlement for automation
+
+The scheduled run now passes adaptive evaluation but fails INVALID_USAGE on its first model action. Server configuration enables provider-managed token/cost accounting, yet adaptive graph settlement unconditionally rejects confirmed usage exceeding its provisional allocation. Delegated execution already respects that server policy.
+
+Share validation between graph and delegated settlement: always validate finite nonnegative usage and confirmed call counts; enforce token/cost ceilings only under the configured bounded policy. Retain real usage and adaptive total budgets. Also make evaluator business-evidence requirements distinct from scheduler-owned recurrence and delivery completion, preventing missing schedule/email receipts from becoming preconditions to gathering evidence or sending reviewed findings. Original objectives, approvals and final action completion remain enforced. Reproduce scheduled execution locally using provider-sized usage, structured evaluator responses and a fake delivery adapter; no production delivery during verification.

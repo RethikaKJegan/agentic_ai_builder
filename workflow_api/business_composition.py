@@ -95,6 +95,8 @@ class BusinessComposition:
         if old:
             if old[0]!=fingerprint:fail('Composition request key was reused.','CAPABILITY_CONFLICT',409)
             return self.get(auth,json.loads(old[1])['composition_id'])
+        from .workflow_display import title_before_planning
+        display_name=title_before_planning(body['objective'],self.service.planner.provider if body.get('planning_mode','model')=='model' else None)
         package_context=None
         if body.get('client_package_id'):
             if body.get('preparation_id') or body.get('business_request'):fail('Select one pinned knowledge preparation.','CLIENT_PACKAGE_INVALID',422)
@@ -263,6 +265,7 @@ class BusinessComposition:
         if recovery_retries:document['recovery_max_retries']=recovery_retries
         if package_context:
             document['client_package_context']=package_context
+        document['display_name']=display_name
         document['sha256']=digest(document)
         with self.store.transaction() as db:db.execute('INSERT INTO business_compositions VALUES (?,?,?,?,?,?)',(*scope,composition_id,key,fingerprint,canonical(document)))
         return document

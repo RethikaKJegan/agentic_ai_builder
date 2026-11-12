@@ -1,0 +1,3 @@
+- [x] Patch active release and remove evaluator exclusions from its preparation script.
+- [x] Verify actual module origins and offline adaptive/scheduled runtime behavior.
+- [x] Reload Subway and verify loaded code, HTTP diagnostics and preserved records.

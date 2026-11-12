@@ -23,7 +23,7 @@ CATEGORIES = {
  'interrupted_read': ('retry_read', True, False),
 }
 CODES = {
- 'DATABASE_BUSY':'storage_contention','INVOCATION_FAILED':'internal_execution_failure',
+ 'DATABASE_BUSY':'storage_contention','INVOCATION_FAILED':'internal_execution_failure','INVALID_USAGE':'internal_execution_failure',
  'ACTION_CONTENT_UNVERIFIED':'invalid_model_output',
  'DATA_QUERY_STALE':'stale_metadata','DATA_QUERY_RESULT_EXPIRED':'stale_metadata',
  'DATA_QUERY_INVALID':'invalid_model_output','DATA_QUERY_INCOMPLETE':'missing_evidence',

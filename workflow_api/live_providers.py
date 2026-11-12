@@ -176,6 +176,12 @@ class LivePlannerProvider:
     def select_capabilities(self,objective,context):
         return self.provider.select_capabilities(objective,context)
 
+    def evaluate_actions(self,context,*,max_output_tokens=2000):
+        return self.provider.evaluate_actions(context,max_output_tokens=max_output_tokens)
+
+    def workflow_title(self,objective):
+        return self.provider.workflow_title(objective)
+
     def generate(self, objective, context):
         if context.get('capability_composition_catalog'):
             # This proposal selects registered operations. The composition factory,

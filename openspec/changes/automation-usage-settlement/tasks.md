@@ -1,0 +1,4 @@
+- [x] Reproduce the saved usage-policy mismatch and unify settlement validation.
+- [x] Clarify evaluator occurrence and delivery boundaries without weakening completion or approval checks.
+- [x] Verify actual scheduled local execution, excessive/invalid usage and policy isolation.
+- [x] Deploy to the actual release and verify hosted health and preservation.

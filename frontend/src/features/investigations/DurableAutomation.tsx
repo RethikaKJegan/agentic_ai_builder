@@ -15,7 +15,7 @@ export function epochDisplay(value: unknown) {
   return typeof value === "number" ? new Date(value * 1000).toISOString() : "Not recorded";
 }
 type Target = { caseId: string; waitId: string; stageId: string };
-export function AutomationPanel({ target }: { target?: Target | undefined }) {
+export function AutomationPanel({ target, workflowId }: { target?: Target | undefined; workflowId?: string | undefined }) {
   const session = useBackend((s) => s.session);
   if (!session) return null;
   return (
@@ -25,13 +25,14 @@ export function AutomationPanel({ target }: { target?: Target | undefined }) {
         ":" +
         session.auth.subject.subject_id +
         ":" +
-        (target?.caseId ?? "")
+        (target?.caseId ?? workflowId ?? "")
       }
       target={target}
+      workflowId={workflowId}
     />
   );
 }
-function AutomationWorkspace({ target }: { target?: Target | undefined }) {
+function AutomationWorkspace({ target, workflowId }: { target?: Target | undefined; workflowId?: string | undefined }) {
   const backend = useBackend();
   const command = useOrchestrationCommand();
   const [records, setRecords] = useState<AutomationRecord[]>([]);
@@ -47,7 +48,7 @@ function AutomationWorkspace({ target }: { target?: Target | undefined }) {
     "schedules",
   );
   const [google, setGoogle] = useState("");
-  const [workflow, setWorkflow] = useState("");
+  const [workflow, setWorkflow] = useState(workflowId ?? "");
   const [consent, setConsent] = useState("");
   const [cron, setCron] = useState("");
   const [timezone, setTimezone] = useState("Etc/UTC");
@@ -73,7 +74,7 @@ function AutomationWorkspace({ target }: { target?: Target | undefined }) {
     let timer: ReturnType<typeof setTimeout>;
     async function read() {
       try {
-        const data = await api.automationRecords(pages.at(-1));
+        const data = await api.automationRecords(pages.at(-1), workflowId);
         if (!live) return;
         setRecords(data.items);
         setCursor(data.next_cursor);
@@ -92,14 +93,14 @@ function AutomationWorkspace({ target }: { target?: Target | undefined }) {
       live = false;
       clearTimeout(timer);
     };
-  }, [refresh, pages]);
+  }, [refresh, pages, workflowId]);
   useEffect(() => {
     let live = true;
     api
       .request("list_workflows", {})
       .then((data) => {
         if (live)
-          setWorkflows(data.items.filter((w) => ["approved", "published"].includes(w.status)));
+          setWorkflows(data.items.filter((w) => (!workflowId || w.workflow_id === workflowId) && ["approved", "published"].includes(w.status)));
       })
       .catch((e) => {
         if (live) setError(e as Error);
@@ -107,7 +108,7 @@ function AutomationWorkspace({ target }: { target?: Target | undefined }) {
     return () => {
       live = false;
     };
-  }, [refresh]);
+  }, [refresh, workflowId]);
   const canExecute = backend.can("workflow.execute");
   const canApprove = backend.can("workflow.approve");
   const permitted = !command.busy && !command.unknown && canExecute;

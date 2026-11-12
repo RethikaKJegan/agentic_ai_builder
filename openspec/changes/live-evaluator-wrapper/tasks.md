@@ -1,0 +1,3 @@
+- [x] Implement provider delegation and bounded diagnostics.
+- [x] Verify wrapper interface parity, provider failures and actual adaptive execution.
+- [x] Validate contracts/OpenSpec and deploy Subway with preservation checks.

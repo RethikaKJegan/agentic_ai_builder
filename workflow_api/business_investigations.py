@@ -171,6 +171,8 @@ class BusinessInvestigations:
         if preflight and preflight.get('schema_version')=='business-preparation-v1':
             knowledge['business_preparation']=self.coverage.preparation.context(preflight)
         planning_knowledge=(dict(version_id=vid,knowledge_sha256=v['knowledge_sha256'],business_preparation=knowledge['business_preparation']) if 'business_preparation' in knowledge else knowledge)
+        from .workflow_display import title_before_planning
+        display_name=title_before_planning(body['objective'],env=self.env if body.get('planning_mode','model')=='model' else None)
         graph,planning=self.planner.plan(body['objective'],required,planning_knowledge,body.get('planning_mode','model'))
         if not validate_graph(graph,required)['valid']:fail('The proposed graph is invalid.','INVESTIGATION_GRAPH_REJECTED')
         p=dict(schema_version=VERSION,workflow_id='investigation_'+secrets.token_hex(12),revision=1,objective=body['objective'],requirements=required,
@@ -178,6 +180,7 @@ class BusinessInvestigations:
                inputs=context,analysis_mode=mode,wait_for_information=body.get('wait_for_information',False),
                ontology_context=knowledge,source_stamps=list(stamps.values()),limits=deepcopy(LIMITS),created_at=now(),read_only=True,company_reads=0)
         if preflight:p.update(preflight=preflight,evidence_context=preflight.get('evidence_context'),company_reads=preflight.get('source_retrieval_calls',0),preparation_fingerprint=digest({k:v for k,v in body.items() if k!='preflight_id'}))
+        p['display_name']=display_name
         p['plan_sha256']=digest(p)
         self.check_plan(auth,p)
         with self.store.transaction() as db:

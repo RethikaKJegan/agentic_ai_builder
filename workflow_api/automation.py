@@ -73,10 +73,12 @@ class DurableAutomation:
     def get(self, auth, identifier):
         with self.store.transaction(write=False) as db:return self._get(db,self.scope(auth),identifier)
 
-    def listing(self, auth, kind=None, before=None, limit=100):
+    def listing(self, auth, kind=None, before=None, limit=100, workflow_id=None):
         scope=self.scope(auth)
         if type(limit) is not int or not 1<=limit<=100:fail('Use a bounded automation page size.')
         if kind is not None and kind not in CONTRACT['$defs']['record']['properties']['kind']['enum']:fail('Unknown automation record kind.')
+        if workflow_id is not None:
+            return self.workflow_listing(auth,workflow_id,kind,before,limit)
         query='SELECT kind,id,document FROM automation_records WHERE workspace=? AND owner=?';args=list(scope)
         if kind is not None:query+=' AND kind=?';args.append(kind)
         if before is not None:query+=' AND id<?';args.append(before)
@@ -90,6 +92,38 @@ class DurableAutomation:
         terminal=counts.get('completed',0)+sum(counts.get(s,0) for s in ('failed','dead_letter','requires_reconciliation'))
         metrics=dict(occurrence_states=counts,terminal_success_rate=counts.get('completed',0)/terminal if terminal else None,duplicate_events=totals[0],rejected_events=totals[1])
         return dict(items=[json.loads(r[2]) for r in rows[:limit]],has_more=len(rows)>limit,next_cursor=rows[limit-1][1] if len(rows)>limit else None,jobs=[j for j in jobs if j.get('automation_kind')],health=deepcopy(self.health),metrics=metrics)
+
+    def workflow_listing(self, auth, workflow_id, kind, before, limit):
+        """Filter before pagination; include related consent and occurrence records."""
+        scope=self.scope(auth)
+        if not isinstance(workflow_id,str) or not 1<=len(workflow_id)<=128:fail('Supply a workflow identifier.')
+        with self.store.transaction(write=False) as db:
+            docs=[json.loads(r[0]) for r in db.execute('SELECT document FROM automation_records WHERE workspace=? AND owner=? ORDER BY id DESC',scope).fetchall()]
+            jobs=[json.loads(r[0]) for r in db.execute("SELECT document FROM lifecycle_jobs WHERE workspace=? AND json_extract(document,'$.owner_id')=? ORDER BY rowid DESC",scope).fetchall()]
+        def matches(doc):
+            request=doc.get('request',{})
+            return any(isinstance(ref,dict) and ref.get('workflow_id')==workflow_id for ref in (request.get('workflow'),request.get('poll_workflow'),doc.get('result'))) or doc.get('workflow_id')==workflow_id
+        ids={d['id'] for d in docs if matches(d)}
+        cases={d.get('request',{}).get('case_id') for d in docs if d['id'] in ids}-{None}
+        # Follow only explicit relationships, never workspace-wide membership.
+        for _ in range(3):
+            for d in docs:
+                request=d.get('request',{})
+                if d['id'] in ids:
+                    ids.update(x for x in (request.get('authorization_id'),d.get('schedule_id'),request.get('target_id')) if isinstance(x,str))
+                elif d.get('schedule_id') in ids or request.get('target_id') in ids or (request.get('case_id') is not None and request.get('case_id') in cases):
+                    ids.add(d['id'])
+        scoped=[d for d in docs if d['id'] in ids]
+        visible=[d for d in scoped if (kind is None or d['kind']==kind) and (before is None or d['id']<before)]
+        counts={}
+        for d in scoped:
+            if d['kind']=='occurrence':counts[d['state']]=counts.get(d['state'],0)+1
+        terminal=counts.get('completed',0)+sum(counts.get(s,0) for s in ('failed','dead_letter','requires_reconciliation'))
+        metrics=dict(occurrence_states=counts,terminal_success_rate=counts.get('completed',0)/terminal if terminal else None,
+            duplicate_events=sum(d.get('duplicate_count',0) for d in scoped if d['kind']=='subscription'),
+            rejected_events=sum(d.get('rejected_count',0) for d in scoped if d['kind']=='subscription'))
+        return dict(items=visible[:limit],has_more=len(visible)>limit,next_cursor=visible[limit-1]['id'] if len(visible)>limit else None,
+            jobs=[j for j in jobs if j.get('automation_kind') and (j.get('target_id') in ids or j.get('schedule_id') in ids or j.get('target_id') in cases or j.get('workflow_id')==workflow_id)],health=deepcopy(self.health),metrics=metrics)
 
     def _document(self, auth, kind, body):
         if kind!='control':self.request(kind,body)

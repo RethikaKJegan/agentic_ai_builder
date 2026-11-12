@@ -9,7 +9,6 @@ import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { Link } from "@/lib/navigation";
 import { InvestigationContext, type InvestigationContextValue } from "./InvestigationContext";
 import { ConnectedPlan, actionButton } from "./ConnectedPlan";
-import { AutomationPanel } from "./DurableAutomation";
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
 import {OverviewWorkflowReview} from './OverviewWorkflowReview';
 
@@ -116,7 +115,6 @@ function ConnectedWorkspace() {
         ) : (
           overview?<OverviewWorkflowReview key={overview+':'+id} requestKey={overview} compositionId={id} runId={run??undefined} onRun={rid=>navigate(id,rid)}/>:<ConnectedPlan id={id} runId={run ?? undefined} onRun={(rid) => navigate(id, rid)} />
         )}
-        <AutomationPanel />
       </div>
     </div>
   );

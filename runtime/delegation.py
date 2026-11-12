@@ -272,12 +272,8 @@ class DelegationSession:
         output, actual = accounted(binding, inputs, invocation_id, schema)
         # Only a confirmed successful provider response releases unused capacity.
         # Unknown/failed calls keep their reservations and are never retried here.
-        if (set(actual) != set(reservation) or actual.get('llm_calls') != 1 or
-                any(type(value) not in (int, float) or value < 0 or value != value or value == float('inf') or
-                    (value > reservation[key] and not (
-                        key in ('tokens', 'estimated_cost_usd') and not self.runtime.enforce_usage_budgets))
-                    for key, value in actual.items())):
-            raise RuntimeFailure('INVALID_USAGE', 'Confirmed model usage must fit its reservation.')
+        from .model_usage import validate_confirmed
+        validate_confirmed(actual,reservation,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
         with self.runtime.store.transaction() as db:
             run = self.current(db, agent)
             for group in ('workflow', agent['agent_id']):

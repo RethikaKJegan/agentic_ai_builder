@@ -1,0 +1,3 @@
+# Expose live evaluator and provider entry points
+
+The first scheduled investigation evaluation fails because LivePlannerProvider exposes planning but not evaluate_actions. Delegate that method with its caller-supplied output budget. Audit the provider's public methods and expose workflow_title as well so its existing consumer uses the configured provider. Add interface parity and real adaptive runtime tests through the wrapper, plus a typed missing-evaluator diagnostic before budget reservation. Record safe exception-class diagnostics for unexpected evaluation failures. Preserve approvals, scope, schedules and blocked run history.

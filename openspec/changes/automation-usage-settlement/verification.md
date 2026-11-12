@@ -1,0 +1,20 @@
+# Verification — 12 November 2026 IST
+
+Saved occurrence run_2bb955308bb0473b981f48db1ca672f3 completed its first evaluator decision and failed INVALID_USAGE at plan_po_summary_query. The server explicitly sets BUILDER_ENFORCE_USAGE_BUDGETS=0. The adaptive graph's settlement nevertheless imposed its provisional 20,000-token/10-cost allocation as a hard ceiling, unlike the delegated path. Confirmed provider usage was not retained by the old rejection path; the exact usage cannot be recovered from that failed run. Its saved model input alone measures 16,688 tokens before model instructions, query schemas and response tokens.
+
+The exact old graph method was replayed with synthetic records and confirmed 60,000-token model responses. It reproduces INVALID_USAGE. The fixed actual-release runtime completes the scheduled occurrence and settles both model calls as 120,000 actual tokens. Both queries and reports execute locally; no production data or mail provider is used.
+
+Shared validation now handles graph and delegated settlement consistently: one call, exact counter keys, finite nonnegative values, with token/cost ceilings enforced only under the server's bounded policy. Adaptive total allowances, timeouts, call counts and authorization remain enforced. Repeated provider-managed turns retain finite configured capacity instead of shrinking capacity below zero after recording a large previous response. INVALID_USAGE is classified as an internal execution failure rather than a missing evidence or authorization issue.
+
+Evaluator context and instructions distinguish source-backed business requirements from report/delivery action completion and scheduler-owned recurrence. The original objective and final completion criteria remain unchanged. Historical descriptive summaries with freshness limitations do not require an invented company acceptance policy. A pending mail receipt does not prevent business evidence from becoming ready; delivery approvals and actual completion still gate the action and final workflow result.
+
+Verification packets:
+- 75 backend regressions passed across model accounting, live wrapper, aggregate derivation and runtime fault/ownership controls.
+- Actual-release local test packet: 15 passed, including exact old/fixed graph replay and full scheduled read/report/fake reviewed delivery.
+- Model usage tests reject nonfinite, negative, malformed, excess-call and bounded excessive counters. Provider-managed policy records real usage. Recurring occurrence deduplication remains intact.
+- One configured live evaluator request used synthetic evidence only. It returned continue/send_email with business readiness true after source analysis/report completion, without requiring a future mail or schedule receipt. No business records were transmitted and no mail action was executed.
+- The exact systemd launcher constructs the active release, with provider-managed accounting confirmed. Contracts/fixtures, generated contract drift, strict OpenSpec and git diff --check passed.
+
+The active source remains .local/workflow-ui-release-20261112/app. Rollback sources, a fresh consistent Subway SQLite backup, exact old/fixed replay results and configured-provider/launcher evidence are private under .local/subway-automation-usage-20261112/. Existing failed runs are preserved. Existing active schedules need no duplication; future fresh occurrences use the corrected runtime after reload.
+
+Final grouped local test rerun: all 13 tests passed. The scheduled summary grouped 100 synthetic rows into four status/currency groups and independently checked counts plus separate sums (5050 and 5051), completed its report, and retained duplicate-occurrence prevention. Deployment reloaded only Subway from its verified active release path. Authenticated hosted health, workspace source isolation and preservation checks passed; source credentials/bindings, protected data, histories, configuration and unrelated service PIDs remained preserved. No production workflow was rerun or email sent during rollout.

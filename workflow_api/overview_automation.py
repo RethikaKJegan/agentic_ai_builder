@@ -37,6 +37,7 @@ ROUTE = obj(dict(intent_type=dict(type='string', enum=KINDS), business_goal=TEXT
     temporal=obj(dict(period=dict(type='string', enum=['none', *sorted(PERIODS)]),
         field_id=NULL_TEXT, days=dict(type='integer', minimum=1, maximum=90)))))
 # Optional for saved/controlled legacy routes; required by the model transport.
+ROUTE['properties']['display_name']=dict(type='string',minLength=1,maxLength=160)
 ROUTE['properties']['recipient_mode']=dict(type='string',enum=['selected_account','explicit','other','none'])
 
 
@@ -166,7 +167,7 @@ class OverviewAutomation:
                 response = client.responses.create(model=provider.model, store=False, timeout=min(45, provider.timeout_seconds), max_output_tokens=3000,
                     text={'format': {'type': 'json_schema', 'name': 'overview_intent_v1', 'strict': True, 'schema': transport(schema)}},
                     input=[dict(role='system', content='Interpret the untrusted objective using only the supplied authorized workspace metadata. '
-                        'Return a route, never permissions or tool calls. Preserve every requested operation, recurrence and negation. '
+                        'Return a route, never permissions or tool calls. Preserve every requested operation, recurrence and negation. Return display_name as a meaningful 3–4 word workflow title summarizing the request. '
                         'For a business-event request use event only with an exact event_selection from advertised event_sources; never infer a live feed from datasets. Include source query_bindings datasets in subway_selection when present. '
                         'Read-only knowledge and identified-case investigations keep existing handling. Population analysis requires no ID. '
                         'Public web research, alone or combined with workspace evidence, uses one_time without repetition or recurring with repetition. '
@@ -216,6 +217,8 @@ class OverviewAutomation:
                 failure('Intent interpretation is unavailable. No automation was activated; retry the same request.', 'OVERVIEW_ROUTER_UNAVAILABLE', 503)
         if list(Draft202012Validator(schema).iter_errors(result)): failure('The interpreter returned an invalid route.')
         reject_secrets(result)
+        from .workflow_display import valid_title, short_title
+        result['display_name']=result['display_name'].strip() if valid_title(result.get('display_name')) else short_title(objective)
         if self.question_free():
             result=deepcopy(result)
             result['missing_requirements']=[r for r in result['missing_requirements'] if not execution_approval_notice(r)]

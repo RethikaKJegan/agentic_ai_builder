@@ -476,3 +476,13 @@ it('does not execute while approving a workflow for its separate schedule',async
  await waitFor(()=>expect(api.request).toHaveBeenCalledWith('approve_workflow',expect.anything(),expect.any(String)));
  expect(vi.mocked(api.request).mock.calls.some(([op])=>op==='execute_workflow')).toBe(false);
 });
+
+it('loads continuation automation only inside the selected workflow Background tab',async()=>{
+ render(<ConnectedPlan id={doc().composition_id}/>);
+ await screen.findByRole('tab',{name:'Background'});
+ expect(api.automationRecords).not.toHaveBeenCalled();
+ expect(screen.queryByText('Background continuation & recurring automation')).toBeNull();
+ fireEvent.click(screen.getByRole('tab',{name:'Background'}));
+ expect(await screen.findByText('Background continuation & recurring automation')).toBeVisible();
+ expect(api.automationRecords).toHaveBeenCalledWith(undefined,view().workflow_id);
+});
