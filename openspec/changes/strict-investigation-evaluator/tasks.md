@@ -1,0 +1,5 @@
+- [x] Add strict investigation decision transport without changing canonical contracts or authority.
+- [x] Preserve source coverage/freshness metadata in bounded evaluator evidence.
+- [x] Verify invalid responses remain blocked with safe diagnostics and accurate recovery guidance.
+- [x] Run schema, runtime, recurrence, approval and configured-provider synthetic checks.
+- [x] Deploy the actual active Subway release and verify health and isolation.

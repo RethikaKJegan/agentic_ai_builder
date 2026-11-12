@@ -19,6 +19,19 @@ import { AdaptiveCasePanel } from "./AdaptiveCasePanel";
 import { AutomationPanel } from "./DurableAutomation";
 import { commandKey, useOrchestrationCommand } from "./useOrchestrationCommand";
 const doc = () => actionDocumentSchema.parse(structuredClone(fixture.document));
+
+it('keeps automation diagnostics in Background while confirming delivered email',async()=>{
+ const current=view();
+ current.run!.status='blocked';current.run!.error_code='ADAPTIVE_FALSE_COMPLETION';
+ current.run!.action_instances={sent:{state:'completed',verified_receipt:true,output:{message_id:'synthetic-confirmed'}}};
+ vi.spyOn(api,'actionPlan').mockResolvedValue(doc());vi.spyOn(api,'compositionView').mockResolvedValue(current);
+ render(<ConnectedPlan id={doc().composition_id} scheduled/>);
+ expect(await screen.findByText('Email sent. This run needs attention.')).toBeVisible();
+ expect(screen.queryByText(/Execution: ADAPTIVE_FALSE_COMPLETION/)).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'View execution details'}));
+ expect(screen.getByRole('tab',{name:'Background'})).toHaveAttribute('aria-selected','true');
+ expect(screen.getByText('Execution diagnostics')).toBeVisible();
+});
 const saved = () => caseSchema.parse(structuredClone(fixture.case));
 const view = () =>
   compositionViewSchema.parse({

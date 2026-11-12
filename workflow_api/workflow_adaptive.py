@@ -94,6 +94,9 @@ def evidence(runtime, db, run, workflow, auth):
         output = item['output']
         valid = True
         cid = actions[aid]['capability_id']
+        # Delivery confirms execution, not source-backed business facts.
+        if workflow['metadata']['connected_contracts'][cid]['side_effect'] in ('draft', 'write'):
+            continue
         if cid == 'tool.subway_query':
             query = item.get('resolved_inputs', {}).get('query')
             row = db.execute('SELECT document FROM subway_query_receipts WHERE workspace=? AND owner=? AND query_id=?',
@@ -147,6 +150,19 @@ def evidence(runtime, db, run, workflow, auth):
     return result, limitations
 
 
+def evidence_preview(output):
+    """Retain receipt metadata independently of sorted field order and row depth.
+
+    The enclosing context budget still applies. Only rows are sampled. Never
+    insert projection annotations inside evidence: they are not receipt facts.
+    """
+    if 'query_id' not in output or 'coverage' not in output or 'sources' not in output:
+        return brief(output)
+    result = deepcopy(output)
+    result['rows'] = result.get('rows', [])[:4]
+    return result
+
+
 def context(runtime, db, run, workflow, auth):
     a = run['adaptive']
     ev, limitations = evidence(runtime, db, run, workflow, auth)
@@ -161,7 +177,8 @@ def context(runtime, db, run, workflow, auth):
             schedule_management='The durable scheduler validates the owned schedule, occurrence and recurring authorization before this evaluator runs. This occurrence does not create a schedule. Do not request schedule creation receipts from query/report actions.',
             delivery_management='Report and delivery actions remain in plan.actions and completion_criteria. Business completion_eligible permits their reviewed execution; final complete still requires their actual completed action states and approvals.'),
         plan=deepcopy(plan), frozen_requirements=deepcopy(a['requirements']),
-        evidence={k:{**v, 'output':brief(v['output'])} for k,v in ev.items()},
+        evidence={k:{**v, 'output':evidence_preview(v['output'])} for k,v in ev.items()},
+        evidence_projection='Evidence output.rows contains at most four preview rows. Full verified receipts are persisted and supplied to reporting actions. Use executed coverage metadata for scan/aggregate completeness; never infer population totals from this preview. Projection annotations are not source facts.',
         deterministic_limitations=limitations, previous_assessment=a['assessment'],
         completed_actions=[k for k,v in run.get('action_instances', {}).items() if v.get('state') == 'completed'],
         failures=deepcopy(run.get('classified_failures', [])[-4:]),
@@ -368,6 +385,45 @@ def drive(runner, run_id, auth, raw_advance):
             return runtime.public(run)
 
 
+def finalize_verified_actions(runtime, db, run, workflow, auth):
+    """Finish an already verified objective using durable execution receipts.
+
+    Never invent a new assessment or retry a connector. The exact last accepted
+    assessment is revalidated against current source authority and stored output.
+    """
+    a = run['adaptive']
+    assessment = a.get('assessment')
+    plan = workflow['metadata']['connected_action_plan']
+    required = plan['completion_criteria']
+    instances = run.get('action_instances', {})
+    if (not assessment or not assessment['completion_eligible'] or not required
+            or any(instances.get(aid, {}).get('state') != 'completed' for aid in required)):
+        return False
+    contracts = workflow['metadata']['connected_contracts']
+    for action in plan['actions']:
+        item = instances.get(action['action_id'], {})
+        if item.get('state') != 'completed':
+            continue
+        if item.get('output_fingerprint') != digest(item.get('output')):
+            fail('ADAPTIVE_RECEIPT_INVALID', 'Completed action output integrity check failed.')
+        if contracts[action['capability_id']]['side_effect'] in ('read', 'draft', 'write') and not item.get('verified_receipt'):
+            fail('ADAPTIVE_RECEIPT_INVALID', 'Required connector completion needs a verified receipt.')
+    ev, limitations = evidence(runtime, db, run, workflow, auth)
+    decision = dict(decision='complete', rationale='Verified business requirements and all required actions are complete.',
+                    action_id=None, proposal=None, input_requests=[], assessment=deepcopy(assessment))
+    validate_decision(decision, run, workflow, ev)
+    a['deterministic_limitations'] = limitations
+    if a['status'] != 'completed':
+        a.update(status='completed')
+        a.pop('execution_permission', None)
+        a['decisions'].append(dict(decision='complete', rationale=decision['rationale'], revision=a['revision'],
+            evidence_ids=sorted(ev), completion_basis='verified_action_receipts'))
+        runtime.event(db, run, 'adaptive.completed', dict(completion_basis='verified_action_receipts',
+            required_actions=list(required), revision=a['revision']))
+    run.pop('error_code', None)
+    return True
+
+
 def _drive(runner, run_id, auth, raw_advance):
     runtime = runner.runtime; service = runtime.workflows
     for _ in range(4):  # One worker tick is bounded; the durable worker continues.
@@ -399,12 +455,13 @@ def _drive(runner, run_id, auth, raw_advance):
             if a.get('pending_wait'):
                 runtime.save(db, run)
                 return runtime.public(run)
-            if runtime.clock() >= a['deadline'] or a['turns'] >= a['limits']['max_reasoning_turns']:
+            terminal = finalize_verified_actions(runtime, db, run, workflow, auth)
+            if not terminal and (runtime.clock() >= a['deadline'] or a['turns'] >= a['limits']['max_reasoning_turns']):
                 block(runtime, db, run, 'ADAPTIVE_BUDGET_EXHAUSTED')
                 return runtime.public(run)
             # Resume an authorized in-progress action after read-only durable wait.
             permission = a.get('execution_permission')
-            if permission and run.get('action_instances', {}).get(permission, {}).get('state') != 'completed':
+            if terminal or permission and run.get('action_instances', {}).get(permission, {}).get('state') != 'completed':
                 runtime.save(db, run)
                 resume = True
             else:
@@ -509,7 +566,11 @@ def _drive(runner, run_id, auth, raw_advance):
                     if current['adaptive'].get('claim',{}).get('token') not in (None,token):
                         return runtime.public(current)
                     current['adaptive'].pop('claim', None)
-                    runtime.event(db,current,'adaptive.evaluation_failed',dict(exception_type=type(exc).__name__))
+                    diagnostics = dict(exception_type=type(exc).__name__)
+                    stage = getattr(exc, 'details', {}).get('validation_stage')
+                    if stage in ('response','incomplete','transport','encoded_value','canonical'):
+                        diagnostics['validation_stage'] = stage
+                    runtime.event(db,current,'adaptive.evaluation_failed',diagnostics)
                     # Explicit provider rejection is safe to retry. Unknown
                     # outcomes remain blocked; their usage reservation is kept.
                     if getattr(exc,'status_code',None) in (429,503):

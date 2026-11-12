@@ -8,6 +8,7 @@ import {Info,Play,CheckCircle2,RefreshCw,Settings2,Network} from "lucide-react";
 import { QueryClarification } from './QueryClarification';
 import { QueryEvidence } from "./QueryEvidence";
 import {AdaptiveProgress} from "@/features/builder/AdaptiveProgress";
+import {AutomationProgress} from './AutomationProgress';
 import { api } from "@/api/client";
 import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { useBackend } from "@/api/state";
@@ -111,6 +112,8 @@ function ScopedConnectedPlan({
   }
   const disabled = command.busy || stale || command.unknown || view?.state==='blocked';
   const needsQueryDefinition=!!view?.recovery.can_clarify&&view.tasks.some(t=>t.result?.classification==='query_clarification');
+  const overview=doc?.['overview_intent'] as {route?:{intent_type?:string}}|undefined;
+  const automation=scheduled||overview?.route?.intent_type==='recurring';
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
@@ -167,7 +170,7 @@ function ScopedConnectedPlan({
               )}
           </div>
           {needsQueryDefinition && doc && <QueryClarification doc={doc} view={view}/>}
-          {view.run?.error_code && !needsQueryDefinition && (
+          {view.run?.error_code && !needsQueryDefinition && !automation && (
             <p role="alert">
               Execution: {view.run.error_code}. {view.recovery.reason}
             </p>
@@ -230,7 +233,8 @@ function ScopedConnectedPlan({
                 ))}
               </article>
             ))}
-          {view.run?.adaptive&&<AdaptiveProgress run={view.run} onUpdated={update}/>}
+          {view.run&&automation&&tab!=='background'&&<AutomationProgress run={view.run} onUpdated={update} onDetails={()=>setTab('background')}/>}
+          {view.run?.adaptive&&(!automation||tab==='background')&&<AdaptiveProgress run={view.run} onUpdated={update}/>}
           {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={view} onSelect={setPanel}/></div>}
           {tab==='report'&&<div role="tabpanel" aria-label="Investigation report">
             <CompositionReport view={view}/>

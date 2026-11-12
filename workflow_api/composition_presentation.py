@@ -169,7 +169,7 @@ class CompositionPresentation:
             return dict(eligible=False,reason='The agent summary contained an unsupported or missing source citation. Review the retrieved records and evidence gaps, then start a new run with the corrected result schema. Source reads may already have completed; this error does not mean an agent ID is missing.',failure=failure)
         writes=[n for n in workflow['nodes'] if node_external_write(workflow,n)]
         if any(run['node_states'].get(n['node_id']) in ('executing','completed','blocked','failed') for n in writes):return dict(eligible=False,can_clarify=False,reason='Reconcile the external action before preparing another attempt.',failure=failure)
-        if run.get('error_code') in ('ADAPTIVE_PROVIDER_UNAVAILABLE','ADAPTIVE_EVALUATION_FAILED'):
+        if run.get('error_code') in ('ADAPTIVE_PROVIDER_UNAVAILABLE','ADAPTIVE_EVALUATION_FAILED','ADAPTIVE_DECISION_INVALID'):
             return dict(eligible=False,reason='The workflow evaluator is unavailable or failed internally. Inspect the backend evaluation diagnostic and correct the service before starting a new run.',failure=failure)
         from .workflow_queries import query_clarifications
         questions=query_clarifications(run,workflow)

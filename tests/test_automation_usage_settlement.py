@@ -5,6 +5,8 @@ import json
 from decimal import Decimal
 import pytest
 from runtime.model_usage import validate_confirmed
+from planner.evaluator_protocol import encode
+from workflow_api.workflow_adaptive import CONTRACT
 from runtime.service import RuntimeFailure
 from tests.test_subway_autonomy import subway,engine,installed,start,decision,drain,load
 from tests.test_subway_automations import schedule,dispatch,google_setup
@@ -77,12 +79,13 @@ def test_scheduled_reviewed_delivery_still_requires_authority_and_completes_loca
             context=json.loads(kwargs['input'][1]['content'])['context'];contexts.append(deepcopy(context))
             assert 'Future email receipt' not in context['execution_scope']['business_requirements']
             assert 'Never require a future email receipt' in kwargs['input'][0]['content']
+            assert not all(a['action_id'] in context['completed_actions'] for a in context['plan']['actions']), 'Do not ask the model to re-evaluate after approved delivery'
             result=decision(context)
             ev=[key for key,value in context['evidence'].items() if value['valid']]
             if ev:
                 result['assessment']['requirements'][0].update(status='verified',evidence_ids=ev)
                 result['assessment'].update(completion_eligible=True,gaps=[])
-            return SimpleNamespace(status='completed',output_text=json.dumps(result))
+            return SimpleNamespace(status='completed',output_text=json.dumps(encode(result,CONTRACT)))
         f.service.planner.provider=LivePlannerProvider('offline',[],SimpleNamespace(responses=SimpleNamespace(create=create)))
         return rid,doc,workflow
     monkeypatch.setattr(automation_tests,'start',adapted_start)

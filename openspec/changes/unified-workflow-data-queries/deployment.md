@@ -1,3 +1,7 @@
+> Latest automation completion and UI: [receipt-aware finalization](../receipt-aware-automation-completion/deployment.md) is deployed as `receipt-completion-20261112-d5e9ec95e8a8`.
+
+> Latest Subway automation backend: [strict investigation evaluator](../strict-investigation-evaluator/deployment.md) is deployed as `strict-evaluator-20261112-f7a1a2f81665`.
+
 > Latest workflow UI release: [simplified workflow list, titles and backgrounds](../workflow-ui-simplification/deployment.md) is deployed as `workflow-ui-20261112-8a29d2f2ef9a`.
 
 Latest hosted Knowledge Map visual update: [direct connected-context highlighting](../knowledge-map-connected-context/deployment.md).

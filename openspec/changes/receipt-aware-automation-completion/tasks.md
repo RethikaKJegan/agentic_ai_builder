@@ -1,0 +1,4 @@
+- [x] Separate delivery receipts and add conservative deterministic terminal completion.
+- [x] Simplify recurring progress without concealing failed action outcomes or approvals.
+- [x] Verify receipt integrity, source revalidation, idempotence and UI behavior.
+- [x] Deploy actual Subway service and tested frontend; verify hosted health/isolation.

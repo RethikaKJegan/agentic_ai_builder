@@ -6,7 +6,8 @@ import pytest
 from tests.test_subway_intelligence import subway, engine, installed, selection, route
 from tests.test_subway_full_queries import plan
 from workflow_api.overview_automation import OverviewAutomation
-from workflow_api.workflow_adaptive import KIND, supply
+from workflow_api.workflow_adaptive import KIND, supply, CONTRACT
+from planner.evaluator_protocol import encode
 from runtime.graph import GraphRunner
 from runtime.worker import RuntimeWorker
 from runtime.model import BoundedLLM
@@ -498,9 +499,9 @@ def test_existing_openai_evaluator_transport_uses_additive_investigation_schema(
         payload=json.loads(request['input'][1]['content'])
         assert payload['schema']['$id'].endswith('/investigation-assessment-v1.json')
         assert request['store'] is False and request['max_output_tokens']==6000
-        assert request['text']['format']['type']=='json_object'
+        assert request['text']['format']['type']=='json_schema' and request['text']['format']['strict'] is True
         assert payload['context']['evaluation_kind']==KIND
-        return SimpleNamespace(status='completed',output_text=json.dumps(decision(payload['context'])))
+        return SimpleNamespace(status='completed',output_text=json.dumps(encode(decision(payload['context']),CONTRACT)))
     provider=OpenAIStructuredOutputProvider(client=SimpleNamespace(responses=SimpleNamespace(create=create)),model='controlled-fixture-model')
     rid,_,_=start(f,provider.evaluate_actions)
     run=drain(f,rid)

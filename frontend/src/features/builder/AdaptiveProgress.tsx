@@ -4,7 +4,7 @@ import { api, type RunRecord } from '@/api/client';
 import {type z} from 'zod';
 import {adaptiveRunSchema} from '@/api/adaptive';
 
-export function AdaptiveProgress({run,onUpdated}:{run:Pick<RunRecord,'run_id'> & {adaptive?:z.infer<typeof adaptiveRunSchema>|undefined};onUpdated:()=>void}) {
+export function AdaptiveProgress({run,onUpdated,compact=false}:{run:Pick<RunRecord,'run_id'> & {adaptive?:z.infer<typeof adaptiveRunSchema>|undefined};onUpdated:()=>void;compact?:boolean}) {
   const [values,setValues]=useState<Record<string,string>>({});
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
@@ -29,7 +29,7 @@ export function AdaptiveProgress({run,onUpdated}:{run:Pick<RunRecord,'run_id'> &
     finally {setBusy(false);}
   }
   return <section aria-label="Autonomous investigation progress" className="max-h-96 shrink-0 space-y-3 overflow-auto border-b p-3 text-sm">
-    <p className="font-medium">{adaptive.objective}</p>
+    {!compact&&<><p className="font-medium">{adaptive.objective}</p>
     <p role="status">{adaptive.status==='waiting_for_input'?'Waiting for business input':adaptive.status==='completed'?'Objective satisfied':adaptive.status==='blocked'?'Investigation blocked':'Evaluating evidence and continuing'} · Plan revision {adaptive.revision}</p>
     {adaptive.decisions.at(-1)&&<p className="text-muted-foreground">{adaptive.decisions.at(-1)!.rationale}</p>}
     {assessment&&<>
@@ -41,7 +41,7 @@ export function AdaptiveProgress({run,onUpdated}:{run:Pick<RunRecord,'run_id'> &
       <details><summary>Assessment and supporting evidence</summary><pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(assessment,null,2)}</pre></details>
     </>}
     {adaptive.deterministic_limitations?.map((limitation,index)=><p key={index} role="status">{limitation.code}: {typeof limitation.details==='string'?limitation.details:'Source evidence requires review.'}</p>)}
-    {adaptive.blocker&&<p role="alert">{adaptive.blocker}</p>}
+    {adaptive.blocker&&<p role="alert">{adaptive.blocker}</p>}</>}
     {wait&&<form onSubmit={event=>{event.preventDefault();void submit();}} className="space-y-3">
       {wait.requests.map(request=><label className="block space-y-1" key={request.key}><span>{request.reason}</span>{request.schema['type']==='boolean'?<select className="block rounded border bg-background p-2" required value={values[request.key]??''} onChange={event=>setValues({...values,[request.key]:event.target.value})}><option value="">Choose</option><option value="true">Yes</option><option value="false">No</option></select>:<input required className="block w-full rounded border bg-background p-2" type={['number','integer'].includes(String(request.schema['type']))?'number':'text'} step={request.schema['type']==='integer'?1:'any'} value={values[request.key]??''} onChange={event=>setValues({...values,[request.key]:event.target.value})}/>}</label>)}
       <button disabled={busy} className="rounded border px-3 py-2" type="submit">{busy?'Saving…':'Save input and resume'}</button>
