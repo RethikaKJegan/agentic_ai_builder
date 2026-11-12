@@ -1,0 +1,4 @@
+- [x] Separate authenticated receipt validity from detail pagination.
+- [x] Qualify investigation context and report inputs with detail scope.
+- [x] Verify reviewed and recurring native workflows and integrity failures.
+- [x] Recheck the reported saved receipt read-only and deploy/verify the active release.

@@ -1,3 +1,5 @@
+> Latest automation evidence fix: [paginated query receipts](../paginated-query-evidence/deployment.md) is deployed as `paginated-evidence-20261112-f8609af5e42a`.
+
 > Latest query validation fix: [authorized detail sorting](../detail-query-sort-scope/deployment.md) is deployed as `detail-sort-20261112-39a1504efca0`.
 
 > Latest Calendar backend: [generic action routing and recurring event timing](../calendar-action-routing/deployment.md) is deployed to Subway and Simpsons as `calendar-routing-20261112-43ed19536853`.

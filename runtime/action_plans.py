@@ -98,6 +98,15 @@ def params(workflow,node,run):
         if run.get('automation_reference') and 'tool.subway_query' in metadata['connected_contracts']:
             result['data']={'primary':result['data'],'automation_trigger':deepcopy(run['automation_reference']),'original_objective':plan['goal'],'assessment':deepcopy(run.get('adaptive',{}).get('assessment'))}
             result['instructions']+=' Include the original objective, reporting period, actual source freshness, verified calculations, cited evidence, completeness, limitations and execution status. Historical snapshots do not establish current business activity; unknown sync coverage is a limitation.'
+        detail_pages={aid:dict(query_id=item['output'].get('query_id'),coverage=deepcopy(item['output']['coverage']))
+            for aid in action['depends_on']
+            for item in [run.get('action_instances',{}).get(aid,{})]
+            if actions[aid]['capability_id']=='tool.subway_query' and item.get('state')=='completed'
+            and item.get('output',{}).get('coverage',{}).get('has_more')
+            and not item['output']['coverage'].get('aggregate_complete')}
+        if detail_pages:
+            result['data']={'primary':result['data'],'query_detail_pages':detail_pages}
+            result['instructions']+=' Disclose returned_rows, total_result_rows, matched_records and has_more for each query_detail_pages entry. Detail rows are an incomplete page, not an exhaustive comparison. Do not infer population totals, exception rates or absence of exceptions from a page. Use only executed complete aggregates for population statistics; clearly identify requested analysis that remains unsupported by the returned detail.'
         result['source_references']=deepcopy(action['evidence_references'])
         from .aggregate_math import percentages,GUIDANCE
         query_inputs={aid:resolve_inputs(actions[aid],context,actions,run).get('query') for aid in action['depends_on'] if run['action_instances'][aid].get('capability_id')=='tool.subway_query' and run['action_instances'][aid]['state']=='completed'}

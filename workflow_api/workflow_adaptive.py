@@ -122,9 +122,11 @@ def evidence(runtime, db, run, workflow, auth):
                     limitations.append(dict(action_id=aid,code='SOURCE_FRESHNESS_UNVERIFIED',details='Source synchronization does not establish coverage of the requested reporting period. Historical snapshots and metadata profiling are not current business activity.'))
             # A complete scan is not complete returned detail or known semantics.
             coverage = output.get('coverage', {})
-            if coverage.get('truncated') or coverage.get('warnings') or coverage.get('has_more') and not coverage.get('aggregate_complete'):
+            if coverage.get('truncated') or coverage.get('warnings'):
                 valid = False
                 limitations.append(dict(action_id=aid, code='QUERY_SCOPE_LIMITATION', details=deepcopy(coverage)))
+            elif coverage.get('has_more') and not coverage.get('aggregate_complete'):
+                limitations.append(dict(action_id=aid, code='QUERY_DETAIL_PAGINATED', details=deepcopy(coverage)))
         elif cid=='tool.subway_documents':
             from hashlib import sha256
             records=output.get('records',[])
@@ -178,7 +180,7 @@ def context(runtime, db, run, workflow, auth):
             delivery_management='Report and delivery actions remain in plan.actions and completion_criteria. Business completion_eligible permits their reviewed execution; final complete still requires their actual completed action states and approvals.'),
         plan=deepcopy(plan), frozen_requirements=deepcopy(a['requirements']),
         evidence={k:{**v, 'output':evidence_preview(v['output'])} for k,v in ev.items()},
-        evidence_projection='Evidence output.rows contains at most four preview rows. Full verified receipts are persisted and supplied to reporting actions. Use executed coverage metadata for scan/aggregate completeness; never infer population totals from this preview. Projection annotations are not source facts.',
+        evidence_projection='Evidence output.rows contains at most four preview rows. Full verified receipts are persisted and supplied to reporting actions. Use executed coverage metadata for scan/aggregate completeness; never infer population totals from this preview. Display pagination does not invalidate an authenticated complete-scan receipt. Returned detail supports only the returned records; matched counts and join coverage retain their executed scope. Explicitly disclose incomplete detail in source_limitations. Do not claim exhaustive comparisons, population totals or absence of exceptions from a page; requirements needing unreturned detail remain unsatisfied unless other complete evidence supports them. Projection annotations are not source facts.',
         deterministic_limitations=limitations, previous_assessment=a['assessment'],
         completed_actions=[k for k,v in run.get('action_instances', {}).items() if v.get('state') == 'completed'],
         failures=deepcopy(run.get('classified_failures', [])[-4:]),

@@ -1,0 +1,3 @@
+# Paginated query evidence
+
+A complete, authenticated query scan is rejected as ADAPTIVE_EVIDENCE_INVALID when its detail response is paginated. Treat display pagination separately from receipt validity. Preserve all authority, scope, fingerprint, freshness and scan-integrity checks; truncated scans and warnings remain invalid. Supply explicit pagination qualifications to investigation and report preparation so returned detail is never presented as exhaustive analysis. Test native reviewed and durable recurring workflows, including response-byte pagination, and deploy the active Subway service without replaying failed occurrences or external actions.
