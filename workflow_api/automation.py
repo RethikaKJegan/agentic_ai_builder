@@ -84,7 +84,12 @@ class DurableAutomation:
         with self.store.transaction(write=False) as db:
             rows=db.execute(query,tuple(args)).fetchall()
             jobs=[json.loads(r[0]) for r in db.execute("SELECT document FROM lifecycle_jobs WHERE workspace=? AND json_extract(document,'$.owner_id')=? ORDER BY rowid DESC LIMIT 100",scope).fetchall()]
-        return dict(items=[json.loads(r[2]) for r in rows[:limit]],has_more=len(rows)>limit,next_cursor=rows[limit-1][1] if len(rows)>limit else None,jobs=[j for j in jobs if j.get('automation_kind')],health=deepcopy(self.health))
+        with self.store.transaction(write=False) as db:
+            counts={state:count for state,count in db.execute("SELECT state,COUNT(*) FROM automation_records WHERE workspace=? AND owner=? AND kind='occurrence' GROUP BY state",scope).fetchall()}
+            totals=db.execute("SELECT COALESCE(SUM(CAST(json_extract(document,'$.duplicate_count') AS INTEGER)),0),COALESCE(SUM(CAST(json_extract(document,'$.rejected_count') AS INTEGER)),0) FROM automation_records WHERE workspace=? AND owner=? AND kind='subscription'",scope).fetchone()
+        terminal=counts.get('completed',0)+sum(counts.get(s,0) for s in ('failed','dead_letter','requires_reconciliation'))
+        metrics=dict(occurrence_states=counts,terminal_success_rate=counts.get('completed',0)/terminal if terminal else None,duplicate_events=totals[0],rejected_events=totals[1])
+        return dict(items=[json.loads(r[2]) for r in rows[:limit]],has_more=len(rows)>limit,next_cursor=rows[limit-1][1] if len(rows)>limit else None,jobs=[j for j in jobs if j.get('automation_kind')],health=deepcopy(self.health),metrics=metrics)
 
     def _document(self, auth, kind, body):
         if kind!='control':self.request(kind,body)
@@ -114,7 +119,8 @@ class DurableAutomation:
         if not isinstance(reference,dict) or set(reference)!={'workflow_id','workflow_version'}:fail('Supply an exact workflow revision.')
         with self.store.transaction(write=False) as db:
             workflow,_=self.service.runtime_runner.runtime.revision(db,reference['workflow_id'],reference['workflow_version'],auth,True)
-        if workflow.get('metadata',{}).get('adaptive_control'):fail('A recurring occurrence requires an independent approved workflow, not a case-owned adaptive revision.')
+        control=workflow.get('metadata',{}).get('adaptive_control')
+        if control and control.get('kind')!='workflow-investigation':fail('A recurring occurrence requires an independent approved workflow, not a case-owned adaptive revision.')
         return workflow
 
     def authorize(self, auth, body):
@@ -124,11 +130,18 @@ class DurableAutomation:
         if set(body)!=required:fail('Supply the full recurring business authorization.')
         old=self._existing(doc)
         if old:return old
-        self._connection(auth,body['connection_id'])
+        if body['connection_id'] is None:
+            if not getattr(self.service,'subway_queries',None) or not set(body['operations']) <= {'subway_query','subway_documents'}:
+                fail('Native recurring consent requires owned read-only Subway operations.','AUTOMATION_SCOPE_DENIED',403)
+            self.service.subway_queries.authorize(auth)
+        else:self._connection(auth,body['connection_id'])
         if not isinstance(body['purpose'],str) or not 1<=len(body['purpose'])<=1000:fail('Supply the business purpose.')
         if not isinstance(body['content_scope'],str) or not 1<=len(body['content_scope'])<=2000:fail('Describe the authorized content scope.')
-        if set(body['schedule'])!={'cron','timezone'}:fail('Pin the exact authorized schedule.')
-        self.cron(body['schedule']['cron'],body['schedule']['timezone'])
+        if set(body['schedule'])=={'cron','timezone'}:
+            self.cron(body['schedule']['cron'],body['schedule']['timezone'])
+        else:
+            from .workflow_events import validate_source
+            validate_source(self,auth,body['schedule'])
         if not self.clock()<body['expires_at']<=self.clock()+366*86400:fail('Consent must expire within one year.')
         limits=body['limits']
         if set(limits)!={'max_occurrences','max_actions_per_occurrence'} or any(type(v) is not int or not 1<=v<=10000 for v in limits.values()) or limits['max_actions_per_occurrence']>16:fail('Supply bounded recurring execution limits.')
@@ -137,6 +150,9 @@ class DurableAutomation:
         for tid,schema in body['operations'].items():
             if tid not in tools:fail('Authorization names an unavailable registered operation.')
             self.schema(schema)
+            if tid=='subway_query':
+                from .subway_automation import validate_consent
+                validate_consent(schema,body['schedule']['timezone'])
             # Bound authority fields explicitly; OAuth is not business consent.
             if tid=='workflow_data_query':
                 # A fresh executable plan may be prepared each day, but the model
@@ -176,10 +192,13 @@ class DurableAutomation:
         if policy['kind']!='authorization' or policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Current recurring consent is required.','AUTOMATION_AUTH_EXPIRED',403)
         if policy['request']['schedule']!={'cron':body['cron'],'timezone':body['timezone']}:fail('Schedule differs from approved consent.')
         if workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Schedule and authorization must pin the same selected account.')
-        doc.update(due=self.cron(body['cron'],body['timezone']).next(self.clock()),workflow_sha256=digest(workflow),occurrences=0)
+        doc.update(name=policy['request']['purpose'],due=self.cron(body['cron'],body['timezone']).next(self.clock()),workflow_sha256=digest(workflow),occurrences=0)
         return self._put(doc)
 
     def subscribe(self, auth, body):
+        if isinstance(body,dict) and 'workflow' in body:
+            from .workflow_events import subscribe
+            return subscribe(self,auth,body)
         doc=self._document(auth,'subscription',body)
         required={'request_key','case_id','wait_id','stage_id','provider','connection_id','correlation','participants','expected_information','payload_mapping','deadline','poll_workflow'}
         if set(body)!=required:fail('Supply a complete event subscription.')
@@ -246,7 +265,7 @@ class DurableAutomation:
 
     def control(self, auth, identifier, body):
         scope=self.scope(auth,True);self.request('control',body)
-        if set(body)!={'request_key','action'} or body['action'] not in ('pause','resume','cancel','revoke'):fail('Choose pause, resume, cancel or revoke.')
+        if body['action']=='retry':return self.retry(auth,identifier,body)
         command=self._document(auth,'control',{**body,'target_id':identifier})
         with self.store.transaction() as db:
             old=db.execute('SELECT document FROM automation_records WHERE id=?',(command['id'],)).fetchone()
@@ -257,12 +276,60 @@ class DurableAutomation:
             if doc['kind'] in ('occurrence','control'):fail('Control the parent schedule instead of an occurrence or command.')
             if doc['kind']=='authorization':RuntimeService.authorize(auth,'workflow.approve',{'admin','approver'})
             if doc['state'] in ('cancelled','revoked','completed'):return doc
-            action=body['action'];doc['state']={'pause':'paused','resume':'active','cancel':'cancelled','revoke':'revoked'}[action]
+            action=body['action']
+            if action=='replace':
+                RuntimeService.authorize(auth,'workflow.approve',{'admin','approver'})
+                replacement=self._get(db,scope,body['replacement_id'])
+                if doc['kind'] not in ('schedule','subscription') or replacement['kind']!=doc['kind'] or replacement['state'] not in ('active','paused') or replacement['id']==doc['id']:fail('Select a separately reviewed active replacement automation.')
+                policy=self._get(db,scope,replacement['request']['authorization_id'],'authorization')
+                if policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Replacement authority has expired.')
+                doc['replaced_by']=replacement['id'];replacement['replaces']=doc['id'];replacement['state']='active';self._save(db,replacement)
+            doc['state']={'pause':'paused','resume':'active','cancel':'cancelled','revoke':'revoked','replace':'cancelled'}[action]
             doc['updated_at']=self.clock();self._save(db,doc)
             if doc['kind']=='subscription' and doc.get('timer_id'):
                 timer=self._get(db,scope,doc['timer_id']);timer['state']=doc['state'];self._save(db,timer)
             command['state']='completed';self._save(db,command)
         return doc
+
+    def retry(self,auth,identifier,body):
+        scope=self.scope(auth,True);self._fresh(auth)
+        command=self._document(auth,'control',{**body,'target_id':identifier})
+        with self.store.transaction() as db:
+            prior=db.execute('SELECT document FROM automation_records WHERE id=?',(command['id'],)).fetchone()
+            if prior:
+                if json.loads(prior[0])['fingerprint']!=command['fingerprint']:fail('Retry key reused.','AUTOMATION_CONFLICT',409)
+                return self._get(db,scope,identifier)
+            occurrence=self._get(db,scope,identifier,'occurrence')
+            if occurrence['state'] not in ('failed','dead_letter') or occurrence.get('retry_count',0)>=3:fail('Occurrence is not eligible for bounded retry.','AUTOMATION_RETRY_INELIGIBLE',409)
+            parent=self._get(db,scope,occurrence['schedule_id']);policy=self._get(db,scope,parent['request']['authorization_id'],'authorization')
+            if parent['state']!='active' or policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Renew current automation authority before retrying.','AUTOMATION_AUTH_REVOKED',403)
+            if occurrence.get('run_id'):
+                run=self.service.runtime_runner.runtime.load(db,occurrence['run_id'],auth)
+                if run['status'] not in ('queued','running') or any(x.get('external_effect_status')=='requires_reconciliation' for x in run.get('action_instances',{}).values()):fail('Terminal or uncertain runs require review; completed effects cannot be replayed.','AUTOMATION_RETRY_INELIGIBLE',409)
+            elif occurrence.get('last_error_code') not in ('AUTOMATION_AUTH_REVOKED','QUEUE_CAPACITY_EXCEEDED','GOOGLE_TOOL_UNSUPPORTED','GOOGLE_CONNECTION_REQUIRED','DATABASE_UNAVAILABLE'):
+                fail('Uncertain dispatch requires review.','AUTOMATION_RETRY_INELIGIBLE',409)
+            row=db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(occurrence['job_id'],)).fetchone();job=json.loads(row[0])
+            if job['state']=='leased':fail('A worker still owns this job.','AUTOMATION_RETRY_INELIGIBLE',409)
+            job.update(state='queued',lease_until=None,available_at=now_iso(self.clock));db.execute('DELETE FROM lifecycle_job_claims WHERE job_id=?',(job['job_id'],))
+            db.execute("UPDATE lifecycle_jobs SET state='queued',lease_until=NULL,available_at=?,document=? WHERE job_id=?",(job['available_at'],canonical(job),job['job_id']))
+            occurrence.update(state='queued',retry_count=occurrence.get('retry_count',0)+1);self._save(db,occurrence)
+            command['state']='completed';self._save(db,command)
+        return occurrence
+
+    def suspended(self,db,auth,run):
+        if not run.get('automation_reference'):return False
+        self._fresh(auth);scope=self.scope(auth,True)
+        occurrence=self._get(db,scope,run['automation_reference']['occurrence_id'],'occurrence')
+        parent=self._get(db,scope,occurrence['schedule_id']);policy=self._get(db,scope,parent['request']['authorization_id'],'authorization')
+        if parent['state']=='paused' or policy['state']=='paused':
+            run.update(lease_until=0,available_at=self.clock()+15);self.service.runtime_runner.runtime.save(db,run);return True
+        return False
+
+    def history(self,auth,identifier):
+        scope=self.scope(auth);self.get(auth,identifier)
+        with self.store.transaction(write=False) as db:
+            items=[json.loads(row[0]) for row in db.execute("SELECT document FROM automation_records WHERE workspace=? AND owner=? AND kind='occurrence' AND json_extract(document,'$.schedule_id')=? ORDER BY due DESC LIMIT 50",(*scope,identifier)).fetchall()]
+        return [dict({k:deepcopy(o[k]) for k in ('id','state','due','created_at','run_id','result','last_error_code','retry_count','metrics') if k in o},retry_eligible=o['state'] in ('failed','dead_letter') and not o.get('run_id') and o.get('retry_count',0)<3 and o.get('last_error_code') in ('AUTOMATION_AUTH_REVOKED','QUEUE_CAPACITY_EXCEEDED','GOOGLE_TOOL_UNSUPPORTED','GOOGLE_CONNECTION_REQUIRED','DATABASE_UNAVAILABLE')) for o in items]
 
     def _enqueue(self, db, scope, target, key, kind, **fields):
         job_id='automation_job_'+digest([scope,key])[:32]
@@ -284,6 +351,10 @@ class DurableAutomation:
             run['created_at']+=elapsed;run.setdefault('automation_pauses',[]).append(dict(seconds=elapsed,resumed_at=self.clock()));rt.save(db,run)
 
     def accept(self, auth, subscription_id, event):
+        subscription=self.get(auth,subscription_id)
+        if 'workflow' in subscription.get('request',{}):
+            from .workflow_events import accept
+            return accept(self,auth,subscription,event)
         sub=self.get(auth,subscription_id);body=deepcopy(sub['request']);body['sent_at']=sub.get('not_before',0);scope=self.scope(auth,True)
         RuntimeService.authorize(auth,'events.ingest',{'admin','builder'})
         identity=event['event_id']
@@ -329,7 +400,9 @@ class DurableAutomation:
                 doc.update(state='paused',last_error_code='AUTOMATION_AUTH_EXPIRED');self._save(db,doc);return
             cron=self.cron(body['cron'],body['timezone']);due=doc['due'];count=0
             # Bounded catch-up. Each due time is a stable occurrence identity.
-            while due<=now and count<10:
+            scanned=0
+            while due<=now and count<10 and scanned<1000:
+                scanned+=1
                 following=cron.next(due)
                 if body['missed_run_policy']=='skip' and now-due>=60:
                     doc['skipped_count']=doc.get('skipped_count',0)+1;due=cron.next(now);break
@@ -387,6 +460,10 @@ class DurableAutomation:
                 if doc['kind']=='schedule':self._due_schedule(auth,doc)
                 elif doc['kind']=='timer':self._fire_timer(auth,doc)
                 elif doc['kind']=='subscription':
+                    if 'workflow' in doc['request']:
+                        from .workflow_events import poll
+                        poll(self,auth,doc)
+                        continue
                     case=self.service.business_cases.get(auth,doc['request']['case_id'])
                     if case['case_status'] in TERMINAL:
                         with self.store.transaction() as db:
@@ -402,7 +479,8 @@ class DurableAutomation:
                 with self.store.transaction() as db:
                     current=self._get(db,(doc['workspace_id'],doc['owner_id']),doc['id']);current['attempts']+=1;current['poll_after']=self.clock()+min(3600,2**min(current['attempts'],10));current['last_error_code']=getattr(exc,'code','AUTOMATION_PROVIDER_FAILED');current['errors']=(current['errors']+[dict(code=current['last_error_code'],at=self.clock())])[-16:];self._save(db,current)
         self._resume_jobs(authenticate)
-        self.health.update(state='ready',last_success=self.clock(),last_error=None)
+        failures=sum(1 for d in records if d.get('last_error_code'))
+        self.health.update(state='degraded' if failures else 'ready',last_success=self.clock(),last_error='AUTOMATION_RECORDS_REQUIRE_ATTENTION' if failures else None)
 
     def _resume_jobs(self,authenticate):
         with self.store.transaction(write=False) as db:
@@ -420,6 +498,11 @@ class DurableAutomation:
                     else:
                         case=self.service.business_cases._load(db,scope,job['target_id']);rid=case.get('adaptive',{}).get('run_id')
                     if not rid:
+                        if job['automation_kind']=='occurrence':
+                            parent=self._get(db,scope,occurrence['schedule_id'])
+                            if parent['state']=='active':
+                                current.update(state='queued',lease_until=None)
+                                db.execute("UPDATE lifecycle_jobs SET state='queued',lease_until=NULL,document=? WHERE job_id=?",(canonical(current),current['job_id']))
                         if job['automation_kind']=='case':
                             stage=case['stages'][case['adaptive']['stage_instance_id']];reference=stage.get('workflow',{})
                             workflow=self.store.get(db,scope[0],reference.get('workflow_id'),reference.get('version',1))
@@ -452,25 +535,35 @@ class DurableAutomation:
     def guard_run(self,db,auth,run,workflow):
         try:
             policy,schedule,occurrence=self._policy(db,auth,run)
-            if digest(workflow)!=schedule['workflow_sha256']:fail('Pinned recurring definition changed.','AUTOMATION_SCOPE_DENIED',403)
+            if not self._pinned(db,run,workflow,schedule):fail('Pinned recurring definition changed.','AUTOMATION_SCOPE_DENIED',403)
+            return policy
         except Exception as exc:
             raise RuntimeFailure(getattr(exc,'code','AUTOMATION_AUTH_REVOKED'),'Recurring execution authority must be renewed.',403) from None
 
     def _policy(self, db, auth, run):
         auth=self._fresh(auth);scope=self.scope(auth,True);ref=run.get('automation_reference')
         if not ref:return None
-        occurrence=self._get(db,scope,ref['occurrence_id'],'occurrence');schedule=self._get(db,scope,occurrence['schedule_id'],'schedule');policy=self._get(db,scope,schedule['request']['authorization_id'],'authorization')
+        occurrence=self._get(db,scope,ref['occurrence_id'],'occurrence');schedule=self._get(db,scope,occurrence['schedule_id']);policy=self._get(db,scope,schedule['request']['authorization_id'],'authorization')
         if 'scheduled_due' in ref and ref['scheduled_due']!=occurrence['due']:fail('Logical occurrence time changed.','AUTOMATION_SCOPE_DENIED',403)
         if schedule['state']!='active' or policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Recurring business authority is inactive.','AUTOMATION_AUTH_REVOKED',403)
         if run['workflow_id']!=schedule['request']['workflow']['workflow_id'] or run['workflow_version']!=schedule['request']['workflow']['workflow_version']:fail('Recurring workflow pin differs.','AUTOMATION_SCOPE_DENIED',403)
         return policy,schedule,occurrence
 
+    def _pinned(self,db,run,workflow,schedule):
+        root=self.store.get(db,run['workspace_id'],run['workflow_id'],run['workflow_version'])
+        if not root or digest(root)!=schedule['workflow_sha256']:return False
+        from .workflow_adaptive import effective
+        return digest(effective(run,root))==digest(workflow)
+
     def check_action(self, db, auth, run, workflow, node, inputs):
         if not run.get('automation_reference'):return
         policy,schedule,occurrence=self._policy(db,auth,run)
         self.service.registry_adapter.execution_assignments(workflow,self._fresh(auth))
-        if digest(workflow)!=schedule['workflow_sha256'] or workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Recurring workflow/account changed.','AUTOMATION_SCOPE_DENIED',403)
+        if not self._pinned(db,run,workflow,schedule) or workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Recurring workflow/account changed.','AUTOMATION_SCOPE_DENIED',403)
         schema=policy['request']['operations'].get(node['tool_id'])
+        if node['tool_id']=='subway_query':
+            from .subway_automation import check_query
+            check_query(schema,inputs,workflow,run,self.service.subway_queries,auth)
         from .temporal_queries import ANNOTATION,consent_schema
         if schema and ANNOTATION in schema:
             overview=workflow.get('metadata',{}).get('overview_intent',{})
@@ -487,7 +580,8 @@ class DurableAutomation:
         with self.store.transaction(write=False) as db:
             saved=runtime.load(db,rid,auth);workflow=self.store.get(db,saved['workspace_id'],saved['workflow_id'],saved['workflow_version'])
             approval=saved['approvals'][-1];gate=saved['approval_context']['node_id'];edge=next(e for e in workflow['edges'] if e['source']==gate and e.get('outcome')=='approved');node=next(n for n in workflow['nodes'] if n['node_id']==edge['target'])
-            try:self.check_action(db,auth,saved,workflow,node,approval['resolved_payload'])
+            from .workflow_adaptive import effective
+            try:self.check_action(db,auth,saved,effective(saved,workflow),node,approval['resolved_payload'])
             except Exception:return False
             if len(saved.get('automation_approvals',{}))>=self._policy(db,auth,saved)[0]['request']['limits']['max_actions_per_occurrence']:return False
         self._connection(auth,workflow['metadata']['google_connection_id'])
@@ -512,10 +606,15 @@ class DurableAutomation:
                     state='queued' if result['stop_reason']=='driver_in_progress' else 'completed' if result['stop_reason'] in ('terminal','external_or_input_wait','budget_exhausted') else 'waiting' if result['stop_reason'] in ('approval_wait','execution_in_progress') else 'dead_letter'
             else:
                 with self.store.transaction(write=False) as db:
-                    occurrence=self._get(db,scope,job['target_id'],'occurrence');schedule=self._get(db,scope,occurrence['schedule_id'],'schedule');policy=self._get(db,scope,schedule['request']['authorization_id'],'authorization')
+                    occurrence=self._get(db,scope,job['target_id'],'occurrence');schedule=self._get(db,scope,occurrence['schedule_id']);policy=self._get(db,scope,schedule['request']['authorization_id'],'authorization')
+                if schedule['state']=='paused' or policy['state']=='paused':
+                    with self.store.transaction() as db:
+                        current=self._get(db,scope,occurrence['id']);current['state']='waiting';self._save(db,current)
+                        return lifecycle._finish_job(db,job,'waiting',None,claim)
                 if occurrence['state']=='completed':state='completed'
                 else:
-                    self._connection(auth,policy['request']['connection_id']);workflow=self._workflow(auth,schedule['request']['workflow'])
+                    if policy['request']['connection_id'] is not None:self._connection(auth,policy['request']['connection_id'])
+                    workflow=self._workflow(auth,schedule['request']['workflow'])
                     if digest(workflow)!=schedule['workflow_sha256'] or schedule['state']!='active' or policy['state']!='active' or policy['request']['expires_at']<=self.clock():fail('Schedule or consent revoked.','AUTOMATION_AUTH_REVOKED',403)
                     if len(workflow.get('metadata',{}).get('connected_action_plan',{}).get('actions',workflow['nodes']))>policy['request']['limits']['max_actions_per_occurrence']:fail('Occurrence exceeds consent execution limits.','AUTOMATION_ACTION_LIMIT',403)
                     def attach(db,created):
@@ -524,7 +623,7 @@ class DurableAutomation:
                             if current['run_id']!=created['run_id']:fail('Occurrence run identity changed.','AUTOMATION_CONFLICT',409)
                             return
                         current.update(state='running',run_id=created['run_id']);self._save(db,current)
-                        run=runner.runtime.load(db,created['run_id'],auth);run['automation_reference']=dict(occurrence_id=current['id'],scheduled_due=current['due']);runner.runtime.save(db,run)
+                        run=runner.runtime.load(db,created['run_id'],auth);run['automation_reference']=dict(occurrence_id=current['id'],scheduled_due=current['due'],trigger=deepcopy(current.get('trigger',{'kind':'schedule','automation_id':schedule['id']}))); runner.runtime.save(db,run)
                     created=runner.runtime.create_automation_run(dict(request_id='occurrence_'+occurrence['id'],idempotency_key=occurrence['id'],payload={**schedule['request']['workflow'],'inputs':schedule['request']['inputs']}),auth,on_created=attach)
                     for _ in range(17):
                         result=runner.advance(created['run_id'],auth)
@@ -534,21 +633,37 @@ class DurableAutomation:
                     if state=='dead_letter':
                         with self.store.transaction(write=False) as db:failed=runner.runtime.load(db,created['run_id'],auth)
                         error=failed.get('error_code') or 'AUTOMATION_RUNTIME_FAILED'
-        except Exception as exc:error=getattr(exc,'code','AUTOMATION_DISPATCH_UNCERTAIN')
+        except Exception as exc:
+            error=getattr(exc,'code','AUTOMATION_DISPATCH_UNCERTAIN')
+            from .postgres import DatabaseFailure
+            import sqlite3
+            transient=(isinstance(exc,DatabaseFailure) and exc.retryable or isinstance(exc,sqlite3.OperationalError) and getattr(exc,'sqlite_errorcode',0)&255 in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED) or error=='QUEUE_CAPACITY_EXCEEDED')
+            if transient and job['attempt']<3:
+                state='queued';job['available_at']=datetime.fromtimestamp(self.clock()+min(2**job['attempt'],60),timezone.utc).isoformat()
+
         with self.store.transaction() as db:
             token=db.execute('SELECT token FROM lifecycle_job_claims WHERE job_id=?',(job['job_id'],)).fetchone()
             if not token or token[0]!=claim:return job
             if job['automation_kind']=='occurrence':
-                occurrence=self._get(db,scope,job['target_id']);occurrence.update(state='completed' if state=='completed' else 'waiting' if state=='waiting' else 'failed',last_error_code=error,result={k:deepcopy(result[k]) for k in ('run_id','workflow_id','workflow_version','status','error_code','trace_reference') if result and k in result})
+                occurrence=self._get(db,scope,job['target_id']);occurrence.update(state='completed' if state=='completed' else 'waiting' if state=='waiting' else 'queued' if state=='queued' else 'failed',last_error_code=error,result={k:deepcopy(result[k]) for k in ('run_id','workflow_id','workflow_version','status','error_code','trace_reference') if result and k in result})
                 if occurrence.get('run_id'):
-                    run=runner.runtime.load(db,occurrence['run_id'],auth)
+                    saved_run=db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?',(scope[0],occurrence['run_id'])).fetchone()
+                    run=json.loads(saved_run[0]) if saved_run else {}
+                    if run.get('subject_id')!=scope[1]:fail('Occurrence run ownership differs.','AUTOMATION_SCOPE_DENIED',403)
                     if any(x.get('external_effect_status')=='requires_reconciliation' for x in run.get('action_instances',{}).values()):occurrence['state']='requires_reconciliation'
+                    occurrence['metrics']=dict(scheduler_delay_seconds=max(0,occurrence['created_at']-occurrence['due']),workflow_latency_seconds=max(0,runner.runtime.clock()-run['created_at']),usage=deepcopy(run.get('usage',{}).get('workflow',{})),replans=max(0,run.get('adaptive',{}).get('revision',1)-1),worker_recoveries=max(0,job['attempt']-1),freshness_failures=sum(1 for l in run.get('adaptive',{}).get('deterministic_limitations',[]) if l['code']=='SOURCE_FRESHNESS_UNVERIFIED'))
                 self._save(db,occurrence)
+                if state=='completed':
+                    parent=self._get(db,scope,occurrence['schedule_id']);consent=self._get(db,scope,parent['request']['authorization_id'],'authorization')
+                    outstanding=db.execute("SELECT 1 FROM automation_records WHERE workspace=? AND owner=? AND kind='occurrence' AND json_extract(document,'$.schedule_id')=? AND state IN ('queued','running','waiting','requires_reconciliation')",(*scope,parent['id'])).fetchone()
+                    if parent['state']=='active' and consent['used_occurrences']>=consent['request']['limits']['max_occurrences'] and not outstanding:
+                        parent.update(state='completed',due=None,completed_at=self.clock());parent.pop('poll_after',None);self._save(db,parent)
             if state=='dead_letter' and error is None:error=(result or {}).get('error_code') or 'AUTOMATION_CONTINUATION_FAILED'
             if result:job['result']={k:deepcopy(result[k]) for k in ('case_id','revision','stop_reason','commands_used','run_id','workflow_id','workflow_version','status','error_code','trace_reference') if k in result}
             if state=='completed' and job['automation_kind']=='case' and result and result['stop_reason']=='budget_exhausted' and result.get('adaptive',{}).get('deadline',self.clock()+1)>self.clock() and job.get('turn',0)<64:
                 turn=job.get('turn',0)+1;root=job.get('chain_id',job['job_id']);self._enqueue(db,scope,job['target_id'],root+':'+str(turn),'case',turn=turn,chain_id=root)
             if error and job.get('result') is not None:job['result']['error_code']=error
+            if state=='queued':db.execute('UPDATE lifecycle_jobs SET available_at=? WHERE job_id=?',(job['available_at'],job['job_id']))
             return lifecycle._finish_job(db,job,state,error,claim)
 
 

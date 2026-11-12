@@ -6,6 +6,7 @@ references are validated; provenance is constructed only from saved documents.
 from copy import deepcopy
 from hashlib import sha256
 import json
+import re
 
 from .business_compiler import canonical, check_snapshot
 from .business_ontology import identity, MODULES
@@ -36,7 +37,7 @@ def digest(value):
     return sha256(canonical(value).encode()).hexdigest()
 
 
-def retrieve(store, auth, objective, version_id=None):
+def retrieve(store, auth, objective, version_id=None, *, concept_ids=None, relationship_ids=None):
     """No initialization, source DB calls, provider calls or writes."""
     result = dict(retrieval_version=VERSION, state='not_configured', version_id=None,
                   revision=None, definition_sha256=None, references=[], matched_modules=[],
@@ -73,6 +74,10 @@ def retrieve(store, auth, objective, version_id=None):
     query = terms(objective)
     subway = snapshot.get('workspace',{}).get('ontology_id') == 'subway'
     if subway:
+        from .subway_demo_definitions import selected as demo_definitions
+        example = demo_definitions(scope, snapshot, objective)
+        if example:
+            result['analytical_assumptions'] = example
         query -= {'what','how','does','do','explain','happens','happen','when','about'}
         # Give planning an explicit distinction between code documentation and
         # connected records. A declared model must not imply a usable dataset.
@@ -106,6 +111,8 @@ def retrieve(store, auth, objective, version_id=None):
             for item in snapshot[kind]:
                 module_scores[item['module_id']] = max(module_scores[item['module_id']], score(item))
     matched = [m for m in sorted(module_scores, key=lambda m: (-module_scores[m], m)) if module_scores[m] > 0][:5 if subway else 3]
+    if subway and concept_ids is not None:
+        matched=sorted({c['module_id'] for c in snapshot['concepts'] if c['id'] in concept_ids})
     if not matched:
         return result
     result['matched_modules'] = matched
@@ -119,13 +126,13 @@ def retrieve(store, auth, objective, version_id=None):
                                   title=sources[e['source_id']]['title']) for e in item['evidence']]
         return annotate(value, resolutions)
     candidates = []
-    selected = sorted([c for c in snapshot['concepts'] if c['module_id'] in matched], key=lambda c: (-score(c), c['id']))[:18]
-    concept_ids = {c['id'] for c in selected}
+    selected = sorted([c for c in snapshot['concepts'] if c['module_id'] in matched and (concept_ids is None or c['id'] in concept_ids)], key=lambda c: (-score(c), c['id']))[:18]
+    selected_ids = {c['id'] for c in selected}
     candidates.extend(cite(c, 'concept') for c in selected)
-    candidates.extend(cite(r, 'relationship') for r in sorted(snapshot['relationships'], key=lambda r: (-score(r), r['id'])) if r['source'] in concept_ids and r['target'] in concept_ids)
-    candidates.extend(cite(r, 'rule') for r in sorted(snapshot['rules'], key=lambda r: (-score(r), r['id'])) if r['module_id'] in matched)
+    candidates.extend(cite(r, 'relationship') for r in sorted(snapshot['relationships'], key=lambda r: (-score(r), r['id'])) if r['source'] in selected_ids and r['target'] in selected_ids and (relationship_ids is None or r['id'] in relationship_ids))
+    candidates.extend(cite(r, 'rule') for r in sorted(snapshot['rules'], key=lambda r: (-score(r), r['id'])) if r['module_id'] in matched and (concept_ids is None or score(r)>0))
     # Prioritize rules over less relevant concepts/relationships within the bound.
-    candidates.sort(key=lambda c: (0 if c['kind'] == 'rule' else 1, -score(c), c['ref']))
+    candidates.sort(key=lambda c: (0 if c['kind'] == ('concept' if concept_ids is not None else 'rule') else 1, -score(c), c['ref']))
     if 'warranty' in matched:
         policies = []
         for raw, in policy_rows:
@@ -142,11 +149,38 @@ def retrieve(store, auth, objective, version_id=None):
                     for cell in p['clauses'].values() if cell['quote']][:8]))
         candidates = policies + candidates
     for item in candidates:
-        if len(result['references']) >= MAX_REFERENCES or len(canonical({**result, 'references': result['references'] + [item]})) > MAX_CHARACTERS:
+        if len(result['references']) >= MAX_REFERENCES or len(canonical({**result, 'references': result['references'] + [item]})) > MAX_CHARACTERS-(12000 if subway else 0):
             result['truncated'] = True
             continue
         result['references'].append(item)
     result['state'] = 'matched' if result['references'] else 'no_match'
+    if subway:
+        # Reuse content already extracted and retained in the owned snapshot.
+        # Catalogue titles/URLs alone never become document contents or facts.
+        documents=[];remaining=12000
+        content_sources={**sources,**((resolutions or {}).get('sources',{}))}
+        for sid in sorted({e['source_id'] for r in result['references'] for e in r['evidence']}):
+            source=content_sources.get(sid,{})
+            text=source.get('text')
+            if not isinstance(text,str) or not text or sha256(text.encode()).hexdigest()!=source['sha256']:continue
+            quotes=list(dict.fromkeys(e['quote'] for r in result['references'] for e in r['evidence'] if e['source_id']==sid))
+            excerpts=[]
+            for quote in quotes[:3]:
+                start=text.find(quote)
+                if start<0:
+                    match=re.search(r'\s+'.join(re.escape(w) for w in quote.split()),text)
+                    if match:start=match.start()
+                if start<0:continue
+                excerpt=text[max(0,start-160):start+min(len(quote)+320,2000)]
+                if len(excerpt)>remaining:continue
+                remaining-=len(excerpt);excerpts.append(excerpt)
+            if excerpts:
+                document=dict(source_id=sid,title=source['title'],source_kind=source['kind'],
+                source_sha256=source['sha256'],version_id=snapshot['version_id'],content_available=True,excerpts=excerpts,
+                qualification='Retrieved source content; source code describes implementation, not independently approved policy.')
+                if len(canonical({**result,'supporting_documents':documents+[document]}))<=MAX_CHARACTERS:documents.append(document)
+                else:result['truncated']=True
+        result['supporting_documents']=documents
     result['retrieval_sha256'] = digest(result)
     return result
 

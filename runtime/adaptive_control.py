@@ -5,6 +5,16 @@ from .service import RuntimeFailure
 def guard(db, runtime, run, workflow, node):
     control=workflow.get('metadata',{}).get('adaptive_control')
     if not control:return True
+    if control.get('kind')=='workflow-investigation':
+        adaptive=run.get('adaptive',{})
+        if not adaptive:raise RuntimeFailure('ADAPTIVE_BUDGET_REQUIRED','Run-owned adaptive state is required.',409)
+        if runtime.clock()>=adaptive['deadline']:raise RuntimeFailure('ADAPTIVE_BUDGET_EXHAUSTED','Investigation deadline expired.',409)
+        if node['kind']=='trigger':return True
+        if node['kind']=='output' and adaptive.get('status')=='completed':return True
+        if adaptive.get('status')=='active' and (adaptive.get('execution_permission')==node['node_id'] or node['kind']=='approval' and node['node_id']=='approve_'+str(adaptive.get('execution_permission'))):return True
+        run['lease_until']=0
+        runtime.save(db,run)
+        return False
     row=db.execute('SELECT document FROM business_cases WHERE workspace=? AND owner=? AND case_id=?',
                    (run['workspace_id'],run['subject_id'],control['case_id'])).fetchone()
     import json
@@ -41,6 +51,7 @@ def reserve(run, workflow, amount):
 def suspended(db,runtime,run,workflow):
     control=workflow.get('metadata',{}).get('adaptive_control')
     if not control:return False
+    if control.get('kind')=='workflow-investigation':return False
     import json
     row=db.execute('SELECT document FROM business_cases WHERE workspace=? AND owner=? AND case_id=?',(run['workspace_id'],run['subject_id'],control['case_id'])).fetchone()
     if not row:return False

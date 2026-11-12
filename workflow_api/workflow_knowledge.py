@@ -37,7 +37,22 @@ def capture(composition, auth, context, version_id=None):
     allowed={f['field_id'] for d in catalog.get('datasets',[]) for f in d['fields']}
     queries=getattr(composition.service,'workflow_queries',None)
     limitation=None
-    if queries and allowed:
+    subway=getattr(composition.service,'subway_queries',None)
+    subway_catalog=context.get('validated_context',{}).get('subway_query_catalog')
+    subway_pin=None
+    if subway and subway_catalog and subway_catalog.get('ontology_version')==snapshot['version_id']:
+        current=subway.catalog(auth)
+        allowed={f['field_id'] for d in subway_catalog['sources'] for f in d['fields']}
+        for mapping in mappings:
+            matches=[fid for fid,f in current['fields'].items() if fid in allowed and
+                f['name']==mapping['field_path'] and
+                current['datasets'][f['dataset_id']]['collection']==mapping['collection'] and
+                current['datasets'][f['dataset_id']]['connection_id']==sources.get(mapping['source_role'])]
+            if len(matches)==1:mapping.update(field_id=matches[0],dataset_id=current['fields'][matches[0]]['dataset_id'])
+        definitions={r['id']:r for r in snapshot.get('relationships',[])}
+        subway_pin=dict(query_kind='subway',relationships=[{**deepcopy(r),'source':definitions[r['relationship_id']]['source'],
+            'target':definitions[r['relationship_id']]['target']} for r in subway_catalog['relationships'] if r['relationship_id'] in definitions])
+    if queries and allowed and not subway_pin:
         try:
             _,datasets,fields,_=queries.queries.context(auth)
         except ApiFailure as exc:limitation=exc.code
@@ -54,6 +69,7 @@ def capture(composition, auth, context, version_id=None):
     result=dict(schema_version=1,version_id=version_id,scope=scope,
                 mapping_sha256=digest(source_mappings(snapshot)),mappings=mappings)
     if limitation:result['query_mapping_unavailable']=limitation
+    if subway_pin:result.update(subway_pin)
     return result
 
 
@@ -93,6 +109,28 @@ def completed_usage(workflow,action,run):
             for mapping in mappings.values():
                 if mapping.get('field_id') in fields:
                     add(mapping,'Verified query used this mapped source field.',field_id=mapping['field_id'],query_id=output['query_id'])
+    elif item.get('verified_receipt') and action['capability_id']=='tool.subway_query' and pin.get('query_kind')=='subway':
+        query=item.get('resolved_inputs',{}).get('query',{})
+        if (output.get('scope')==scope and output.get('ontology_version')==pin['version_id'] and output.get('query_id')
+                and output.get('query_sha256')==digest(query) and output.get('coverage',{}).get('complete_scan') is True):
+            used=set(query.get('fields',[])+query.get('group_by',[]))
+            used.update(f['field_id'] for f in query.get('filters',[]))
+            used.update(m['field_id'] for m in query.get('metrics',[]) if m['field_id'])
+            joins={r['relationship_id']:r for r in pin.get('relationships',[])}
+            checks={r['relationship_id']:r for r in output.get('join_checks',[])}
+            selected={query.get('base_dataset_id')}
+            relationship_usage=[]
+            for rid in query.get('joins',[]):
+                if rid in joins and rid in checks:
+                    r=joins[rid];selected.add(r['target_dataset_id'])
+                    used.update([r['source_field_id'],r['target_field_id']])
+                    relationship_usage.append(dict(relationship_id=rid,source=r['source'],target=r['target'],query_id=output['query_id'],coverage=deepcopy(checks[rid])))
+            item['ontology_relationship_usage']=relationship_usage
+            source_ids={s['dataset_id'] for s in output.get('sources',[])}
+            for mapping in mappings.values():
+                if mapping.get('dataset_id') in selected & source_ids and (mapping.get('field_id') in used or not used and mapping['field_path']=='_id'):
+                    add(mapping,'Verified Subway query used this mapped source field.' if mapping.get('field_id') in used else 'Verified Subway row count scanned this mapped dataset.',
+                        field_id=mapping.get('field_id'),dataset_id=mapping['dataset_id'],query_id=output['query_id'],source_role=mapping['source_role'],collection=mapping['collection'])
     elif item.get('verified_receipt'):
         # Native mapped readers return a records envelope, not query rows.
         for record in output.get('records',[]):

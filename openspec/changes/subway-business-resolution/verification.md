@@ -1,0 +1,13 @@
+# Business readiness verification
+
+Saved job `plan_dae8268cfd094667958cc5b99f71f1f3` returned state clarification and no workflow composition. Its clarification text was a declarative methodology note: use a primary PO amount and disclose its distinction from another stored amount. Any nonempty clarification string previously stopped generation. The new fix does not endorse that implicit primary measure or parse this particular wording to bypass a blocker.
+
+New provider responses require `business_resolution` with a discriminated state: ready has an empty question; needs_definition has a nonempty question. Notes are separate. Legacy clarification remains empty in new provider responses. Legacy saved/injected selections remain valid and retain their prior conservative nonempty-clarification behavior. Contradictory structured and legacy fields fail validation rather than silently dropping a question.
+
+Routing guidance permits supported descriptive comparisons that keep distinct named source measures separate and disclose limitations. It does not designate an approved measure, infer equivalence or classify overpayments/compliance without a business definition. Typed source identities, relationship authority, source/currency/filter limits, monetary precision, paging and explicit demo-profile selection remain unchanged. Structured notes reach planning through the selected catalog interpretation.
+
+Validation passed: 28 existing selection/intelligence/context-budget tests, 57 business-resolution/demo/Simpsons/query-model/pagination/Overview integration tests, and one private replay against the saved canonical source metadata (86 total). The replay reproduced legacy blocking, verified ready descriptive preparation, and verified a real business-policy question still blocks. It used isolated fixture source configuration and controlled intent responses; no live model, tenant source query or email delivery was performed. Provider transport fixtures validate the new strict response shape. Existing deprecation warnings remain.
+
+Canonical contracts, generated UI contracts, strict OpenSpec and whitespace validation passed. Private rollback, backups, replay and deployment records: `.local/subway-business-resolution-20261112/`.
+
+Deployment verified: only agentic-builder-subway restarted. Authenticated HTTPS session, tool, worker-health and query-list checks passed across operator, Simpsons and Subway. Foreign source access remained denied. Credential/binding, ontology/package, automation, configuration and history preservation checks passed. Other service process IDs and the frontend build remained unchanged. Resubmit the same objective with Generate workflow to obtain a fresh interpretation; the historical clarification remains intact.

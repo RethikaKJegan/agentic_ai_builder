@@ -45,8 +45,13 @@ def ready_frontier(nodes, edges, node_states, edge_states):
 
 class GraphRunner:
     @staticmethod
-    def model_pass_binding(binding,action):
+    def model_pass_binding(binding,action,workflow=None,run=None):
         agent=deepcopy(binding)
+        if (workflow or {}).get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation':
+            usage=(run or {}).get('usage',{}).get(agent['agent_id'],{})
+            agent['limits']['max_tokens']=max(0,agent['limits']['max_tokens']-usage.get('tokens',0))
+            agent['limits']['max_estimated_cost_usd']=max(0,agent['limits'].get('max_estimated_cost_usd',0)-usage.get('estimated_cost_usd',0))
+            agent['limits']['max_llm_calls']=1
         if action and action['capability_id'] in {'content.prepare','data.plan_query'}:
             agent['limits']['max_llm_calls']=min(1,agent['limits']['max_llm_calls'])
         if action and action['capability_id']=='data.plan_query' and binding['limits']['max_llm_calls']>=2:
@@ -57,8 +62,9 @@ class GraphRunner:
 
     def invoke_agent_with_feedback(self, adapter, binding, params, run_id, auth, worker, workflow, node, reference):
         from shared.llm_feedback import correct_once
+        attempt_binding=binding
         def invoke(item):
-            agent = deepcopy(binding)
+            agent = deepcopy(attempt_binding)
             graph=getattr(self.runtime.workflows,'account_graph',None)
             pin=workflow.get('metadata',{}).get('account_graph_pin')
             if graph and pin:agent['_account_knowledge']=graph.context(auth,pin,node.get('label',''))
@@ -66,14 +72,27 @@ class GraphRunner:
                 agent['_validation_feedback'] = item
             from .action_plans import action_for
             action=action_for(workflow,node['node_id'])
-            agent=self.model_pass_binding(agent,action)
-            output = adapter.invoke(agent, params, reference)
+            agent=self.model_pass_binding(agent,action,workflow)
+            accounted=getattr(adapter,'invoke_accounted',None)
+            if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation' and callable(accounted):
+                reservation=adapter.reservation(agent)
+                output,actual=accounted(agent,params,reference)
+                if set(actual)!=set(reservation) or actual.get('llm_calls')!=1 or any(type(v) not in (int,float) or v<0 or v!=v or v>reservation[k] for k,v in actual.items()):
+                    raise RuntimeFailure('INVALID_USAGE','Confirmed model usage must fit the reviewed reservation.')
+                with self.runtime.store.transaction() as db:
+                    saved=self.runtime.load(db,run_id,auth,'workflow.execute')
+                    if not self.runtime.owns_execution(saved,worker):raise RuntimeFailure('DELEGATION_INTERRUPTED','Execution ownership changed.')
+                    for group in ('workflow',agent['agent_id']):
+                        for key,value in actual.items():saved['usage'][group][key]=max(0,saved['usage'][group][key]-(reservation[key]-value))
+                    self.runtime.event(db,saved,'budget.settled',dict(agent_id=agent['agent_id'],counters=actual))
+                    self.runtime.save(db,saved)
+            else:output = adapter.invoke(agent, params, reference)
             if list(Draft202012Validator(binding['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Agent output failed validation.')
             from .action_plans import validate_content
             try:validate_content(workflow,node,output,params)
             except RuntimeFailure as error:
-                if action and action['capability_id']=='data.plan_query' and getattr(error,'invalid_model_output',False):
+                if action and action['capability_id'] in {'data.plan_query','subway.plan_query'} and getattr(error,'invalid_model_output',False):
                     with self.runtime.store.transaction() as db:
                         run=self.runtime.load(db,run_id,auth,'workflow.execute')
                         if self.runtime.owns_execution(run,worker):
@@ -83,6 +102,7 @@ class GraphRunner:
                 raise
             return output
         def prepare(item):
+            nonlocal attempt_binding
             if getattr(adapter, 'external_write', False):
                 return False
             with self.runtime.store.transaction() as db:
@@ -97,7 +117,9 @@ class GraphRunner:
                                              ('workflow', workflow['execution_policy']['limits']))):
                     return False
                 from .action_plans import action_for
-                amount = adapter.reservation(self.model_pass_binding(binding,action_for(workflow,node['node_id'])))
+                root=next(a for a in workflow['agents'] if a['agent_id']==binding['agent_id'])
+                attempt_binding=self.model_pass_binding(root,action_for(workflow,node['node_id']),workflow,run)
+                amount = adapter.reservation(attempt_binding)
                 amount['llm_calls'] = 1
                 self.reserve(db, run, workflow, binding, amount)
                 self.runtime.event(db, run, 'agent.correction', {'node_id': node['node_id'],
@@ -174,6 +196,19 @@ class GraphRunner:
             run['node_states'][node_id] = 'blocked' if blocked else 'failed'
             self.runtime.event(db, run, 'node.failed', {'node_id': node_id, 'invocation_id': run.get('node_invocations', {}).get(node_id), 'error_code': code, 'status': 'blocked' if blocked else 'failed'})
         self.runtime.event(db, run, 'runtime.denied', {'error_code': code})
+        if run.get('adaptive',{}).get('kind')=='workflow-investigation':
+            # Known validation failures have no uncertain external effect. Let
+            # the existing evaluator revise unfinished read/reasoning work.
+            if code in {'AGENT_OUTPUT_INVALID','CONNECTOR_INPUT_INVALID','SUBWAY_QUERY_INVALID','SUBWAY_QUERY_TYPE','SUBWAY_QUERY_LIMIT'}:
+                adaptive=run['adaptive']
+                adaptive['recoverable_failures']=adaptive.get('recoverable_failures',0)+1
+                if adaptive['recoverable_failures']<=2:
+                    adaptive.pop('execution_permission',None)
+                    run['lease_until']=0
+                    self.runtime.event(db,run,'adaptive.action_rejected',dict(node_id=node_id,code=code))
+                    self.runtime.save(db,run)
+                    return
+            run['adaptive'].update(status='blocked' if blocked else 'failed',blocker=code)
         self.runtime.transition(db, run, 'blocked' if blocked else 'failed')
 
     @staticmethod
@@ -288,7 +323,7 @@ class GraphRunner:
         if list(Draft202012Validator(grant['input_schema']).iter_errors(params)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
         automation=getattr(runtime.workflows,'automation',None)
-        if automation and run.get('automation_reference') and (connector.external_write or getattr(connector,'durable_query',False)):
+        if automation and run.get('automation_reference') and (connector.external_write or getattr(connector,'durable_query',False) or node.get('tool_id') in {'subway_query','subway_documents'}):
             with runtime.store.transaction(write=False) as db:automation.check_action(db,auth,run,workflow,node,params)
         if workflow.get('metadata',{}).get('connected_action_plan'):
             from .action_plans import preflight
@@ -298,7 +333,14 @@ class GraphRunner:
         reservation['estimated_cost_usd'] = max(record['definition']['estimated_cost']['per_call'], reservation.get('estimated_cost_usd', 0))
         return connector, grant, agent, params, reservation
 
-    def advance(self, run_id, auth):
+    def advance(self, run_id, auth, *, _adaptive_dispatch=False):
+        if not _adaptive_dispatch:
+            with self.runtime.store.transaction(write=False) as db:
+                run=self.runtime.load(db,run_id,auth,'workflow.execute')
+                saved=self.runtime.store.get(db,run['workspace_id'],run['workflow_id'],run['workflow_version']) or {}
+            from workflow_api.workflow_adaptive import controlled,drive
+            if controlled(saved):
+                return drive(self,run_id,auth,lambda:self.advance(run_id,auth,_adaptive_dispatch=True))
         import os
         from workflow_api.worker_control import LeaseHeartbeat
         seconds=int(os.getenv('BUILDER_RUNTIME_LEASE_SECONDS','120'))
@@ -339,7 +381,7 @@ class GraphRunner:
             # Durable read-only query submissions can reattach by run/node identity
             # after a worker crash. All other uncertain invocations keep the guard.
             if any(state == 'executing' for state in run['node_states'].values()):
-                reviewed,_=runtime.revision(db,run['workflow_id'],run['workflow_version'],auth,run.get('release_bound',False))
+                reviewed,_=runtime.execution_revision(db,run,auth)
                 for pending_node in reviewed['nodes']:
                     connector=self.connectors.get(pending_node.get('tool_id'))
                     if (run['node_states'].get(pending_node['node_id'])=='executing' and
@@ -369,12 +411,12 @@ class GraphRunner:
                 if not runtime.owns_execution(run, worker):
                     return runtime.public(run)
                 try:
-                    workflow, grants = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
-                    if digest(workflow) != run['workflow_digest']:
-                        raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed after execution was queued.')
+                    workflow, grants = runtime.execution_revision(db, run, auth)
+                    automation_policy=None
                     automation=getattr(runtime.workflows,'automation',None)
                     if automation and run.get('automation_reference'):
-                        automation.guard_run(db,auth,run,workflow)
+                        if automation.suspended(db,auth,run):return runtime.public(run)
+                        automation_policy=automation.guard_run(db,auth,run,workflow)
                     from .adaptive_control import suspended as adaptive_suspended
                     if adaptive_suspended(db,runtime,run,workflow):return runtime.public(run)
                     if runtime.clock() - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
@@ -390,6 +432,11 @@ class GraphRunner:
                     if not adaptive_guard(db,runtime,run,workflow,node):return runtime.public(run)
                     run['current_node_id'] = node['node_id']
                     kind = node['kind']
+                    if automation_policy and run.get('action_instances',{}).get(node['node_id'],{}).get('state','pending')=='pending':
+                        from .action_plans import action_for
+                        attempted=sum(1 for item in run.get('action_instances',{}).values() if item.get('state')!='pending')
+                        if action_for(workflow,node['node_id']) and attempted>=automation_policy['request']['limits']['max_actions_per_occurrence']:
+                            raise RuntimeFailure('AUTOMATION_ACTION_LIMIT','The reviewed occurrence action allowance is exhausted.',403)
                     config = node.get('configuration', {})
                     if set(config) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
                         raise RuntimeFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'The node contains execution configuration requiring review.')
@@ -459,7 +506,9 @@ class GraphRunner:
                             reservation_agent=agent
                             from .action_plans import action_for
                             action=action_for(workflow,node['node_id'])
-                            reservation_agent=self.model_pass_binding(agent,action)
+                            reservation_agent=self.model_pass_binding(agent,action,workflow,run)
+                            if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation':
+                                invocation=(self.agents,reservation_agent,self.params(node,run,workflow))
                             reservation = self.agents.reservation(reservation_agent)
                             reservation['llm_calls'] = max(1, reservation.get('llm_calls', 0))
                         else:
@@ -496,8 +545,8 @@ class GraphRunner:
                         current = runtime.load(db, run_id, auth, 'workflow.execute')
                         if not runtime.owns_execution(current, worker):
                             return runtime.public(current)
-                        reviewed, _ = runtime.revision(db, current['workflow_id'], current['workflow_version'], auth, current.get('release_bound', False))
-                        if digest(reviewed) != current['workflow_digest']:
+                        reviewed, _ = runtime.execution_revision(db, current, auth)
+                        if digest(reviewed) != digest(workflow):
                             raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed before invocation.')
                         runtime.check_deadlines(current, reviewed, agent)
                     if kind == 'agent' and node['node_id'] in workflow['metadata'].get('dynamic_delegation', {}):
@@ -550,6 +599,12 @@ class GraphRunner:
                 except RetryableInvocation:
                     output, code = None, 'RETRYABLE_INVOCATION_FAILED'
                 except RuntimeFailure as failure:
+                    if kind=='agent' and getattr(failure,'invalid_model_output',False) and getattr(failure,'validation_field',None)!='query':
+                        with runtime.store.transaction() as db:
+                            saved=runtime.load(db,run_id,auth,'workflow.execute')
+                            if runtime.owns_execution(saved,worker):
+                                runtime.event(db,saved,'agent.output_rejected',dict(node_id=node['node_id'],error_code=failure.code,
+                                    field=getattr(failure,'validation_field','output'),validation_rule=getattr(failure,'validation_hint','')[:400]))
                     output, code = None, failure.code
                 except Exception:
                     output, code = None, 'UNKNOWN_INVOCATION_RESULT' if getattr(adapter, 'external_write', False) else 'INVOCATION_FAILED'
@@ -598,9 +653,7 @@ class GraphRunner:
                         self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'})
                         return runtime.public(run)
                     try:
-                        workflow, _ = runtime.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
-                        if digest(workflow) != run['workflow_digest']:
-                            raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed.')
+                        workflow, _ = runtime.execution_revision(db, run, auth)
                         runtime.check_deadlines(run, workflow, agent)
                         self.finish_node(db, run, workflow, node, output)
                     except Exception as failure:

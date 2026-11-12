@@ -58,6 +58,9 @@ def registry_configuration(env):
                 from .subway_queries import definition as subway_query_definition
                 config['tools'].append({'definition':subway_query_definition()})
                 config['policy']['remaining_quota']['subway_query']=10000
+                from .subway_documents import definition as subway_documents_definition
+                config['tools'].append({'definition':subway_documents_definition()})
+                config['policy']['remaining_quota']['subway_documents']=10000
         if env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
             from .tenant_google import extend_registry
             extend_registry(config)

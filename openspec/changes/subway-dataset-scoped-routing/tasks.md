@@ -1,0 +1,5 @@
+- [x] Confirm saved source-union failure and reproduce it offline.
+- [x] Constrain new routing to dataset-only selection with scoped metadata expansion.
+- [x] Preserve explicit selections, supported joins and strict execution authority.
+- [x] Verify invoice comparison, model transport, prior fixes and isolation.
+- [x] Deploy backend-only with rollback and preservation checks.

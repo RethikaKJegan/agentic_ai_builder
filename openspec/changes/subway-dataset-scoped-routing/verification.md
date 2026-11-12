@@ -1,0 +1,15 @@
+# Dataset-scoped routing verification
+
+Saved job `plan_15426159c7144df4a36f5ae8b1580c9b` failed with SUBWAY_SELECTION_INVALID because selected field owners and relationship endpoints expanded its metadata union past four source datasets. The historical raw model selection was not retained, so the exact extra source identities cannot be recovered.
+
+New provider intent transport requires `metadata_mode=datasets`, at most four authorized dataset IDs, and empty field_ids/relationship_ids. Dataset choices alone consume its identity schema budget; global field and edge counts cannot exceed it. On actual saved metadata, all 52 descriptors fit a 3,721-byte model selection schema with valid provider enum/string bounds. No additional model calls were introduced.
+
+The server builds current metadata inside exactly those source datasets. It preserves objective-ranked fields, required relationship key fields and only supported directed scalar edges whose endpoints are inside the selected set. This provides metadata options; it does not execute or infer a join. Actual query validation still checks explicit query fields/joins against current authority. Legacy explicit selections keep ownership closure and four-source denials. Contradictory dataset-mode selections that also specify fields/edges fail rather than silently discard them.
+
+Offline tests cover global hint sets spanning more than four sources, many-field/edge catalogs, unknown IDs, legacy overflow, scoped relationship keys, and actual CrewAI/GraphRunner invoice-to-order execution. The invoice test completed query and report generation with one matched link, one missing link and one unmatched link, preserving distinct recorded amounts. Controlled OpenAI SDK transports retain the existing call count and execute existing queries through the real runtime. No live model calls, business-source queries or email deliveries were performed.
+
+Canonical contract validation, generated UI contracts, strict OpenSpec validation and whitespace checks passed. Exact rollback, backups and private replay evidence: `.local/subway-dataset-routing-20261112/`.
+
+Validation completed: 107 unique tests passed across focused routing/selection/business-resolution/context-budget cases, new dataset-mode invoice execution cases and existing query/pagination/model/demo/Overview/Simpsons regressions. Six overlapping tests were rerun after simplifying the dataset-only transport budget and passed. Existing framework deprecation warnings remain.
+
+Deployment verified: only agentic-builder-subway restarted. Hosted authenticated checks passed for operator, Simpsons and Subway, including native tools and foreign source denial. Credentials/bindings, selected Google accounts, ontology/packages, automations, configuration and history were preserved. Unrelated service process IDs and frontend build remained unchanged. No live model call, business-source query or email delivery was performed during verification. Submit the original objective again with a fresh generation attempt; failed jobs remain historical records.

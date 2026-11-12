@@ -1,0 +1,4 @@
+- [x] Confirm saved failure and reproduce inconsistent source/field selection.
+- [x] Constrain model identity choices and reconcile exact owned metadata membership.
+- [x] Verify source limits, unknown/foreign denials, joined and existing planning flows.
+- [x] Replay actual metadata preparation and deploy a backend-only release with rollback.

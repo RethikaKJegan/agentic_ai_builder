@@ -1,4 +1,5 @@
 import {runKnowledgeSchema,recoveryInspectionSchema,operationalAlertsSchema} from './reliability';
+import {adaptiveRunSchema} from './adaptive';
 import {knowledgeSnapshotSchema} from './knowledge-map';
 import { browserSessionCurrent } from '@/lib/browser-session';
 import {overviewResultSchema,overviewActivationSchema} from './overview-automation';
@@ -55,6 +56,7 @@ export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow
   status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().nullable().optional(),
   allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
 const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
+  adaptive: adaptiveRunSchema.optional(),
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
@@ -684,6 +686,14 @@ export class WorkflowClient {
     const parsed=eventsData.safeParse(await this.read(`runs/${encodeURIComponent(runId)}/events${queryString({after_sequence:afterSequence,limit})}`));
     if(!parsed.success)return fail("INVALID_API_DATA","The run event response is invalid.");
     return parsed.data;
+  }
+
+  async adaptiveInput(runId:string, waitId:string, values:Record<string,unknown>) {
+    return runData.parse(await this.read(`runs/${encodeURIComponent(runId)}/input`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wait_id:waitId,values})}));
+  }
+
+  async runWorkflow(runId:string) {
+    return workflowData.parse(await this.read(`runs/${encodeURIComponent(runId)}/workflow`));
   }
 
   async releaseState(workflowId: string) {

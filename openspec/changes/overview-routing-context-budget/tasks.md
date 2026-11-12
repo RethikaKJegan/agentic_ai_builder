@@ -1,0 +1,4 @@
+- [x] Reproduce the full routing envelope using actual copied metadata and account context.
+- [x] Allocate discovery capacity from the complete serialized context.
+- [x] Verify varying prompt/context sizes, source coverage, account preservation and prior flows.
+- [x] Deploy the backend-only fix with rollback and authenticated read-only verification.

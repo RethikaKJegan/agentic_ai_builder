@@ -39,7 +39,7 @@ def count_evidence(instance,subject):
     return dict(count=count,filters=filters,plan=plan,query_id=output['query_id'],scope=output['scope'],revision=output['metadata_revision'])
 
 
-def percentages(instances,subject):
+def percentages(instances,subject,*,subway_context=None,queries=None):
     evidence=[e for i in instances if (e:=count_evidence(i,subject)) is not None]
     derived=[]
     for n in evidence:
@@ -57,4 +57,7 @@ def percentages(instances,subject):
                 base_dataset_id=n['plan']['base_dataset_id'],scope=n['scope'],metadata_revision=n['revision'],
                 numerator_filters=n['plan']['filters'],denominator_filters=d['plan']['filters'])
             if item not in derived:derived.append(item)
+    if subway_context:
+        from .subway_percentages import derive
+        derived.extend(derive(instances,subject,subway_context,queries or {}))
     return derived

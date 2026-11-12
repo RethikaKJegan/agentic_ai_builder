@@ -5,7 +5,7 @@ import {useBackend} from '@/api/state';
 import {knowledgeFixture} from '@/test/fixtures/knowledge-map';
 import {KnowledgeMap} from './KnowledgeMap';
 
-vi.mock('@xyflow/react',()=>({ReactFlowProvider:({children}:{children:React.ReactNode})=><>{children}</>,ReactFlow:({nodes,onNodeClick}:{nodes:{id:string;data:{label:string}}[];onNodeClick:(event:unknown,node:unknown)=>void})=><div>{nodes.map(n=><button key={n.id} onClick={()=>onNodeClick(null,n)}>{n.data.label}</button>)}</div>,Background:()=>null,Controls:()=>null,Handle:()=>null,useNodesInitialized:()=>false,useReactFlow:()=>({fitView:()=>{}}),Position:{Left:'left',Right:'right'},MarkerType:{ArrowClosed:'closed'}}));
+vi.mock('@xyflow/react',()=>({ReactFlowProvider:({children}:{children:React.ReactNode})=><>{children}</>,ReactFlow:({nodes,onNodeClick}:{nodes:{id:string;data:{label:string;state:string}}[];onNodeClick:(event:unknown,node:unknown)=>void})=><div>{nodes.map(n=><button key={n.id} data-state={n.data.state} onClick={()=>onNodeClick(null,n)}>{n.data.label}</button>)}</div>,Background:()=>null,Controls:()=>null,Handle:()=>null,useNodesInitialized:()=>false,useReactFlow:()=>({fitView:()=>{}}),Position:{Left:'left',Right:'right'},MarkerType:{ArrowClosed:'closed'}}));
 function scope(workspace:string){useBackend.setState({session:{auth:{subject:{workspace_id:workspace,subject_id:'owner'}}} as never});}
 beforeEach(()=>{vi.restoreAllMocks();scope('simpsons');vi.spyOn(api,'runKnowledge').mockResolvedValue({projections:[],qualification:'Saved references'});});
 afterEach(cleanup);
@@ -37,4 +37,20 @@ it('labels current ontology fallback and never upgrades it to historical executi
  render(<KnowledgeMap doc={f.doc} view={f.view}/>);
  await screen.findByText('Current ontology shown. Historical ontology version unavailable.');
  fireEvent.click(screen.getByRole('button',{name:'Complaint'}));expect(screen.queryByText(/Executed ·/)).toBeNull();
+});
+
+it('shows direct context separately and clears it when another step is selected',async()=>{
+ const f=knowledgeFixture();const a=f.doc.action_plan.actions[0]!;
+ f.doc.action_plan.actions.push({...a,action_id:'other',evidence_references:[]});
+ vi.spyOn(api,'businessOntology').mockResolvedValue(f.ontology);vi.spyOn(api,'knowledgeSnapshot').mockResolvedValue(f.snapshot);
+ render(<KnowledgeMap doc={f.doc} view={f.view}/>);
+ const neighbour=await screen.findByRole('button',{name:'Related Complaint'});
+ expect(neighbour).toHaveAttribute('data-state','context');
+ expect(screen.getByRole('button',{name:'Complaint'})).toHaveAttribute('data-state','executed');
+ expect(screen.getByText('1 with recorded execution evidence')).toBeVisible();
+ fireEvent.click(neighbour);expect(screen.getByRole('heading',{name:'Connected context'})).toBeVisible();
+ expect(screen.getByText(/This connection does not establish/)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Full ontology'}));
+ fireEvent.change(screen.getByLabelText('Knowledge workflow step'),{target:{value:'other'}});
+ expect(screen.getByRole('button',{name:'Related Complaint'})).toHaveAttribute('data-state','available');
 });

@@ -1,0 +1,5 @@
+- [x] Reproduce invalid shape and source identity cases using controlled responses.
+- [x] Add bounded catalog-specific model schema and query-mode guidance.
+- [x] Preserve strict execution checks and safe failure diagnostics.
+- [x] Verify detail, aggregate, currency, join, reporting and existing query runtime paths.
+- [x] Deploy Subway backend with rollback and preservation checks.

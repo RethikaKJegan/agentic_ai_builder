@@ -95,16 +95,30 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     tools=composition.tools(auth);contracts=catalogue(prepared,tools,connectors);contracts['content.prepare']=content_contract()
     if package_context:contracts.update(deepcopy(package_context['package']['capability_contracts']))
     full_queries=getattr(composition.service,'subway_queries',None) if package_context and package_context['package']['ontology_version']=='bov_subway_dump_v4' else None
+    if _revision and 'tool.subway_query' not in _revision.get('contracts',{}):full_queries=None
     if full_queries:
         from .subway_queries import planning_contract
         contracts['subway.plan_query']=planning_contract()
-        context['validated_context']['subway_query_catalog']=full_queries.catalog(auth,objective)
+        selection=(_overview or {}).get('subway_selection')
+        query_catalog,query_knowledge=full_queries.knowledge(auth,objective,selection)
+        if knowledge_only and (_overview or {}).get('knowledge',{}).get('references'):
+            query_knowledge=deepcopy(_overview['knowledge'])
+        context['validated_context']['subway_query_catalog']=query_catalog
+        context['validated_context']['business_knowledge']=query_knowledge
+        context['evidence'].update({r['ref']:deepcopy(r) for r in query_knowledge.get('references',[])})
+        if (_overview or {}).get('subway_date_filters'):
+            context['validated_context']['subway_date_filters']=deepcopy(_overview['subway_date_filters'])
         if not _revision:
             # Old reviewed workflows keep their immutable inspection capabilities.
             # New client questions must query the relevant data, not inspection samples.
             contracts={cid:c for cid,c in contracts.items() if not cid.startswith('subway.read.')}
     data_queries=getattr(composition.service,'workflow_queries',None)
-    if data_queries:
+    if full_queries and not _revision:
+        # New Subway questions must have one executor/schema. Historical generic
+        # plans remain immutable and may still be reconstructed by revision.
+        contracts.pop('data.plan_query',None)
+        contracts.pop('tool.workflow_data_query',None)
+    elif data_queries:
         from .workflow_queries import planning_contract
         try:
             context['validated_context']['data_query_catalog']=data_queries.queries.catalogue(auth,objective)
@@ -133,6 +147,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             return True
         except RegistryError:return False
     visible={cid:c for cid,c in contracts.items() if eligible(cid,c)}
+    if 'tool.subway_query' not in visible:visible.pop('subway.plan_query',None)
+    if 'tool.workflow_data_query' not in visible:visible.pop('data.plan_query',None)
     if _overview is not None:
         from .overview_automation import allowed_write
         visible={cid:c for cid,c in visible.items() if allowed_write(_overview['route']['side_effects'],dict(c,capability_id=cid))}
@@ -175,6 +191,12 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         planning_context['planning_defaults']=GUIDANCE+(QUESTION_FREE_GUIDANCE if _overview and _overview.get('question_free') else '')
         planning_context['planning_defaults']+=' '+AGGREGATE_GUIDANCE+' For a requested percentage, supply separate filtered and denominator count(*) query results as direct dependencies of each report or spreadsheet content step.'
         planning_context['query_guidance']='Use data.plan_query followed by tool.workflow_data_query for multi-record filtering, sorting, grouping or statistics, including complaints without an ID. Use business.read.* only for identified case evidence. Bind data.plan_query output [query] to tool query using kind output. The model action receives context.data_query_catalog, including exact authorized fields and reviewed relationships. Then bind actual query output into content.prepare for report/Sheets/email. Never calculate population statistics from displayed rows; use query metrics. Preserve completeness and warnings. Use the already selected Google account and resolved recipient; do not ask again for supplied inputs. If a query capability is unavailable, explain the actual limitation instead of substituting case samples.'
+        if full_queries:
+            planning_context['query_guidance']='Use subway.plan_query → tool.subway_query → content.prepare for supported read-only data requests. The model query action receives context.subway_query_catalog and context.business_knowledge. Bind its output path [query] to tool target [query]. Use exact selected IDs and engine aggregates; include server-provided subway_date_filters unchanged. Missing dataset/field/query bindings are internal planning errors, never user inputs. Do not substitute inspection samples, generic query schemas, unsupported joins or invented financial/approval semantics.'
+            from .query_predicates import FILTER_GUIDANCE
+            planning_context['query_guidance']+=FILTER_GUIDANCE
+            from .query_branches import GUIDANCE as BRANCH_GUIDANCE
+            planning_context['query_guidance']+=BRANCH_GUIDANCE
         if _overview is not None:
             planning_context['overview_intent']=deepcopy(_overview)
             if knowledge_only:
@@ -191,9 +213,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             package=package_context['package']
             from .business_planning import retrieve
             planning_context['client_knowledge']=dict(client_id=package['client_id'],domain=package['domain'],
-                ontology_version=package['ontology_version'],concepts=deepcopy(package['concepts']),
-                source_mappings=deepcopy(package['source_mappings']),
-                ontology_evidence=retrieve(composition.store,auth,objective,package['ontology_version']))
+                ontology_version=package['ontology_version'],concepts=deepcopy(package['concepts']) if not full_queries else [c for c in package['concepts'] if c['id'] in {r['id'] for r in query_knowledge.get('references',[]) if r['kind']=='concept'}],
+                source_mappings=deepcopy(package['source_mappings']) if not full_queries else [],
+                ontology_evidence=query_knowledge if full_queries else retrieve(composition.store,auth,objective,package['ontology_version']))
             if full_queries:
                 planning_context['client_knowledge']['query_guidance']='For data questions use subway.plan_query followed by tool.subway_query, then content.prepare. The planner action receives server-provided context including subway_query_catalog. Bind its typed query output with kind output, path [query], target [query]. Query generation is a metered model action, not a missing user input. Query results contain complete matched counts/aggregates and measured left-join coverage; result limit is display pagination. Never substitute package inspection samples for filtered facts or totals.'
                 planning_context['client_knowledge']['ontology_evidence']['source_coverage'].update(
@@ -206,6 +228,25 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if not isinstance(proposal,dict) or set(proposal)-{'actions','completion_criteria','missing_inputs'}:deny('Invalid structured action proposal.')
     actions=deepcopy(proposal.get('actions',[]))
     if not isinstance(actions,list) or not 1<=len(actions)<=16:deny('Select between one and sixteen action instances.')
+    if full_queries and not _revision and body.get('action_plan') is None:
+        from .query_branches import expand
+        try:
+            actions,completion,branch_pins=expand(actions,proposal.get('completion_criteria',[]),(selection or {}).get('filter_branches',[]))
+        except Exception as exc:
+            if getattr(exc,'code',None) in ('ACTION_BINDING_INVALID','ACTION_CONTENT_UNVERIFIED') and _planning_feedback is None:
+                return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
+                    _planning_budget=_planning_budget,_overview=_overview,_planning_feedback=dict(error_code=exc.code,message=str(exc),invalid_proposal=deepcopy(proposal),correction='Preserve all interpreted alternatives. Supply exactly one unconditional subway.plan_query template and its directly bound tool.subway_query read, followed by a content.prepare depending on that read. The server expands all pinned categories. Keep the remaining requested report/delivery actions.'))
+            raise
+        proposal=deepcopy(proposal);proposal['completion_criteria']=completion
+        if branch_pins:
+            context['validated_context']['subway_filter_branches']=branch_pins
+            reads={a['action_id'] for a in actions if a['capability_id']=='tool.subway_query' and a['action_id'] in branch_pins}
+            context['validated_context']['subway_filter_reports']={a['action_id']:sorted(reads) for a in actions if a['capability_id']=='content.prepare' and reads & set(a['depends_on'])}
+    example=context['validated_context'].get('business_knowledge',{}).get('analytical_assumptions') if full_queries else None
+    if example and not _revision:
+        for action in actions:
+            if isinstance(action,dict) and action.get('capability_id')=='content.prepare' and isinstance(action.get('instructions'),str):
+                action['instructions']+=' Disclose: '+example['report_label']+' State the applied assumptions, with explicit request definitions taking precedence. Never present them as verified company policy or source observations.'
     # A null condition unambiguously means unconditional execution. Repair only
     # generated flags; explicit plans and real conditions retain strict validation.
     if body.get('action_plan') is None:
@@ -300,10 +341,13 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     except Exception as exc:
         if getattr(exc,'code',None) in ('ACTION_BINDING_INVALID','ACTION_INPUT_REQUIRED','ACTION_AUTHORITY_DENIED','ACTION_CONTENT_UNVERIFIED'):
             import logging
-            logging.getLogger(__name__).warning('Connected plan binding diagnostic: %s',json.dumps([dict(action_id=a['action_id'],capability_id=a['capability_id'],depends_on=a['depends_on'],bindings=a['bindings'],evidence_references=a['evidence_references']) for a in actions],sort_keys=True))
+            from .security import request_correlation
+            logging.getLogger(__name__).warning('Connected plan validation failed',extra=dict(
+                correlation_id=request_correlation.get(),error_code=exc.code,
+                action_count=len(actions),binding_count=sum(len(a.get('bindings',[])) for a in actions)))
         if getattr(exc,'code',None) in ('ACTION_BINDING_INVALID','ACTION_AUTHORITY_DENIED','ACTION_CONTENT_UNVERIFIED'):
             import logging
-            logging.getLogger(__name__).warning('Rejected connected binding: %s',json.dumps(getattr(exc,'binding_issue',None),sort_keys=True))
+            logging.getLogger(__name__).warning('Rejected connected binding (code=%s)',exc.code)
         if ((getattr(exc,'code',None) in ('ACTION_BINDING_INVALID','ACTION_AUTHORITY_DENIED','ACTION_CONTENT_UNVERIFIED') or
                 getattr(exc,'code',None)=='ACTION_INPUT_REQUIRED' and (getattr(exc,'binding_issue',{}).get('section') in ('validated_context','configuration','evidence') or _overview and _overview.get('question_free'))) and body.get('automatic_inputs')
                 and body.get('action_plan') is None and _planning_feedback is None):
@@ -330,6 +374,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
                 if actual!=dict(package_id=package_context['pins']['package_id'],revision=package_context['pins']['revision'],capability_id=a['capability_id']):deny('Package retrieval must match pinned package and capability.','ACTION_SCOPE_DENIED')
     if plan['missing_inputs']:deny('Resolve the plan missing_inputs before compiling.','ACTION_INPUT_REQUIRED')
     plan['fingerprint']=digest({k:v for k,v in plan.items() if k!='fingerprint'})
+    adaptive_candidate=bool(full_queries and _overview and (_overview['route']['intent_type']=='investigation' or _overview.get('schedule') or _overview.get('event_subscription'))
+        and (not _overview['route']['side_effects'] or _overview.get('schedule') or _overview.get('event_subscription')) and not lifecycle_context
+        and all(not a['optional'] and not a.get('when') for a in actions))
     cid='composition_'+(secrets.token_hex(12) if _revision is not None else plan_id.removeprefix('plan_'));configs=[];chosen={};tasks=[]
     from .business_composition import AgentConfigurationFactory
     factory=AgentConfigurationFactory(composition.service.registry_adapter,composition.model_id)
@@ -368,6 +415,12 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         for field in ('max_llm_calls','max_tool_calls','max_retries','timeout_seconds'):
             if a['budget'][field]>definition['limits'][field]:deny('Action exceeds current agent limits.','ACTION_BUDGET_INVALID')
             definition['limits'][field]=a['budget'][field]
+        if adaptive_candidate:
+            # Repeated read/reasoning actions reuse this exact reviewed template.
+            # Its cumulative allowance is approved up front, within account caps.
+            field='max_tool_calls' if tool else 'max_llm_calls'
+            definition['limits'][field]=min(policy.agent_limits[field],plan['constraints'][field])
+            definition['limits']['timeout_seconds']=min(policy.agent_limits['timeout_seconds'],plan['constraints']['max_seconds'])
         cfg['required_evidence_facts']=deepcopy(cfg['evidence_references']);cfg['evidence_references']=[]
         composition.register(definition,auth);configs.append(cfg);tasks.append(task)
     doc=dict(schema_version='business-composition-v1',composition_id=cid,scope=dict(workspace=scope[0],owner=scope[1]),objective=objective,state='ready',gaps=[],
@@ -394,6 +447,12 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         with composition.store.transaction(write=False) as db:google.validate(w,auth,db)
         for tool in chosen.values():google.bind(connectors[tool['tool_id']],w,{},auth,{'tool_id':tool['tool_id']})
     if _revision is not None:doc['adaptive_control']=deepcopy(_revision['control'])
+    elif adaptive_candidate:
+        # The reviewed initial workflow explicitly authorizes bounded read-only
+        # continuation. Existing saved queries and lifecycle runs remain unchanged.
+        doc['adaptive_control']=dict(kind='workflow-investigation',limits=dict(
+            max_seconds=plan['constraints']['max_seconds'],max_llm_calls=plan['constraints']['max_llm_calls'],
+            max_tool_calls=plan['constraints']['max_tool_calls']))
     doc['sha256']=digest(doc)
     from planner.validation import validate_workflow
     validate_workflow(compile_workflow(doc))
@@ -453,6 +512,10 @@ def compile_workflow(doc):
     limits=deepcopy(w['agents'][0]['limits'])
     for field in ('max_llm_calls','max_tool_calls','max_tokens','max_estimated_cost_usd'):limits[field]=sum(a['limits'].get(field,0) for a in w['agents'])
     limits.update(max_retries=doc['action_plan']['constraints'].get('max_retries',0),timeout_seconds=doc['action_plan']['constraints']['max_seconds'])
+    if doc.get('adaptive_control',{}).get('kind')=='workflow-investigation':
+        # Visible in the initial workflow review, never expanded by a revision.
+        limits.update(max_llm_calls=doc['action_plan']['constraints']['max_llm_calls'],
+            max_tool_calls=doc['action_plan']['constraints']['max_tool_calls'],max_tokens=1000000)
     w['error_policy']['max_retries']=limits['max_retries']
     w['execution_policy']['limits']=limits;w['execution_policy']['allow_external_writes']=bool(w['approval_gates'])
     return w

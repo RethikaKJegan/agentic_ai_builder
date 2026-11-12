@@ -39,6 +39,7 @@ for(const mobile of [false,true])for(const [tenant,title] of [['simpsons','Compl
  await expect(page.getByLabel('Business module groups')).toBeVisible();
  await page.getByLabel('Search ontology concepts').fill('Related');
  await expect(page.locator('.react-flow__node').filter({hasText:'Related '+title})).toHaveCount(1);
+ await expect(page.locator('.react-flow__node').filter({hasText:'Related '+title}).filter({hasText:'Connected context · usage unverified'})).toHaveCount(1);
  await page.getByLabel('Search ontology concepts').clear();
  await page.getByRole('button',{name:'zoom in'}).click();await page.getByRole('button',{name:'fit view'}).click();
  await page.getByLabel('Knowledge workflow step').selectOption(f.doc.action_plan.actions[0]!.action_id);

@@ -28,7 +28,34 @@ def params(workflow,node,run):
     action=actions.get(node['node_id'])
     if not action:return None
     result=resolve_inputs(action,context,actions,run)
+    if action['capability_id']=='tool.subway_query':
+        from workflow_api.descriptive_measures import pin,check
+        resolution=pin(context.get('validated_context',{}).get('subway_query_catalog',{}))
+        if resolution:check(result.get('query',{}),resolution)
+    if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation' and action['capability_id']=='subway.plan_query':
+        result.setdefault('context',{})['user_values']=deepcopy(context['user_values'])
+        result.setdefault('context',{})['investigation_task']=dict(objective=plan['goal'],instructions=action['instructions'],
+            assessment=deepcopy(run.get('adaptive',{}).get('assessment')),plan_revision=plan['revision'])
     overview=metadata.get('overview_intent',{})
+    if action['capability_id']=='subway.plan_query' and run.get('automation_reference',{}).get('trigger',{}).get('kind')=='event':
+        result.setdefault('context',{})['trigger_event']=deepcopy(run['automation_reference']['trigger'])
+        result['context']['subway_event_filters']=deepcopy(run['automation_reference']['trigger'].get('query_filters',[]))
+    if action['capability_id']=='subway.plan_query' and overview.get('subway_temporal'):
+        from workflow_api.subway_automation import date_filters
+        result.setdefault('context',{})['subway_date_filters']=date_filters(overview,run)
+    branch=deepcopy(context.get('validated_context',{}).get('subway_filter_branches',{}).get(action['action_id']))
+    if branch:
+        extra=deepcopy(context.get('validated_context',{}).get('subway_date_filters',[]))
+        if overview.get('subway_temporal'):
+            from workflow_api.subway_automation import date_filters
+            extra=date_filters(overview,run)
+        extra+=deepcopy(run.get('automation_reference',{}).get('trigger',{}).get('query_filters',[]))
+        for predicate in extra:
+            if predicate not in branch['filters']:branch['filters'].append(predicate)
+        if action['capability_id']=='subway.plan_query':result.setdefault('context',{})['subway_filter_branch']=branch
+        elif action['capability_id']=='tool.subway_query':
+            from workflow_api.query_branches import check
+            check(result.get('query',{}),branch)
     if action['capability_id']=='tool.workflow_data_query' and overview.get('query'):
         if result.get('query')!=overview['query']:deny('Query differs from the reviewed automation template.','AUTOMATION_SCOPE_DENIED')
         if overview.get('temporal_pin'):
@@ -38,14 +65,41 @@ def params(workflow,node,run):
             if due is None:deny('Logical occurrence time is missing.','AUTOMATION_SCOPE_DENIED')
             result['query']=resolve(overview['query'],overview['temporal_pin'],due)
     if action['capability_id']=='content.prepare':
+        required=context.get('validated_context',{}).get('subway_filter_reports',{}).get(action['action_id'],[])
+        if any(aid not in action['depends_on'] or run.get('action_instances',{}).get(aid,{}).get('state')!='completed' for aid in required):
+            deny('Every pinned alternative must complete and feed the report.','ACTION_INCOMPLETE')
         if metadata.get('goal_planning'):
             upstream={aid:deepcopy(run['action_instances'][aid]['output']) for aid in action['depends_on'] if run['action_instances'][aid]['output']!=result.get('data')}
             if upstream:result['data']={'primary':result['data'],'upstream_results':upstream}
+        categories={aid:deepcopy(pin) for aid,pin in context.get('validated_context',{}).get('subway_filter_branches',{}).items() if aid in action['depends_on'] and actions[aid]['capability_id']=='tool.subway_query'}
+        if categories:
+            data=result['data']
+            result['data']={**data,'filter_categories':categories} if isinstance(data,dict) else {'primary':data,'filter_categories':categories}
+        from workflow_api.descriptive_measures import pin as measure_pin
+        catalog=context.get('validated_context',{}).get('subway_query_catalog',{})
+        resolution=measure_pin(catalog)
+        if resolution:
+            basis=dict(resolution=deepcopy(resolution),fields=[dict(field_id=f['field_id'],source=d['label'],name=f['name']) for d in catalog['sources'] for f in d['fields'] if f['field_id'] in {m['field_id'] for m in resolution['metrics']}])
+            basis['queries']={}
+            for aid in action['depends_on']:
+                if actions[aid]['capability_id']=='tool.subway_query':
+                    query=resolve_inputs(actions[aid],context,actions,run)['query']
+                    basis['queries'][aid]=dict(query_id=run['action_instances'][aid]['output']['query_id'],metrics=deepcopy(query['metrics']),group_by=deepcopy(query['group_by']))
+            data=result['data']
+            result['data']={**data,'descriptive_measure_basis':basis} if isinstance(data,dict) else {'primary':data,'descriptive_measure_basis':basis}
+            action=deepcopy(action)
+            action['instructions']+=' Label every recorded measure separately using descriptive_measure_basis. Preserve each requested statistic and currency group; do not infer measure equivalence, an approved basis or policy outcomes.'
         result['instructions']=action['instructions']
+        if run.get('automation_reference') and 'tool.subway_query' in metadata['connected_contracts']:
+            result['data']={'primary':result['data'],'automation_trigger':deepcopy(run['automation_reference']),'original_objective':plan['goal'],'assessment':deepcopy(run.get('adaptive',{}).get('assessment'))}
+            result['instructions']+=' Include the original objective, reporting period, actual source freshness, verified calculations, cited evidence, completeness, limitations and execution status. Historical snapshots do not establish current business activity; unknown sync coverage is a limitation.'
         result['source_references']=deepcopy(action['evidence_references'])
         from .aggregate_math import percentages,GUIDANCE
-        derived=percentages([run['action_instances'][aid] for aid in action['depends_on']],
-            dict(workspace_id=run['workspace_id'],subject_id=run['subject_id']))
+        query_inputs={aid:resolve_inputs(actions[aid],context,actions,run).get('query') for aid in action['depends_on'] if run['action_instances'][aid].get('capability_id')=='tool.subway_query' and run['action_instances'][aid]['state']=='completed'}
+        derived=percentages([{**run['action_instances'][aid],'action_id':aid} for aid in action['depends_on']],
+            dict(workspace_id=run['workspace_id'],subject_id=run['subject_id']),subway_context=catalog,queries=query_inputs)
+        if query_inputs and (catalog.get('interpretation') or {}).get('percentage_basis','none')!='none' and not derived:
+            deny('Requested percentages require complete compatible verified numerator and denominator counts.','ACTION_CONTENT_UNVERIFIED')
         if derived:
             result['data']={'primary':result['data'],'verified_aggregate_math':derived}
             result['instructions']+=' '+GUIDANCE
@@ -93,6 +147,33 @@ def content_urls(value):
 
 def validate_content(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
+    if action and action['capability_id']=='subway.plan_query' and isinstance(output,dict) and 'query' in output:
+        from .subway_query_model import canonical_projection
+        output['query']=canonical_projection(output['query'])
+        from workflow_api.subway_queries import SubwayQueries
+        from workflow_api.service import ApiFailure
+        catalog=inputs.get('context',{}).get('subway_query_catalog',{})
+        datasets={d['dataset_id']:d for d in catalog.get('sources',[])}
+        fields={f['field_id']:{**f,'dataset_id':d['dataset_id']} for d in datasets.values() for f in d['fields']}
+        relationships={r['relationship_id']:r for r in catalog.get('relationships',[])}
+        try:
+            SubwayQueries.validate(None,output['query'],dict(datasets=datasets,fields=fields,relationships=relationships))
+            from workflow_api.descriptive_measures import pin,check as check_measures
+            resolution=pin(catalog)
+            if resolution:check_measures(output['query'],resolution)
+            if inputs.get('context',{}).get('subway_filter_branch'):
+                from workflow_api.query_branches import check
+                check(output['query'],inputs['context']['subway_filter_branch'])
+            for expected in inputs.get('context',{}).get('subway_date_filters',[])+inputs.get('context',{}).get('subway_event_filters',[]):
+                if output['query']['filters'].count(expected)!=1:
+                    raise ApiFailure('SUBWAY_QUERY_INVALID','Preserve the exact reporting-period filters.',422)
+        except ApiFailure as exc:
+            from .service import RuntimeFailure
+            error=RuntimeFailure('AGENT_OUTPUT_INVALID','Subway query does not match the selected metadata or reporting requirements.',422)
+            error.invalid_model_output=True
+            error.validation_field='query'
+            error.validation_hint=exc.code+': '+str(exc)
+            raise error from None
     if action and action['capability_id']=='data.plan_query' and isinstance(output,dict) and 'query' in output:
         from workflow_api.data_queries import canonical_model_projection,DataQueries
         from workflow_api.service import ApiFailure
@@ -145,6 +226,15 @@ def verify(workflow,node,output,inputs):
         except ApiFailure as exc:deny('Specialist findings cite unprovided evidence.',exc.code)
         output.clear();output.update(checked)
     if node['kind']=='tool':
+        if action['capability_id']=='tool.subway_query':
+            from workflow_api.business_knowledge_model import digest as query_digest
+            pin=workflow.get('metadata',{}).get('client_package_pin',{})
+            scope=workflow['metadata']['connected_action_plan']['scope']
+            if (output.get('query_sha256')!=query_digest(inputs.get('query')) or
+                    output.get('ontology_version')!=pin.get('ontology_version') or
+                    output.get('scope')!={'workspace_id':scope['workspace_id'],'owner_id':scope['owner_id']} or
+                    output.get('coverage',{}).get('complete_scan') is not True):
+                deny('Subway receipt does not verify this exact scoped query.','ACTION_RECEIPT_INVALID')
         if output.get('status') in ('failed','error','rejected'):deny('Connector did not confirm the operation.','ACTION_RECEIPT_INVALID')
         if 'spreadsheet_id' in output and 'spreadsheet_url' in output:
             from urllib.parse import urlsplit
@@ -182,6 +272,11 @@ def completed(workflow,node,run,output):
     item.update(state='completed',output=deepcopy(output),output_fingerprint=digest(output),
         verified_receipt=node['kind']=='tool',provenance_type='SYNTHETIC' if scenario and source_read else 'ACTUAL' if node['kind']=='tool' else 'INFERRED',
         source_references=deepcopy(action['evidence_references']),assumptions=[dict(value=v,provenance_type='SYNTHETIC',permitted_uses=['analytical_continuation']) for v in (output or {}).get('assumptions',[])],external_effect_status='connector_confirmed' if action['required_approvals'] else 'not_applicable')
+    if run.get('adaptive',{}).get('kind')=='workflow-investigation':
+        item['plan_revision']=run['adaptive']['revision']
+        item['action_plan_fingerprint']=workflow['metadata']['connected_action_plan']['fingerprint']
+        if action['capability_id']=='tool.subway_documents':
+            item['document_evidence']=[{k:deepcopy(r[k]) for k in ('source_id','version_id','source_sha256','excerpt_sha256','location','scope') if k in r} for r in output.get('records',[])]
     from workflow_api.workflow_knowledge import completed_usage
     item['ontology_usage']=completed_usage(workflow,action,run)
     # Existing checkpoint/recovery storage is reused with stable action-specific keys.

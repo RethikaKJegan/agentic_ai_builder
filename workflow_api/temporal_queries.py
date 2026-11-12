@@ -6,7 +6,7 @@ from .service import ApiFailure
 
 VERSION = 'relative-query-v1'
 ANNOTATION = 'x-praxi-relative-query-v1'
-PERIODS = {'today', 'yesterday', 'this_week', 'previous_week', 'current_month', 'previous_month', 'last_n_days'}
+PERIODS = {'today', 'yesterday', 'this_week', 'previous_week', 'current_month', 'previous_month', 'last_n_days', 'previous_quarter', 'current_quarter'}
 
 
 def fail(message):
@@ -27,6 +27,12 @@ def window(period, zone, due, days=1):
         start -= timedelta(days=start.weekday())
         if period == 'previous_week': start -= timedelta(days=7)
         end = start + timedelta(days=7)
+    elif period in {'current_quarter', 'previous_quarter'}:
+        month = ((start.month - 1) // 3) * 3 + 1
+        start = start.replace(month=month, day=1)
+        if period == 'previous_quarter':
+            start = start.replace(year=start.year - 1, month=10) if month == 1 else start.replace(month=month - 3)
+        end = start.replace(year=start.year + 1, month=1) if start.month == 10 else start.replace(month=start.month + 3)
     elif period in {'current_month', 'previous_month'}:
         start = start.replace(day=1)
         if period == 'previous_month': start = (start - timedelta(days=1)).replace(day=1)

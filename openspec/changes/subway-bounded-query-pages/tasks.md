@@ -1,0 +1,5 @@
+- [x] Reproduce the saved high-cardinality query with more than 10,000 groups.
+- [x] Implement bounded temporary aggregation/sorting and byte-bounded display pages.
+- [x] Verify complete totals, deterministic ordering, pagination and cleanup on failure.
+- [x] Run existing query, runtime, reporting and isolation checks.
+- [x] Deploy Subway backend with exact rollback and preservation verification.

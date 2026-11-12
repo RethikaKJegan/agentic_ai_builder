@@ -1,0 +1,5 @@
+- [x] Verify the saved clarification and reproduce note versus blocker cases.
+- [x] Separate ready notes from real blocking questions in model transport and routing.
+- [x] Verify old selections and genuine policy ambiguity remain blocked appropriately.
+- [x] Run routing, selection, query execution and customer isolation checks.
+- [x] Deploy Subway backend with exact rollback and preservation checks.

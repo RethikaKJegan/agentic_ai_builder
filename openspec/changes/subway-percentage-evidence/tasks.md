@@ -1,0 +1,4 @@
+- [x] Implement typed denominator intent and verified grouped percentage derivation.
+- [x] Clarify individual-record empty state and test rendering.
+- [x] Verify saved run/sheet read-only, runtime regressions and frontend checks.
+- [x] Deploy verified backend/frontend changes with rollback and preservation evidence.

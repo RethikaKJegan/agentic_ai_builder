@@ -38,7 +38,9 @@ for(const mobile of [false,true])for(const clarify of [false,true])test(`no-ID w
  await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
  await expect(page).toHaveURL(/connected=1.*composition=/);
  expect(submitted).toMatchObject({objective:goal,google_connection_id:doc.google_connection_id,automatic_inputs:true,user_values:{}});
+ await page.getByRole('button',{name:'Details',exact:true}).click();
  await expect(page.getByLabel('Workflow Google account')).toHaveValue(doc.google_connection_id);
+ await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
  if(clarify){
   await expect(page.getByRole('heading',{name:'Query blocked',exact:true})).toBeVisible();
   await expect(page.getByText(question,{exact:true})).toHaveCount(0);
@@ -49,11 +51,11 @@ for(const mobile of [false,true])for(const clarify of [false,true])test(`no-ID w
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);return;
  }
- await page.getByRole('tab',{name:'report',exact:true}).click();
+ await page.getByRole('tab',{name:'Reports',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Verified query results',exact:true})).toBeVisible();
  await expect(page.getByText('603 matching records. Showing 1 of 1 result rows.')).toBeVisible();
  await expect(page.getByText(/Statistics cover all matching records/)).toBeVisible();
- await page.reload();await page.getByRole('tab',{name:'report',exact:true}).click();
+ await page.reload();await page.getByRole('tab',{name:'Reports',exact:true}).click();
  await expect(page.getByRole('cell',{name:'603',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  expect(errors).toEqual([]);

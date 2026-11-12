@@ -49,7 +49,7 @@ def canonical_query_output(definition,inputs,output):
     Unknown or non-group fields are left for the strict query validator.
     """
     context=inputs.get('context')
-    if (not isinstance(context,dict) or 'data_query_catalog' not in context
+    if (not isinstance(context,dict) or not {'data_query_catalog','subway_query_catalog'} & set(context)
             or set(definition.get('output_schema',{}).get('properties',{}))!={'query'}):return output
     query=output.get('query',{})
     if not isinstance(query,dict):return output
@@ -61,6 +61,9 @@ def canonical_query_output(definition,inputs,output):
 
 def scoped_query_schema(definition,inputs):
     """Constrain projections without choosing a source or changing permissions."""
+    if 'subway_query_catalog' in inputs.get('context',{}):
+        from .subway_query_model import response_schema
+        return response_schema(definition,inputs)
     schema=deepcopy(definition['output_schema'])
     catalog=inputs.get('context',{}).get('data_query_catalog',{})
     datasets=catalog.get('datasets',[])
@@ -162,6 +165,9 @@ class CrewAdapter:
             llm.structured_format=dict(type='json_schema',name='scoped_read_query',strict=True,schema=scoped_query_schema(definition,inputs))
             if 'data_query_catalog' in inputs['context']:
                 query_guidance = QUERY_CLARIFICATION_GUIDANCE
+            else:
+                from .subway_query_model import GUIDANCE
+                query_guidance = GUIDANCE
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
             llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions']+query_guidance,
@@ -199,17 +205,24 @@ class CrewAdapter:
             if failure is not None:
                 raise failure from None
             raise
+        validation_field='output'
         try:
             output = json.loads(result.raw)
             reject_secrets(output)
-            if list(Draft202012Validator(definition['output_schema']).iter_errors(output)):
+            errors=list(Draft202012Validator(definition['output_schema']).iter_errors(output))
+            if errors:
+                validation_field='/'.join(str(p) for p in errors[0].absolute_schema_path)
                 raise ValueError()
             output=canonical_query_output(definition,inputs,output)
             if usage_callback is not None:
                 usage_callback(deepcopy(crew.agents[0].llm.actual_usage))
             return output
         except Exception as exc:
-            raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'The agent did not produce a safe schema-valid result.') from None
+            error=RuntimeFailure('AGENT_OUTPUT_INVALID', 'The agent did not produce a safe schema-valid result.')
+            error.invalid_model_output=True
+            error.validation_field=validation_field
+            error.validation_hint='Return only the exact JSON object required by the registered output schema; no prose or additional fields.'
+            raise error from None
 
 class CrewExecutor:
     retry_safe = False

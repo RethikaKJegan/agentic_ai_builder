@@ -1,0 +1,68 @@
+{
+  "profile_id": "subway-demo-definitions-v1",
+  "revision": 1,
+  "scope": {"workspace_id": "client-subway", "subject_id": "subway-client"},
+  "ontology_version": "bov_subway_dump_v4",
+  "definition_sha256": "03af7fa412133bd232e23735a124db11a10bed711de993bc88e5c0391c96ee02",
+  "source_basis": "user_requested_generated_example",
+  "authority": "analytical_assumptions_only",
+  "selection_phrase": "Use Subway demo definitions v1",
+  "report_label": "Subway demo definitions v1 — example analytical assumptions, not verified company policy.",
+  "guidance": [
+    "Use defaults only where the request has not explicitly defined a different measure. State each applied assumption in the report.",
+    "Query actual authorized records. Never generate missing operational rows, source identities, currency conversions, business findings or delivery receipts.",
+    "These definitions grant no source access, join, approval, policy execution or external action authority.",
+    "Use current catalog IDs and supported scalar relationships. If a required field or relationship is absent, report the precise limitation and retain supported independent findings.",
+    "Historical snapshot results describe the available snapshot, not current restaurant operations. Calendar labels and profiling dates do not prove business coverage."
+  ],
+  "definitions": [
+    {
+      "id": "recorded_po_value",
+      "terms": ["spending", "spend", "procurement spend", "purchase order value"],
+      "definition": "For this demo, unspecified spending means recorded purchase-order value: sum finance.purchaseorders.totalAmount by stored currency. Include all recorded statuses unless the request explicitly supplies a status filter; show a status breakdown so cancelled or draft records remain visible. Label the measure recorded PO value (demo), not approved commitments, cash paid or actual expenses.",
+      "evidence_required": ["purchase order identity", "totalAmount", "stored currency", "status", "recorded PO date when a reporting period is requested"]
+    },
+    {
+      "id": "restaurant_location",
+      "terms": ["restaurant", "outlet", "store", "site"],
+      "definition": "Restaurant or outlet means a central.stores record for this demo. Finance locations/sites remain their own source identities. Group procurement by a location only when an existing declared source relationship establishes it; never match central stores and finance sites by similar names or numeric IDs.",
+      "evidence_required": ["native location identity", "declared relationship for cross-source attribution"]
+    },
+    {
+      "id": "supplier_analysis",
+      "terms": ["supplier", "vendor", "supplier concentration"],
+      "definition": "Rank suppliers using recorded purchase-order vendor identities or labels and recorded PO value by currency. Preserve raw vendor labels when no declared link to central.vendors exists. Do not claim distinct labels identify distinct legal suppliers, deduplicate them, or equate names with vendor IDs.",
+      "evidence_required": ["recorded PO vendor reference or label", "recorded PO value", "currency", "declared supplier link if used"]
+    },
+    {
+      "id": "budget_headroom",
+      "terms": ["available budget", "budget headroom", "budget availability"],
+      "definition": "Demo available budget means the stored finance.lineitems.availableAmount at snapshot read time. For an explicitly supplied requested amount, headroom is availableAmount minus requested amount for that exact line item and compatible currency/unit. Negative headroom is an analytical shortfall, not a denied approval. Never infer historical reservations, balances at an earlier date or official budget policy.",
+      "evidence_required": ["line item identity", "availableAmount", "requested amount for a proposal comparison", "compatible currency and unit"]
+    },
+    {
+      "id": "pending_approval",
+      "terms": ["pending approval", "approval backlog"],
+      "definition": "For this demo only, pending means exact stored status PENDING on the specifically requested approval-record collection. Show other raw status counts and disclose this literal filter. Zero PENDING records means zero under this demo definition; it does not prove that no approvals await action under the real application. A child stage does not establish its parent's final decision.",
+      "evidence_required": ["approval record identity", "raw status", "parent record when a parent conclusion is requested"]
+    },
+    {
+      "id": "invoice_po_difference",
+      "terms": ["invoice variance", "invoice discrepancy", "invoice versus purchase order"],
+      "definition": "Compare an invoice's recorded amount with its linked PO amount only through a supported declared relationship and after establishing compatible currency, scope and grain. Difference is invoice amount minus PO amount; percentage difference is difference divided by nonzero PO amount times 100. A nonzero difference is a review candidate, not proof of overbilling, fraud or payable liability. Missing links and incompatible measures remain separate findings.",
+      "evidence_required": ["invoice identity and amount", "declared PO reference", "PO identity and amount", "compatible currency, scope and grain"]
+    },
+    {
+      "id": "receipt_review",
+      "terms": ["goods receipt", "GRN", "receipt discrepancy"],
+      "definition": "Use recorded goods-receipt and PO references for evidence review. A missing or unmatched receipt link means receipt evidence was not established; it does not prove goods were not delivered. Do not multiply order totals through item arrays or repeated receipt rows.",
+      "evidence_required": ["receipt identity", "declared PO link", "comparable item quantity/unit for quantity conclusions"]
+    },
+    {
+      "id": "restaurant_performance",
+      "terms": ["P&L", "AOP", "UEM", "restaurant performance"],
+      "definition": "For this demo, AOP means Annual Operating Plan and UEM means Unit Economics Model; these expansions are assumptions, not verified company terminology. Treat recorded P&L actual, AOP and UEM collections as separate observations. For comparable measures, actual-minus-plan is the analytical variance; a larger expense is adverse and a larger revenue is favourable only after the source establishes that measure's meaning. Compare only when evidence establishes the same location, period, currency, unit and measure. Revenue, food cost, labour cost and profit cannot be generated when the required source measures are absent.",
+      "evidence_required": ["recorded performance measure", "period", "location identity", "currency/unit", "supported plan correspondence when comparing"]
+    }
+  ]
+}

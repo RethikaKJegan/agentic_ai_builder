@@ -43,6 +43,25 @@ describe('Exact workflow knowledge associations',()=>{
 });
 
 describe('Recorded query ontology usage',()=>{
+ it('renders exact Subway metric and joined-relationship receipts in the existing map',()=>{
+  const f=knowledgeFixture('client-subway','Purchase order');const a=f.doc.action_plan.actions[0]!;
+  a.capability_id='tool.subway_query';a.evidence_references=[];
+  const mapping={...f.snapshot.knowledge!.source_mappings[0],field_id:'amount',dataset_id:'purchaseorders'};
+  const relation={relationship_id:'shared:relation',source:'shared:case',target:'shared:item',source_field_id:'approval',target_field_id:'approval_id'};
+  f.doc['binding_context']={validated_context:{ontology_usage:{version_id:f.snapshot.version_id,scope:{workspace_id:'client-subway',owner_id:'owner'},query_kind:'subway',mappings:[mapping],relationships:[relation]},
+   subway_query_catalog:{sources:[{label:'finance.purchaseorders',fields:[{field_id:'amount',name:'totalAmount'}]}]}}};
+  const instance=f.view.run!.action_instances![a.action_id]!;
+  instance.resolved_inputs={query:{fields:[],group_by:[],filters:[],metrics:[{op:'avg',field_id:'amount'}],joins:['shared:relation']}};
+  instance.output={query_id:'subway_query_saved',ontology_version:f.snapshot.version_id,coverage:{complete_scan:true},join_checks:[{relationship_id:'shared:relation'}]};
+  instance['ontology_usage']=[{version_id:f.snapshot.version_id,concept_id:'shared:case',mapping_id:'mapping:shared',field_id:'amount',query_id:'subway_query_saved',reason:'Verified Subway query used this mapped source field.'}];
+  instance['ontology_relationship_usage']=[{...relation,query_id:'subway_query_saved'}];
+  const graph=workflowKnowledge(f.snapshot,f.doc,f.view,true);
+  expect(graph.nodes[0]!.usage.map(u=>u.state)).toEqual(['planned','executed']);
+  expect(graph.sourceFields[0]!.fields).toContain('finance.purchaseorders · totalAmount');
+  expect(graph.edges[0]!.steps).toEqual([a.action_id]);
+  instance['ontology_relationship_usage']=[{...relation,target:'foreign',query_id:'subway_query_saved'}];
+  expect(workflowKnowledge(f.snapshot,f.doc,f.view,true).edges[0]!.steps).toEqual([]);
+ });
  function savedQuery(tenant='simpsons'){
   const f=knowledgeFixture(tenant);const a=f.doc.action_plan.actions[0]!;
   a.capability_id='tool.workflow_data_query';a.evidence_references=[];

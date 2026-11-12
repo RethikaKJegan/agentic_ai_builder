@@ -81,6 +81,7 @@ export const automationListSchema = z.object({
   next_cursor: z.string().nullable(),
   jobs: z.array(record),
   health: record,
+  metrics: record.optional(),
 });
 export type ActionDocument = z.infer<typeof actionDocumentSchema>;
 export type AdaptiveState = z.infer<typeof adaptiveSchema>;

@@ -391,6 +391,7 @@ it('prepares a goal-mode plan without approving or executing it automatically',a
  vi.mocked(api.compositionView).mockResolvedValue({...view(),run:null,workflow_status:'draft'});
  render(<ConnectedPlan id={document.composition_id}/>);
  const review=await screen.findByRole('button',{name:/^Validate$/});
+ await waitFor(()=>expect(review).toBeEnabled());
  expect(screen.queryByRole('button',{name:'Save workflow draft'})).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Validate workflow'})).not.toBeInTheDocument();
  fireEvent.click(review);

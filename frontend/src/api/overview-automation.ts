@@ -10,6 +10,8 @@ export const overviewResultSchema=z.object({
   planning_job:z.object({job_id:z.string(),state:z.string()}).optional(),
   composition_id:z.string().optional(),
   schedule:z.object({cron:z.string(),timezone:z.string(),next_due:z.number(),expires_at:z.number(),max_occurrences:z.number(),missed_run_policy:z.string(),overlap_policy:z.string()}).nullable().optional(),
+  event_subscription:z.object({source:z.object({provider:z.string(),source_id:z.string(),event_type:z.string(),timezone:z.string()}),conditions:z.array(z.record(z.unknown())).optional(),expires_at:z.number(),max_occurrences:z.number()}).nullable().optional(),
+  automation_history:z.array(z.object({id:z.string(),state:z.string(),due:z.number(),run_id:z.string().nullable().optional(),last_error_code:z.string().nullable().optional(),retry_count:z.number().optional(),retry_eligible:z.boolean().optional()}).passthrough()).optional(),
   operations:z.record(z.unknown()).optional(),
   activation:z.object({state:z.string(),schedule_id:z.string(),authorization_id:z.string(),due:z.number()}).optional(),
   schedule_record:z.object({id:z.string(),state:z.string(),due:z.number().nullable().optional()}).passthrough().optional(),

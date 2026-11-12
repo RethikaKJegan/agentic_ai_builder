@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {dynamicView} from './fixtures/dynamic-investigation';
 
-for(const mobile of [false,true])test(`existing Overview recurring review, consent and refresh ${mobile?'mobile':'desktop'}`,async({page})=>{
+for(const event of [false,true])for(const mobile of [false,true])test(`existing Overview ${event?'event':'recurring'} review, consent and refresh ${mobile?'mobile':'desktop'}`,async({page})=>{
   if(mobile)await page.setViewportSize({width:390,height:844});
   const payload=`${Math.floor(Date.now()/1000)+3600}.${randomBytes(24).toString('hex')}`;
   await page.context().addCookies([{name:'builder_workspace_access',value:`${payload}.${createHmac('sha256',process.env['BUILDER_LOGIN_SECRET']!).update(payload).digest('hex')}`,domain:'127.0.0.1',path:'/'}]);
@@ -12,6 +12,7 @@ for(const mobile of [false,true])test(`existing Overview recurring review, conse
   const goal='Daily complaint report at 6 PM India time, email me.';doc.action_plan.goal=goal;doc.interaction_mode='goal';
   const view={...dynamicView('completed'),composition_id:doc.composition_id,workflow_id:'cw_'+doc.composition_id.replace('composition_',''),objective:goal,workflow_status:'approved',run:null};
   const proposal:Record<string,unknown>={version:'overview-intent-v1',state:'prepared',request_key:'',workspace:{workspace_id:'one',subject_id:'alice'},intent:{intent_type:'recurring',business_goal:'Daily complaint summary',side_effects:['email_send']},composition_id:doc.composition_id,schedule:{cron:'0 18 * * *',timezone:'Asia/Kolkata',next_due:1794313800,expires_at:1800000000,max_occurrences:90,missed_run_policy:'coalesce',overlap_policy:'forbid'},operations:{extension_mail_send:{properties:{to:{const:'owner@example.com'}}}}};
+  if(event){proposal['schedule']=null;proposal['event_subscription']={source:{provider:'fixture',source_id:'synthetic-finance',event_type:'invoice.created',timezone:'Asia/Kolkata'},expires_at:1800000000,max_occurrences:90};}
   let activated=0;let preparations=0;let cancelled=false;const keys:string[]=[];let submitted:Record<string,unknown>|undefined;const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/api/backend/**',async route=>{
@@ -31,7 +32,7 @@ for(const mobile of [false,true])test(`existing Overview recurring review, conse
       const body=req.postDataJSON();expect(body.overview).toBe(true);
       if(body.operation==='prepare'){submitted=body;proposal['request_key']=body.request_key;data=proposal;}
       else if(body.operation==='activate'){
-        activated++;const activation={state:'active',schedule_id:'auto_reviewed',authorization_id:'auto_consent',due:1794313800};proposal['activation']=activation;proposal['schedule_record']={id:'auto_reviewed',state:'active',due:1794313800};data=activation;
+        activated++;const activation={state:'active',schedule_id:'auto_reviewed',authorization_id:'auto_consent',due:1794313800};proposal['activation']=activation;proposal['schedule_record']={id:'auto_reviewed',state:'active',due:1794313800};proposal['automation_history']=[{id:'occ_fixture',state:'failed',due:1794313800,run_id:'run_fixture',last_error_code:'SOURCE_FRESHNESS_UNVERIFIED'}];data=activation;
       }else data=proposal;
     }else if(target==='business-ontology/v1/action-plans/'+doc.composition_id)data=doc;
     else if(target.endsWith('/compositions/'+doc.composition_id+'/view'))data=view;
@@ -44,15 +45,15 @@ for(const mobile of [false,true])test(`existing Overview recurring review, conse
   await expect(page.getByRole('button',{name:'Retry generation',exact:true})).toBeEnabled();
   expect(activated).toBe(0);await expect(page.getByLabel('Process description')).toHaveValue(goal);
   await page.getByRole('button',{name:'Retry generation',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Request review',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Overview request review',exact:true})).toBeVisible();
   expect(keys).toHaveLength(2);expect(keys[0]).not.toBe(keys[1]);
-  await expect(page).toHaveURL(/\/app\/workflows\/investigate\?.*overview=/);
+  await expect(page).toHaveURL(/\/app\/workflows\/(?:investigate|editor)\?.*overview=/);
   expect(submitted).toMatchObject({objective:goal,google_connection_id:doc.google_connection_id,overview:true});
   expect(activated).toBe(0);expect(await page.getByLabel('Process description').count()).toBe(0);
-  const activate=page.getByRole('button',{name:'Authorize and start schedule'});await expect(activate).toBeDisabled();
+  const activate=page.getByRole('button',{name:event?'Authorize and start event subscription':'Authorize and start schedule'});await expect(activate).toBeDisabled();
   await page.getByRole('checkbox').check();await activate.click();
-  await expect(page.getByText(/Schedule active\. Next run:/)).toBeVisible();expect(activated).toBe(1);
-  await page.reload();await expect(page.getByText(/Schedule active\. Next run:/)).toBeVisible();expect(activated).toBe(1);
+  await expect(page.getByText(event?/Event subscription active\./:/Schedule active\. Next run:/)).toBeVisible();expect(activated).toBe(1);await expect(page.getByText(/failed · SOURCE_FRESHNESS_UNVERIFIED/)).toBeVisible();
+  await page.reload();await expect(page.getByText(event?/Event subscription active\./:/Schedule active\. Next run:/)).toBeVisible();expect(activated).toBe(1);
   await page.goto('/app');await expect(page.getByLabel('Process description')).toBeVisible();
   await expect(page.getByRole('link',{name:'Open workflow',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Authorize and start schedule'})).toHaveCount(0);
@@ -161,13 +162,13 @@ for(const mobile of [false,true])for(const kind of ['population','one_time','res
     await page.getByLabel('Workflow Google account').selectOption(doc.google_connection_id);
     await page.getByRole('button',{name:'Generate workflow',exact:true}).click();
   }
-  await expect(page).toHaveURL(/\/app\/workflows\/investigate\?.*composition=.*overview=/);
-  await expect(page.getByRole('heading',{name:'Request review',exact:true})).toBeVisible();
-  await expect(page.getByRole('tab',{name:'steps',exact:true})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Agents and tools',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/workflows\/(?:investigate|editor)\?.*composition=.*overview=/);
+  await expect(page.getByRole('region',{name:'Overview request review',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'Steps',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Details',exact:true})).toBeVisible();
   await expect(page.getByLabel('Process description')).toHaveCount(0);
-  await page.reload();await expect(page.getByRole('tab',{name:'steps',exact:true})).toBeVisible();
-  if(kind==='blocked'){await expect(page.getByText('Workflow draft blocked',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Review plan',exact:true})).toBeDisabled();await expect(page.getByRole('textbox')).toHaveCount(0);}
+  await page.reload();await expect(page.getByRole('tab',{name:'Steps',exact:true})).toBeVisible();
+  if(kind==='blocked'){await expect(page.getByText('Workflow draft blocked',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Run',exact:true})).toBeDisabled();await expect(page.getByRole('textbox')).toHaveCount(0);}
   expect(prepared).toBe(kind==='restored_pending'?0:1);expect(unexpected).toEqual([]);expect(errors).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

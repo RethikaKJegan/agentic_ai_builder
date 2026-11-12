@@ -1,3 +1,7 @@
+Latest hosted Knowledge Map visual update: [direct connected-context highlighting](../knowledge-map-connected-context/deployment.md).
+
+Latest hosted ontology usage release: [recorded concept highlights and source evidence](../workflow-ontology-usage/deployment.md).
+
 > Latest release: [empty-query report tables](../empty-query-report-tables/deployment.md) is deployed as `empty-report-20261111-cb5425fdfdac`. Earlier details below are historical.
 
 > Latest release: [verified aggregate percentages](../verified-aggregate-percentages/deployment.md) is deployed as `aggregate-percent-20261111-19ec7bd63922`. Earlier details below are historical.

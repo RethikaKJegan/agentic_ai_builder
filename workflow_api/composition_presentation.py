@@ -73,6 +73,10 @@ class CompositionPresentation:
                 if runtime is None:fail('The runtime is unavailable.','SERVICE_UNAVAILABLE',503)
                 run=runtime.load(db,run_id,auth)
                 if run['subject_id']!=scope[1] or run['workflow_id']!=wid:fail('Run is outside this composition.','RUN_NOT_FOUND',404)
+                if run.get('adaptive'):
+                    from .workflow_adaptive import effective, presentation_document
+                    workflow=effective(run,workflow)
+                    doc=presentation_document(doc,workflow)
             events=[]
             if run:
                 events=[json.loads(r[0]) for r in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence DESC LIMIT 1000',(scope[0],run_id)).fetchall()][::-1]
@@ -105,6 +109,9 @@ class CompositionPresentation:
                 receipt=run['outputs'].get(action_node['node_id'])
                 if receipt is not None and task['capability_id']=='content.prepare':
                     output=dict(summary=receipt.get('summary') or receipt.get('body') or '',findings=[],missing_information=deepcopy(receipt.get('questions',[])),records=[],rule_results=[],tool_receipts=[])
+                    if run.get('adaptive'):
+                        output['summary']='Generated interpretation; consult the evidence assessment for verified findings and completion. '+output['summary']
+                        output['classification']='agent_interpretation'
                 elif receipt is not None and contract['kind']=='model':output=result_view(receipt)
                 elif receipt is not None:
                     tool_id=doc['selected_tools'].get(task['task_id'],{}).get('tool_id') or action_node.get('tool_id')
@@ -131,6 +138,9 @@ class CompositionPresentation:
         public_run=None
         if run:
             public_run={k:deepcopy(run[k]) for k in ('run_id','status','approvals','created_at','usage')}
+            if run.get('adaptive'):
+                public_run['adaptive']=runtime.public(run)['adaptive']
+                public_run['action_plan']=deepcopy(workflow['metadata']['connected_action_plan'])
             if doc.get('action_plan'):
                 public_run['action_plan_reference']=deepcopy(run.get('action_plan_reference'))
                 public_run['action_instances']=deepcopy(run.get('action_instances',{}))

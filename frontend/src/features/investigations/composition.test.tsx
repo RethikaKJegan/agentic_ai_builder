@@ -89,3 +89,11 @@ it('shows pending tool state instead of rendering an empty provider receipt',()=
  expect(screen.getByText('Tool has not returned a result yet.')).toBeVisible();
  expect(screen.queryByText('Provider receipt')).toBeNull();
 });
+
+it('distinguishes unattached individual records from aggregate query evidence',()=>{
+ const view=compositionViewSchema.parse(dynamicView('completed'));
+ view.tasks.forEach(task=>{if(task.result)task.result.records=[];});
+ render(<CompositionReport view={view}/>);
+ expect(screen.getByText('No individual records are attached to this report. Aggregate query results are shown separately.')).toBeVisible();
+ expect(screen.queryByText('No mapped records have been retrieved.')).toBeNull();
+});

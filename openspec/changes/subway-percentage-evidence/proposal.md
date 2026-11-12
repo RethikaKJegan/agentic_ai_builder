@@ -1,0 +1,3 @@
+# Verified grouped percentages and clear aggregate evidence
+
+The fifth-prompt saved sheet payload has the correct overall-population percentage, but the deterministic helper only handles the older ungrouped query tool. Add explicit percentage-denominator intent and derive Subway grouped percentages from complete, scoped, hash-verified count receipts and executed queries. Preserve overall versus within-group denominators, missing numerator groups as zero, undefined zero denominators and evidence provenance. Do not infer denominator meaning from action names or prose. Clarify that the individual-record section does not include aggregate results. Verify the existing sheet read-only; never resend mail or alter it during verification.

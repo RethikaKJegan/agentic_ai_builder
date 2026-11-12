@@ -126,6 +126,13 @@ class RuntimeService:
             raise RuntimeFailure('INVALID_INPUT', 'Execution inputs do not satisfy workflow fields.', 400)
         reject_secrets(inputs)
 
+    def execution_revision(self, db, run, auth):
+        approved, grants = self.revision(db, run['workflow_id'], run['workflow_version'], auth, run.get('release_bound', False))
+        if digest(approved) != run['workflow_digest']:
+            raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed after execution was queued.')
+        from workflow_api.workflow_adaptive import effective
+        return effective(run, approved), grants
+
     def create_run(self, request, auth, *, on_created=None):
         # Trusted in-process persistence hook; never accepted from an API payload.
         return self._create_run(request, auth, allow_superseded=False, on_created=on_created)
@@ -163,6 +170,8 @@ class RuntimeService:
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
                        request_id=request['request_id'], release_bound=allow_superseded)
+            from workflow_api.workflow_adaptive import initialize
+            initialize(run, workflow)
             previous=db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? AND version=? AND json_extract(document,'$.status') IN ('failed','blocked') ORDER BY rowid DESC LIMIT 1",(workspace,subject,workflow['workflow_id'],workflow['version'])).fetchone()
             if previous:
                 from .recovery import failure_feedback
@@ -180,7 +189,11 @@ class RuntimeService:
 
     @staticmethod
     def public(run):
-        return {key: deepcopy(run[key]) for key in ('run_id', 'workflow_id', 'workflow_version', 'status', 'approvals', 'correlation_id', 'trace_reference')}
+        result = {key: deepcopy(run[key]) for key in ('run_id', 'workflow_id', 'workflow_version', 'status', 'approvals', 'correlation_id', 'trace_reference')}
+        if run.get('adaptive'):
+            a = run['adaptive']
+            result['adaptive'] = {k:deepcopy(a[k]) for k in ('objective','status','revision','turns','assessment','pending_wait','decisions','revisions','blocker','deterministic_limitations') if k in a}
+        return result
 
     def owns_execution(self, run, worker):
         """An owner token is executable authority only while its lease is live."""
@@ -214,6 +227,8 @@ class RuntimeService:
         if target not in TRANSITIONS[run['status']]:
             raise RuntimeFailure('INVALID_RUN_TRANSITION', 'The requested run transition is not legal.')
         run['status'] = target
+        if run.get('adaptive',{}).get('kind')=='workflow-investigation' and target in {'failed','blocked','cancelled','rejected'}:
+            run['adaptive']['status']=target
         if target in {'completed','failed','blocked','cancelled','rejected'}:
             from .recovery import evaluate_run
             workflow = self.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}

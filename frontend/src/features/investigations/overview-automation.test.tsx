@@ -4,11 +4,13 @@ import {OverviewAutomationReview} from './OverviewAutomationReview';
 import {overviewResultSchema,overviewStorageKey} from '@/api/overview-automation';
 import {InputError} from '@/api/feedback';
 
-const calls=vi.hoisted(()=>({activate:vi.fn(),read:vi.fn(),control:vi.fn()}));
+const calls=vi.hoisted(()=>({activate:vi.fn(),read:vi.fn(),control:vi.fn(),list:vi.fn()}));
 vi.mock('next/navigation',()=>({usePathname:()=>'/app'}));
-vi.mock('@/api/client',async importOriginal=>({...await importOriginal<typeof import('@/api/client')>(),api:{activateOverview:calls.activate,overviewIntent:calls.read,controlAutomation:calls.control}}));
+vi.mock('@/api/client',async importOriginal=>({...await importOriginal<typeof import('@/api/client')>(),api:{activateOverview:calls.activate,overviewIntent:calls.read,controlAutomation:calls.control,automationRecords:calls.list}}));
 vi.mock('@/api/state',()=>({useBackend:()=>({session:{auth:{subject:{workspace_id:'one',subject_id:'alice'}}},can:()=>true})}));
 vi.mock('./ConnectedPlan',()=>({ConnectedPlan:({scheduled}:{scheduled:boolean})=><div>Existing workflow review {scheduled?'scheduled':'one time'}</div>,actionButton:'button'}));
+
+beforeEach(()=>vi.clearAllMocks());
 
 const prepared=()=>overviewResultSchema.parse({version:'overview-intent-v1',state:'prepared',request_key:'overview_test_001',workspace:{workspace_id:'one',subject_id:'alice'},intent:{intent_type:'recurring',business_goal:'Daily source report',side_effects:['email_send']},composition_id:'composition_review',schedule:{cron:'0 18 * * *',timezone:'Asia/Kolkata',next_due:1794313800,expires_at:1800000000,max_occurrences:90,missed_run_policy:'coalesce',overlap_policy:'forbid'},operations:{extension_mail_send:{properties:{to:{const:'owner@example.com'}}}}});
 
@@ -30,6 +32,13 @@ describe('Existing Overview automation review',()=>{
     expect(screen.queryByText('Which report should be updated?')).toBeNull();expect(screen.getByText(/no additional answer is requested here/)).toBeVisible();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByText('Authorize and start schedule')).toBeNull();
+  });
+  it('shows a source-meaning clarification for Subway without adding input bindings',()=>{
+    const value=prepared();value.state='clarification';value.questions=['Should spending mean purchase-order value or paid invoices?'];value['business_clarification']=true;delete value.composition_id;delete value.schedule;
+    render(<OverviewAutomationReview value={value} onChange={vi.fn()}/>);
+    expect(screen.getByText(value.questions[0]!)).toBeVisible();
+    expect(screen.getByText(/Update the request with the intended business meaning/)).toBeVisible();
+    expect(screen.queryByRole('textbox')).toBeNull();
   });
   it('keeps Overview compact with a workflow link and no graph or authorization controls',()=>{
     render(<OverviewAutomationReview value={prepared()} onChange={vi.fn()} compact/>);
@@ -67,4 +76,44 @@ describe('Existing Overview automation review',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Resume schedule'}));
     await waitFor(()=>expect(calls.control).toHaveBeenCalledWith('auto_saved',expect.objectContaining({action:'resume',request_key:expect.any(String)})));
   });
+});
+
+describe('Subway event review and execution history',()=>{
+  beforeEach(()=>vi.clearAllMocks());
+  it('requires consent for a configured event and prevents manual execution',()=>{
+    const value=prepared();value.schedule=null;value.event_subscription={source:{provider:'fixture',source_id:'synthetic-finance',event_type:'invoice.created',timezone:'UTC'},expires_at:1800000000,max_occurrences:10};
+    render(<OverviewAutomationReview value={value} onChange={vi.fn()}/>);
+    expect(screen.getByText(/Business event: invoice.created/)).toBeVisible();
+    expect(screen.getByText('Existing workflow review scheduled')).toBeVisible();
+    const start=screen.getByRole('button',{name:'Authorize and start event subscription'});
+    expect(start).toBeDisabled();fireEvent.click(screen.getByRole('checkbox'));expect(start).toBeEnabled();
+    expect(calls.activate).not.toHaveBeenCalled();
+  });
+  it('shows blocked executions and opens their saved run',()=>{
+    const value=prepared();value.activation={state:'active',schedule_id:'saved',authorization_id:'approved',due:123};value.automation_history=[{id:'occ_1',state:'failed',due:123,run_id:'run_verified',last_error_code:'SOURCE_FRESHNESS_UNVERIFIED'}];
+    const onRun=vi.fn();render(<OverviewAutomationReview value={value} onChange={vi.fn()} onRun={onRun}/>);
+    expect(screen.getByText(/failed · SOURCE_FRESHNESS_UNVERIFIED/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'Inspect execution'}));expect(onRun).toHaveBeenCalledWith('run_verified');
+  });
+});
+
+it('retries only an eligible saved occurrence with an idempotent control',async()=>{
+  const value=prepared();value.activation={state:'active',schedule_id:'parent',authorization_id:'consent',due:123};value.automation_history=[{id:'occ_retry',state:'failed',due:123,run_id:null,retry_eligible:true,last_error_code:'AUTOMATION_AUTH_REVOKED'}];
+  calls.control.mockResolvedValue({});calls.read.mockResolvedValue(value);
+  render(<OverviewAutomationReview value={value} onChange={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Retry eligible execution'}));
+  await waitFor(()=>expect(calls.control).toHaveBeenCalledWith('occ_retry',expect.objectContaining({action:'retry',request_key:expect.any(String)})));
+});
+
+it('replaces a definition only with a selected reviewed automation',async()=>{
+  const value=prepared();value.activation={state:'active',schedule_id:'original',authorization_id:'consent',due:123};
+  calls.list.mockResolvedValue({items:[{id:'replacement',kind:'schedule',state:'paused',name:'Edited purchasing report',request:{}}]});
+  calls.control.mockResolvedValue({});calls.read.mockResolvedValue({...value,schedule_record:{id:'original',state:'cancelled'}});
+  render(<OverviewAutomationReview value={value} onChange={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Edit automation'}));
+  await screen.findByRole('option',{name:'Edited purchasing report'});
+  expect(calls.control).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText('Reviewed replacement'),{target:{value:'replacement'}});
+  fireEvent.click(screen.getByRole('button',{name:'Replace reviewed definition'}));
+  await waitFor(()=>expect(calls.control).toHaveBeenCalledWith('original',expect.objectContaining({action:'replace',replacement_id:'replacement',request_key:expect.any(String)})));
 });

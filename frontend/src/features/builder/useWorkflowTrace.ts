@@ -34,15 +34,16 @@ export function useWorkflowTrace(workflowId: string, enabled = true) {
   const feed=useRunFeed(runId,available,attempt);
   const historicalRunId=feed.run?.workflow_id===workflowId?feed.run.run_id:undefined;
   const historicalVersion=feed.run?.workflow_id===workflowId?feed.run.workflow_version:undefined;
+  const adaptiveRevision=feed.run?.adaptive?.revision;
   useEffect(()=>{
     if(!historicalRunId || !historicalVersion)return;
     let disposed=false;
-    void api.request("get_workflow",{workflow_id:workflowId,workflow_version:historicalVersion}).then(result=>{
+    void (adaptiveRevision ? api.runWorkflow(historicalRunId) : api.request("get_workflow",{workflow_id:workflowId,workflow_version:historicalVersion})).then(result=>{
       if(result.workflow.workflow_id!==workflowId || result.workflow.version!==historicalVersion)throw new Error("The server returned a different historical revision.");
       if(!disposed){setRevision({runId:historicalRunId,value:fromCanonical(result.workflow)});setError(null);}
     }).catch(caught=>{if(!disposed)setError(caught instanceof Error?caught:new Error("Historical revision is unavailable."));});
     return()=>{disposed=true;};
-  },[historicalRunId,historicalVersion,workflowId,attempt]);
+  },[historicalRunId,historicalVersion,adaptiveRevision,workflowId,attempt]);
   const current=useMemo(()=>available && feed.run?.workflow_id===workflowId && revision?.runId===runId?{run:feed.run,events:feed.events,revision:revision.value}:null,[available,feed.run,feed.events,workflowId,revision,runId]);
   const events = useMemo(() => current?.events ?? [], [current]);
   const runState = useMemo(() => {

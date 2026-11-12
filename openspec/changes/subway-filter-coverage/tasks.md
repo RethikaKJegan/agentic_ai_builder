@@ -1,0 +1,3 @@
+- [x] Implement bounded intent alternatives, deterministic branch expansion and execution checks.
+- [x] Verify omitted alternatives, shared constraints, complete counts, failures and existing workflows.
+- [x] Validate contracts and strict OpenSpec; deploy only Subway with rollback and preservation checks.

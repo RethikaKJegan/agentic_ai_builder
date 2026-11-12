@@ -1,0 +1,5 @@
+- [x] Reproduce the exact saved contradictory query and zero-match evidence.
+- [x] Add generic contradiction validation and alternative-branch planning guidance.
+- [x] Verify legitimate empty results, compatible predicates and exact branch coverage.
+- [x] Exercise real offline query-to-report runtime and existing customer/query regressions.
+- [x] Deploy Subway backend with exact rollback and preservation checks.

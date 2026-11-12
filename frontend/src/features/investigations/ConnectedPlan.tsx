@@ -6,6 +6,7 @@ import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@
 import {Info,Play,CheckCircle2,RefreshCw,Settings2,Network} from "lucide-react";
 import { QueryClarification } from './QueryClarification';
 import { QueryEvidence } from "./QueryEvidence";
+import {AdaptiveProgress} from "@/features/builder/AdaptiveProgress";
 import { api } from "@/api/client";
 import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { useBackend } from "@/api/state";
@@ -61,7 +62,7 @@ function ScopedConnectedPlan({
         if (!live) return;
         if (d.composition_id!==id || v.composition_id!==id || (runId&&v.run?.run_id!==runId) || d.scope.workspace + ":" + d.scope.owner !== scope || d.action_plan.scope.workspace_id+":"+d.action_plan.scope.owner_id!==scope)
           throw new Error("Plan is outside the selected workspace.");
-        setDoc(d);
+        setDoc(v.run?.action_plan ? {...d,action_plan:v.run.action_plan} : d);
         setView(v);
         setError(null);
         setStale(false);
@@ -228,6 +229,7 @@ function ScopedConnectedPlan({
                 ))}
               </article>
             ))}
+          {view.run?.adaptive&&<AdaptiveProgress run={view.run} onUpdated={update}/>}
           {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={view} onSelect={setPanel}/></div>}
           {tab==='report'&&<div role="tabpanel" aria-label="Investigation report">
             <CompositionReport view={view}/>

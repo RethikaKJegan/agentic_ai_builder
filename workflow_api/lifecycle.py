@@ -497,6 +497,17 @@ class LifecycleService:
     def replay(self, job_id, auth):
         self.authorize(auth, "workflow.execute")
         workspace = auth["subject"]["workspace_id"]
+        with self.store.transaction(write=False) as db:
+            saved=db.execute('SELECT document FROM lifecycle_jobs WHERE workspace=? AND job_id=?',(workspace,job_id)).fetchone()
+            existing=json.loads(saved[0]) if saved else None
+        if existing and existing.get('automation_kind')=='occurrence':
+            if existing.get('owner_id')!=auth['subject']['subject_id']:
+                raise LifecycleFailure('JOB_NOT_FOUND','The dispatch job was not found.',404)
+            automation=getattr(self.workflows,'automation',None)
+            if automation is None:raise LifecycleFailure('AUTOMATION_UNAVAILABLE','Automation service is unavailable.')
+            automation.control(auth,existing['target_id'],dict(request_key='lifecycle_retry_'+job_id+'_'+str(existing['attempt']),action='retry'))
+            with self.store.transaction(write=False) as db:
+                return json.loads(db.execute('SELECT document FROM lifecycle_jobs WHERE job_id=?',(job_id,)).fetchone()[0])
         with self.store.transaction() as db:
             row = db.execute("SELECT document FROM lifecycle_jobs WHERE workspace=? AND job_id=?", (workspace, job_id)).fetchone()
             if not row:

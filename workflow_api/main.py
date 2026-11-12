@@ -407,6 +407,38 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     async def recovery(run_id: str, request: Request):
         return await runtime_history(request, 'recovery', run_id)
 
+    @app.get('/runs/{run_id}/workflow')
+    async def run_workflow(run_id: str):
+        from runtime.service import RuntimeFailure
+        from workflow_api.workflow_adaptive import effective
+        if workflow_service.runtime_runner is None:
+            return error('SERVICE_UNAVAILABLE','The runtime is not connected.',503)
+        try:
+            runtime = workflow_service.runtime_runner.runtime
+            with workflow_service.store.transaction(write=False) as db:
+                saved_run = runtime.load(db, run_id, auth)
+                saved = workflow_service.store.get(db, saved_run['workspace_id'], saved_run['workflow_id'], saved_run['workflow_version'])
+                workflow = effective(saved_run, saved)
+            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, dict(workflow=workflow)))
+        except RuntimeFailure as exc:
+            return error(exc.code, str(exc), exc.status)
+
+    @app.post('/runs/{run_id}/input')
+    async def run_input(run_id: str, request: Request):
+        from runtime.service import RuntimeFailure
+        from workflow_api.workflow_adaptive import supply
+        if workflow_service.runtime_runner is None:
+            return error('SERVICE_UNAVAILABLE','The runtime is not connected.',503)
+        try:
+            body = await request.json()
+            runtime = workflow_service.runtime_runner.runtime
+            result = await run_in_threadpool(supply, runtime, auth, run_id, body)
+            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, dict(run=result)))
+        except RuntimeFailure as exc:
+            return error(exc.code, str(exc), exc.status)
+        except (ValueError, TypeError):
+            return error('INVALID_REQUEST', 'Supply a typed business input response.', 400)
+
     @app.get('/runs')
     async def runs(request: Request):
         return await runtime_history(request, 'runs')

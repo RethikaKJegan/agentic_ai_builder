@@ -28,8 +28,9 @@ export function workflowKnowledge(snapshot:KnowledgeSnapshot,doc:ActionDocument,
   const pin=asObject(validated['ontology_usage']);const pinScope=asObject(pin['scope']);
   const pinned=historical&&pin['version_id']===snapshot.version_id&&pinScope['workspace_id']===doc.scope.workspace&&pinScope['owner_id']===doc.scope.owner;
   const pinnedMappings=list(pin['mappings']).map(asObject).filter(m=>typeof m['id']==='string'&&mappings.get(m['id'])?.concept_id===m['concept_id']);
-  const catalog=asObject(validated['data_query_catalog']);
-  const fieldLabels=new Map(list(catalog['datasets']).flatMap(raw=>{const d=asObject(raw);return list(d['fields']).flatMap(rawField=>{const f=asObject(rawField);return typeof f['field_id']==='string'&&typeof f['name']==='string'?[[f['field_id'],`${String(d['name']??'Dataset')} · ${f['name']}`] as const]:[];});}));
+  const subway=pin['query_kind']==='subway';
+  const catalog=asObject(validated[subway?'subway_query_catalog':'data_query_catalog']);
+  const fieldLabels=new Map(list(catalog[subway?'sources':'datasets']).flatMap(raw=>{const d=asObject(raw);return list(d['fields']).flatMap(rawField=>{const f=asObject(rawField);return typeof f['field_id']==='string'&&typeof f['name']==='string'?[[f['field_id'],`${String(d['name']??d['label']??'Dataset')} · ${f['name']}`] as const]:[];});}));
   const add=(id:string,usage:KnowledgeUsage)=>{
     const node=byId.get(id);if(node&&!node.usage.some(u=>u.step===usage.step&&u.state===usage.state))node.usage.push(usage);
   };
@@ -55,9 +56,14 @@ export function workflowKnowledge(snapshot:KnowledgeSnapshot,doc:ActionDocument,
       }
     }
     const fields=[...strings(query['fields']),...strings(query['group_by']),...list(query['filters']).flatMap(f=>typeof asObject(f)['field_id']==='string'?[String(asObject(f)['field_id'])]:[])];
+    if(subway)fields.push(...list(query['metrics']).flatMap(m=>typeof asObject(m)['field_id']==='string'&&asObject(m)['field_id']?[String(asObject(m)['field_id'])]:[]));
+    if(subway)for(const rid of strings(query['joins'])){
+      const edge=list(pin['relationships']).map(asObject).find(r=>r['relationship_id']===rid);
+      if(edge)fields.push(...[edge['source_field_id'],edge['target_field_id']].filter((f):f is string=>typeof f==='string'));
+    }
     const operands=list(query['metrics']).flatMap(m=>String(asObject(m)['expression']??'').match(/[A-Za-z_][A-Za-z0-9_]*/g)??[]).filter(id=>fieldLabels.has(id));
     fields.push(...operands);
-    if(pinned&&action.capability_id==='tool.workflow_data_query')for(const mapping of pinnedMappings){if(fields.includes(String(mapping['field_id'])))add(String(mapping['concept_id']),{step:action.action_id,state:'planned',reason:'The query references this exact saved concept-to-source field mapping.'});}
+    if(pinned&&['tool.workflow_data_query','tool.subway_query'].includes(action.capability_id))for(const mapping of pinnedMappings){if(fields.includes(String(mapping['field_id'])))add(String(mapping['concept_id']),{step:action.action_id,state:'planned',reason:'The query references this exact saved concept-to-source field mapping.'});}
     if(fields.length||typeof output['query_id']==='string')sourceFields.push({step:action.action_id,fields:[...new Set(fields)].map(id=>fieldLabels.get(id)??id),...(typeof output['query_id']==='string'?{queryId:output['query_id']} :{}),...(output['coverage']?{coverage:asObject(output['coverage'])}:{})});
     if(pinned&&instance?.state==='completed'&&instance.provenance_type!=='SYNTHETIC'){
       for(const raw of list(instance['ontology_usage'])){
@@ -67,6 +73,13 @@ export function workflowKnowledge(snapshot:KnowledgeSnapshot,doc:ActionDocument,
         if(action.capability_id==='content.prepare'&&(!action.depends_on.includes(String(usage['upstream_action_id']))||!list(instance.input_provenance).some(p=>asObject(asObject(p)['source_reference'])['action_id']===usage['upstream_action_id'])))continue;
         const field=typeof usage['field_id']==='string'?fieldLabels.get(usage['field_id'])??usage['field_id']:undefined;
         add(String(usage['concept_id']),{step:action.action_id,state:'executed',reason:`${String(usage['reason'])}${field?' Field: '+field+'.':''}`,reference:String(usage['query_id']??usage['record_id']??usage['upstream_action_id'])});
+      }
+      if(subway&&action.capability_id==='tool.subway_query'&&instance.verified_receipt===true&&output['ontology_version']===snapshot.version_id){
+        for(const raw of list(instance['ontology_relationship_usage'])){
+          const usage=asObject(raw);const edge=edges.find(e=>e.id===usage['relationship_id']&&e.source===usage['source']&&e.target===usage['target']);
+          const saved=list(pin['relationships']).map(asObject).some(r=>r['relationship_id']===usage['relationship_id']&&r['source']===usage['source']&&r['target']===usage['target']);
+          if(edge&&saved&&strings(query['joins']).includes(edge.id)&&usage['query_id']===output['query_id']&&list(output['join_checks']).some(r=>asObject(r)['relationship_id']===edge.id)&&!edge.steps.includes(action.action_id))edge.steps.push(action.action_id);
+        }
       }
     }
     // A successful query alone proves no concept association. Require an exact

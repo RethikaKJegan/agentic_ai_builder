@@ -1,0 +1,15 @@
+# Bounded complete query verification
+
+The saved query from run `run_d7930d9537e644319d9a0e69f1eac992` groups by currency, vendor name and purchase-order ID, with max/sum/count metrics and a 500-row display limit. The exact unchanged query was replayed on 43,439 synthetic order records using the saved canonical IDs and declared currency join. The archived deployed executor reproduced its 10,000-group SUBWAY_QUERY_LIMIT failure. The new executor completed all 43,439 groups and matched rows, retained all 43,439 join matches, and returned 418 display rows in 99,833 canonical JSON bytes with next_offset=418. These are synthetic verification figures, not live business findings.
+
+Aggregate state spills after 10,000 in-memory groups to a new private temporary SQLite store with a 256 MiB database budget and a 4 MiB page cache. Database-backed ordering selects only the requested display page; exact Decimal state is serialized internally, without accepting external serialized objects. Temporary storage is removed after success and failure. Source row/projected-byte/time budgets and currency/join/type/authority checks retain their previous values and behavior. Resource exhaustion still fails without partial totals.
+
+Successful response bytes remain capped at 100,000. Oversized display pages return the largest fitting whole-row prefix; returned_rows, has_more and next_offset describe actual displayed rows. Total group counts and matched records describe the complete computation. A row that cannot fit with its required metadata still fails; no empty non-progressing page is returned.
+
+Focused and regression tests cover high cardinality, repeated group updates after spill, exact sums/averages/minimums/maximums, Decimal group identity, deterministic sorting and continuation, Unicode byte accounting, disk-budget/cancellation cleanup, strict source query authority, runtime query modes, report content and Simpsons isolation. Existing framework deprecation warnings remain.
+
+No live model call, tenant source query or email action was performed. Private backups, exact rollback, replay and deployment evidence: `.local/subway-query-pagination-20261112/`.
+
+Validation completed: 83 regression tests, one additional full two-query-to-report runtime test on 43,439 synthetic orders, and one exact saved-query baseline/new replay passed (85 cases total). Canonical contract validation, generated UI contract checks, strict OpenSpec validation and whitespace checks passed. The full runtime test used controlled model responses and completed both query reads and report generation; it did not deliver email.
+
+Deployment completed: only agentic-builder-subway restarted. Hosted authenticated checks passed for operator, Simpsons and Subway, including native tools and foreign source rejection. Source credentials/bindings, Google connections, ontology/packages, automations, history and configuration were preserved. Other backend/frontend/worker process IDs and the frontend build stayed unchanged.

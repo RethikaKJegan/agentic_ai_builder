@@ -17,6 +17,7 @@ from .planning_defaults import GUIDANCE, QUESTION_FREE_GUIDANCE
 
 KINDS = ['knowledge', 'investigation', 'population', 'one_time', 'recurring', 'event', 'unsupported', 'ambiguous']
 WRITES = ['email_send', 'email_draft', 'sheet_create', 'sheet_update', 'calendar_write']
+MAX_ROUTING_CONTEXT_BYTES = 220000
 
 
 def obj(properties):
@@ -125,7 +126,17 @@ class OverviewAutomation:
             return json.loads(row[1])
 
     def interpret(self, objective, context):
-        if len(canonical(context).encode())>220000:
+        from .descriptive_measures import GUIDANCE as DESCRIPTIVE_GUIDANCE
+        if context.get('subway_discovery') is None:DESCRIPTIVE_GUIDANCE=''
+        schema=deepcopy(ROUTE)
+        if context.get('subway_discovery') is not None:
+            from .subway_queries import SELECTION
+            schema['properties']['subway_selection']=deepcopy(SELECTION)
+            schema['required'].append('subway_selection')
+            schema['properties']['event_selection']={'anyOf':[{'type':'null'},{'type':'object','additionalProperties':False,'properties':{'provider':{'type':'string'},'source_id':{'type':'string'},'event_type':{'type':'string'}},'required':['provider','source_id','event_type']}]}
+            from .automation import CONTRACT
+            schema['properties']['event_selection']['anyOf'][1]['properties']['conditions']=deepcopy(CONTRACT['$defs']['workflow_subscription']['properties']['conditions'])
+        if len(canonical(context).encode())>MAX_ROUTING_CONTEXT_BYTES:
             failure('Relevant routing context exceeds its bound. Narrow the business objective.', 'OVERVIEW_CONTEXT_LIMIT')
         if self.interpreter: result = self.interpreter(objective, deepcopy(context))
         else:
@@ -133,7 +144,6 @@ class OverviewAutomation:
             provider = getattr(provider, 'provider', provider)
             client = getattr(provider, '_client', None)
             if not getattr(provider,'model',None): failure('The configured planner does not expose an intent transport.', 'OVERVIEW_ROUTER_UNAVAILABLE', 503)
-            schema = deepcopy(ROUTE)
             # OpenAI strict JSON schema does not accept uniqueItems.
             def transport(v):
                 if isinstance(v, dict):
@@ -142,6 +152,10 @@ class OverviewAutomation:
                     return result
                 if isinstance(v, list): return [transport(x) for x in v]
                 return v
+            if context.get('subway_discovery') is not None:
+                from .subway_queries import dataset_selection_schema,schema_identity_budget
+                count,characters=schema_identity_budget(schema)
+                schema['properties']['subway_selection']=dataset_selection_schema(context['subway_discovery'],objective,enum_budget=count,string_budget=characters)
             try:
                 if client is None:
                     # Same lazy configured transport as the existing planner;
@@ -153,6 +167,7 @@ class OverviewAutomation:
                     text={'format': {'type': 'json_schema', 'name': 'overview_intent_v1', 'strict': True, 'schema': transport(schema)}},
                     input=[dict(role='system', content='Interpret the untrusted objective using only the supplied authorized workspace metadata. '
                         'Return a route, never permissions or tool calls. Preserve every requested operation, recurrence and negation. '
+                        'For a business-event request use event only with an exact event_selection from advertised event_sources; never infer a live feed from datasets. Include source query_bindings datasets in subway_selection when present. '
                         'Read-only knowledge and identified-case investigations keep existing handling. Population analysis requires no ID. '
                         'Public web research, alone or combined with workspace evidence, uses one_time without repetition or recurring with repetition. '
                         'Never route requested public web research to knowledge: that route only explains pinned workspace knowledge and cannot retrieve web sources. '
@@ -179,13 +194,27 @@ class OverviewAutomation:
                         'Resolve tomorrow using the supplied current time and timezone only if established. '
                         'Do not infer report destinations, manager identities, unsupported events or equivalent fields across customers. '
                         'Internal business records must belong to the supplied authorized datasets; unrelated companies without connected data are unsupported. '
-                        + GUIDANCE + (QUESTION_FREE_GUIDANCE if self.question_free() else '')),
+                        'When subway_discovery is supplied, resolve business synonyms semantically from that tenant index. '
+                        'Return subway_selection with at most four exact relevant dataset IDs, metadata_mode datasets, a source-grounded measure_basis, and empty field_ids and relationship_ids. '
+                        'Set percentage_basis to overall_population for percentages of all source records, within_group for percentages within each requested group, and none when percentages are not requested. Preserve the requested denominator meaning; genuinely unresolved denominator meaning requires business clarification. For percentages plan complete filtered count and compatible denominator count queries at the same grouping, source and grain, as direct report dependencies. '
+                        'Extract filter_branches independently of action planning: for alternative requested record categories over the same base source, enumerate EVERY category using exact advertised field IDs and typed query predicates. Repeat common constraints in each branch. Missing, null or unrecorded values use is_null; numeric comparisons do not include null. Do not collapse alternatives to a single category or conjoin exclusive predicates. Use [] for requests without alternative filters. Temporal windows remain in temporal selection. If required field identities are unavailable, request clarification rather than omit a category. '
+                        'Copy dataset identifiers from authorized metadata. Select only sources needed for the requested business scope, not unrelated context. '
+                        'The server supplies scoped fields and supported relationships to the existing query planner; routing never selects them independently. A supported relationship never proves matching business records. '
+                        'Return business_resolution: ready with question empty and nonblocking notes, or needs_definition with the minimum necessary blocking question. Keep legacy clarification empty. '
+                        'For descriptive comparisons, retain distinct named source measures separately and disclose their differences; do not arbitrarily designate one as the approved basis. '+DESCRIPTIVE_GUIDANCE+
+                        'Source limitations and methodological notes alone do not block supported descriptive analysis. An authoritative discrepancy, overpayment, compliance or approval classification still requires its missing business rule. '
+                        'Do not equate purchase-order value, invoices, payments and budget consumption. Do not infer store/site cross-database identity or approval status semantics. '
+                        'If subway_discovery.analytical_assumptions is present, the user explicitly selected that demo profile. '
+                        'Use its analytical defaults for otherwise unspecified terms, with explicit request definitions taking precedence. '
+                        'Keep the example label and applied assumptions in measure_basis; these are not verified company policy, observed facts or permission for unsupported joins. '
+                        + GUIDANCE + (QUESTION_FREE_GUIDANCE if self.question_free() else '')
+                        + (' For Subway, genuinely blocking unresolved business meaning must use subway_selection.business_resolution with status needs_definition and its question. This takes precedence over a no-questions preference: never invent a spending measure, approval policy, currency conversion or cross-source identity.' if context.get('subway_discovery') is not None else '')),
                         dict(role='user', content=json.dumps(dict(objective=objective, context=context)))] )
                 if getattr(response, 'status', 'completed') != 'completed': raise ValueError()
                 result = json.loads(response.output_text)
             except Exception:
                 failure('Intent interpretation is unavailable. No automation was activated; retry the same request.', 'OVERVIEW_ROUTER_UNAVAILABLE', 503)
-        if list(Draft202012Validator(ROUTE).iter_errors(result)): failure('The interpreter returned an invalid route.')
+        if list(Draft202012Validator(schema).iter_errors(result)): failure('The interpreter returned an invalid route.')
         reject_secrets(result)
         if self.question_free():
             result=deepcopy(result)
@@ -287,6 +316,7 @@ class OverviewAutomation:
                 result.update(activation=active[1])
                 if active[1].get('schedule_id'):
                     result['schedule_record'] = self.service.automation.get(auth, active[1]['schedule_id'])
+                    result['automation_history']=self.service.automation.history(auth,active[1]['schedule_id'])
             return result
         if set(body) - {'operation', 'request_key', 'objective', 'google_connection_id', 'business_request', 'user_values', 'resources'}:
             failure('Use supported Overview request fields.')
@@ -308,7 +338,7 @@ class OverviewAutomation:
             prepared=self._save(auth,stage_key,body,prepared)
         result=deepcopy(prepared['result']);intent=deepcopy(prepared['intent'])
         if intent is None:
-            if self.question_free():return self._save(auth,key,body,self.limitation_report(auth,body,result,'UNRESOLVED_REQUEST'))
+            if self.question_free() and not result.get('business_clarification'):return self._save(auth,key,body,self.limitation_report(auth,body,result,'UNRESOLVED_REQUEST'))
             return self._save(auth,key,body,result)
         if self.question_free():intent['question_free']=True
         schedule=intent['schedule']
@@ -319,11 +349,11 @@ class OverviewAutomation:
         # returns not_configured/unsupported for unrelated tenant vocabulary.
         try:
             doc = prepare(self.service.business_composition, auth, request, _overview=intent)
-            operations=self.operations(auth,doc,intent) if schedule else {}
+            operations=self.operations(auth,doc,intent) if schedule or intent.get('event_subscription') else {}
         except Exception as exc:
             if not self.question_free() or getattr(exc,'code',None) not in {'ACTION_INPUT_REQUIRED','CASE_IDENTIFIER_REQUIRED','OVERVIEW_CLARIFICATION'}:raise
             return self._save(auth,key,body,self.limitation_report(auth,body,result,'UNRESOLVED_ACTION',str(exc)))
-        result.update(composition_id=doc['composition_id'], schedule=schedule,
+        result.update(composition_id=doc['composition_id'], schedule=schedule,event_subscription=intent.get('event_subscription'),
             operations=operations,
             query=intent.get('query'), temporal_pin=intent.get('temporal_pin'))
         if self.question_free():result['questions']=[]
@@ -359,6 +389,10 @@ class OverviewAutomation:
         """Persist this bounded stage before compiling, so crash/retry reuses it."""
         key=body['request_key'];objective=body['objective']
         q = getattr(self.service, 'workflow_queries', None)
+        subway=getattr(self.service,'subway_queries',None)
+        if subway:
+            subway.authorize(auth)
+            q=None # Existing Subway full-data semantics are authoritative here.
         catalog = None; unavailable = None
         if q:
             try: catalog = q.queries.catalogue(auth, objective)
@@ -371,15 +405,36 @@ class OverviewAutomation:
         recipient_context(resolved,self.service.business_composition,auth,body)
         now = self.service.lifecycle.clock()
         calendar_context(resolved,objective,bool(body.get('google_connection_id')),now=now)
-        route = self.interpret(objective, dict(workspace=deepcopy(auth['subject']), catalog=catalog,
+        routing_context=dict(workspace=deepcopy(auth['subject']), catalog=catalog,
             knowledge=knowledge, query_unavailable=unavailable, selected_google_account=body.get('google_connection_id'),
             resolved_inputs=resolved, planning_defaults=GUIDANCE+(QUESTION_FREE_GUIDANCE if self.question_free() else ''),
             workspace_timezone=self.env.get('BUILDER_WORKSPACE_TIMEZONE'), current_time=datetime.fromtimestamp(now, timezone.utc).isoformat(),
-            tools=[dict(capability=t['definition']['capability'], provider=t['definition']['provider_id']) for t in self.service.business_composition.tools(auth)]))
+            tools=[dict(capability=t['definition']['capability'], provider=t['definition']['provider_id']) for t in self.service.business_composition.tools(auth)])
+        if subway:
+            from .workflow_events import sources
+            routing_context['event_sources']=sources(self.service.automation,auth)
+            # Budget the complete envelope, not independent component ceilings.
+            # Replacing the empty object changes its two bytes to discovery's
+            # actual size; all account/knowledge/event context stays intact.
+            routing_context['subway_discovery']={}
+            discovery_budget=MAX_ROUTING_CONTEXT_BYTES-len(canonical(routing_context).encode())+2
+            routing_context['subway_discovery']=subway.discovery(auth,objective,max_bytes=discovery_budget)
+        route = self.interpret(objective,routing_context)
         result = dict(version='overview-intent-v1', state='prepared', intent=route, workspace=deepcopy(auth['subject']), request_key=key)
+        if subway:
+            selection=subway.selection(auth,route['subway_selection'])
+            route=deepcopy(route);route['subway_selection']=selection
+            result['intent']=route
+            catalog,selected_knowledge=subway.knowledge(auth,objective,selection)
+            if selected_knowledge.get('references') or route['intent_type']!='knowledge':knowledge=selected_knowledge
+            from .subway_queries import business_question
+            question=business_question(selection)
+            if question or (not catalog['sources'] and route['intent_type']!='knowledge'):
+                result.update(state='clarification',business_clarification=True,questions=[question or 'Which supported business dataset should this request use?'])
+                return dict(result=result,intent=None)
         # Interpretation notes are planning context, not executable prerequisites.
         # Actual missing inputs are checked by action compilation and scheduling.
-        if (route['missing_requirements'] and not self.question_free()) or route['intent_type'] in {'ambiguous', 'unsupported', 'event'}:
+        if (route['missing_requirements'] and not self.question_free()) or route['intent_type'] in {'ambiguous', 'unsupported'} or route['intent_type']=='event' and not (subway and route.get('event_selection')):
             result.update(state='unsupported' if route['intent_type'] in {'unsupported','event'} else 'clarification',
                 questions=route['missing_requirements'] or ['No authorized business-event source is available for this request.' if route['intent_type']=='event' else 'Specify the intended business operation.'])
             return dict(result=result,intent=None)
@@ -389,12 +444,38 @@ class OverviewAutomation:
             result.update(state='clarification', questions=[str(exc)])
             return dict(result=result,intent=None)
         intent = dict(version='overview-intent-v1', route=route, schedule=schedule, prepared_at=now)
+        if subway and route['intent_type']=='event':
+            from .workflow_events import validate_source
+            zone=self.env.get('BUILDER_WORKSPACE_TIMEZONE') or route['recurrence']['timezone']
+            pin={**{k:route['event_selection'][k] for k in ('provider','source_id','event_type')},'timezone':zone}
+            try:validate_source(self.service.automation,auth,pin)
+            except ApiFailure as exc:
+                result.update(state='unsupported',business_clarification=True,questions=[str(exc)]);return dict(result=result,intent=None)
+            intent['event_subscription']=dict(source=pin,conditions=deepcopy(route['event_selection'].get('conditions',[])),expires_at=now+90*86400,max_occurrences=90)
+        if subway:
+            intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge))
+            period=route['temporal']['period']
+            if period!='none':
+                field=route['temporal']['field_id']
+                fields={f['field_id']:f for d in catalog['sources'] for f in d['fields']}
+                if field not in fields or not set(fields[field]['types'])&{'date','datetime','timestamp'}:
+                    result.update(state='clarification',business_clarification=True,questions=['Which supported recorded date defines this reporting period?'])
+                    return dict(result=result,intent=None)
+                zone=route['recurrence']['timezone'] or self.env.get('BUILDER_WORKSPACE_TIMEZONE')
+                if not zone:
+                    result.update(state='clarification',business_clarification=True,questions=['Which timezone defines this reporting period?'])
+                    return dict(result=result,intent=None)
+                low,high=window(period,zone,(schedule or {}).get('next_due',now),route['temporal']['days'])
+                if schedule or intent.get('event_subscription'):
+                    intent['subway_temporal']=dict(period=period,timezone=zone,days=route['temporal']['days'],field_id=field)
+                intent['subway_date_filters']=[dict(field_id=field,op='gte',value=low),dict(field_id=field,op='lt',value=high)]
         if route['intent_type']=='knowledge':
             if not knowledge.get('references'):
                 result.update(state='clarification',questions=['No relevant source-cited definition was found in this workspace. Which document or approved business definition should I use?'])
                 return dict(result=result,intent=None)
             intent['knowledge']=deepcopy(knowledge)
             return dict(result=result,intent=intent)
+        if subway:return dict(result=result,intent=intent)
         period = route['temporal']['period']
         if period != 'none' and not catalog:
             result.update(state='unsupported', questions=[(unavailable or {}).get('message', 'No authorized date-query source is available.')])
@@ -439,7 +520,10 @@ class OverviewAutomation:
             if c['kind'] != 'tool': continue
             tid = doc['selected_tools'][a['action_id']]['tool_id']
             schema = deepcopy(c['input_schema'])
-            if c['side_effect']=='read' and tid!='workflow_data_query':
+            if tid=='subway_query':
+                from .subway_automation import query_consent
+                schema=query_consent(doc,intent)
+            if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
                 if any(b['kind'] not in {'literal','context','configuration','evidence'} for b in a['bindings']):
                     failure('This recurring read needs a reviewed fixed resource scope before scheduling.', 'OVERVIEW_CLARIFICATION')
                 from .action_bindings import resolve_inputs
@@ -461,7 +545,7 @@ class OverviewAutomation:
                 if intent.get('temporal_pin'): schema[ANNOTATION] = deepcopy(intent['temporal_pin'])
             if tid in operations and operations[tid] != schema:
                 previous=operations[tid]
-                if c['side_effect']=='read' and tid!='workflow_data_query':
+                if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
                     # Multiple reviewed case tasks may share one registered reader.
                     # Authorize only their finite complete payloads, never a union
                     # of independently interchangeable identity/operation fields.
@@ -480,7 +564,7 @@ class OverviewAutomation:
 
     def activate(self, auth, key, result):
         RuntimeService.authorize(auth, 'workflow.approve', {'admin','approver'})
-        if result.get('state') != 'prepared' or not result.get('schedule'): failure('Prepare a complete schedule first.')
+        if result.get('state') != 'prepared' or not (result.get('schedule') or result.get('event_subscription')): failure('Prepare a complete schedule first.')
         activation_key = 'activation_' + digest(key)[:40]
         old = self.saved(auth, activation_key)
         if old: return old[1]
@@ -491,11 +575,16 @@ class OverviewAutomation:
         # This call fails closed until those reviews are complete.
         self.service.automation._workflow(auth, reference)
         schedule = result['schedule']
+        if result.get('event_subscription'):
+            event=result['event_subscription'];prefix='overview_'+digest([auth['subject'],key])[:32]
+            consent=self.service.automation.authorize(auth,dict(request_key=prefix+'_consent',connection_id=doc.get('google_connection_id'),operations=result['operations'],purpose=doc['objective'][:1000],content_scope='Reviewed workflow and authenticated business-event source.',schedule=event['source'],limits=dict(max_occurrences=event['max_occurrences'],max_actions_per_occurrence=16),expires_at=event['expires_at']))
+            record=self.service.automation.subscribe(auth,dict(request_key=prefix+'_subscription',workflow=reference,authorization_id=consent['id'],**{k:event['source'][k] for k in ('provider','source_id','event_type')},conditions=event.get('conditions',[]),inputs={},expires_at=event['expires_at'],overlap_policy='forbid'))
+            return self._save(auth,activation_key,{'request_key':key},dict(state='active',schedule_id=record['id'],authorization_id=consent['id'],due=record['due']))
         if (result['intent']['recurrence']['kind'] == 'once'
                 and schedule['next_due'] <= self.service.lifecycle.clock()):
             failure('This proposed execution time has passed. Generate a new proposal with a future date and time.', 'OVERVIEW_CLARIFICATION')
         prefix = 'overview_' + digest([auth['subject'], key])[:32]
-        authorization = self.service.automation.authorize(auth, dict(request_key=prefix + '_consent', connection_id=doc['google_connection_id'],
+        authorization = self.service.automation.authorize(auth, dict(request_key=prefix + '_consent', connection_id=doc.get('google_connection_id'),
             operations=result['operations'], purpose=doc['objective'][:1000], content_scope='Reviewed workflow, exact sources and destinations; only approved relative date bounds may vary.',
             schedule={k:schedule[k] for k in ('cron','timezone')}, limits=dict(max_occurrences=schedule['max_occurrences'], max_actions_per_occurrence=16), expires_at=schedule['expires_at']))
         record = self.service.automation.schedule(auth, dict(request_key=prefix + '_schedule', workflow=reference, authorization_id=authorization['id'],

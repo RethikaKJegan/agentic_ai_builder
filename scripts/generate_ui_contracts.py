@@ -63,6 +63,7 @@ def generated():
     for name, key in [('ApiRequest', 'request_envelope'), ('ApiResponse', 'response_envelope'), ('Collection', 'collection_response')]:
         emit(name, 'api-payloads-v1.json', lambda root, key=key: root['properties'][key])
     emit('Operation', 'api-payloads-v1.json', lambda root: root['properties']['operation_names']['items'])
+    emit('InvestigationAssessment', 'investigation-assessment-v1.json')
     emit('RunEvent', 'run-status-versioning-v1.json', lambda root: root['properties']['run_event'])
     emit('RunStatus', 'run-status-versioning-v1.json', lambda root: root['properties']['run_states']['items'])
     emit('RevisionStatus', 'run-status-versioning-v1.json', lambda root: root['properties']['workflow_revision_states']['items'])

@@ -28,6 +28,10 @@ class RestoredSubwayAdapters(CloudAdapters):
             raise ApiFailure('DATA_SOURCE_NOT_AUTHORIZED', 'The source is outside the pinned Subway restore.', 403)
         return target
 
+    def business_freshness(self, config):
+        self.target(config)
+        return dict(status='historical_snapshot',last_synced_at=None,extracted_at=None,coverage_start=None,coverage_end=None,refresh_available=False)
+
     @contextmanager
     def connection(self, config):
         self.target(config)

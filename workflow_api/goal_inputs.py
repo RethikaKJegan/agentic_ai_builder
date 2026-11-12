@@ -123,7 +123,7 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
             replace_binding(action,field,'configuration',key,satisfied)
     from .action_bindings import content_target
     by_id={a.get('action_id'):a for a in actions}
-    normalize_query_envelopes(actions,contracts,by_id)
+    satisfied.update(normalize_query_envelopes(actions,contracts,by_id,context))
     for action in actions:
         c=contracts.get(action.get('capability_id'),{})
         for binding in action.get('bindings',[]):
@@ -165,24 +165,37 @@ def bind_internal(actions,contracts,context,connectors,tool_id,request_key):
     return satisfied
 
 
-def normalize_query_envelopes(actions,contracts,by_id):
+def normalize_query_envelopes(actions,contracts,by_id,context=None):
     """Select the known query child; never coerce arbitrary model output.
 
     The query planner returns {query: typed_query}, while the tool's query
     field accepts typed_query. This server-owned handoff is independent of
     model adherence to path guidance. Full plan validation still follows.
     """
+    satisfied=set()
     for action in actions:
-        if action.get('capability_id')!='tool.workflow_data_query':continue
-        target=contracts.get('tool.workflow_data_query',{}).get('input_schema',{}).get('properties',{}).get('query')
+        planner={'tool.workflow_data_query':'data.plan_query','tool.subway_query':'subway.plan_query'}.get(action.get('capability_id'))
+        if not planner:continue
+        target=contracts.get(action['capability_id'],{}).get('input_schema',{}).get('properties',{}).get('query')
+        if context is not None:
+            bindings=[b for b in action.get('bindings',[]) if b.get('target',[None])[0]=='query']
+            missing=not bindings or len(bindings)==1 and bindings[0].get('target')==['query'] and bindings[0].get('kind')=='literal' and bindings[0].get('key') not in context['user_values']
+            parents=[p for p in actions if p.get('capability_id')==planner and p.get('action_id') in action.get('depends_on',[])]
+            if not parents:parents=[p for p in actions if p.get('capability_id')==planner]
+            if missing and len(parents)==1:
+                for binding in bindings:satisfied.add(binding.get('key'))
+                action['bindings']=[b for b in action.get('bindings',[]) if b not in bindings]
+                action['bindings'].append(dict(kind='output',action_id=parents[0]['action_id'],path=['query'],target=['query']))
+                satisfied.add('query')
         for binding in action.get('bindings',[]):
             if binding.get('kind')!='output' or binding.get('path')!=[] or binding.get('target')!=['query']:continue
             parent=by_id.get(binding.get('action_id'),{})
-            if parent.get('capability_id')!='data.plan_query' or parent.get('action_id') not in action.get('depends_on',[]):continue
-            envelope=contracts.get('data.plan_query',{}).get('output_schema',{})
+            if parent.get('capability_id')!=planner:continue
+            envelope=contracts.get(planner,{}).get('output_schema',{})
             if (target and envelope.get('type')=='object' and 'query' in envelope.get('required',[])
                     and envelope.get('properties',{}).get('query')==target):
                 binding['path']=['query']
+    return satisfied
 
 
 def replace_binding(action,field,kind,key,satisfied):

@@ -7,6 +7,9 @@ from copy import deepcopy
 import hashlib
 import json
 import re
+import logging
+import sqlite3
+import traceback
 from threading import Event, Lock, Thread
 import time
 from uuid import uuid4
@@ -16,6 +19,7 @@ from registry.contracts import schema
 from registry.safety import reject_secrets
 from .service import ApiFailure
 from runtime.service import RuntimeFailure
+from planner.errors import PlannerFailure
 
 
 class PlanningJobs:
@@ -68,6 +72,8 @@ class PlanningJobs:
                 job_id = 'plan_' + uuid4().hex
                 queued_request = deepcopy(request)
                 queued_request['idempotency_key'] = retry_key
+                from .security import request_correlation
+                queued_request['_planning_correlation_id']=request_correlation.get() or request['request_id']
                 db.execute('INSERT INTO builder_planning_jobs VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)',
                            (job_id, workspace, subject, retry_key, fingerprint, 'queued', json.dumps(queued_request), time.time()))
         self.wake.set()
@@ -99,11 +105,13 @@ class PlanningJobs:
             if not row:
                 return False
             db.execute("UPDATE builder_planning_jobs SET state='running', claim=?, lease_until=? WHERE job_id=? AND state='queued'", (claim, now + self.deadline, row[0]))
+        request={};correlation=None
         try:
             auth = self.authenticate(row[1], row[2])
             if auth is None:
                 raise ApiFailure('OPERATION_NOT_AUTHORIZED', 'Planning authority is no longer available.', 403)
             request=json.loads(row[3])
+            correlation=request.pop('_planning_correlation_id',None)
             context=request.get('payload',{}).get('context',{})
             overview=context.get('praxi_overview_request_v1') if isinstance(context,dict) else None
             if overview is not None:
@@ -116,17 +124,38 @@ class PlanningJobs:
                 result=self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
             else:
                 result = self.service.handle(request, deepcopy(auth))
-        except (ApiFailure,RuntimeFailure) as exc:
+        except (ApiFailure,RuntimeFailure,PlannerFailure) as exc:
+            if isinstance(exc,PlannerFailure):
+                exc=ApiFailure(exc.code,'The planner returned an invalid or unavailable proposal. Regenerate using the same business objective.',502,retryable=exc.retryable)
             if isinstance(exc,RuntimeFailure):
                 required=getattr(exc,'required_inputs',None)
                 exc=ApiFailure(exc.code,str(exc),exc.status,details={'required_inputs':required} if required else None)
-            result = self.service.failure('req_planning', exc)
-        except Exception:
-            result = self.service.failure('req_planning', ApiFailure('PLANNING_FAILED', 'Planning failed. Check the service and start a new generation request.', 503))
+            self.log_failure(row[0],request,exc,correlation=correlation)
+            result = self.service.failure(request.get('request_id','req_planning'), exc)
+        except Exception as exc:
+            from .storage import sqlite_category
+            from .postgres import DatabaseFailure
+            contention=isinstance(exc,sqlite3.DatabaseError) and sqlite_category(exc)=='contention' or isinstance(exc,DatabaseFailure) and exc.category=='contention'
+            failure=ApiFailure('API_DATABASE_BUSY' if contention else 'PLANNING_FAILED',
+                'The planning database is busy. Check this job before retrying.' if contention else 'Planning failed before an executable workflow was prepared. Inspect the request reference in service diagnostics.',503,retryable=bool(contention))
+            self.log_failure(row[0],request,exc,failure.code,correlation)
+            result = self.service.failure(request.get('request_id','req_planning'),failure)
         with self.store.transaction() as db:
             db.execute("UPDATE builder_planning_jobs SET state=?, result=?, request=NULL, lease_until=NULL, claim=NULL WHERE job_id=? AND state='running' AND claim=?",
                        ('succeeded' if result['status'] < 400 else 'failed', json.dumps(result), row[0], claim))
         return True
+
+    @staticmethod
+    def log_failure(job_id,request,exc,code=None,correlation=None):
+        from .security import request_correlation
+        # Stack locations and typed codes diagnose failures without exception
+        # messages, request bodies, model output, bindings or source record data.
+        logging.getLogger(__name__).warning('Planning job failed',extra=dict(
+            planning_job_id=job_id,request_id=request.get('request_id'),
+            correlation_id=correlation or request_correlation.get() or request.get('request_id'),
+            error_code=code or getattr(exc,'code','PLANNING_FAILED'),exception_type=type(exc).__name__,
+            failure_frames=[dict(file=frame.filename.rsplit('/',1)[-1],line=frame.lineno,function=frame.name)
+                for frame in traceback.extract_tb(exc.__traceback__)[-12:]]))
 
     def start(self):
         with self.guard:

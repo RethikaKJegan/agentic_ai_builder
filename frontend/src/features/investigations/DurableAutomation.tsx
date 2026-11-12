@@ -78,7 +78,7 @@ function AutomationWorkspace({ target }: { target?: Target | undefined }) {
         setRecords(data.items);
         setCursor(data.next_cursor);
         setJobs(data.jobs);
-        setHealth(data.health);
+        setHealth({...data.health,...(data.metrics?{metrics:data.metrics}:{})});
         setError(null);
         timer = setTimeout(() => void read(), 5000);
       } catch (e) {

@@ -1,0 +1,3 @@
+- [x] Add typed descriptive aggregation resolution and scoped validation.
+- [x] Verify summaries, currency groups, metric omissions and genuine policy blockers.
+- [x] Validate contracts/OpenSpec and deploy the Subway backend with rollback and preservation checks.

@@ -18,6 +18,7 @@ import { dependencyOrder } from "@/domain/graph-review";
 import { ProcurementProjectCommunication } from "./ProcurementProjectCommunication";
 import { AgentCommunication } from "./AgentCommunication";
 import { ApprovalControl } from "@/features/runs/ServerRunView";
+import { AdaptiveProgress } from './AdaptiveProgress';
 const nodeTypes = { mesh: MeshNode };
 export function ExecutionView({ trace, workflow, onDesign, preferRun = false }: { trace: WorkflowTrace; workflow?: Workflow; onDesign: () => void; preferRun?: boolean }) {
   const [scope,setScope]=useState<"project"|"run">(preferRun?"run":"project");
@@ -102,6 +103,7 @@ export function ExecutionView({ trace, workflow, onDesign, preferRun = false }: 
         {(workflow || graph) && <AgentCommunication workflow={workflow ?? graph!} trace={trace} />}
       </div>
       <ApiFeedback error={trace.error} />
+      {trace.run?.adaptive&&<AdaptiveProgress run={trace.run} onUpdated={trace.retry}/>}
       {pendingApprovals.length > 0 && <section aria-label="Approvals for this run" className="max-h-96 shrink-0 space-y-3 overflow-y-auto border-b p-3">
         <h2 className="text-sm font-semibold">Waiting for your approval</h2>
         {pendingApprovals.map(approval => {

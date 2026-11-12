@@ -1,0 +1,5 @@
+# Subway query execution shape
+
+The saved run failed at the first Subway query-planning agent before any source/tool execution. Historical rejected model text and validation details were not retained, so the exact rejected payload is unknown. The actual saved task requests projected order details plus complete matching counts, while the broad query schema allows invalid detail/aggregate combinations and arbitrary identifiers. Subway model transport currently receives no specialized constraints or query-mode guidance.
+
+Constrain generated Subway queries to detail or aggregate shapes and current catalog identifiers, and explain that full matching counts are executor coverage rather than a metric added to detail queries. Preserve immutable reviewed workflows, execution/query permissions, filters, currency semantics and budgets. Normalize only redundant aggregate projections equal to group keys at the generated model boundary, as already done for generic data queries. Retain strict direct query validation. Record safe validation diagnostics without raw output.
