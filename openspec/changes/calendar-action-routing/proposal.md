@@ -1,0 +1,3 @@
+# Generic Calendar action routing
+
+Calendar-only requests are incorrectly forced through Subway's dataset gate. Calendar requests with two clock times or word durations also lack trusted event-time bindings, allowing question-free fallback reports to replace the requested action. Separate source-free connected work from business-data analysis, preserve required external operations during action planning, parse explicit Calendar intervals, and pin same-day recurring event timing to the scheduler's logical occurrence. Never infer new accounts, attendees or authority. Verify both source-backed and source-free paths with controlled connectors and active tenant tool metadata before deployment.

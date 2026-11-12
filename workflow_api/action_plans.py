@@ -74,11 +74,16 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     from .workflow_display import title_before_planning, display_title
     display_name=display_title(dict(objective=objective,overview_intent=_overview)) if _overview else title_before_planning(objective,composition.service.planner.provider if body.get('action_plan') is None else None)
     knowledge_only=bool(_overview and _overview['route']['intent_type']=='knowledge')
+    source_free=bool(_overview and _overview.get('source_free'))
     prepared=composition.preparation.checked(auth,body['preparation_id']) if body.get('preparation_id') else None
     if not knowledge_only and not prepared and body.get('business_request') is not None:
         view=composition.preparation.general_context(auth,objective,body['business_request'])
         if view.get('preflight_id'):prepared=composition.preparation.checked(auth,view['preflight_id'])
     context=trusted_context(composition,auth,body,prepared)
+    if source_free:context['validated_context']['connected_request']=dict(objective=objective)
+    if (_overview or {}).get('calendar_occurrence'):
+        from .calendar_occurrences import values
+        context['validated_context'].update(values(_overview['calendar_occurrence'],_overview['schedule']['next_due']))
     account_graph=getattr(composition.service,'account_graph',None)
     graph_pin=account_graph.sync_preparation(auth,composition.preparation,prepared['preflight_id']) if account_graph and prepared else None
     package_context=None
@@ -86,7 +91,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         pin=_revision['package']
         package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
         context['validated_context'].update(package_id=pin['package_id'],package_revision=pin['revision'],pins=deepcopy(package_context['pins']))
-    elif getattr(composition.service,'default_client_package',None):
+    elif not source_free and getattr(composition.service,'default_client_package',None):
         pin=composition.service.default_client_package
         package_context=composition.packages.prepare(auth,pin['package_id'],pin['revision'],objective)
         if body.get('client_id',package_context['package']['client_id'])!=package_context['package']['client_id']:
@@ -98,6 +103,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if package_context:contracts.update(deepcopy(package_context['package']['capability_contracts']))
     full_queries=getattr(composition.service,'subway_queries',None) if package_context and package_context['package']['ontology_version']=='bov_subway_dump_v4' else None
     if _revision and 'tool.subway_query' not in _revision.get('contracts',{}):full_queries=None
+    if source_free:full_queries=None
     if full_queries:
         from .subway_queries import planning_contract
         contracts['subway.plan_query']=planning_contract()
@@ -120,7 +126,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         # plans remain immutable and may still be reconstructed by revision.
         contracts.pop('data.plan_query',None)
         contracts.pop('tool.workflow_data_query',None)
-    elif data_queries:
+    elif data_queries and not source_free:
         from .workflow_queries import planning_contract
         try:
             context['validated_context']['data_query_catalog']=data_queries.queries.catalogue(auth,objective)
@@ -149,6 +155,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             return True
         except RegistryError:return False
     visible={cid:c for cid,c in contracts.items() if eligible(cid,c)}
+    if source_free:
+        visible={cid:c for cid,c in visible.items() if cid=='content.prepare' or c.get('side_effect') in ('draft','write')}
     if 'tool.subway_query' not in visible:visible.pop('subway.plan_query',None)
     if 'tool.workflow_data_query' not in visible:visible.pop('data.plan_query',None)
     if _overview is not None:
@@ -201,6 +209,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             planning_context['query_guidance']+=BRANCH_GUIDANCE
         if _overview is not None:
             planning_context['overview_intent']=deepcopy(_overview)
+            if source_free:
+                planning_context['query_guidance']='This request only uses connected actions. No business records, dataset, query planner or case ID is required. Preserve every requested external operation. Use content.prepare for event title/description when needed, with user-supplied request content as its data. Bind primary_calendar_id and calendar_event_start/end from validated_context, never generated identity or timing. Omit optional Calendar properties such as reminders, location and attendees unless explicitly supplied. Do not invent user_values keys for optional fields or request them as required business inputs. No attendees means no attendee binding or a supplied empty list. Use only existing context keys.'
             if knowledge_only:
                 planning_context['query_guidance']='This is a knowledge explanation, not a record query. Use only content.prepare. Bind context key business_knowledge, path [], target [data]. Cite its exact provided reference tokens through evidence_references. Explain only supplied definitions, properties, relationships and quotations. Preserve source_basis, unknowns and draft versus verified status. Do not infer equivalent fields or units from names; say when knowledge does not establish a meaning. No data planning, source reads, case identifier or external action is needed.'
             if _overview.get('query'):
@@ -230,6 +240,22 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if not isinstance(proposal,dict) or set(proposal)-{'actions','completion_criteria','missing_inputs'}:deny('Invalid structured action proposal.')
     actions=deepcopy(proposal.get('actions',[]))
     if not isinstance(actions,list) or not 1<=len(actions)<=16:deny('Select between one and sixteen action instances.')
+    if _overview and 'calendar_write' in _overview['route']['side_effects']:
+        actual={a.get('capability_id') for a in actions}
+        by_id={a.get('action_id'):a for a in actions}
+        required=set(proposal.get('completion_criteria',[]))
+        for _ in actions:
+            required.update(parent for aid in list(required) for parent in by_id.get(aid,{}).get('depends_on',[]))
+        if not any(visible.get(cid,{}).get('supported_operation','').startswith('calendar.')
+                   and visible.get(cid,{}).get('side_effect')=='write'
+                   and any(a.get('capability_id')==cid and a.get('action_id') in required and not a.get('optional') and not a.get('when') for a in actions)
+                   for cid in actual):
+            if _planning_feedback is None and body.get('action_plan') is None:
+                return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
+                    _planning_budget=_planning_budget,_overview=_overview,_planning_feedback=dict(
+                        error_code='ACTION_REQUIRED_OPERATION_MISSING',invalid_proposal=deepcopy(proposal),
+                        correction='Preserve the explicitly requested Calendar write using the registered Calendar capability and exact-payload approval. Do not substitute a report-only workflow.'))
+            deny('The plan omitted the requested Calendar action.','ACTION_REQUIRED_OPERATION_MISSING')
     if full_queries and not _revision and body.get('action_plan') is None:
         from .query_branches import expand
         try:

@@ -210,20 +210,23 @@ def replace_binding(action,field,kind,key,satisfied):
 def calendar_context(context,goal,selected,*,now=None):
     """Interpret fully specified local scheduling facts; never guess missing times."""
     if not selected:return
-    if re.search(r'\bprimary\s+calendar\b|\bmy\s+calendar\b(?=\s*(?:[,.!?]|$|today\b|tomorrow\b|on\b|at\b|with\b|for\b))',goal,re.I):
+    if re.search(r'\bprimary\s+(?:Google\s+)?calendar\b|\bmy\s+calendar\b(?=\s*(?:[,.!?]|$|today\b|tomorrow\b|on\b|at\b|with\b|for\b))',goal,re.I):
         context['validated_context']['primary_calendar_id']='primary'
     # Separate the event clause from an earlier requested workflow execution time.
     clause=re.search(r'\b(?:add|create|book|schedule)\b[^.!?\n]*?\b(?:review|meeting|event|appointment)\b',goal,re.I)
     if clause and re.search(r'\bcalendar\b',goal,re.I):goal=goal[clause.start():]
     date_match=re.search(r'\b(\d{4}-\d{2}-\d{2})\b',goal)
     words=re.search(r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b',goal,re.I)
-    clocks=list(re.finditer(r'\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}):(\d{2})\b',goal,re.I))
-    clock=clocks[0] if len(clocks)==1 else None
+    clocks=list(re.finditer(r'\b(\d{1,2})(?::\s*(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}):\s*(\d{2})\b',goal,re.I))
+    interval=len(clocks)==2 and bool(re.fullmatch(r'\s*(?:to|until|[-–])\s*',goal[clocks[0].end():clocks[1].start()],re.I))
+    clock=clocks[0] if len(clocks)==1 or interval else None
     zone=re.search(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',goal)
     zone_name=zone[1] if zone else 'Asia/Kolkata' if re.search(r'\b(?:India(?:n)? (?:standard )?time)\b',goal,re.I) else None
     duration=re.search(r'\b(\d{1,3})[- ]minute\b',goal,re.I)
+    words_duration=re.search(r'\b(one|five|ten|fifteen|twenty|thirty|forty-five|sixty|ninety)[- ]minute\b',goal,re.I)
+    duration_minutes=int(duration[1]) if duration else {'one':1,'five':5,'ten':10,'fifteen':15,'twenty':20,'thirty':30,'forty-five':45,'sixty':60,'ninety':90}.get(words_duration[1].lower()) if words_duration else None
     relative=re.search(r'\b(today|tomorrow)\b',goal,re.I)
-    if not (date_match or words or relative) or not clock or not zone_name or not duration:return
+    if not (date_match or words or relative) or not clock or not zone_name or not (duration_minutes or interval):return
     from datetime import datetime,timedelta
     from zoneinfo import ZoneInfo,ZoneInfoNotFoundError
     try:
@@ -240,8 +243,17 @@ def calendar_context(context,goal,selected,*,now=None):
             hour=hour%12+(12 if period.upper()=='PM' else 0)
         start=day.replace(hour=hour,minute=minute,second=0,microsecond=0,tzinfo=timezone)
         if start.utcoffset()!=start.replace(fold=1).utcoffset():return
-        if not 1<=int(duration[1])<=999:return
-        end=start+timedelta(minutes=int(duration[1]))
+        if interval:
+            other=clocks[1];end_hour=int(other[1] or other[4]);end_minute=int(other[2] or other[5] or 0)
+            if other[3]:
+                if not 1<=end_hour<=12:return
+                end_hour=end_hour%12+(12 if other[3].upper()=='PM' else 0)
+            end=start.replace(hour=end_hour,minute=end_minute)
+            if end<=start:return
+            if duration_minutes and end-start!=timedelta(minutes=duration_minutes):return
+        else:
+            if not 1<=duration_minutes<=999:return
+            end=start+timedelta(minutes=duration_minutes)
         if end.utcoffset()!=end.replace(fold=1).utcoffset():return
         context['validated_context']['calendar_event_start']={'dateTime':start.isoformat(),'timeZone':zone_name}
         context['validated_context']['calendar_event_end']={'dateTime':end.isoformat(),'timeZone':zone_name}

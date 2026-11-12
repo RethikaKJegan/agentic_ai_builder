@@ -17,6 +17,11 @@ def params(workflow,node,run):
         from datetime import datetime,timezone
         if datetime.now(timezone.utc)>=datetime.fromisoformat(plan['constraints']['deadline'].replace('Z','+00:00')):deny('Plan deadline has expired.','ACTION_DEADLINE_EXCEEDED')
     context=metadata['action_binding_context'];actions={a['action_id']:a for a in plan['actions']}
+    pin=metadata.get('overview_intent',{}).get('calendar_occurrence')
+    if pin and run.get('automation_reference'):
+        from workflow_api.calendar_occurrences import values
+        context=deepcopy(context)
+        context['validated_context'].update(values(pin,run['automation_reference'].get('scheduled_due')))
     if node['node_id']=='workflow_output':
         for aid in plan['completion_criteria']:
             if run.get('action_instances',{}).get(aid,{}).get('state')!='completed':deny('Plan completion criteria are not satisfied.','ACTION_INCOMPLETE')

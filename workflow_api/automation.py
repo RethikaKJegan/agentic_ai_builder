@@ -184,6 +184,14 @@ class DurableAutomation:
         for tid,schema in body['operations'].items():
             if tid not in tools:fail('Authorization names an unavailable registered operation.')
             self.schema(schema)
+            if 'x-praxi-calendar-occurrence-v1' in schema:
+                from .calendar_occurrences import values
+                pin=schema['x-praxi-calendar-occurrence-v1']
+                if tid!='extension_calendar_create' or not isinstance(pin,dict) or pin.get('timezone')!=body['schedule']['timezone']:
+                    fail('Recurring Calendar time must match the reviewed schedule timezone.','AUTOMATION_SCOPE_DENIED',403)
+                if set(pin)!={'timezone','hour','minute','duration_minutes'} or any(type(pin[k]) is not int for k in ('hour','minute','duration_minutes')) or not (0<=pin['hour']<24 and 0<=pin['minute']<60 and 1<=pin['duration_minutes']<=999):
+                    fail('Invalid recurring Calendar interval.','AUTOMATION_SCOPE_DENIED',403)
+                values(pin,self.clock())
             if tid=='subway_query':
                 from .subway_automation import validate_consent
                 validate_consent(schema,body['schedule']['timezone'])
@@ -595,6 +603,14 @@ class DurableAutomation:
         self.service.registry_adapter.execution_assignments(workflow,self._fresh(auth))
         if not self._pinned(db,run,workflow,schedule) or workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Recurring workflow/account changed.','AUTOMATION_SCOPE_DENIED',403)
         schema=policy['request']['operations'].get(node['tool_id'])
+        if schema and 'x-praxi-calendar-occurrence-v1' in schema:
+            from .calendar_occurrences import values
+            pin=workflow.get('metadata',{}).get('overview_intent',{}).get('calendar_occurrence')
+            if node['tool_id']!='extension_calendar_create' or pin!=schema['x-praxi-calendar-occurrence-v1']:
+                fail('Calendar interval differs from the reviewed workflow.','AUTOMATION_SCOPE_DENIED',403)
+            expected=values(pin,occurrence['due'])
+            if any(inputs.get('event',{}).get(field)!=expected['calendar_event_'+field] for field in ('start','end')):
+                fail('Calendar event must preserve its reviewed occurrence time.','AUTOMATION_SCOPE_DENIED',403)
         if node['tool_id']=='subway_query':
             from .subway_automation import check_query
             check_query(schema,inputs,workflow,run,self.service.subway_queries,auth)

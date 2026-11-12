@@ -175,6 +175,7 @@ class OverviewAutomation:
                         'Analysis plus any external action (email, Sheets or Calendar) is composed work: use one_time '
                         'without repetition, recurring with repetition, never population or investigation with side_effects. '
                         'entity_scope is identified_case only when a supplied identity selects a specific business case; otherwise population for record analysis, none for other work. '
+                        'Calendar-only and other connector-only requests use entity_scope=none, empty business_goal and no business datasets. Empty subway_selection.dataset_ids is valid for these requests; business_resolution is ready. Never ask for a dataset when no business records are requested. '
                         'External actions require explicit intent; no external writes means side_effects is empty. '
                         'recipient_mode is selected_account for requested email delivery with no other named destination, '
                         'or explicit self-mail; explicit for a supplied address, other for a named third party without an address, '
@@ -188,6 +189,7 @@ class OverviewAutomation:
                         'Reporting periods (today, yesterday, previous month) filter data; they do not schedule execution. '
                         'Calendar event start/end are event data, not workflow execution times. Investigate now then create '
                         'the requested future event: recurrence.kind=none unless the user separately delays workflow execution. '
+                        'A Calendar event creation request is never intent_type=event: that kind means an incoming business-event subscription. Use one_time or recurring for Calendar creation. '
                         'Dates must use a supported exact field_id from metadata; do not guess among ambiguous date meanings. '
                         'Use null for unspecified hour/timezone/date/field, and ask only unresolved necessary business questions. '
                         'India time is Asia/Kolkata. Morning alone does not establish an hour. weekdays are cron weekdays: Sunday=0. '
@@ -225,6 +227,10 @@ class OverviewAutomation:
         # Correct an event timestamp mistaken for a workflow timer. Only an exact
         # server-resolved event match qualifies; separate execution clauses stay.
         event=context.get('resolved_inputs',{}).get('validated_context',{}).get('calendar_event_start')
+        if (event and result['intent_type']=='event' and result['entity_scope']=='none'
+                and 'calendar_write' in result['side_effects'] and not result.get('event_selection')):
+            result=deepcopy(result)
+            result['intent_type']='recurring' if result['recurrence']['kind'] in {'daily','weekdays','weekly','monthly'} else 'one_time'
         event_clause=re.search(r'\b(?:add|create|book|schedule)\b[^.!?\n]*?\b(?:review|meeting|event|appointment)\b',objective,re.I)
         r=result['recurrence']
         if event and event_clause and 'calendar_write' in result['side_effects'] and r['kind']=='once':
@@ -341,6 +347,8 @@ class OverviewAutomation:
             prepared=self._save(auth,stage_key,body,prepared)
         result=deepcopy(prepared['result']);intent=deepcopy(prepared['intent'])
         if intent is None:
+            if 'calendar_write' in result.get('intent',{}).get('side_effects',[]):
+                return self._save(auth,key,body,result)
             if self.question_free() and not result.get('business_clarification'):return self._save(auth,key,body,self.limitation_report(auth,body,result,'UNRESOLVED_REQUEST'))
             return self._save(auth,key,body,result)
         if self.question_free():intent['question_free']=True
@@ -355,6 +363,9 @@ class OverviewAutomation:
             operations=self.operations(auth,doc,intent) if schedule or intent.get('event_subscription') else {}
         except Exception as exc:
             if not self.question_free() or getattr(exc,'code',None) not in {'ACTION_INPUT_REQUIRED','CASE_IDENTIFIER_REQUIRED','OVERVIEW_CLARIFICATION'}:raise
+            if 'calendar_write' in intent['route']['side_effects']:
+                result.update(state='clarification',business_clarification=True,questions=[str(exc)])
+                return self._save(auth,key,body,result)
             return self._save(auth,key,body,self.limitation_report(auth,body,result,'UNRESOLVED_ACTION',str(exc)))
         result.update(composition_id=doc['composition_id'], schedule=schedule,event_subscription=intent.get('event_subscription'),
             operations=operations,
@@ -432,7 +443,8 @@ class OverviewAutomation:
             if selected_knowledge.get('references') or route['intent_type']!='knowledge':knowledge=selected_knowledge
             from .subway_queries import business_question
             question=business_question(selection)
-            if question or (not catalog['sources'] and route['intent_type']!='knowledge'):
+            source_free=route['entity_scope']=='none' and bool(route['side_effects']) and route['temporal']['period']=='none'
+            if not source_free and (question or (not catalog['sources'] and route['intent_type']!='knowledge')):
                 result.update(state='clarification',business_clarification=True,questions=[question or 'Which supported business dataset should this request use?'])
                 return dict(result=result,intent=None)
         # Interpretation notes are planning context, not executable prerequisites.
@@ -447,6 +459,11 @@ class OverviewAutomation:
             result.update(state='clarification', questions=[str(exc)])
             return dict(result=result,intent=None)
         intent = dict(version='overview-intent-v1', route=route, schedule=schedule, prepared_at=now)
+        intent['source_free']=route['entity_scope']=='none' and bool(route['side_effects']) and route['temporal']['period']=='none'
+        if schedule and 'calendar_write' in route['side_effects']:
+            from .calendar_occurrences import prepare_pin
+            pin=prepare_pin(objective,body.get('google_connection_id'),schedule['next_due'])
+            if pin:intent['calendar_occurrence']=pin
         if subway and route['intent_type']=='event':
             from .workflow_events import validate_source
             zone=self.env.get('BUILDER_WORKSPACE_TIMEZONE') or route['recurrence']['timezone']
@@ -523,6 +540,8 @@ class OverviewAutomation:
             if c['kind'] != 'tool': continue
             tid = doc['selected_tools'][a['action_id']]['tool_id']
             schema = deepcopy(c['input_schema'])
+            if c.get('supported_operation')=='calendar.create' and intent.get('calendar_occurrence'):
+                schema['x-praxi-calendar-occurrence-v1']=deepcopy(intent['calendar_occurrence'])
             if tid=='subway_query':
                 from .subway_automation import query_consent
                 schema=query_consent(doc,intent)

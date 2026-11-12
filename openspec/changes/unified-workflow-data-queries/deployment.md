@@ -1,3 +1,5 @@
+> Latest Calendar backend: [generic action routing and recurring event timing](../calendar-action-routing/deployment.md) is deployed to Subway and Simpsons as `calendar-routing-20261112-43ed19536853`.
+
 > Latest automation completion and UI: [receipt-aware finalization](../receipt-aware-automation-completion/deployment.md) is deployed as `receipt-completion-20261112-d5e9ec95e8a8`.
 
 > Latest Subway automation backend: [strict investigation evaluator](../strict-investigation-evaluator/deployment.md) is deployed as `strict-evaluator-20261112-f7a1a2f81665`.

@@ -1,0 +1,5 @@
+- [x] Route source-free Calendar work without a business dataset.
+- [x] Bind explicit intervals and occurrence-relative recurring Calendar timestamps.
+- [x] Reject omitted requested Calendar operations rather than publish a successful substitute.
+- [x] Verify generic and Subway/Simpsons planning, approval, execution and repeat protection.
+- [x] Deploy verified backend modules and check hosted health and isolation.
