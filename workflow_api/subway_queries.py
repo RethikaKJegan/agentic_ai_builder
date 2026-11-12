@@ -329,6 +329,9 @@ class SubwayQueries:
    if not r or r['source_dataset_id'] not in selected or r['target_dataset_id'] in selected:fail('Join must add an exact allowlisted scalar target to the current query scope.')
    selected.add(r['target_dataset_id']);edges.append(r)
   used=set(query['fields']+query['group_by']+[f['field_id'] for f in query['filters']]+[m['field_id'] for m in query['metrics'] if m['field_id']])
+  # A detail sort may use an authorized base field without displaying it.
+  # Include it in the same scope/type/provenance checks and source projection.
+  if not query['metrics']:used.update(o['column'] for o in query['order_by'])
   if any(fid not in fields or fields[fid]['dataset_id'] not in selected for fid in used):fail('Selected fields are outside the query datasets.','SUBWAY_QUERY_DENIED',403)
   if len(query['fields'])!=len(set(query['fields'])) or len(query['group_by'])!=len(set(query['group_by'])):fail('Select each field once.')
   if query['metrics'] and query['fields'] or query['group_by'] and not query['metrics'] or not query['metrics'] and not query['fields']:fail('Use projected fields for details or metrics/group_by for aggregates.')
@@ -339,7 +342,7 @@ class SubwayQueries:
   for metric in query['metrics']:
    if metric['op']!='count' and not metric['field_id']:fail('This metric requires an explicit field.')
   columns=query['group_by']+labels if labels else query['fields']
-  if any(o['column'] not in columns for o in query['order_by']):fail('Sort columns must be selected output columns.')
+  if labels and any(o['column'] not in columns for o in query['order_by']):fail('Aggregate sort columns must be selected output columns.')
   if not labels and any(fields[o['column']]['dataset_id']!=base for o in query['order_by']):fail('Detail sorting currently requires a base collection field; aggregate/group to sort joined measures.')
   return selected,edges,used
  def execute(self,auth,query):

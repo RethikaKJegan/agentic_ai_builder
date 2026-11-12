@@ -1,0 +1,3 @@
+# Detail query sort scope
+
+The reported invoice comparison failed before any read or Calendar action because the model sorted by an unprojected column. Detail query sorting currently rejects valid base-source fields unless displayed, despite the executor sorting the base cursor independently. Permit sorting by authorized base fields without adding them to returned columns. Include sort fields in metadata scope validation/read requirements; keep aggregate sort rules restricted to returned group/metric columns and reject unknown, unrelated or joined detail sort fields. Verify model-output validation and actual source execution before deploying the active Subway release.

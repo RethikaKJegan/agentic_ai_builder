@@ -1,0 +1,3 @@
+- [x] Support authorized base-field detail sorting without changing returned columns.
+- [x] Verify model boundary, result ordering/pagination/coverage and negative scope cases.
+- [x] Deploy actual Subway modules and verify hosted health and preservation.

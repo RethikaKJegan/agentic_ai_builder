@@ -54,6 +54,13 @@ def test_supported_join_and_provider_budget_and_immutable_original():
     assert min(schema_identity_budget(schema(c)))>=0  # Falls back to bounded mode constraints.
 
 
+def test_detail_sort_identifiers_are_constrained_before_generation():
+    validator=Draft202012Validator(schema())
+    assert validator.is_valid({'query':query(order_by=[dict(column='amount',direction='desc')])})
+    assert not validator.is_valid({'query':query(order_by=[dict(column='invented_sort_label',direction='desc')])})
+    assert validator.is_valid({'query':query(fields=[],metrics=[dict(label='total',op='sum',field_id='amount')],order_by=[dict(column='total',direction='desc')])})
+
+
 def test_only_redundant_generated_group_projection_is_canonicalized():
     q=query(fields=['currency'],group_by=['currency'],metrics=[dict(label='total',op='sum',field_id='amount')])
     before=deepcopy(q);assert canonical_projection(q)['fields']==[];assert q==before

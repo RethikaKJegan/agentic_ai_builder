@@ -11,7 +11,9 @@ GUIDANCE = (
     'and one or more metrics; group_by declares grouping columns. All metrics are per group. '
     'Use a separate aggregate query when the task requires independent aggregate results. '
     'Use only supplied canonical IDs, selected directed joins, and fields of the base or '
-    'joined datasets. Detail sorting supports base-dataset fields only. Preserve explicit '
+    'joined datasets. Detail sorting supports authorized base-dataset fields, including '
+    'fields not displayed in the detail projection. Aggregate sorting must name an exact '
+    'group_by field ID or metric label returned by that query. Preserve explicit '
     'filters and requested numeric measures; keep currencies separate for monetary '
     'aggregation. Downstream reporting and email are separate actions. Never invent '
     'IDs, joins, filters, business results, currency conversions or coverage.\n'
@@ -61,6 +63,8 @@ def response_schema(definition, inputs):
                 p[name]['items'] = {'$ref': '#/$defs/subway_fields'}
         if choices['subway_fields']:
             p['filters']['items']['properties']['field_id'] = {'$ref': '#/$defs/subway_fields'}
+            if branch is detail:
+                p['order_by']['items']['properties']['column'] = {'$ref': '#/$defs/subway_fields'}
         p['metrics']['items']['properties']['field_id'] = {'$ref': '#/$defs/subway_metric_fields'}
         if choices['subway_relationships']:
             p['joins']['items'] = {'$ref': '#/$defs/subway_relationships'}
