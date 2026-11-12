@@ -1,4 +1,4 @@
-- [ ] Define shared conditional-analysis policy at the evaluator boundary and context.
-- [ ] Verify configured-model conditional, frozen-requirement and genuine-blocker cases with synthetic inputs.
-- [ ] Verify native recurring delivery and unchanged external-action gates.
-- [ ] Deploy the actual Subway release and verify hosted health/preservation.
+- [x] Define shared conditional-analysis policy at the evaluator boundary and context.
+- [x] Verify configured-model conditional, frozen-requirement and genuine-blocker cases with synthetic inputs.
+- [x] Verify native recurring delivery and unchanged external-action gates.
+- [x] Deploy the actual Subway release and verify hosted health/preservation.

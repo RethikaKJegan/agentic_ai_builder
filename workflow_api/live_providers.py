@@ -61,6 +61,9 @@ def registry_configuration(env):
                 from .subway_documents import definition as subway_documents_definition
                 config['tools'].append({'definition':subway_documents_definition()})
                 config['policy']['remaining_quota']['subway_documents']=10000
+                from .subway_assessments import definition as subway_assessment_definition
+                config['tools'].append({'definition':subway_assessment_definition()})
+                config['policy']['remaining_quota']['subway_assess']=10000
         if env.get('BUILDER_CLIENT_GOOGLE_ENABLED')=='1':
             from .tenant_google import extend_registry
             extend_registry(config)
@@ -496,6 +499,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         if env.get('BUILDER_SUBWAY_QUERY_ENABLED')=='1':
             from .subway_queries import install as install_subway_queries
             install_subway_queries(app,auth)
+            if env.get('BUILDER_SUBWAY_DEMO_ENABLED')=='1':
+                from .subway_demonstration import install as install_demo
+                install_demo(service.store,auth,service.subway_queries.version)
     if procurement_settings:
         from .procurement import install
         procurement_worker = install(app, procurement_settings, env, client, model, auth)

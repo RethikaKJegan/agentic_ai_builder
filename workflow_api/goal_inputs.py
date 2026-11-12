@@ -212,6 +212,7 @@ def calendar_context(context,goal,selected,*,now=None):
     if not selected:return
     if re.search(r'\bprimary\s+(?:Google\s+)?calendar\b|\bmy\s+calendar\b(?=\s*(?:[,.!?]|$|today\b|tomorrow\b|on\b|at\b|with\b|for\b))',goal,re.I):
         context['validated_context']['primary_calendar_id']='primary'
+    original_goal=goal
     # Separate the event clause from an earlier requested workflow execution time.
     clause=re.search(r'\b(?:add|create|book|schedule)\b[^.!?\n]*?\b(?:review|meeting|event|appointment)\b',goal,re.I)
     if clause and re.search(r'\bcalendar\b',goal,re.I):goal=goal[clause.start():]
@@ -222,6 +223,11 @@ def calendar_context(context,goal,selected,*,now=None):
     clock=clocks[0] if len(clocks)==1 or interval else None
     zone=re.search(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',goal)
     zone_name=zone[1] if zone else 'Asia/Kolkata' if re.search(r'\b(?:India(?:n)? (?:standard )?time)\b',goal,re.I) else None
+    if not zone_name:
+        # A single explicitly stated timezone also governs the later event clause.
+        zones=set(re.findall(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',original_goal))
+        if re.search(r'\bIndia(?:n)? (?:standard )?time\b',original_goal,re.I):zones.add('Asia/Kolkata')
+        if len(zones)==1:zone_name=zones.pop()
     duration=re.search(r'\b(\d{1,3})[- ]minute\b',goal,re.I)
     words_duration=re.search(r'\b(one|five|ten|fifteen|twenty|thirty|forty-five|sixty|ninety)[- ]minute\b',goal,re.I)
     duration_minutes=int(duration[1]) if duration else {'one':1,'five':5,'ten':10,'fifteen':15,'twenty':20,'thirty':30,'forty-five':45,'sixty':60,'ninety':90}.get(words_duration[1].lower()) if words_duration else None
@@ -276,6 +282,16 @@ def calendar_bindings(actions,contracts,context,satisfied):
 def research_queries(actions,contracts,context):
     """Prepare search text as model content, rather than dispatching the whole goal."""
     context['validated_context']['research_request']={'objective':context['validated_context']['goal']}
+    reviewed=context['validated_context'].get('reviewed_public_search_queries',[])
+    if len(reviewed)==1:
+        # The public phrase was proposed before review, never from business results.
+        # Exact recurring consent still fixes the complete resolved search payload.
+        for action in actions:
+            if contracts.get(action.get('capability_id'),{}).get('supported_operation')!='research.search':continue
+            for binding in action.get('bindings',[]):
+                if binding.get('target')==['query'] and (binding.get('kind') in ('generated','output','receipt')
+                        or binding.get('kind')=='context' and binding.get('key') in ('goal','research_request')):
+                    binding.clear();binding.update(kind='context',key='reviewed_public_search_queries',path=[0],target=['query'])
     used={a['action_id'] for a in actions};additions=[]
     for action in actions:
         contract=contracts.get(action.get('capability_id'),{})

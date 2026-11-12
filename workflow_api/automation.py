@@ -165,7 +165,7 @@ class DurableAutomation:
         old=self._existing(doc)
         if old:return old
         if body['connection_id'] is None:
-            if not getattr(self.service,'subway_queries',None) or not set(body['operations']) <= {'subway_query','subway_documents'}:
+            if not getattr(self.service,'subway_queries',None) or not set(body['operations']) <= {'subway_query','subway_documents','subway_assess'}:
                 fail('Native recurring consent requires owned read-only Subway operations.','AUTOMATION_SCOPE_DENIED',403)
             self.service.subway_queries.authorize(auth)
         else:self._connection(auth,body['connection_id'])
@@ -192,6 +192,15 @@ class DurableAutomation:
                 if set(pin)!={'timezone','hour','minute','duration_minutes'} or any(type(pin[k]) is not int for k in ('hour','minute','duration_minutes')) or not (0<=pin['hour']<24 and 0<=pin['minute']<60 and 1<=pin['duration_minutes']<=999):
                     fail('Invalid recurring Calendar interval.','AUTOMATION_SCOPE_DENIED',403)
                 values(pin,self.clock())
+            if tid=='subway_assess':
+                from .subway_assessments import INPUT as assessment_input
+                from jsonschema import Draft202012Validator
+                exact=schema.get('const')
+                from .subway_automation import DEMO_ASSESSMENT,validate_assessment_consent
+                if DEMO_ASSESSMENT in schema:
+                    validate_assessment_consent(schema,body['schedule']['timezone'])
+                elif not isinstance(exact,dict) or list(Draft202012Validator(assessment_input).iter_errors(exact)):
+                    fail('Recurring assessments require exact reviewed input consent.','AUTOMATION_SCOPE_DENIED',403)
             if tid=='subway_query':
                 from .subway_automation import validate_consent
                 validate_consent(schema,body['schedule']['timezone'])
@@ -611,6 +620,9 @@ class DurableAutomation:
             expected=values(pin,occurrence['due'])
             if any(inputs.get('event',{}).get(field)!=expected['calendar_event_'+field] for field in ('start','end')):
                 fail('Calendar event must preserve its reviewed occurrence time.','AUTOMATION_SCOPE_DENIED',403)
+        if node['tool_id']=='subway_assess' and schema and 'x-praxi-subway-demo-assessment-v1' in schema:
+            from .subway_automation import check_assessment
+            check_assessment(schema,inputs,workflow,run,self.service.subway_queries,auth)
         if node['tool_id']=='subway_query':
             from .subway_automation import check_query
             check_query(schema,inputs,workflow,run,self.service.subway_queries,auth)

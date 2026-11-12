@@ -1,3 +1,7 @@
+> Latest combined automation fix: [reviewed recurring public research](../reviewed-recurring-research/deployment.md) is deployed as `reviewed-research-20261112-6312a6f70958`.
+
+> Latest automation assessment fix: [conditional investigation evidence](../conditional-investigation-evidence/deployment.md) is deployed as `conditional-evidence-20261112-9c77ee3a6841`.
+
 > Latest automation evidence fix: [paginated query receipts](../paginated-query-evidence/deployment.md) is deployed as `paginated-evidence-20261112-f8609af5e42a`.
 
 > Latest query validation fix: [authorized detail sorting](../detail-query-sort-scope/deployment.md) is deployed as `detail-sort-20261112-39a1504efca0`.

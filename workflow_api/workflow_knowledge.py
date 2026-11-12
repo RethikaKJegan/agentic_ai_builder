@@ -41,6 +41,7 @@ def capture(composition, auth, context, version_id=None):
     subway_catalog=context.get('validated_context',{}).get('subway_query_catalog')
     subway_pin=None
     if subway and subway_catalog and subway_catalog.get('ontology_version')==snapshot['version_id']:
+        subway=subway.for_workflow({'metadata':{'action_binding_context':context}},auth)
         current=subway.catalog(auth)
         allowed={f['field_id'] for d in subway_catalog['sources'] for f in d['fields']}
         for mapping in mappings:
@@ -131,6 +132,22 @@ def completed_usage(workflow,action,run):
                 if mapping.get('dataset_id') in selected & source_ids and (mapping.get('field_id') in used or not used and mapping['field_path']=='_id'):
                     add(mapping,'Verified Subway query used this mapped source field.' if mapping.get('field_id') in used else 'Verified Subway row count scanned this mapped dataset.',
                         field_id=mapping.get('field_id'),dataset_id=mapping['dataset_id'],query_id=output['query_id'],source_role=mapping['source_role'],collection=mapping['collection'])
+    elif item.get('verified_receipt') and action['capability_id']=='tool.subway_assess':
+        if (output.get('scope')==scope and output.get('ontology_version')==pin['version_id']
+                and output.get('input_sha256')==digest(item.get('resolved_inputs',{}))
+                and output.get('report',{}).get('provenance',{}).get('mode')==('modeled_demonstration' if context['validated_context'].get('demo_context') else 'source_records')):
+            report=output['report'];collections=set(report.get('evidence_hashes',{}))
+            from .subway_assessments import FIELDS
+            if context['validated_context'].get('demo_context'):
+                from .subway_demo_assessment import DEMO_FIELDS as FIELDS
+            for mapping in mappings.values():
+                col=mapping.get('collection');root=mapping.get('field_path','').split('.')[0].split('[')[0]
+                if mapping.get('source_role')=='finance' and col in collections and root in FIELDS.get(col,[]):
+                    rules=sorted({r['rule_id']+'='+r['outcome'] for r in report.get('results',[]) if r['entity_collection']==col})
+                    reason='Deterministic procurement assessment consumed this source field. Knowledge '+report['knowledge_version']+'. Rules: '+', '.join(rules)
+                    add(mapping,reason,record_id=output['assessment_id'],source_role='finance',collection=col)
+            item['ontology_rule_usage']=[dict(rule_id=r['rule_id'],outcome=r['outcome'],entity_id=r['entity_id'],record_sha256=r['record_sha256'],
+                knowledge_version=report['knowledge_version'],knowledge_sha256=report['knowledge_sha256']) for r in report.get('results',[])]
     elif item.get('verified_receipt'):
         # Native mapped readers return a records envelope, not query rows.
         for record in output.get('records',[]):

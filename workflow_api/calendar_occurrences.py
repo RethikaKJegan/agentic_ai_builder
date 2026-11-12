@@ -8,9 +8,9 @@ from .service import ApiFailure
 
 
 def prepare_pin(objective, selected, due):
-    if not re.search(r'\b(?:that|the) same day\b',objective,re.I):return None
+    if not re.search(r'\b(?:that(?: same)?|the same) day\b',objective,re.I):return None
     context={'validated_context':{}}
-    calendar_context(context,re.sub(r'\b(?:that|the) same day\b','today',objective,flags=re.I),bool(selected),now=due)
+    calendar_context(context,re.sub(r'\b(?:that(?: same)?|the same) day\b','today',objective,flags=re.I),bool(selected),now=due)
     values=context['validated_context']
     if 'calendar_event_start' not in values or 'calendar_event_end' not in values:return None
     start=datetime.fromisoformat(values['calendar_event_start']['dateTime']);end=datetime.fromisoformat(values['calendar_event_end']['dateTime'])

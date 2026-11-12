@@ -36,7 +36,7 @@ class SubwayDocuments:
     def bind_context(self, workflow, run, auth, node):
         from .subway_queries import SubwayQueryConnector
         bound = SubwayQueryConnector(self.queries).bind_context(workflow, run, auth, node)
-        return SubwayDocuments(self.queries, bound.auth, bound.pin)
+        return SubwayDocuments(bound.queries, bound.auth, bound.pin)
 
     def invoke(self, grant, inputs, effect_id):
         if not self.auth or grant.get('tool_id') != 'subway_documents' or list(Draft202012Validator(INPUT).iter_errors(inputs)):
@@ -50,6 +50,9 @@ class SubwayDocuments:
         scope = (self.auth['subject']['workspace_id'], self.auth['subject']['subject_id'])
         snapshot = self.queries.version
         sources = {s['source_id']:s for s in snapshot['sources']}
+        from .subway_procurement import load as procurement_load
+        procurement=procurement_load(scope,snapshot)
+        if procurement:sources.update({s['source_id']:s for s in procurement['sources']})
         resolved = load(scope, snapshot)
         if resolved:
             sources.update(resolved['sources'])

@@ -1,0 +1,4 @@
+- [x] Propose bounded public-only queries before recurring review.
+- [x] Pin search bindings and correct dynamic recurring reads during preparation.
+- [x] Verify native recurring research/delivery and unchanged one-time behavior.
+- [x] Deploy Subway and verify hosted health and preservation.

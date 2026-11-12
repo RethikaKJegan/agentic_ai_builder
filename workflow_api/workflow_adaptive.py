@@ -87,7 +87,9 @@ def evidence(runtime, db, run, workflow, auth):
     scope = dict(workspace_id=run['workspace_id'], owner_id=run['subject_id'])
     # Recheck current owned source/credential generations before interpreting
     # saved receipts. A historical successful read is not a fresh authorization.
-    current_catalog=runtime.workflows.subway_queries.catalog(auth)
+    selected_queries=runtime.workflows.subway_queries.for_workflow(workflow,auth)
+    current_catalog=selected_queries.catalog(auth)
+    demo_context=getattr(selected_queries,'demo_context',None)
     for aid, item in run.get('action_instances', {}).items():
         if item.get('state') != 'completed' or not item.get('verified_receipt') or aid not in actions:
             continue
@@ -113,7 +115,7 @@ def evidence(runtime, db, run, workflow, auth):
                 and item.get('output_fingerprint') == digest(output)
                 and output.get('coverage', {}).get('complete_scan') is True)
             overview=workflow['metadata'].get('overview_intent',{})
-            if overview.get('subway_temporal'):
+            if overview.get('subway_temporal') and not demo_context:
                 from .subway_automation import date_filters
                 from .source_freshness import covers
                 filters=date_filters(overview,run)
@@ -127,6 +129,32 @@ def evidence(runtime, db, run, workflow, auth):
                 limitations.append(dict(action_id=aid, code='QUERY_SCOPE_LIMITATION', details=deepcopy(coverage)))
             elif coverage.get('has_more') and not coverage.get('aggregate_complete'):
                 limitations.append(dict(action_id=aid, code='QUERY_DETAIL_PAGINATED', details=deepcopy(coverage)))
+        elif cid=='tool.subway_assess':
+            row=db.execute('SELECT document FROM subway_assessment_receipts WHERE workspace=? AND owner=? AND assessment_id=?',
+                (run['workspace_id'],run['subject_id'],output.get('assessment_id'))).fetchone()
+            receipt=json.loads(row[0]) if row else {}
+            from .subway_procurement import load as procurement_load
+            bundle=selected_queries.procurement_bundle()
+            valid=(output.get('scope')==scope and output.get('ontology_version')==selected_queries.version['version_id']
+                and receipt.get('input_sha256')==query_digest(item.get('resolved_inputs'))
+                and receipt.get('output_sha256')==query_digest(output)
+                and receipt.get('source_authority_sha256')==query_digest(current_catalog['stamps'])
+                and receipt.get('knowledge_sha256')==(bundle or {}).get('sha256')
+                and output.get('report',{}).get('provenance',{}).get('mode')==('modeled_demonstration' if demo_context else 'source_records')
+                and item.get('output_fingerprint')==digest(output))
+            report=output.get('report',{})
+            overview=workflow['metadata'].get('overview_intent',{})
+            if overview.get('subway_temporal') and not demo_context:
+                from .subway_automation import date_filters
+                from .source_freshness import covers
+                if not all(covers(source,date_filters(overview,run)) for source in output.get('sources',[])):
+                    valid=False
+                    limitations.append(dict(action_id=aid,code='SOURCE_FRESHNESS_UNVERIFIED',details='Historical source evidence cannot establish the current reporting period.'))
+            if report.get('readiness',{}).get('outcome')=='INSUFFICIENT_EVIDENCE':
+                limitations.append(dict(action_id=aid,code='PROCUREMENT_PREREQUISITES_MISSING',details=report.get('readiness')))
+            if not output.get('coverage',{}).get('population_assessment_complete'):
+                limitations.append(dict(action_id=aid,code='PROCUREMENT_DETAIL_PAGINATED',details=output.get('coverage',{})))
+            if not demo_context:limitations.append(dict(action_id=aid,code='PROCUREMENT_SOURCE_FRESHNESS',details=output.get('sources',[])))
         elif cid=='tool.subway_documents':
             from hashlib import sha256
             records=output.get('records',[])
@@ -158,6 +186,14 @@ def evidence_preview(output):
     The enclosing context budget still applies. Only rows are sampled. Never
     insert projection annotations inside evidence: they are not receipt facts.
     """
+    if output.get('report',{}).get('provenance',{}).get('mode')=='modeled_demonstration':
+        result={k:deepcopy(output[k]) for k in ('assessment_id','scope','ontology_version','input_sha256','coverage') if k in output}
+        report=output['report']
+        result['report']={k:deepcopy(report[k]) for k in ('assessment','knowledge_version','knowledge_sha256','readiness','provenance','limitations','demo_context','modeled_policy','modeled_rule_summary','modeled_policy_results') if k in report}
+        for k in ('reconciliations','invoice_reconciliation','comparisons'):
+            if k in report:result['report'][k]=deepcopy(report[k][:2])
+        result['sources']=deepcopy(output.get('sources',[])[:2])
+        return result
     if 'query_id' not in output or 'coverage' not in output or 'sources' not in output:
         return brief(output)
     result = deepcopy(output)
@@ -198,6 +234,12 @@ def context(runtime, db, run, workflow, auth):
             'Only observation/correlation findings are supported; unresolved causes and missing company policy are gaps. '
             'Preserve conflicting source values. No source precedence exists without a verified rule. '
             'Assess business findings separately from pending delivery. Select an approved external follow-up only after business requirements are verified; execution completion still requires its actual receipt.')
+    demo=workflow['metadata']['action_binding_context']['validated_context'].get('demo_context')
+    if demo:
+        knowledge=workflow['metadata']['action_binding_context']['validated_context'].get('business_knowledge',{})
+        ctx['knowledge']={k:deepcopy(knowledge[k]) for k in ('version_id','retrieval_sha256','demo_context','modeled_policy') if k in knowledge}
+        ctx['demonstration']=deepcopy(demo)
+        ctx['demonstration_instructions']='The user explicitly selected persistent modeled records and illustrative policy. Execute the reviewed plan to obtain deterministic tool.subway_assess receipts. Keep findings and calculations empty in evaluator decisions; the normal report action receives the complete deterministic receipts and renders findings there. Verify requirement status using valid evidence_ids and the exact receipt summaries, without copying long arrays into evaluator findings. Before reads, business requirements remain unsatisfied; continue the ready query-planning action. Never treat static knowledge or planned rule checks as executed evidence. The modeled assessment preview preserves readiness, modeled_policy_results and modeled_rule_summary; detailed arrays are previews of at most two entries. Full receipts feed the report. Do not infer absence of dates, items, payments or currency from a preview. Keep rule_evaluations empty: scenario_only/verified_policy classifications are not supported by this evaluator. Instead cite actual tool assessment report.results/readiness in findings and requirements after execution. Modeled policies are supplied; unavailable official company policy is not a blocking gap for this demonstration. Deliberate failing checks and missing-stage findings satisfy a request to investigate exceptions when reported accurately; they do not require remediation or passing every check. All findings remain modeled demonstration only.'
     bounded_context(ctx, max_bytes=96000, max_tokens=96000)
     return ctx, ev, limitations
 

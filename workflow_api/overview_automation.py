@@ -39,6 +39,7 @@ ROUTE = obj(dict(intent_type=dict(type='string', enum=KINDS), business_goal=TEXT
 # Optional for saved/controlled legacy routes; required by the model transport.
 ROUTE['properties']['display_name']=dict(type='string',minLength=1,maxLength=160)
 ROUTE['properties']['recipient_mode']=dict(type='string',enum=['selected_account','explicit','other','none'])
+ROUTE['properties']['public_research_queries']=dict(type='array',maxItems=4,uniqueItems=True,items=dict(type='string',minLength=1,maxLength=500))
 
 
 def failure(message, code='OVERVIEW_INTENT_INVALID', status=422):
@@ -172,6 +173,7 @@ class OverviewAutomation:
                         'Read-only knowledge and identified-case investigations keep existing handling. Population analysis requires no ID. '
                         'Public web research, alone or combined with workspace evidence, uses one_time without repetition or recurring with repetition. '
                         'Never route requested public web research to knowledge: that route only explains pinned workspace knowledge and cannot retrieve web sources. '
+                        'For recurring public web research, return public_research_queries as one to four concise public-only search phrases covering the requested public subjects. These phrases are proposed for review before scheduling, not derived from runtime records. Exclude internal company identities, vendor names, private identifiers, addresses, amounts and delivery/scheduling instructions. For other requests return an empty array. '
                         'Analysis plus any external action (email, Sheets or Calendar) is composed work: use one_time '
                         'without repetition, recurring with repetition, never population or investigation with side_effects. '
                         'entity_scope is identified_case only when a supplied identity selects a specific business case; otherwise population for record analysis, none for other work. '
@@ -404,6 +406,7 @@ class OverviewAutomation:
         key=body['request_key'];objective=body['objective']
         q = getattr(self.service, 'workflow_queries', None)
         subway=getattr(self.service,'subway_queries',None)
+        if subway:subway=subway.for_objective(auth,objective)
         if subway:
             subway.authorize(auth)
             q=None # Existing Subway full-data semantics are authoritative here.
@@ -412,7 +415,7 @@ class OverviewAutomation:
             try: catalog = q.queries.catalogue(auth, objective)
             except ApiFailure as exc: unavailable = dict(code=exc.code, message=str(exc))
         from .business_planning import retrieve
-        knowledge = retrieve(self.service.store, auth, objective)
+        knowledge = retrieve(self.service.store, auth, objective,subway.version['version_id'] if subway and getattr(subway,'demo_context',None) else None)
         from .goal_inputs import recipient_context,calendar_context
         resolved=dict(user_values=deepcopy(body.get('user_values',{})),validated_context={})
         if not isinstance(resolved['user_values'],dict):failure('User values must be an object.')
@@ -474,6 +477,7 @@ class OverviewAutomation:
             intent['event_subscription']=dict(source=pin,conditions=deepcopy(route['event_selection'].get('conditions',[])),expires_at=now+90*86400,max_occurrences=90)
         if subway:
             intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge))
+            if getattr(subway,'demo_context',None):intent['demo_context']=deepcopy(subway.demo_context)
             period=route['temporal']['period']
             if period!='none':
                 field=route['temporal']['field_id']
@@ -545,7 +549,11 @@ class OverviewAutomation:
             if tid=='subway_query':
                 from .subway_automation import query_consent
                 schema=query_consent(doc,intent)
-            if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
+            modeled_assessment=tid=='subway_assess' and bool(doc['binding_context']['validated_context'].get('demo_context'))
+            if modeled_assessment:
+                from .subway_automation import assessment_consent
+                schema=assessment_consent(doc,intent,a)
+            if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'} and not modeled_assessment:
                 if any(b['kind'] not in {'literal','context','configuration','evidence'} for b in a['bindings']):
                     failure('This recurring read needs a reviewed fixed resource scope before scheduling.', 'OVERVIEW_CLARIFICATION')
                 from .action_bindings import resolve_inputs
@@ -567,6 +575,7 @@ class OverviewAutomation:
                 if intent.get('temporal_pin'): schema[ANNOTATION] = deepcopy(intent['temporal_pin'])
             if tid in operations and operations[tid] != schema:
                 previous=operations[tid]
+                if modeled_assessment:failure('Use one exact reviewed modeled assessment per recurring workflow.','OVERVIEW_CLARIFICATION')
                 if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
                     # Multiple reviewed case tasks may share one registered reader.
                     # Authorize only their finite complete payloads, never a union

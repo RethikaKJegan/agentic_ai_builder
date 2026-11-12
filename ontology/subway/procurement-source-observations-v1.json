@@ -1,0 +1,198 @@
+{
+  "source": "restored historical Subway finance snapshot",
+  "writes": 0,
+  "model_calls": 0,
+  "collections": {
+    "purchaseorders": {
+      "status_counts": [
+        {
+          "_id": "cancelled",
+          "records": 29
+        },
+        {
+          "_id": "approved",
+          "records": 37307
+        },
+        {
+          "_id": "rejected",
+          "records": 121
+        },
+        {
+          "_id": "reconsider",
+          "records": 18
+        },
+        {
+          "_id": "short_close",
+          "records": 5958
+        },
+        {
+          "_id": "draft",
+          "records": 6
+        }
+      ],
+      "field_presence": {
+        "purchaseRequestId": 0
+      }
+    },
+    "approvals": {
+      "status_counts": [
+        {
+          "_id": "cancelled",
+          "records": 762
+        },
+        {
+          "_id": "approved",
+          "records": 92788
+        },
+        {
+          "_id": "rejected",
+          "records": 210
+        },
+        {
+          "_id": "reconsider",
+          "records": 302
+        },
+        {
+          "_id": "approval_in_progress",
+          "records": 390
+        }
+      ],
+      "field_presence": {
+        "approvalType": 94452
+      }
+    },
+    "stages": {
+      "status_counts": [
+        {
+          "_id": "reconsider",
+          "records": 9867
+        },
+        {
+          "_id": "approved",
+          "records": 200774
+        },
+        {
+          "_id": "rejected",
+          "records": 210
+        },
+        {
+          "_id": "approval_in_progress",
+          "records": 2053
+        },
+        {
+          "_id": "cancelled",
+          "records": 742
+        },
+        {
+          "_id": "hold",
+          "records": 30
+        }
+      ],
+      "field_presence": {
+        "approvalId": 213676
+      }
+    },
+    "grns": {
+      "status_counts": [
+        {
+          "_id": "approved",
+          "records": 39884
+        },
+        {
+          "_id": "cancelled",
+          "records": 780
+        },
+        {
+          "_id": "approval_in_progress",
+          "records": 381
+        },
+        {
+          "_id": "reconsider",
+          "records": 251
+        },
+        {
+          "_id": "rejected",
+          "records": 47
+        },
+        {
+          "_id": "draft",
+          "records": 37
+        },
+        {
+          "_id": "created_by_vendor",
+          "records": 77
+        }
+      ],
+      "field_presence": {}
+    },
+    "invoicedatas": {
+      "status_counts": [
+        {
+          "_id": "approved",
+          "records": 40968
+        },
+        {
+          "_id": "cancelled",
+          "records": 762
+        },
+        {
+          "_id": "approval_in_progress",
+          "records": 459
+        },
+        {
+          "_id": "reconsider",
+          "records": 284
+        },
+        {
+          "_id": "rejected",
+          "records": 60
+        }
+      ],
+      "field_presence": {
+        "currency": 0,
+        "items": 0,
+        "dueDate": 0
+      }
+    },
+    "lineitems": {
+      "status_counts": [
+        {
+          "_id": "inactive",
+          "records": 4992
+        },
+        {
+          "_id": "approved",
+          "records": 17549
+        },
+        {
+          "_id": "approval_in_progress",
+          "records": 9
+        }
+      ],
+      "field_presence": {
+        "reservedAmount": 0,
+        "currency": 0
+      }
+    },
+    "budgets": {
+      "status_counts": [
+        {
+          "_id": "created",
+          "records": 1
+        },
+        {
+          "_id": "inactive",
+          "records": 1873
+        },
+        {
+          "_id": "approved",
+          "records": 1362
+        }
+      ],
+      "field_presence": {
+        "reservedAmount": 0
+      }
+    }
+  },
+  "pr_approval_records": 0
+}

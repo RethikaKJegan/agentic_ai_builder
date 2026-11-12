@@ -117,6 +117,12 @@ def retrieve(store, auth, objective, version_id=None, *, concept_ids=None, relat
         return result
     result['matched_modules'] = matched
     sources = {s['source_id']: s for s in snapshot['sources']}
+    procurement=None
+    if subway:
+        from .subway_procurement import load as procurement_load
+        procurement=procurement_load(scope,snapshot)
+        if procurement:
+            result['procurement_extension']=dict(version=procurement['extension_version'],sha256=procurement['sha256'],unresolved=procurement['unresolved'])
     def cite(item, kind):
         value = {k: deepcopy(v) for k, v in item.items() if k not in ('evidence', 'confidence', 'status', 'executable')}
         value.update(ref=kind + ':' + item['id'], kind=kind)
@@ -124,6 +130,12 @@ def retrieve(store, auth, objective, version_id=None, *, concept_ids=None, relat
                                   source_sha256=sources[e['source_id']]['sha256'],
                                   source_kind=sources[e['source_id']]['kind'],
                                   title=sources[e['source_id']]['title']) for e in item['evidence']]
+        if procurement and kind=='concept':
+            value['procurement_semantics']=dict(extension_version=procurement['extension_version'],sha256=procurement['sha256'],
+                identities=[x for x in procurement['identity_definitions'] if x['concept_id']==item['id']],
+                states=[x for x in procurement['state_models'] if x['concept_id']==item['id']],
+                dates=[x for x in procurement['temporal_models'] if x['concept_id']==item['id']],
+                executable_rules=[dict(id=x['id'],label=x['label'],version=x['version'],provenance=x['provenance']) for x in procurement['structured_rules'] if item['id'] in x['related_concepts']])
         return annotate(value, resolutions)
     candidates = []
     selected = sorted([c for c in snapshot['concepts'] if c['module_id'] in matched and (concept_ids is None or c['id'] in concept_ids)], key=lambda c: (-score(c), c['id']))[:18]

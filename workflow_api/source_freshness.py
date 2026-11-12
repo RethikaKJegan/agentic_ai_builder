@@ -14,7 +14,7 @@ def describe(adapter,config,version):
         try:
             if value[key] is not None and datetime.fromisoformat(value[key].replace('Z','+00:00')).tzinfo is None:raise ValueError()
         except (ValueError,TypeError,AttributeError):value[key]=None
-    if value['status'] not in ('current','historical_snapshot','unverified'):value['status']='unverified'
+    if value['status'] not in ('current','historical_snapshot','unverified','modeled_demonstration'):value['status']='unverified'
     value['refresh_available']=value['refresh_available'] is True
     return value
 

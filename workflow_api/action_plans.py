@@ -105,6 +105,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if _revision and 'tool.subway_query' not in _revision.get('contracts',{}):full_queries=None
     if source_free:full_queries=None
     if full_queries:
+        full_queries=full_queries.for_objective(auth,objective)
+        if getattr(full_queries,'demo_context',None):context['validated_context']['demo_context']=deepcopy(full_queries.demo_context)
+    if full_queries:
         from .subway_queries import planning_contract
         contracts['subway.plan_query']=planning_contract()
         selection=(_overview or {}).get('subway_selection')
@@ -187,6 +190,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         hints=runtime.experience_memory.ranked(auth,domain='configured_business_ontology',pins=prepared['pins'] if prepared else {},contracts=visible,tool_references=[t['definition'] for t in tools])
     from .goal_inputs import configure,bind_internal
     configure(context,composition,auth,body,visible,connectors,tool_id)
+    if (_overview or {}).get('schedule') and (_overview or {}).get('route',{}).get('public_research_queries'):
+        context['validated_context']['reviewed_public_search_queries']=deepcopy(_overview['route']['public_research_queries'])
     if (_overview and _overview.get('route',{}).get('recipient_mode')=='selected_account'
             and set(_overview['route'].get('side_effects',[])) & {'email_send','email_draft'}):
         # A model selects a mode, never an address. Identity comes from the owned
@@ -199,11 +204,15 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if not callable(selector):deny('The configured provider does not support connected action planning.','ACTION_PLANNER_UNAVAILABLE')
         planning_context=dict(capabilities=visible,binding_context=context,verified_experience_recommendations=hints,tool_constraints={cid:dict(minimum_timeout_seconds=current[tool_id(cid,c)]['definition']['timeout_seconds']) for cid,c in visible.items() if c['kind']=='tool'})
         planning_context['planning_defaults']=GUIDANCE+(QUESTION_FREE_GUIDANCE if _overview and _overview.get('question_free') else '')
+        if (_overview or {}).get('schedule') or (_overview or {}).get('event_subscription'):
+            planning_context['planning_defaults']+=' Recurring non-business-query reads require fixed reviewed inputs. For research.search, bind query to context reviewed_public_search_queries with path [0] (or another actual supplied index), not a runtime content.prepare output. Use returned search snippets and source links for public guidance, with their evidence limitations. Do not fetch runtime-discovered URLs in a recurring workflow unless that exact resource was already supplied for review. Keep every requested report, Sheet, email and Calendar action. Never insert internal records or generated business findings into public-search inputs. Explicitly required unavailable resource scopes remain real gaps.'
         planning_context['planning_defaults']+=' '+AGGREGATE_GUIDANCE+' For a requested percentage, supply separate filtered and denominator count(*) query results as direct dependencies of each report or spreadsheet content step.'
         planning_context['query_guidance']='Use data.plan_query followed by tool.workflow_data_query for multi-record filtering, sorting, grouping or statistics, including complaints without an ID. Use business.read.* only for identified case evidence. Bind data.plan_query output [query] to tool query using kind output. The model action receives context.data_query_catalog, including exact authorized fields and reviewed relationships. Then bind actual query output into content.prepare for report/Sheets/email. Never calculate population statistics from displayed rows; use query metrics. Preserve completeness and warnings. Use the already selected Google account and resolved recipient; do not ask again for supplied inputs. If a query capability is unavailable, explain the actual limitation instead of substituting case samples.'
         if full_queries:
             planning_context['query_guidance']='Use subway.plan_query → tool.subway_query → content.prepare for supported read-only data requests. The model query action receives context.subway_query_catalog and context.business_knowledge. Bind its output path [query] to tool target [query]. Use exact selected IDs and engine aggregates; include server-provided subway_date_filters unchanged. Missing dataset/field/query bindings are internal planning errors, never user inputs. Do not substitute inspection samples, generic query schemas, unsupported joins or invented financial/approval semantics.'
             from .query_predicates import FILTER_GUIDANCE
+            if context['validated_context'].get('demo_context'):
+                planning_context['query_guidance']+=' The user explicitly selected persistent modeled Subway records and policies. These are authorized stored sources, never simulated tool responses or actual company operations. For a cross-procurement investigation, one purchase_order_reconciliation assessment already traverses requisitions, invoices, receipts, approvals and budgets and executes all applicable structural and modeled checks. Use a compact plan: subway.plan_query for purchase-order native IDs (no joins/metrics; limit <=20), tool.subway_assess with purchase_order_reconciliation, then content.prepare bound to the complete assessment output. This is a complete multi-source assessment, so additional per-collection assessment/report synthesis actions are unnecessary unless explicitly requested. Bind assessment from business_knowledge path [procurement_knowledge,assessment_kinds,chosen assessment]. For ordinary counts/sums use subway_query. Use supplied modeled_policy; do not block on unavailable real-company policies. Preserve the modeled label in every report.'
             planning_context['query_guidance']+=FILTER_GUIDANCE
             from .query_branches import GUIDANCE as BRANCH_GUIDANCE
             planning_context['query_guidance']+=BRANCH_GUIDANCE
@@ -313,6 +322,8 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             'description':'Exact complaint ID for the case to investigate. For a multi-record request, use the registered workflow data-query capability when available.'}}
         raise error
     configure(context,composition,auth,body,visible,connectors,tool_id)
+    if (_overview or {}).get('schedule') and (_overview or {}).get('route',{}).get('public_research_queries'):
+        context['validated_context']['reviewed_public_search_queries']=deepcopy(_overview['route']['public_research_queries'])
     if body.get('automatic_inputs'):
         satisfied=bind_internal(actions,visible,context,connectors,tool_id,key)
         proposal=deepcopy(proposal)
@@ -349,6 +360,14 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         plan.update(schema_version='orchestration-plan-v2',plan_id=_revision['plan_id'],revision=_revision['revision'],previous_revision=deepcopy(_revision['previous_revision']),revision_reason=_revision['reason'],triggering_observations=deepcopy(_revision['observations']))
     try:
         validate_plan(plan,visible,context,scope_doc)
+        if (_overview or {}).get('schedule') or (_overview or {}).get('event_subscription'):
+            for a in actions:
+                c=visible[a['capability_id']]
+                if (c['kind']=='tool' and c['side_effect']=='read'
+                        and a['capability_id'] not in {'tool.workflow_data_query','tool.subway_query','tool.subway_documents'}
+                        and not (a['capability_id']=='tool.subway_assess' and context['validated_context'].get('demo_context'))
+                        and any(b['kind'] not in {'literal','context','configuration','evidence'} for b in a['bindings'])):
+                    deny('Recurring reads require fixed reviewed bindings. Bind public research to reviewed_public_search_queries; do not derive search queries or resource URLs from runtime results. Preserve all explicitly requested work.','ACTION_BINDING_INVALID')
         if knowledge_only:
             for a in actions:
                 if (a['capability_id']!='content.prepare' or not any(b.get('kind')=='context' and b.get('key')=='business_knowledge' and b.get('path')==[] and b.get('target')==['data'] for b in a['bindings'])
@@ -458,6 +477,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         action_plan=plan,binding_context=context,memory_recommendations=hints,interaction_mode='goal' if body.get('automatic_inputs') else 'advanced')
     from .workflow_knowledge import capture
     usage_version=(prepared or {}).get('version_id') or (_overview or {}).get('knowledge',{}).get('version_id') or (package_context or {}).get('package',{}).get('ontology_version')
+    if context['validated_context'].get('demo_context'):usage_version=context['validated_context']['subway_query_catalog']['ontology_version']
     usage_pin=capture(composition,auth,context,usage_version)
     if usage_pin:context['validated_context']['ontology_usage']=usage_pin
     if _overview is not None:doc['overview_intent']=deepcopy(_overview)

@@ -1,0 +1,6 @@
+- [x] Generate and persist coherent modeled records, relationships, ontology and policies.
+- [x] Add explicit demo selection and immutable workflow/source pins to existing tools.
+- [x] Execute modeled readiness, tolerance, budget, approval and invoice-item checks.
+- [x] Integrate demo knowledge, RAG, evidence labeling and recurring consent.
+- [x] Verify unit/integration isolation and genuine model-backed Overview/API executions.
+- [x] Deploy Subway-only and verify preservation, public access and demonstration acceptance.

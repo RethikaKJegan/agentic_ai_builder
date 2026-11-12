@@ -1,0 +1,7 @@
+- [x] Inspect current domain, typed engine, actual source schemas and record coverage.
+- [x] Author reproducible versioned source-cited identity/state/date/rule/dependency extension.
+- [x] Implement deterministic assessment and bounded reconciliation through existing registered tools.
+- [x] Integrate metadata, planning, adaptive evidence and Knowledge Map references.
+- [x] Add deterministic isolated coherent scenarios and acceptance/regression coverage.
+- [x] Run required checks and document precise results and limitations.
+- [x] Prepare and activate Subway-only deployment with preservation verification.

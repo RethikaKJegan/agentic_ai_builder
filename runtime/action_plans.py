@@ -232,6 +232,12 @@ def validate_content(workflow,node,output,inputs):
 def verify(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
     if not action:return
+    if action['capability_id']=='content.prepare' and workflow['metadata']['action_binding_context']['validated_context'].get('demo_context'):
+        from workflow_api.subway_demo_data import LABEL
+        for field in ('summary','body'):
+            if isinstance(output.get(field),str) and not output[field].startswith(LABEL):output[field]=LABEL+'\n\n'+output[field]
+        output.setdefault('assumptions',[])
+        if LABEL not in output['assumptions']:output['assumptions'].append(LABEL)
     validate_content(workflow,node,output,inputs)
     if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis
@@ -245,10 +251,18 @@ def verify(workflow,node,output,inputs):
             pin=workflow.get('metadata',{}).get('client_package_pin',{})
             scope=workflow['metadata']['connected_action_plan']['scope']
             if (output.get('query_sha256')!=query_digest(inputs.get('query')) or
-                    output.get('ontology_version')!=pin.get('ontology_version') or
+                    output.get('ontology_version')!=workflow['metadata']['action_binding_context']['validated_context'].get('subway_query_catalog',{}).get('ontology_version',pin.get('ontology_version')) or
                     output.get('scope')!={'workspace_id':scope['workspace_id'],'owner_id':scope['owner_id']} or
                     output.get('coverage',{}).get('complete_scan') is not True):
                 deny('Subway receipt does not verify this exact scoped query.','ACTION_RECEIPT_INVALID')
+        if action['capability_id']=='tool.subway_assess':
+            from workflow_api.business_knowledge_model import digest as assessment_digest
+            pin=workflow.get('metadata',{}).get('client_package_pin',{})
+            scope=workflow['metadata']['connected_action_plan']['scope']
+            if (output.get('input_sha256')!=assessment_digest(inputs) or output.get('ontology_version')!=workflow['metadata']['action_binding_context']['validated_context'].get('subway_query_catalog',{}).get('ontology_version',pin.get('ontology_version'))
+                    or output.get('scope')!={'workspace_id':scope['workspace_id'],'owner_id':scope['owner_id']}
+                    or output.get('report',{}).get('provenance',{}).get('mode')!=('modeled_demonstration' if workflow['metadata']['action_binding_context']['validated_context'].get('demo_context') else 'source_records')):
+                deny('Assessment receipt does not verify this scoped request.','ACTION_RECEIPT_INVALID')
         if output.get('status') in ('failed','error','rejected'):deny('Connector did not confirm the operation.','ACTION_RECEIPT_INVALID')
         if 'spreadsheet_id' in output and 'spreadsheet_url' in output:
             from urllib.parse import urlsplit

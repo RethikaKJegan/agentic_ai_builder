@@ -187,6 +187,15 @@ class SubwayQueries:
   self.collection_scope={(c['role'],c['collection']) for c in self.version['dump_grounding']['correspondence']}
   from .subway_onboarding import build_package
   self.binding_stamps={b['connection_id']:(b['metadata_revision'],b['generation']) for b in build_package(self.version,4)['resource_bindings'].values()}
+ def for_objective(self,auth,objective):
+  from .subway_demonstration import selected, DemoQueries
+  return DemoQueries(self,auth) if selected(objective) else self
+ def for_workflow(self,workflow,auth):
+  from .subway_demonstration import from_workflow
+  return from_workflow(self,workflow,auth)
+ def procurement_bundle(self):
+  from .subway_procurement import load
+  return load(('client-subway','subway-client'),self.version)
  def discovery(self,auth,objective='',*,max_bytes=180000):
   """Compact source-backed index for the existing intent model; no source rows."""
   catalog=self.catalog(auth);concepts={(c.get('dump_mapping',{}).get('role'),c.get('dump_mapping',{}).get('collection')):c for c in self.version['concepts']}
@@ -199,11 +208,17 @@ class SubwayQueries:
     fields=[{k:f[k] for k in ('field_id','name','types')} for f in d['fields']]))
   result=dict(ontology_version=self.version['version_id'],sources=sources,relationships=list(catalog['relationships'].values()),
    guidance='Resolve business vocabulary using these definitions, aliases and field meanings, not exact names alone. During routing select at most four relevant datasets, set metadata_mode to datasets, and leave field_ids and relationship_ids empty. The existing query planner selects exact measures, dimensions, filters and joins from server-built metadata scoped to those datasets. Only listed directed scalar relationships support joins. Similar identifiers, store/site names or currencies never establish equivalence. Spending may mean purchase orders, invoices, payments or budget use: require clarification unless the supplied definitions or explicit goal establish the measure. Status names alone do not prove approval semantics. An absent relationship is a limitation, never permission to invent a join.')
+  from .subway_procurement import load as procurement_load
+  procurement=self.procurement_bundle()
+  if procurement:
+   result['procurement_knowledge']=dict(extension_version=procurement['extension_version'],sha256=procurement['sha256'],
+    status_semantics={m['collection']:{v['raw']:v['meaning'] for v in m['values']} for m in procurement['state_models']},
+    guidance='Approval in progress means exact approval_in_progress in the corresponding finance approval record. Awaiting approval requires parent approval evidence. Never use the demo PENDING definition for normal requests. Use tool.subway_assess for deterministic procurement checks; no corporate tolerance or fiscal calendar is established.')
   from .subway_demo_definitions import selected as demo_definitions
   example=demo_definitions((auth['subject']['workspace_id'],auth['subject']['subject_id']),self.version,objective)
   if example:result['analytical_assumptions']=example
   return bounded_discovery(result,objective,max_bytes=min(max_bytes,180000))
- def catalog(self,auth,objective=None,selection=None):
+ def source_catalog(self,auth):
   self.authorize(auth);datasets={};fields={};stamps={}
   with self.store.transaction(write=False) as db:
    for role in ('central','finance'):
@@ -224,6 +239,7 @@ class SubwayQueries:
   for r in self.version['relationships']:
    source=concepts[r['source']]['dump_mapping'];target=concepts[r['target']]['dump_mapping'];path=r['source_field']
    if '[]' in path:continue # fanout requires explicit grain, not accidental double counting
+   if (source['role'],source['collection']) not in by_collection or (target['role'],target['collection']) not in by_collection:continue
    left=by_collection[(source['role'],source['collection'])];right=by_collection[(target['role'],target['collection'])]
    src=next((f['field_id'] for f in datasets[left]['fields'] if f['name']==path),None);dst=next((f['field_id'] for f in datasets[right]['fields'] if f['name']=='_id'),None)
    if src and dst:
@@ -232,6 +248,10 @@ class SubwayQueries:
     conversion='schema_integer_reference' if numeric_ref and numeric_target else 'native'
     rels[r['id']]=dict(relationship_id=r['id'],source_dataset_id=left,target_dataset_id=right,source_field_id=src,target_field_id=dst,join_kind='left',reference_conversion=conversion,label=r['label'],definition=r['definition'])
   result=dict(datasets=datasets,fields=fields,relationships=rels,stamps=stamps)
+  return result
+ def catalog(self,auth,objective=None,selection=None):
+  result=self.source_catalog(auth)
+  datasets=result['datasets'];fields=result['fields'];rels=result['relationships'];stamps=result['stamps']
   if objective is None and selection is None:return result
   if selection is not None:
    if list(Draft202012Validator(SELECTION).iter_errors(selection)):fail('Use a bounded metadata selection.','SUBWAY_SELECTION_INVALID')
@@ -293,6 +313,21 @@ class SubwayQueries:
    for section in ('properties','declared_fields'):
     if section in ref:ref[section]=[p for p in ref[section] if p['name'] in names]
   evidence.setdefault('source_coverage',{}).update(record_read_basis='Complete read-only queries; displayed rows are paginated. Descriptive rules remain non-executable.')
+  from .subway_procurement import load as procurement_load, context as procurement_context
+  procurement=self.procurement_bundle()
+  if procurement:
+   evidence['procurement_knowledge']=procurement_context(procurement,labels)
+   # The shared retrieval already annotates concept references. Keep one complete
+   # set of typed definitions rather than repeating it in every concept.
+   for ref in evidence.get('references',[]):
+    if 'procurement_semantics' in ref:
+     ref['procurement_semantics']={k:ref['procurement_semantics'][k] for k in ('extension_version','sha256')}
+   while len(canonical(evidence).encode())>70000 and evidence.get('supporting_documents'):
+    evidence['supporting_documents'].pop();evidence['truncated']=True
+   while len(canonical(evidence).encode())>70000 and len(evidence.get('references',[]))>1:
+    evidence['references'].pop();evidence['truncated']=True
+   if len(canonical(evidence).encode())>70000:fail('Procurement context exceeds its bounded planning allowance.','SUBWAY_CONTEXT_LIMIT')
+   evidence['source_coverage']['procurement_rules']='Versioned analytical typed checks execute through tool.subway_assess. Existing descriptive code guards remain non-executable.'
   from .business_knowledge_model import digest
   evidence.pop('retrieval_sha256',None);evidence['retrieval_sha256']=digest(evidence)
   return catalog,evidence
@@ -487,6 +522,7 @@ class SubwayQueries:
   reporting_filters=[deepcopy(f) for f in query['filters'] if set(fields[f['field_id']]['types'])&{'date','datetime','timestamp'}]
   result=dict(query_id=query_id,columns=[dict(id=fid,label=(datasets[fields[fid]['dataset_id']]['label']+'.'+fields[fid]['name']) if fid in fields else fid) for fid in columns],rows=results,coverage=dict(complete_scan=True,matched_records=matched,total_result_rows=total_rows,returned_rows=len(results),offset=offset,limit=limit,has_more=offset+len(results)<total_rows,aggregate_complete=aggregate,filtered_on_entire_source=True,qualification='Display pagination does not limit matching or aggregation. Left-join coverage is measured before query filters. Average values use 38-digit decimal arithmetic.'),sources=[dict(dataset_id=did,label=datasets[did]['label'],scanned_records=source_counts[did],metadata_revision=datasets[did]['metadata_revision'],generation=datasets[did]['generation'],read_at=now(),freshness=source_freshness[did]) for did in sorted(selected)],join_checks=join_checks)
   result['coverage']['reporting_filters']=reporting_filters
+  if getattr(self,'demo_context',None):result['coverage']['demo_context']=deepcopy(self.demo_context)
   result.update(ontology_version=self.version['version_id'],scope=dict(workspace_id=auth['subject']['workspace_id'],owner_id=auth['subject']['subject_id']),
    query_sha256=hashlib.sha256(canonical(query).encode()).hexdigest(),field_ids=sorted(set(used)|{fid for edge in edges for fid in (edge['source_field_id'],edge['target_field_id'])}),relationship_ids=[e['relationship_id'] for e in edges])
   result['coverage']['warnings']=['A monetary measure has no recorded currency; no currency or conversion was inferred.'] if any(None in values for values in currency_guards.values()) else []
@@ -505,8 +541,9 @@ class SubwayQueryConnector:
  def bind_context(self,workflow,run,auth,node):
   pin=workflow.get('metadata',{}).get('client_package_pin')
   if not pin or pin.get('ontology_version')!='bov_subway_dump_v4':fail('Use the reviewed Subway ontology pin.','SUBWAY_QUERY_DENIED',403)
-  self.queries.authorize(auth)
-  return SubwayQueryConnector(self.queries,deepcopy(auth),deepcopy(pin))
+  queries=self.queries.for_workflow(workflow,auth)
+  queries.authorize(auth)
+  return SubwayQueryConnector(queries,deepcopy(auth),deepcopy(pin))
  def invoke(self,grant,inputs,effect_id):
   if not self.auth or grant.get('tool_id')!='subway_query':fail('Use a workflow-bound Subway query.','SUBWAY_QUERY_DENIED',403)
   p=self.queries.app.state.client_packages.get(self.auth,self.pin['package_id'],self.pin['revision'])
@@ -531,3 +568,5 @@ def install(app,auth):
  service.runtime_runner.connectors['subway_query']=SubwayQueryConnector(queries)
  from .subway_documents import SubwayDocuments
  service.runtime_runner.connectors['subway_documents']=SubwayDocuments(queries)
+ from .subway_assessments import SubwayAssessments
+ service.runtime_runner.connectors['subway_assess']=SubwayAssessments(queries)

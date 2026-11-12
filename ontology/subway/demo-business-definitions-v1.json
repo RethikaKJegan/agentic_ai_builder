@@ -1,6 +1,6 @@
 {
   "profile_id": "subway-demo-definitions-v1",
-  "revision": 1,
+  "revision": 2,
   "scope": {"workspace_id": "client-subway", "subject_id": "subway-client"},
   "ontology_version": "bov_subway_dump_v4",
   "definition_sha256": "03af7fa412133bd232e23735a124db11a10bed711de993bc88e5c0391c96ee02",
@@ -43,7 +43,7 @@
     {
       "id": "pending_approval",
       "terms": ["pending approval", "approval backlog"],
-      "definition": "For this demo only, pending means exact stored status PENDING on the specifically requested approval-record collection. Show other raw status counts and disclose this literal filter. Zero PENDING records means zero under this demo definition; it does not prove that no approvals await action under the real application. A child stage does not establish its parent's final decision.",
+      "definition": "Pending approval means the source-defined approval_in_progress status on the specifically requested finance approval-record collection, linked to its parent record through an authorized relationship when a parent conclusion is requested. Preserve reconsider, rejected and cancelled as distinct states. A child stage does not establish its parent's final decision.",
       "evidence_required": ["approval record identity", "raw status", "parent record when a parent conclusion is requested"]
     },
     {
