@@ -166,6 +166,7 @@ def evidence_preview(output):
 
 
 def context(runtime, db, run, workflow, auth):
+    from planner.evaluator_protocol import ANALYSIS_POLICY
     a = run['adaptive']
     ev, limitations = evidence(runtime, db, run, workflow, auth)
     plan = workflow['metadata']['connected_action_plan']
@@ -181,6 +182,8 @@ def context(runtime, db, run, workflow, auth):
         plan=deepcopy(plan), frozen_requirements=deepcopy(a['requirements']),
         evidence={k:{**v, 'output':evidence_preview(v['output'])} for k,v in ev.items()},
         evidence_projection='Evidence output.rows contains at most four preview rows. Full verified receipts are persisted and supplied to reporting actions. Use executed coverage metadata for scan/aggregate completeness; never infer population totals from this preview. Display pagination does not invalidate an authenticated complete-scan receipt. Returned detail supports only the returned records; matched counts and join coverage retain their executed scope. Explicitly disclose incomplete detail in source_limitations. Do not claim exhaustive comparisons, population totals or absence of exceptions from a page; requirements needing unreturned detail remain unsatisfied unless other complete evidence supports them. Projection annotations are not source facts.',
+        analysis_policy=ANALYSIS_POLICY,
+        decision_feedback=deepcopy(a.get('decision_feedback')),
         deterministic_limitations=limitations, previous_assessment=a['assessment'],
         completed_actions=[k for k,v in run.get('action_instances', {}).items() if v.get('state') == 'completed'],
         failures=deepcopy(run.get('classified_failures', [])[-4:]),
@@ -540,7 +543,18 @@ def _drive(runner, run_id, auth, raw_advance):
                         fail('ADAPTIVE_ACTION_NOT_READY','Rejected actions require a validated replacement with a fresh action ID.')
                     capability=workflow['metadata']['connected_contracts'][actions[aid]['capability_id']]
                     if capability['side_effect'] in ('draft','write') and not decision['assessment']['completion_eligible']:
-                        fail('ADAPTIVE_EVIDENCE_INCOMPLETE','External follow-up requires verified business findings before approval.')
+                        # Correct an inconsistent model choice once, without granting
+                        # execution or changing its assessment. Real gaps must remain
+                        # blocked; only a newly validated decision can allow delivery.
+                        if a.get('delivery_decision_corrections',0)>=1:
+                            fail('ADAPTIVE_EVIDENCE_INCOMPLETE','External follow-up requires verified business findings before approval.')
+                        a['delivery_decision_corrections']=1
+                        a['decision_feedback']=dict(code='ADAPTIVE_EVIDENCE_INCOMPLETE',action_id=aid,
+                            message='The selected external follow-up was NOT executed: completion_eligible is false. Reassess requirements using analysis_policy and the original conditional wording. Either provide a coherent verified assessment with source limitations, or gather evidence/request input/block for genuine unmet requirements. Do not invent evidence or mark unsupported unconditional outcomes verified.')
+                        a['decisions'][-1]['rejected']=True
+                        runtime.event(db,current,'adaptive.decision_rejected',dict(code='ADAPTIVE_EVIDENCE_INCOMPLETE',action_id=aid,correction=1))
+                        runtime.save(db,current)
+                        continue
                     a['execution_permission'] = aid
                     current['adaptive_next_action'] = aid
                 elif choice == 'request_input':
@@ -554,6 +568,7 @@ def _drive(runner, run_id, auth, raw_advance):
                 elif choice == 'complete':
                     a['status'] = 'completed'
                     current.pop('error_code',None)
+                a.pop('decision_feedback',None)
                 runtime.save(db, current)
             if choice in ('continue', 'complete'):
                 outcome = raw_advance()

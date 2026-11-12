@@ -11,8 +11,36 @@ from jsonschema import Draft202012Validator
 from .errors import PlannerFailure
 
 
+ANALYSIS_POLICY = (
+    'Preserve evidence-conditional analytical obligations. A request to report or calculate '
+    'ONLY WHERE comparable, supported or available does not require every source pair to '
+    'be comparable or every requested fact to exist. Verify such a requirement by citing '
+    'valid executed evidence for evaluating the condition, reporting supported findings, '
+    'and withholding unsupported calculations with an explicit source limitation. '
+    'Do not convert that condition into an unconditional requirement to establish missing '
+    'currencies, units, policies or other unavailable facts. This also applies to frozen '
+    'requirements: preserve their exact IDs/descriptions but evaluate their original '
+    'conditional meaning; a previous unsatisfied assessment is not immutable. '
+    'For descriptive reviews of available records, bounded detail and unknown freshness '
+    'are disclosed limitations, not automatic blocking gaps. Clearly restrict row-level '
+    'conclusions to returned records; executed complete-scan counts and join coverage '
+    'retain their stated population scope. Never claim an exhaustive comparison from a '
+    'page or invent missing values, currency equivalence, policies or current coverage. '
+    'An explicit requirement for exhaustive detail, verified current coverage, an '
+    'unconditional calculation or an authoritative decision remains unsatisfied if its '
+    'necessary evidence is missing. Invalid receipts and authorization failures still block. '
+    'Before selecting a reviewed external follow-up, verify every business requirement '
+    'according to its original meaning, cite valid receipts and disclose all limitations. '
+    'If a genuine requirement remains unsatisfied or a blocking gap remains, select '
+    'retrieve_more, replan, request_input or blocked; never select external delivery '
+    'with completion_eligible=false. Do not mark an unsupported unconditional outcome '
+    'verified merely to enable delivery. Approval and delivery receipts remain separate '
+    'runtime requirements.'
+)
+
+
 INSTRUCTIONS = (
-    'Use the supplied strict transport_schema for the response. Fields described '
+    ANALYSIS_POLICY+' Use the supplied strict transport_schema for the response. Fields described '
     'as JSON-encoded values contain a single serialized JSON value, not prose. '
     'In particular findings.value encodes the EXACT source value: the number 100 '
     'is "100", the string abc is "\\\"abc\\\"", and null is "null". '

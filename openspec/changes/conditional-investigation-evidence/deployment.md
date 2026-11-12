@@ -1,0 +1,15 @@
+# Conditional investigation evidence — 12 November 2026
+
+Release `conditional-evidence-20261112-9c77ee3a6841` repairs the evaluation behavior seen in occurrence `occ_735ea704421eee09b79778bf1efcb38a`, run `run_af0409ee1425452db0b522a0a4e6758f`.
+
+This was the daily 3:57 PM invoice-to-purchase-order investigation with a 6 PM Calendar review, not the subsequent proposed web/Sheets/Gmail/Calendar test. The query scanned all 42,533 matching records and returned a 203-row response-size-bounded page. The earlier receipt fix worked: the evidence was valid and report preparation completed. The evaluator nevertheless treated "numeric differences only where currencies and units are comparable" as an unconditional requirement to establish missing invoice currency, and marked pagination as a blocking gap. It then selected Calendar creation while its own completion_eligible was false. The external-action gate correctly rejected that inconsistent choice. No Calendar event was created by this occurrence. This was not a token, record-count or scheduler-delay exhaustion.
+
+A shared generic analysis policy now preserves conditional meanings both when requirements are first decomposed and when existing frozen requirements are reassessed. Supported observations can be reported with explicit limits and unsupported comparisons withheld. Explicit exhaustive/current/unconditional outcomes still require their actual evidence. No source equivalence, missing currency, business threshold or receipt is invented. Normal approval and completion gates are unchanged.
+
+If a model selects external follow-up while its own assessment is ineligible, execution is withheld and one budgeted reassessment receives explicit feedback. A second inconsistent selection blocks. The runtime never changes requirement status or eligibility to force success. Existing reasoning/time/resource bounds remain in force; removing display limits would not establish absent units or currency evidence.
+
+Verification so far: five configured-model cases with hand-authored synthetic contexts passed, covering conditional first decomposition, frozen conditional reassessment, missing evidence for unconditional calculations, exhaustive analysis and invalid receipts. Two boundary tests passed. A read-only reconstruction of the actual failed run confirms valid receipt, completed report, pending Calendar action, unchanged five frozen requirements and a 43,815-byte context inside existing bounds. No live customer records were sent to the model for verification and no real connector action was performed.
+
+Active-release regressions and hosted activation checks: pending.
+
+Private rollback sources, database snapshot, configured-model test evidence and saved-run read-only check: `.local/conditional-evidence-20261112/`. The failed historical occurrence is preserved and not replayed. The existing schedule remains active, next due 13 November at 3:57 PM Asia/Kolkata. Passing these checks establishes the repaired failure class and local approval/delivery behavior, not live Calendar delivery for the failed occurrence.
