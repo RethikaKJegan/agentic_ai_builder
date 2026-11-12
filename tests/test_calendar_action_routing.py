@@ -113,7 +113,9 @@ def test_subway_calendar_only_does_not_require_dataset_selection(subway):
     f=subway
     selected=dict(dataset_ids=[],field_ids=[],relationship_ids=[],measure_basis='',clarification='')
     routed=subway_route(selected,intent_type='one_time',entity_scope='none',business_goal='',side_effects=['calendar_write'])
-    r=OverviewAutomation(f.service,f.env,interpreter=lambda *_:deepcopy(routed))
+    # This test isolates source-free routing; owned-account questions are covered
+    # separately by the natural communication acceptance suite.
+    r=OverviewAutomation(f.service,{**f.env,'BUILDER_NATURAL_COMMUNICATION_ENABLED':'0'},interpreter=lambda *_:deepcopy(routed))
     prepared=r.prepare_intent(f.auth,dict(objective=GOAL,request_key='calendar_subway_routing'))
     assert prepared['intent'] and prepared['intent']['source_free'] and prepared['result']['state']=='prepared'
     assert not prepared['result'].get('questions')

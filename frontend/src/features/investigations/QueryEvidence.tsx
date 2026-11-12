@@ -1,3 +1,5 @@
+import {useBackend} from '@/api/state';
+import {subwayDisplay} from '@/domain/subway-presentation';
 import { z } from 'zod';
 
 const evidence = z.object({
@@ -18,7 +20,8 @@ const subwayEvidence=z.object({
   warnings:[...(output.coverage.warnings??[]),...(output.coverage.qualification?[output.coverage.qualification]:[]),...output.join_checks.filter(c=>c.unmatched_reference_rows||c.missing_reference_rows).map(c=>`${c.relationship_id}: ${c.unmatched_reference_rows} unmatched and ${c.missing_reference_rows} missing references. Left joins preserve these source rows.`)],
 }}));
 
-export function QueryEvidence({instance}:{instance:unknown}) {
+export function QueryEvidence({instance:sourceInstance}:{instance:unknown}) {
+  const workspace=useBackend(s=>s.session?.auth.subject.workspace_id);const instance=subwayDisplay(sourceInstance,workspace);
   const pending=waiting.safeParse(instance);
   if(pending.success)return <p role="status" className="text-sm">Query in progress: {pending.data.query_job.progress.stage}</p>;
   const saved=z.object({state:z.literal('completed'),verified_receipt:z.literal(true),output:z.union([evidence,subwayEvidence])}).safeParse(instance);

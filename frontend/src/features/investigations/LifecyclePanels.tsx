@@ -1,3 +1,5 @@
+import {subwayDisplayJson,subwayDisplayText} from "@/domain/subway-presentation";
+import {useBackend} from "@/api/state";
 import { useState } from "react";
 import { type BusinessCase, type EvidenceValue, words } from "@/api/business-lifecycle";
 import { containsSecret } from "@/api/client";
@@ -9,11 +11,12 @@ export function SavedDetails({
   value: unknown;
   label?: string;
 }) {
+  const workspace=useBackend(s=>s.session?.auth.subject.workspace_id);
   return (
     <details className="min-w-0 rounded-lg border p-3 text-sm">
-      <summary className="cursor-pointer font-medium">{label}</summary>
+      <summary className="cursor-pointer font-medium">{subwayDisplayText(label,workspace)}</summary>
       <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs">
-        {containsSecret(value) ? "Sensitive data withheld." : JSON.stringify(value, null, 2)}
+        {containsSecret(value) ? "Sensitive data withheld." : subwayDisplayJson(value,workspace)}
       </pre>
     </details>
   );

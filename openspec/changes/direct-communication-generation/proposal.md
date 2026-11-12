@@ -1,0 +1,2 @@
+# Direct communication workflow generation
+Generate owned email/report/review workflows immediately using editable workflow steps and existing approval. Infer sending unless drafting is explicit, and after-ready review unless fixed timing is explicit. Keep genuinely blocking destination/timezone questions. No additional settings summary. Both Subway and Simpson; no stored workflow or source changes.

@@ -1,5 +1,21 @@
 # Handoff — Harihar
 
+## Generic Subway assessment query compatibility — deployed 12 November 2026
+
+Assessment selection now fully validates requested base fields, then uses canonical native IDs without changing filters, ordering or page bounds. Handles extra/missing/empty detail projections across all eight assessments. Binding/invocation API failures retain typed runtime codes and explicit recovery categories. The exact failed ten-field query now reconciles eight orders identically to an ID-only baseline in an isolated real-data replay. 74 candidate acceptance and 96 integration/isolation tests passed; focused 23-test coverage overlaps. Subway-only restart; frontend, Simpson, canonical sources, credentials, schedules and history preserved. No live workflow/model/external action was retried. See `openspec/changes/subway-assessment-query-contract/verification.md`.
+
+## Subway actual delivery cleanup — deployed 12 November 2026
+
+Removed backend-forced demonstration prefixes and normalized actual report/email/Calendar/Sheet content before exact approval. Legacy prepared content is cleaned at new delivery input resolution; recipient/resource/date authority, citations, figures and canonical provenance remain unchanged. 75 final affected tests passed; 119 wider regressions passed on the isolated candidate before the defensive legacy-context fix. Actual saved report replay verified plaintext/HTML MIME, Calendar JSON and Sheet payloads offline. Only Subway backend restarted; frontend/Simpson and protected data unchanged. One configured-provider assessment rehearsal failed before reporting, and automatic approval review rejected an additional external-model rehearsal; neither is claimed as passing evidence. See `openspec/changes/subway-clean-delivery-content/verification.md`. This supersedes the earlier backend Demo data insertion, while retaining stored provenance.
+
+## Subway clean workflow UI — deployed 12 November 2026
+
+Frontend-only build `6csstwFbPIsnB_HGLFB-X` removes repeated demonstration wording/badges, supplier prefixes and boilerplate from Subway workflow tabs, node inspectors, Knowledge Map and rendered diagnostics. Meaningful evidence/currency notes remain; canonical records/IDs/provenance and outgoing payload generation are unchanged. 116 frontend tests, eight browser journeys, types/lint/build and hosted desktop/mobile checks passed. Only frontend restarted; all backend PIDs and Python hashes, including Simpson and Subway, remain unchanged. See `openspec/changes/subway-clean-workflow-ui/verification.md`. This supersedes the visible Demo data indicator in the prior presentation entry.
+
+## Subway compact presentation and Knowledge Map — deployed 12 November 2026
+
+Fixed the authenticated Knowledge Map list parser rejecting the demo ontology at revision zero; exact authorized demo pins load independently of optional module labels. Subway display copies and new prepared report/email/Calendar/spreadsheet content use Demo data; canonical provenance and exact payload authority remain unchanged. Deployed isolated Subway backend and frontend build `rdAkVLyxq_5vug08JkGqd`. Final affected backend 26, wider regression 119, frontend 80 and desktop/mobile browser six checks passed (overlapping suites). Hosted old-report/map/diagnostics checks and a fresh ordinary provider-backed run passed; an earlier evaluator-blocked attempt is retained and reported separately. No external delivery or Simpson account/data/workflow mutation. See `openspec/changes/subway-compact-presentation/verification.md`.
+
 ## Provider-managed investigation tokens — 3 November 2026
 
 Explicitly user-approved backend/worker deployment removes investigation application input/output-token and cost ceilings; provider request omits max_output_tokens for planning and analysis. Effective policy exposed in capabilities/reports. Calls/time, strict citations and source scopes remain. Truncated optional final narrative retains a qualified source report; original failed run stays preserved. 130 tests plus 28 subtests, followed by 7 focused checks passed (overlap); actual saved-evidence local-provider replay and live authenticated policy checks passed. No paid replay/company writes or frontend/knowledge changes. Existing workflows can start new runs. See `openspec/changes/investigation-provider-token-policy/verification.md`.
@@ -790,3 +806,13 @@ Final affected suite: 65 passed. Existing backend/worker correction deployed;
 saved user inputs verified ready, zero model calls/external actions; original
 failed workflow retained. Generate an updated workflow to use the fix.
 Evidence: `openspec/changes/business-draft-connector-binding/verification.md`.
+
+
+## Subway report reliability and workflow card layout — 12 November 2026
+
+Subway-only deployment reduces report transport with reversible shared evidence/tables, preserves typed model failures and safe diagnostics, corrects misleading recovery guidance and bounds workflow cards to actual layout dimensions. Original evidence and full instructions remain; no external action was repeated. See `openspec/changes/subway-report-reliability-layout/verification.md` for exact tests, deployment and the unresolved historical provider-cause/live-provider acceptance boundary. Simpson services and records are unchanged.
+
+
+## Natural email and Calendar review — Simpson and Subway, 12 November 2026
+
+Deployed tenant-isolated owned-account/primary-calendar resolution, structured natural send/draft and timing choices, plain-language review, pinned after-ready/fixed times and provider-confirmed independent statuses. Expired undispatched Calendar actions support separately approved Calendar-only continuations; confirmed email remains unchanged, unknown writes stay reconciliation-only. 53 backend tests per candidate plus final six exact natural cases per tenant, 60 affected regressions, 23 frontend tests and 20 desktop/mobile journeys passed (overlapping). Existing data/configuration/schedules preserved; no live communication or schedule creation. See `openspec/changes/natural-email-calendar-review/verification.md` for exact boundaries and rollout details.

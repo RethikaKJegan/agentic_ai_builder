@@ -63,6 +63,12 @@ class SubwayAssessments:
     def __init__(self,queries,auth=None,pin=None):self.queries,self.auth,self.pin=queries,auth,pin
     def reservation(self,grant):return dict(tool_calls=1,llm_calls=0,tokens=0,estimated_cost_usd=0)
     def bind_context(self,workflow,run,auth,node):
+        try:return self._bind_context(workflow,run,auth,node)
+        except ApiFailure as exc:
+            from runtime.service import RuntimeFailure
+            raise RuntimeFailure(exc.code,str(exc),exc.status) from None
+
+    def _bind_context(self,workflow,run,auth,node):
         bound=SubwayQueryConnector(self.queries).bind_context(workflow,run,auth,node)
         knowledge=workflow.get('metadata',{}).get('action_binding_context',{}).get('validated_context',{}).get('business_knowledge',{}).get('procurement_knowledge',{})
         bundle=bound.queries.procurement_bundle()
@@ -76,6 +82,12 @@ class SubwayAssessments:
         return SubwayAssessments(bound.queries,bound.auth,pin)
 
     def invoke(self,grant,inputs,effect_id):
+        try:return self._invoke(grant,inputs,effect_id)
+        except ApiFailure as exc:
+            from runtime.service import RuntimeFailure
+            raise RuntimeFailure(exc.code,str(exc),exc.status) from None
+
+    def _invoke(self,grant,inputs,effect_id):
         from jsonschema import FormatChecker
         from registry.safety import reject_secrets
         if not self.auth or grant.get('tool_id')!='subway_assess' or list(Draft202012Validator(INPUT,format_checker=FormatChecker()).iter_errors(inputs)):
@@ -101,10 +113,16 @@ class SubwayAssessments:
         q=self.queries;q.authorize(auth);before=q.catalog(auth);query=inputs['query'];col=ASSESSMENTS[inputs['assessment']]
         source=before['datasets'].get(query['base_dataset_id'],{})
         idfield=next((f['field_id'] for f in source.get('fields',[]) if f['name']=='_id'),None)
-        if source.get('role')!='finance' or source.get('collection')!=col or query['joins'] or query['metrics'] or query['group_by'] or query['fields']!=[idfield] or query['limit']>20:
-            raise ApiFailure('SUBWAY_ASSESSMENT_INVALID','Select native IDs from the assessment base collection with no joins/metrics and limit <= 20.',422)
+        if source.get('role')!='finance' or source.get('collection')!=col or query['joins'] or query['metrics'] or query['group_by'] or not idfield or query['limit']>20:
+            raise ApiFailure('SUBWAY_ASSESSMENT_INVALID','Use a detail query on the assessment base collection with no joins/metrics/groups and limit <= 20.',422)
+        # Validate every requested field before discarding projection-only columns.
+        # Hidden base sort/filter fields retain their normal query-engine semantics.
+        selection=deepcopy(query)
+        if not selection['fields']:selection['fields']=[idfield]
+        q.validate(selection,before)
+        selection['fields']=[idfield]
         bundle=q.procurement_bundle()
-        page=q.execute(auth,query);ids=[r[idfield] for r in page['rows']]
+        page=q.execute(auth,selection);ids=[r[idfield] for r in page['rows']]
         datasets={d['collection']:d for d in before['datasets'].values() if d['role']=='finance'}
         if getattr(q,'demo_context',None):datasets.update({d['label']:d for d in before['datasets'].values() if d['role']=='central'})
         evidence={};read_sources={};seen={};count=0;bytecount=0
@@ -182,6 +200,7 @@ class SubwayAssessments:
         if before['stamps']!=after['stamps']:raise ApiFailure('SUBWAY_QUERY_STALE','Source authority changed during assessment.',409)
         coverage=deepcopy(page['coverage']);coverage.update(assessment_scope='selected base page plus bounded authorized related evidence',related_records=count,population_assessment_complete=not coverage['has_more'] and query['offset']==0,
             historical_source_warning='Source read time is not current business coverage; preserve each source freshness attestation.')
+        coverage['assessment_selection']=dict(requested_fields=deepcopy(query['fields']),effective_fields=[idfield],query_id=page['query_id'])
         output=public(dict(assessment_id='subway_assessment_'+uuid4().hex,scope=dict(workspace_id='client-subway',owner_id='subway-client'),ontology_version=q.version['version_id'],input_sha256=digest(inputs),report=report,coverage=coverage,sources=list(read_sources.values())))
         reject_secrets(output)
         if len(json.dumps(output).encode())>800000:raise ApiFailure('SUBWAY_ASSESSMENT_LIMIT','Assessment output exceeds 800 KB; narrow the query.',422)

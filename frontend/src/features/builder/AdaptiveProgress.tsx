@@ -1,4 +1,6 @@
 "use client";
+import {useBackend} from '@/api/state';
+import {subwayDisplay,subwayDisplayJson} from '@/domain/subway-presentation';
 import { useState } from 'react';
 import { api, type RunRecord } from '@/api/client';
 import {type z} from 'zod';
@@ -8,7 +10,8 @@ export function AdaptiveProgress({run,onUpdated,compact=false}:{run:Pick<RunReco
   const [values,setValues]=useState<Record<string,string>>({});
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
-  const adaptive=run.adaptive;
+  const workspace=useBackend(s=>s.session?.auth.subject.workspace_id);
+  const adaptive=subwayDisplay(run.adaptive,workspace);
   if(!adaptive)return null;
   const assessment=adaptive.assessment;
   const wait=adaptive.pending_wait;
@@ -36,9 +39,9 @@ export function AdaptiveProgress({run,onUpdated,compact=false}:{run:Pick<RunReco
       <ul className="space-y-1">{assessment.requirements.map(requirement=><li key={requirement.id}>{requirement.description}: {requirement.status}</li>)}</ul>
       {!!assessment.findings.length&&<details><summary>Verified source observations</summary><ul>{assessment.findings.map((finding,index)=><li key={index}>{JSON.stringify(finding.value)} · {finding.evidence_id} · {finding.classification}</li>)}</ul></details>}
       {!!assessment.calculations?.length&&<details><summary>Verified arithmetic</summary><ul>{assessment.calculations.map(calculation=><li key={calculation.id}>{calculation.id}: {calculation.result} ({calculation.operation}). Units and scope follow the cited source evidence.</li>)}</ul></details>}
-      {assessment.gaps.map(gap=><p key={gap.id}>{gap.blocking?'Blocking gap: ':'Limitation: '}{gap.description}</p>)}
+      {assessment.gaps.map(gap=><p key={gap.id}>{gap.blocking?'Blocking gap: ':workspace==='client-subway'?'Note: ':'Limitation: '}{gap.description}</p>)}
       {assessment.source_limitations.map((limitation,index)=><p key={index}>{limitation}</p>)}
-      <details><summary>Assessment and supporting evidence</summary><pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(assessment,null,2)}</pre></details>
+      <details><summary>Assessment and supporting evidence</summary><pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{subwayDisplayJson(assessment,workspace)}</pre></details>
     </>}
     {adaptive.deterministic_limitations?.map((limitation,index)=><p key={index} role="status">{limitation.code}: {typeof limitation.details==='string'?limitation.details:'Source evidence requires review.'}</p>)}
     {adaptive.blocker&&<p role="alert">{adaptive.blocker}</p>}</>}

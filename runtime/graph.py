@@ -213,10 +213,10 @@ class GraphRunner:
         self.runtime.transition(db, run, 'blocked' if blocked else 'failed')
 
     @staticmethod
-    def params(node, run, workflow=None):
+    def params(node, run, workflow=None, *, now=None):
         if workflow is not None:
             from .action_plans import params as connected_params
-            resolved=connected_params(workflow,node,run)
+            resolved=connected_params(workflow,node,run,now=now)
             if resolved is not None:return resolved
         configuration = node.get('configuration', {})
         if 'input' in configuration:
@@ -233,7 +233,7 @@ class GraphRunner:
     def action_digest(self, node, run, workflow=None):
         """Hash the exact approved action without persisting its input values."""
         return digest({'node_id': node['node_id'], 'kind': node['kind'], 'tool_id': node.get('tool_id'),
-                       'agent_id': node.get('agent_id'), 'params': self.params(node, run, workflow)})
+                       'agent_id': node.get('agent_id'), 'params': self.params(node, run, workflow,now=self.runtime.clock())})
 
     def reserve(self, db, run, workflow, agent, amount, provider_id=None, credential_reference=None):
         if set(amount) - {'llm_calls', 'tool_calls', 'tokens', 'retries', 'estimated_cost_usd'}:
@@ -320,7 +320,7 @@ class GraphRunner:
         remaining_agent = agent['limits']['timeout_seconds'] - (runtime.clock() - run.get('agent_started_at', {}).get(agent['agent_id'], runtime.clock()))
         if getattr(connector, 'timeout', float('inf')) > min(record['definition']['timeout_seconds'], remaining_agent, remaining_run):
             raise RuntimeFailure('TOOL_TIMEOUT_EXCEEDED', 'The connector timeout exceeds its accepted policy.', 403)
-        params = self.params(node, run, workflow)
+        params = self.params(node, run, workflow,now=self.runtime.clock())
         if list(Draft202012Validator(grant['input_schema']).iter_errors(params)):
             raise RuntimeFailure('CONNECTOR_INPUT_INVALID', 'Connector inputs do not meet the assignment schema.', 400)
         automation=getattr(runtime.workflows,'automation',None)
@@ -441,7 +441,7 @@ class GraphRunner:
                     config = node.get('configuration', {})
                     if set(config) - {'ui', 'description', 'input', 'input_mapping', 'on_timeout', 'timeout_outcome', 'error_outcome'}:
                         raise RuntimeFailure('UNSUPPORTED_EXECUTION_CONFIGURATION', 'The node contains execution configuration requiring review.')
-                    params = self.params(node, run, workflow)
+                    params = self.params(node, run, workflow,now=self.runtime.clock())
                     from .action_plans import observed as action_observed
                     action_observed(workflow,node,run,params)
                     invocation_id = str(uuid4())
@@ -464,13 +464,13 @@ class GraphRunner:
                         if approved_node and approved_node.get('tool_id') == 'smtp_send_email':
                             from .email_recipients import source_recipient
                             recipient = source_recipient(workflow, run['inputs'])
-                            email_preview = self.params(approved_node, run, workflow)
+                            email_preview = self.params(approved_node, run, workflow,now=self.runtime.clock())
                             if recipient is not None and email_preview.get('to') != recipient:
                                 raise RuntimeFailure('DESTINATION_NOT_AUTHORIZED', 'Recipient must match the original review row.', 403)
                         approval = dict(approval_id='approval_' + uuid4().hex, workflow_id=run['workflow_id'], workflow_version=run['workflow_version'],
                                         status='pending', allowed_decisions=['approved', 'rejected'], action_digest=action_hash)
                         if workflow.get('metadata',{}).get('connected_action_plan') and approved_node:
-                            approval['resolved_payload']=self.params(approved_node,run,workflow)
+                            approval['resolved_payload']=self.params(approved_node,run,workflow,now=self.runtime.clock())
                             run['action_instances'][approved_node['node_id']].update(state='waiting_for_approval',resolved_inputs=deepcopy(approval['resolved_payload']),input_fingerprint=digest(approval['resolved_payload']))
                         run['approvals'].append(approval)
                         run['approval_context'] = dict(node_id=node['node_id'], gate_id=gate['approval_gate_id'],
@@ -479,7 +479,7 @@ class GraphRunner:
                         run['node_states'][node['node_id']] = 'paused'
                         run['lease_until'] = 0
                         runtime.event(db, run, 'approval.pending', {'approval_id': approval['approval_id'], 'node_id': node['node_id'],
-                                      **({'database_operation_id': self.params(approved_node, run, workflow).get('operation_id')} if approved_node and approved_node.get('tool_id') == 'database_execute_operation' else {}),
+                                      **({'database_operation_id': self.params(approved_node, run, workflow,now=self.runtime.clock()).get('operation_id')} if approved_node and approved_node.get('tool_id') == 'database_execute_operation' else {}),
                                       **({'email_preview': email_preview} if email_preview is not None else {})})
                         runtime.transition(db, run, 'paused_for_approval')
                         return runtime.public(run)
@@ -487,7 +487,7 @@ class GraphRunner:
                         if kind == 'trigger':
                             from .email_recipients import source_recipient
                             source_recipient(workflow, run['inputs'])
-                        output = self.params(node, run, workflow)
+                        output = self.params(node, run, workflow,now=self.runtime.clock())
                         if kind == 'output':
                             fields = workflow['outputs']
                             contract = {'type': 'object', 'properties': {f['name']: {'type': f['type']} for f in fields},
@@ -503,13 +503,13 @@ class GraphRunner:
                                 raise RuntimeFailure('APPROVAL_REQUIRED', 'The agent requires an approved gate before model execution.', 403)
                             if self.agents is None:
                                 raise RuntimeFailure('MODEL_NOT_CONFIGURED', 'A bounded model adapter must be configured.', 503)
-                            invocation = (self.agents, agent, self.params(node, run, workflow))
+                            invocation = (self.agents, agent, self.params(node, run, workflow,now=self.runtime.clock()))
                             reservation_agent=agent
                             from .action_plans import action_for
                             action=action_for(workflow,node['node_id'])
                             reservation_agent=self.model_pass_binding(agent,action,workflow,run,enforce_usage_budgets=self.runtime.enforce_usage_budgets)
                             if workflow.get('metadata',{}).get('adaptive_control',{}).get('kind')=='workflow-investigation':
-                                invocation=(self.agents,reservation_agent,self.params(node,run,workflow))
+                                invocation=(self.agents,reservation_agent,self.params(node,run,workflow,now=self.runtime.clock()))
                             reservation = self.agents.reservation(reservation_agent)
                             reservation['llm_calls'] = max(1, reservation.get('llm_calls', 0))
                         else:
@@ -600,6 +600,12 @@ class GraphRunner:
                 except RetryableInvocation:
                     output, code = None, 'RETRYABLE_INVOCATION_FAILED'
                 except RuntimeFailure as failure:
+                    if kind == 'agent' and isinstance(getattr(failure, 'model_diagnostic', None), dict):
+                        with runtime.store.transaction() as db:
+                            saved = runtime.load(db, run_id, auth, 'workflow.execute')
+                            if runtime.owns_execution(saved, worker):
+                                runtime.event(db, saved, 'model.invocation_failed', dict(node_id=node['node_id'], error_code=failure.code,
+                                    **failure.model_diagnostic))
                     if kind=='agent' and getattr(failure,'invalid_model_output',False) and getattr(failure,'validation_field',None)!='query':
                         with runtime.store.transaction() as db:
                             saved=runtime.load(db,run_id,auth,'workflow.execute')
@@ -642,7 +648,7 @@ class GraphRunner:
                                 code = 'BUDGET_EXHAUSTED'
                         else:
                             code = 'RETRY_EXHAUSTED'
-                    if code and workflow['error_policy']['on_runtime_error'] == 'branch' and code not in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'}:
+                    if code and workflow['error_policy']['on_runtime_error'] == 'branch' and code not in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'MODEL_PROVIDER_TIMEOUT', 'MODEL_PROVIDER_CONNECTION', 'MODEL_PROVIDER_AUTH', 'MODEL_PROVIDER_RATE_LIMIT', 'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_REQUEST_REJECTED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'}:
                         outcome = node.get('configuration', {}).get('error_outcome')
                         if outcome and any(edge.get('outcome') == outcome for edge in self.outgoing(workflow, node['node_id'])):
                             self.finish_node(db, run, workflow, node, outcome=outcome)
@@ -651,7 +657,7 @@ class GraphRunner:
                             runtime.save(db, run)
                             continue
                     if code:
-                        self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'})
+                        self.fail(db, run, code, blocked=code in {'SMTP_DELIVERY_UNCERTAIN', 'MODEL_INVOCATION_FAILED', 'MODEL_PROVIDER_TIMEOUT', 'MODEL_PROVIDER_CONNECTION', 'MODEL_PROVIDER_AUTH', 'MODEL_PROVIDER_RATE_LIMIT', 'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_REQUEST_REJECTED', 'UNKNOWN_INVOCATION_RESULT','ACTION_EFFECT_UNVERIFIED'})
                         return runtime.public(run)
                     try:
                         workflow, _ = runtime.execution_revision(db, run, auth)
@@ -699,8 +705,11 @@ class GraphRunner:
                 raise RuntimeFailure('INVALID_APPROVAL_DECISION', 'Choose approved or rejected.', 400)
             old = run.get('approval_decisions', {}).get(approval['approval_id'])
             if old:
-                if old != dict(key=digest(key), decision=decision, subject=approver['subject']['subject_id']):
-                    raise RuntimeFailure('APPROVAL_ALREADY_DECIDED', 'This gate already has a decision.')
+                # A refreshed browser or scheduler can use a new transport key.
+                # Authorization above still applies; replay never changes the
+                # original approver, audit trail, run state or external effects.
+                if old.get('decision') != decision:
+                    raise RuntimeFailure('APPROVAL_ALREADY_DECIDED', 'This gate already has a different decision. Refresh to see its current status.')
                 return runtime.public(run)
             if run['status'] != 'paused_for_approval' or approval['status'] != 'pending':
                 raise RuntimeFailure('APPROVAL_NOT_PENDING', 'The approval is no longer pending.')

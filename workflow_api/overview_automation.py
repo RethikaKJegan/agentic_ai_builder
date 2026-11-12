@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 import re
+import os
 from jsonschema import Draft202012Validator
 from registry.safety import reject_secrets
 from runtime.service import RuntimeService
@@ -309,6 +310,9 @@ class OverviewAutomation:
         if not self.enabled(auth): return dict(version='overview-intent-v1', state='legacy')
         if not isinstance(body, dict): failure('Use an Overview request.')
         operation = body.get('operation', 'prepare')
+        if operation=='recover_calendar':
+            from .calendar_recovery import prepare as prepare_recovery
+            return prepare_recovery(self,auth,body)
         if operation not in {'prepare', 'get', 'activate'}: failure('Unsupported Overview operation.')
         key = body.get('request_key'); old = self.saved(auth, key)
         if operation != 'prepare':
@@ -361,6 +365,12 @@ class OverviewAutomation:
         from .action_plans import prepare
         request = {k:deepcopy(v) for k,v in body.items() if k in {'objective', 'request_key', 'google_connection_id', 'business_request', 'user_values', 'resources'}}
         request.update(automatic_inputs=True)
+        if intent.get('communication'):
+            request['google_connection_id']=intent['communication']['connection_id']
+            request.setdefault('user_values',{})
+            if intent['communication'].get('recipient'):request['user_values']['recipient']=intent['communication']['recipient']
+            if intent['communication'].get('calendar_id'):request['user_values']['calendar_id']=intent['communication']['calendar_id']
+
         # Reuse the same guarded preparation as the legacy Overview. It already
         # returns not_configured/unsupported for unrelated tenant vocabulary.
         try:
@@ -422,6 +432,17 @@ class OverviewAutomation:
         from .goal_inputs import recipient_context,calendar_context
         resolved=dict(user_values=deepcopy(body.get('user_values',{})),validated_context={})
         if not isinstance(resolved['user_values'],dict):failure('User values must be an object.')
+        natural=self.env.get('BUILDER_NATURAL_COMMUNICATION_ENABLED',os.getenv('BUILDER_NATURAL_COMMUNICATION_ENABLED','1' if self.env.get('BUILDER_CLIENT_ID',os.getenv('BUILDER_CLIENT_ID')) in ('subway','simpsons') else '0'))=='1'
+        natural=natural and getattr(self.service,'google_tools',None) is not None
+        if natural:
+            from .communication_intent import requested,account
+            if requested(objective):
+                selected,missing=account(self.service,auth,body)
+                if missing:
+                    result=dict(version='overview-intent-v1',state='clarification',request_key=key,workspace=deepcopy(auth['subject']),business_clarification=True,
+                        questions=[missing['question']],clarifications=[missing],intent=dict(business_goal=objective,side_effects=['calendar_write'],intent_type='ambiguous'))
+                    return dict(result=result,intent=None)
+                body={**body,'google_connection_id':selected['connection_id']}
         recipient_context(resolved,self.service.business_composition,auth,body)
         now = self.service.lifecycle.clock()
         calendar_context(resolved,objective,bool(body.get('google_connection_id')),now=now)
@@ -439,6 +460,8 @@ class OverviewAutomation:
             routing_context['subway_discovery']={}
             discovery_budget=MAX_ROUTING_CONTEXT_BYTES-len(canonical(routing_context).encode())+2
             routing_context['subway_discovery']=subway.discovery(auth,objective,max_bytes=discovery_budget)
+        if natural:
+            routing_context['planning_defaults']+=' Generate the requested email and Calendar workflow directly using owned account defaults. Do not require technical calendar IDs, special phrases or user account addresses. An email report means delivery unless the user explicitly requests a draft or no sending. For a report-reading Calendar session without explicit event timing, use five minutes after report completion, default thirty minutes if duration is unspecified. Keep the daily investigation trigger distinct from the review event. Preserve explicit timing, recipients and draft instructions; ask only genuinely blocking questions. Existing workflow approval remains required.'
         route = self.interpret(objective,routing_context)
         result = dict(version='overview-intent-v1', state='prepared', intent=route, workspace=deepcopy(auth['subject']), request_key=key)
         if subway:
@@ -465,6 +488,16 @@ class OverviewAutomation:
             result.update(state='clarification', questions=[str(exc)])
             return dict(result=result,intent=None)
         intent = dict(version='overview-intent-v1', route=route, schedule=schedule, prepared_at=now)
+        if natural:
+            from .communication_intent import requested,prepare as prepare_communication
+            if requested(objective):
+                route,communication,questions=prepare_communication(self.service,auth,body,route,schedule,resolved,timezone=self.env.get('BUILDER_WORKSPACE_TIMEZONE'))
+                result['intent']=route;intent['route']=route
+                if questions:
+                    result.update(state='clarification',business_clarification=True,questions=[q['question'] for q in questions],clarifications=questions)
+                    return dict(result=result,intent=None)
+                intent['communication']=communication
+
         intent['source_free']=route['entity_scope']=='none' and bool(route['side_effects']) and route['temporal']['period']=='none'
         if schedule and 'calendar_write' in route['side_effects']:
             from .calendar_occurrences import prepare_pin
@@ -547,6 +580,8 @@ class OverviewAutomation:
             if c['kind'] != 'tool': continue
             tid = doc['selected_tools'][a['action_id']]['tool_id']
             schema = deepcopy(c['input_schema'])
+            if c.get('supported_operation')=='calendar.create' and intent.get('communication',{}).get('review'):
+                schema['x-praxi-calendar-review-v1']=deepcopy(intent['communication']['review'])
             if c.get('supported_operation')=='calendar.create' and intent.get('calendar_occurrence'):
                 schema['x-praxi-calendar-occurrence-v1']=deepcopy(intent['calendar_occurrence'])
             if tid=='subway_query':

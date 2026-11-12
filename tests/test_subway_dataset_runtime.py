@@ -9,7 +9,7 @@ from tests.test_subway_autonomy import start,drain,decision
 from tests.test_connected_action_plans import action,bind
 from workflow_api.subway_demonstration import install,DemoQueries
 from workflow_api.subway_assessments import definition
-from workflow_api.subway_demo_data import LABEL
+
 from workflow_api.automation import DurableAutomation
 
 @pytest.mark.parametrize('recurring',[False,True])
@@ -70,7 +70,7 @@ def test_automatic_overview_replan_restart_and_frozen_scheduled_source(subway,mo
     out=run['action_instances']['assess']['output'];assert out['coverage']['matched_records']==8
     assert out['report']['provenance']['mode']=='modeled_demonstration' and len(out['report']['invoice_reconciliation'])==8
     assert all(r['invoice_item_comparison']!='INSUFFICIENT_EVIDENCE' for r in out['report']['reconciliations'])
-    assert LABEL in run['action_instances']['report']['output']['summary']
+    assert 'Demo data' not in run['action_instances']['report']['output']['summary']
     assert run['action_instances']['assess']['ontology_rule_usage']
     assert all('subway-demonstration-v1 revision 1' in u['reason'] for u in run['action_instances']['assess']['ontology_usage'])
     assert all(v['valid'] for v in contexts[-1]['evidence'].values())

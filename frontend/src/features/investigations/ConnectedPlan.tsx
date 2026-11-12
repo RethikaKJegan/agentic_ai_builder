@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import {Link} from '@/lib/navigation';
+import {communicationStatuses} from '@/domain/communication-status';
+import { useEffect, useMemo, useState } from "react";
 import { AutomationPanel } from "./DurableAutomation";
 import {KnowledgeMap} from "./KnowledgeMap";
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/components/ui/sheet";
@@ -19,6 +21,8 @@ import { SavedDetails, Outcome } from "./LifecyclePanels";
 import { CompositionCanvas } from './CompositionCanvas';
 import { CompositionInspector, CompositionReport } from './CompositionPanels';
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
+
+import {subwayDisplay} from '@/domain/subway-presentation';
 
 export const actionButton = "rounded-lg border px-3 py-2 text-sm disabled:opacity-40";
 export function ConnectedPlan(props:{id:string;runId?:string|undefined;onRun?:((id:string)=>void)|undefined;adaptive?:boolean;scheduled?:boolean}) {
@@ -110,23 +114,31 @@ function ScopedConnectedPlan({
       setReviewRun(false);update();
     });
   }
+  const displayDoc=useMemo(()=>subwayDisplay(doc,backend.session?.auth.subject.workspace_id),[doc,backend.session?.auth.subject.workspace_id]);
+  const displayView=useMemo(()=>subwayDisplay(view,backend.session?.auth.subject.workspace_id),[view,backend.session?.auth.subject.workspace_id]);
+  const demoData=backend.session?.auth.subject.workspace_id==='client-subway'&&!!(doc?.['binding_context'] as {validated_context?:{demo_context?:unknown}}|undefined)?.validated_context?.demo_context;
   const disabled = command.busy || stale || command.unknown || view?.state==='blocked';
+  const [calendarRecovery,setCalendarRecovery]=useState<{composition_id:string;request_key:string}|null>(null);
+  useEffect(()=>setCalendarRecovery(null),[id,backend.session?.auth.subject.workspace_id,backend.session?.auth.subject.subject_id]);
   const needsQueryDefinition=!!view?.recovery.can_clarify&&view.tasks.some(t=>t.result?.classification==='query_clarification');
   const overview=doc?.['overview_intent'] as {route?:{intent_type?:string}}|undefined;
   const automation=scheduled||overview?.route?.intent_type==='recurring';
   return (
     <section aria-label="Connected action plan" className="min-w-0 space-y-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-        <div className="min-w-0"><p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Workflow workspace</p><h1 className="text-xl font-semibold">{view?.display_name??'Investigation workflow'}</h1><p className="mt-1 text-xs text-muted-foreground">{view?.run?.status?.replaceAll('_',' ')??view?.workflow_status??'Preparing'}{doc&&` · Plan revision ${doc.action_plan.revision}`}</p></div>
+        <div className="min-w-0"><p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Workflow workspace</p><h1 className="text-xl font-semibold">{displayView?.display_name??'Investigation workflow'}</h1><p className="mt-1 text-xs text-muted-foreground">{displayView?.run?.status?.replaceAll('_',' ')??displayView?.workflow_status??'Preparing'}{displayDoc&&` · Plan revision ${displayDoc.action_plan.revision}`}</p></div>
         <div className="flex flex-wrap items-center gap-2">
-          <button className={actionButton} disabled={!view} onClick={()=>setDetails(true)}><Info size={14} className="mr-2 inline"/>Details</button>
-          <button className={actionButton} disabled={disabled||!view||!backend.can('workflow.edit')||!backend.can('workflow.validate')||!!view.workflow_status&&view.workflow_status!=='draft'} onClick={()=>void prepareReview()}><CheckCircle2 size={14} className="mr-2 inline"/>Validate</button>
-          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-40" disabled={disabled||!view||!!view.run||!['validated','approved','published'].includes(view.workflow_status??'')||!backend.can('workflow.execute')||!backend.session?.runtime_available||view.workflow_status==='validated'&&!backend.can('workflow.approve')} onClick={()=>setReviewRun(true)}><Play size={14}/>Run</button>
+          <button className={actionButton} disabled={!displayView} onClick={()=>setDetails(true)}><Info size={14} className="mr-2 inline"/>Details</button>
+          <button className={actionButton} disabled={disabled||!displayView||!backend.can('workflow.edit')||!backend.can('workflow.validate')||!!displayView.workflow_status&&displayView.workflow_status!=='draft'} onClick={()=>void prepareReview()}><CheckCircle2 size={14} className="mr-2 inline"/>Validate</button>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-40" disabled={disabled||!displayView||!!displayView.run||!['validated','approved','published'].includes(displayView.workflow_status??'')||!backend.can('workflow.execute')||!backend.session?.runtime_available||displayView.workflow_status==='validated'&&!backend.can('workflow.approve')} onClick={()=>setReviewRun(true)}><Play size={14}/>Run</button>
           <button className={actionButton} aria-label="Refresh plan" disabled={command.busy} onClick={update}><RefreshCw size={14}/></button>
         </div>
       </div>
       <ApiFeedback error={error ?? command.error} />
-      {view?.state==='blocked'&&<div role="status" className="rounded-lg border border-warning/50 p-3 text-sm"><p className="font-medium">Workflow draft blocked</p><p>This workflow is saved, but unresolved execution requirements prevent approval or execution. No follow-up answer is requested and no action has been performed.</p>{view.gaps.map((gap,i)=>typeof gap['description']==='string'?<p key={i} className="mt-2">{gap['description']}</p>:null)}</div>}
+      {displayView?.run&&<div aria-label="Delivery status" className="flex flex-wrap gap-3 text-sm">{communicationStatuses(displayView.run.action_instances).map((status,i)=><span key={i} className="rounded-lg border px-3 py-2">{status.label}</span>)}</div>}
+      {displayView?.run&&(displayView.run.error_code==='CALENDAR_REVIEW_TIME_PASSED'||!!(doc?.['overview_intent'] as Record<string,unknown>|undefined)?.['communication']&&displayView.run.status==='paused_for_approval'&&displayView.run.approvals.some(a=>a.status==='pending'&&typeof (a.resolved_payload?.['event'] as {start?:{dateTime?:unknown}}|undefined)?.start?.dateTime==='string'&&Date.parse((a.resolved_payload!['event'] as {start:{dateTime:string}}).start.dateTime)<=Date.now()))&&<div className="space-y-2 text-sm"><p>The reading-session time passed before it could be sent. You can prepare a new Calendar-only review using the saved report.</p><button className={actionButton} disabled={command.busy||!backend.can('workflow.plan')} onClick={()=>void command.act('calendar-recovery:'+displayView.run!.run_id,{},async()=>{const next=await api.overviewIntent({operation:'recover_calendar',request_key:'calendar-recovery-'+crypto.randomUUID(),composition_id:id,run_id:displayView.run!.run_id});if(next.composition_id&&next.request_key)setCalendarRecovery({composition_id:next.composition_id,request_key:next.request_key});})}>Prepare Calendar-only review</button>{calendarRecovery&&<Link className={actionButton} to="/app/workflows/investigate" search={{connected:'1',composition:calendarRecovery.composition_id,overview:calendarRecovery.request_key}}>Review new reading session</Link>}</div>}
+
+      {displayView?.state==='blocked'&&<div role="status" className="rounded-lg border border-warning/50 p-3 text-sm"><p className="font-medium">Workflow draft blocked</p><p>This workflow is saved, but unresolved execution requirements prevent approval or execution. No follow-up answer is requested and no action has been performed.</p>{displayView.gaps.map((gap,i)=>typeof gap['description']==='string'?<p key={i} className="mt-2">{gap['description']}</p>:null)}</div>}
       {command.unknown && (
         <p role="alert">
           Command outcome is unconfirmed. Refresh the saved state before continuing. Do not submit a
@@ -138,29 +150,29 @@ function ScopedConnectedPlan({
           Retry identical command
         </button>
       )}
-      {!doc || !view ? (
+      {!displayDoc || !displayView ? (
         <p role="status">
           {error ? "Plan unavailable. Refresh to read saved state." : "Loading persisted plan…"}
         </p>
       ) : (
         <>
           <div role="tablist" aria-label="Investigation views" className="flex max-w-full gap-1 overflow-x-auto border-b pb-1">
-            {(['workflow','steps','report','knowledge','background'] as const).map(value=><button key={value} role="tab" aria-label={value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)} aria-selected={tab===value} disabled={value==='report'&&!view.run&&!view.tasks.some(t=>t.result)} onClick={()=>setTab(value)} className={`shrink-0 rounded-lg px-4 py-2.5 text-sm disabled:opacity-40 ${tab===value?'bg-primary/10 font-semibold text-primary':'text-muted-foreground hover:bg-muted'}`}>{value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)}</button>)}
+            {(['workflow','steps','report','knowledge','background'] as const).map(value=><button key={value} role="tab" aria-label={value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)} aria-selected={tab===value} disabled={value==='report'&&!displayView.run&&!displayView.tasks.some(t=>t.result)} onClick={()=>setTab(value)} className={`shrink-0 rounded-lg px-4 py-2.5 text-sm disabled:opacity-40 ${tab===value?'bg-primary/10 font-semibold text-primary':'text-muted-foreground hover:bg-muted'}`}>{value==='report'?'Reports':value==='knowledge'?'Knowledge Map':value[0]!.toUpperCase()+value.slice(1)}</button>)}
           </div>
-          {tab==='knowledge'&&<KnowledgeMap doc={doc} view={view}/>}
-          {tab==='background'&&<section className="space-y-4" aria-label="Workflow background"><div><h3 className="font-semibold">Behind the workflow</h3><p className="mt-1 text-sm text-muted-foreground">Inspect the agents, tools and saved execution details supporting this workflow.</p></div><div className="grid gap-3 sm:grid-cols-2"><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('agents')}><Network className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Agents and tools</p><p className="mt-1 text-xs text-muted-foreground">Task assignments and connected capabilities</p></button><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('memory')}><Settings2 className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Memory and recovery</p><p className="mt-1 text-xs text-muted-foreground">Saved context, failures and recovery history</p></button></div><SavedDetails label="Execution diagnostics" value={{run:view.run,planning:view.planning}}/><AutomationPanel workflowId={view.workflow_id}/></section>}
-          <Sheet open={details} onOpenChange={setDetails}><SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Workflow details</SheetTitle><SheetDescription>Saved request, account and execution settings.</SheetDescription></SheetHeader><div className="mt-6 space-y-5"><section><h3 className="text-sm font-semibold">Your request</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{doc.action_plan.goal}</p></section><GoogleAccountSelect value={doc.google_connection_id??''} onChange={()=>{}} disabled/><SavedDetails label="Completion criteria and missing inputs" value={{completion_criteria:doc.action_plan.completion_criteria,missing_inputs:doc.action_plan.missing_inputs}}/><SavedDetails label="Schedule and request context" value={{overview:doc['overview_intent'],request:view.request_context}}/><SavedDetails label="Workflow references" value={{workflow_id:view.workflow_id,version:view.workflow_version,plan_revision:doc.action_plan.revision,run_id:view.run?.run_id}}/></div></SheetContent></Sheet>
-          <Dialog open={reviewRun} onOpenChange={setReviewRun}><DialogContent><DialogHeader><DialogTitle>{view.workflow_status==='validated'?'Review and run workflow':'Run workflow'}</DialogTitle><DialogDescription>{scheduled?'Approve this workflow for the separately reviewed schedule. Scheduling authorization remains below.':adaptive?'Approve this workflow for the existing orchestration controller.':'Start the saved workflow using its connected account and configured actions. External writes still require their exact-payload approvals.'}</DialogDescription></DialogHeader><p className="text-sm">{doc.action_plan.goal}</p><p className="text-xs text-muted-foreground">Workflow version {view.workflow_version??1} · {doc.action_plan.actions.length} steps</p><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40" disabled={disabled} onClick={()=>void startReviewed()}>{scheduled||adaptive?'Approve workflow':'Confirm and run'}</button></DialogContent></Dialog>
+          {tab==='knowledge'&&<KnowledgeMap doc={displayDoc} view={displayView}/>}
+          {tab==='background'&&<section className="space-y-4" aria-label="Workflow background"><div><h3 className="font-semibold">Behind the workflow</h3><p className="mt-1 text-sm text-muted-foreground">Inspect the agents, tools and saved execution details supporting this workflow.</p></div><div className="grid gap-3 sm:grid-cols-2"><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('agents')}><Network className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Agents and tools</p><p className="mt-1 text-xs text-muted-foreground">Task assignments and connected capabilities</p></button><button className="rounded-xl border p-5 text-left hover:bg-muted/30" onClick={()=>setPanel('memory')}><Settings2 className="mb-3 h-5 w-5 text-primary"/><p className="text-sm font-medium">Memory and recovery</p><p className="mt-1 text-xs text-muted-foreground">Saved context, failures and recovery history</p></button></div><SavedDetails label="Execution diagnostics" value={{run:displayView.run,planning:displayView.planning}}/><AutomationPanel workflowId={displayView.workflow_id}/></section>}
+          <Sheet open={details} onOpenChange={setDetails}><SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Workflow details</SheetTitle><SheetDescription>Saved request, account and execution settings.</SheetDescription></SheetHeader><div className="mt-6 space-y-5"><section><h3 className="text-sm font-semibold">Your request</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{displayDoc.action_plan.goal}</p></section><GoogleAccountSelect value={displayDoc.google_connection_id??''} onChange={()=>{}} disabled/><SavedDetails label="Completion criteria and missing inputs" value={{completion_criteria:displayDoc.action_plan.completion_criteria,missing_inputs:displayDoc.action_plan.missing_inputs}}/><SavedDetails label="Schedule and request context" value={{overview:displayDoc['overview_intent'],request:displayView.request_context}}/><SavedDetails label="Workflow references" value={{workflow_id:displayView.workflow_id,version:displayView.workflow_version,plan_revision:displayDoc.action_plan.revision,run_id:displayView.run?.run_id}}/></div></SheetContent></Sheet>
+          <Dialog open={reviewRun} onOpenChange={setReviewRun}><DialogContent><DialogHeader><DialogTitle>{displayView.workflow_status==='validated'?'Review and run workflow':'Run workflow'}</DialogTitle><DialogDescription>{scheduled?'Approve this workflow for the separately reviewed schedule. Scheduling authorization remains below.':adaptive?'Approve this workflow for the existing orchestration controller.':'Start the saved workflow using its connected account and configured actions. External writes still require their exact-payload approvals.'}</DialogDescription></DialogHeader><p className="text-sm">{displayDoc.action_plan.goal}</p><p className="text-xs text-muted-foreground">Workflow version {displayView.workflow_version??1} · {displayDoc.action_plan.actions.length} steps</p><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40" disabled={disabled} onClick={()=>void startReviewed()}>{scheduled||adaptive?'Approve workflow':'Confirm and run'}</button></DialogContent></Dialog>
           <div className="flex flex-wrap gap-2">
             {!adaptive &&
-              view.run &&
-              ["running", "queued", "paused_for_approval"].includes(view.run.status) && (
+              displayView.run &&
+              ["running", "queued", "paused_for_approval"].includes(displayView.run.status) && (
                 <button
                   className={actionButton}
                   disabled={disabled || !backend.can("workflow.execute")}
                   onClick={() =>
-                    void command.act("cancel:" + view.run!.run_id, {}, async () => {
-                      await api.cancelComposition(id, view.run!.run_id);
+                    void command.act("cancel:" + displayView.run!.run_id, {}, async () => {
+                      await api.cancelComposition(id, displayView.run!.run_id);
                       update();
                     })
                   }
@@ -169,13 +181,13 @@ function ScopedConnectedPlan({
                 </button>
               )}
           </div>
-          {needsQueryDefinition && doc && <QueryClarification doc={doc} view={view}/>}
-          {view.run?.error_code && !needsQueryDefinition && !automation && (
+          {needsQueryDefinition && displayDoc && <QueryClarification doc={doc!} view={view!}/>}
+          {displayView.run?.error_code && !needsQueryDefinition && !automation && (
             <p role="alert">
-              Execution: {view.run.error_code}. {view.recovery.reason}
+              {(doc?.['overview_intent'] as Record<string,unknown>|undefined)?.['communication']?'A requested delivery needs attention. Confirmed email and Calendar results remain saved. Check the delivery status before retrying an action.':<>Execution: {displayView.run.error_code}. {displayView.recovery.reason}</>}
             </p>
           )}
-          {view.run?.approvals
+          {displayView.run?.approvals
             .filter((a) => a.status === "pending")
             .map((a) => (
               <article
@@ -233,19 +245,19 @@ function ScopedConnectedPlan({
                 ))}
               </article>
             ))}
-          {view.run&&automation&&tab!=='background'&&<AutomationProgress run={view.run} onUpdated={update} onDetails={()=>setTab('background')}/>}
-          {view.run?.adaptive&&(!automation||tab==='background')&&<AdaptiveProgress run={view.run} onUpdated={update}/>}
-          {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={view} onSelect={setPanel}/></div>}
+          {displayView.run&&automation&&tab!=='background'&&<AutomationProgress run={displayView.run} onUpdated={update} onDetails={()=>setTab('background')}/>}
+          {displayView.run?.adaptive&&(!automation||tab==='background')&&<AdaptiveProgress run={displayView.run} onUpdated={update}/>}
+          {tab==='workflow'&&<div className="h-[65vh] min-h-[480px] overflow-hidden rounded-xl border"><CompositionCanvas view={displayView} onSelect={setPanel}/></div>}
           {tab==='report'&&<div role="tabpanel" aria-label="Investigation report">
-            <CompositionReport view={view}/>
-            {Object.entries(view.run?.action_instances??{}).map(([id,instance])=><QueryEvidence key={id} instance={instance}/>)}
-            {Object.values(view.run?.action_instances??{}).flatMap(instance=>receiptLinks(instance)).map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="mx-5 block break-all text-sm text-primary underline">Open verified artifact: {url}</a>)}
-            {doc.action_plan.actions.filter(a=>a.capability_id==='content.prepare').map(a=>{const output=view.run?.action_instances?.[a.action_id]?.output;return output&&typeof output['body']==='string'&&output['body']?<article key={a.action_id} className="mx-auto max-w-5xl space-y-3 p-5"><h3 className="font-semibold">Generated report content</h3><p className="whitespace-pre-wrap break-words text-sm">{output['body']}</p></article>:null;})}
+            <CompositionReport view={displayView}/>
+            {Object.entries(displayView.run?.action_instances??{}).map(([id,instance])=><QueryEvidence key={id} instance={instance}/>)}
+            {Object.values(displayView.run?.action_instances??{}).flatMap(instance=>receiptLinks(instance)).map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="mx-5 block break-all text-sm text-primary underline">Open verified artifact: {url}</a>)}
+            {displayDoc.action_plan.actions.filter(a=>a.capability_id==='content.prepare').map(a=>{const output=displayView.run?.action_instances?.[a.action_id]?.output;return output&&typeof output['body']==='string'&&output['body']?<article key={a.action_id} className="mx-auto max-w-5xl space-y-3 p-5"><h3 className="font-semibold">Generated report content</h3><p className="whitespace-pre-wrap break-words text-sm">{output['body']}</p></article>:null;})}
           </div>}
           {tab==='steps'&&<ol className="space-y-3">
-            {doc.action_plan.actions.map((a, i) => {
-              const task = view.tasks.find((t) => t.id === a.action_id);
-              const instance = view.run?.action_instances?.[a.action_id];
+            {displayDoc.action_plan.actions.map((a, i) => {
+              const task = displayView.tasks.find((t) => t.id === a.action_id);
+              const instance = displayView.run?.action_instances?.[a.action_id];
               return (
                 <li key={a.action_id} className="min-w-0 space-y-2 rounded-lg border p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -300,12 +312,12 @@ function ScopedConnectedPlan({
               );
             })}
           </ol>}
-          <CompositionInspector view={view} section={panel} onClose={()=>setPanel(null)}/>
-          <p className="text-xs text-muted-foreground">
+          <CompositionInspector view={displayView} section={panel} onClose={()=>setPanel(null)}/>
+          {!demoData&&<p className="text-xs text-muted-foreground">
             ACTUAL source/provider reports, DERIVED values, INFERRED content and SYNTHETIC
             assumptions keep their provenance. Provider confirmation does not establish physical
             completion or commercial authorization.
-          </p>
+          </p>}
         </>
       )}
     </section>

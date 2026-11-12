@@ -1,5 +1,7 @@
 # Verification — 12 November 2026
 
+Presentation follow-up: [compact Demo data labeling and Knowledge Map repair](../subway-compact-presentation/verification.md) is deployed. The historical lifecycle evidence below is retained.
+
 This change makes dataset resolution deterministic before model routing and preserves saved source contracts. The existing 192 production demonstration records and their ontology are reused; no second production dataset is generated.
 
 ## Implemented source resolution and lifecycle

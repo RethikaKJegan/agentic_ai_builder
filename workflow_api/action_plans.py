@@ -80,6 +80,13 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         view=composition.preparation.general_context(auth,objective,body['business_request'])
         if view.get('preflight_id'):prepared=composition.preparation.checked(auth,view['preflight_id'])
     context=trusted_context(composition,auth,body,prepared)
+    communication=(_overview or {}).get('communication')
+    if communication:
+        if communication.get('calendar_id'):context['validated_context']['primary_calendar_id']=communication['calendar_id']
+        if communication.get('review'):
+            from .communication_timing import preview_values
+            context['validated_context'].update(preview_values(communication['review'],(_overview.get('schedule') or {}).get('next_due',composition.service.lifecycle.clock())))
+
     if source_free:context['validated_context']['connected_request']=dict(objective=objective)
     if (_overview or {}).get('calendar_occurrence'):
         from .calendar_occurrences import values
@@ -206,6 +213,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if not callable(selector):deny('The configured provider does not support connected action planning.','ACTION_PLANNER_UNAVAILABLE')
         planning_context=dict(capabilities=visible,binding_context=context,verified_experience_recommendations=hints,tool_constraints={cid:dict(minimum_timeout_seconds=current[tool_id(cid,c)]['definition']['timeout_seconds']) for cid,c in visible.items() if c['kind']=='tool'})
         planning_context['planning_defaults']=GUIDANCE+(QUESTION_FREE_GUIDANCE if _overview and _overview.get('question_free') else '')
+        planning_context['planning_defaults']+=' Allocate calls by registered capability kind: model steps require max_llm_calls >=1 and max_tool_calls=0; tool steps require max_tool_calls >=1 and max_llm_calls=0. Writes allow exactly one tool dispatch, no retries. Respect aggregate plan and agent limits and registered tool timeouts. These are execution allowances, never user billing or procurement budgets.'
         if (_overview or {}).get('schedule') or (_overview or {}).get('event_subscription'):
             planning_context['planning_defaults']+=' Recurring non-business-query reads require fixed reviewed inputs. For research.search, bind query to context reviewed_public_search_queries with path [0] (or another actual supplied index), not a runtime content.prepare output. Use returned search snippets and source links for public guidance, with their evidence limitations. Do not fetch runtime-discovered URLs in a recurring workflow unless that exact resource was already supplied for review. Keep every requested report, Sheet, email and Calendar action. Never insert internal records or generated business findings into public-search inputs. Explicitly required unavailable resource scopes remain real gaps.'
         planning_context['planning_defaults']+=' '+AGGREGATE_GUIDANCE+' For a requested percentage, supply separate filtered and denominator count(*) query results as direct dependencies of each report or spreadsheet content step.'
@@ -214,12 +222,15 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             planning_context['query_guidance']='Use subway.plan_query → tool.subway_query → content.prepare for supported read-only data requests. The model query action receives context.subway_query_catalog and context.business_knowledge. Bind its output path [query] to tool target [query]. Use exact selected IDs and engine aggregates; include server-provided subway_date_filters unchanged. Missing dataset/field/query bindings are internal planning errors, never user inputs. Do not substitute inspection samples, generic query schemas, unsupported joins or invented financial/approval semantics.'
             from .query_predicates import FILTER_GUIDANCE
             if context['validated_context'].get('demo_context'):
-                planning_context['query_guidance']+=' The user explicitly selected persistent modeled Subway records and policies. These are authorized stored sources, never simulated tool responses or actual company operations. For a cross-procurement investigation, one purchase_order_reconciliation assessment already traverses requisitions, invoices, receipts, approvals and budgets and executes all applicable structural and modeled checks. Use a compact plan: subway.plan_query for purchase-order native IDs (no joins/metrics; limit <=20), tool.subway_assess with purchase_order_reconciliation, then content.prepare bound to the complete assessment output. This is a complete multi-source assessment, so additional per-collection assessment/report synthesis actions are unnecessary unless explicitly requested. Bind assessment from business_knowledge path [procurement_knowledge,assessment_kinds,chosen assessment]. For ordinary counts/sums use subway_query. Use supplied modeled_policy; do not block on unavailable real-company policies. Preserve the modeled label in every report.'
+                planning_context['query_guidance']+=' The user explicitly selected persistent modeled Subway records and policies. These are authorized stored sources, never simulated tool responses or actual company operations. For a cross-procurement investigation, one purchase_order_reconciliation assessment already traverses requisitions, invoices, receipts, approvals and budgets and executes all applicable structural and modeled checks. Use a compact plan: subway.plan_query for purchase-order native IDs (no joins/metrics; limit <=20), tool.subway_assess with purchase_order_reconciliation, then content.prepare bound to the complete assessment output. This is a complete multi-source assessment, so additional per-collection assessment/report synthesis actions are unnecessary unless explicitly requested. Bind assessment from business_knowledge path [procurement_knowledge,assessment_kinds,chosen assessment]. For ordinary counts/sums use subway_query. Use supplied modeled_policy; do not block on unavailable real-company policies. Use clean business text without Demo or demonstration prefixes in reports, emails, Calendar descriptions and spreadsheets; display Demo Supplier N as Supplier N. Keep provenance in internal receipts and preserve factual evidence gaps, currency separation and coverage as concise notes.'
             planning_context['query_guidance']+=FILTER_GUIDANCE
             from .query_branches import GUIDANCE as BRANCH_GUIDANCE
             planning_context['query_guidance']+=BRANCH_GUIDANCE
         if _overview is not None:
             planning_context['overview_intent']=deepcopy(_overview)
+            if communication:
+                planning_context['planning_defaults']+=' Preserve every requested email and Calendar action. Calendar times and identity are resolved by the server from the reviewed communication policy; bind calendar_event_start/end and primary_calendar_id from validated_context. Both email and Calendar content must consume the actual completed report. Never infer delivery success from report generation.'
+
             if source_free:
                 planning_context['query_guidance']='This request only uses connected actions. No business records, dataset, query planner or case ID is required. Preserve every requested external operation. Use content.prepare for event title/description when needed, with user-supplied request content as its data. Bind primary_calendar_id and calendar_event_start/end from validated_context, never generated identity or timing. Omit optional Calendar properties such as reminders, location and attendees unless explicitly supplied. Do not invent user_values keys for optional fields or request them as required business inputs. No attendees means no attendee binding or a supplied empty list. Use only existing context keys.'
             if knowledge_only:
@@ -337,11 +348,38 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             semantic=lambda c:{k:v for k,v in c.items() if k not in ('required_ontology','required_evidence')}
             if semantic(visible[cid])!=semantic(pinned):deny('Pinned capability semantics changed.','CASE_CAPABILITY_STALE')
             visible[cid]=deepcopy(pinned)
+    if communication and communication.get('recipient'):
+        context['user_values']['communication_recipient']=communication['recipient']
+        from .goal_inputs import replace_binding
+        for outgoing in actions:
+            target_contract=visible.get(outgoing.get('capability_id'),{})
+            if target_contract.get('supported_operation') in ('mail.send','mail.draft'):
+                target='to' if 'to' in target_contract['input_schema'].get('properties',{}) else 'recipient'
+                replace_binding(outgoing,target,'literal','communication_recipient',set())
+    if communication:
+        requested_effects=set((_overview or {}).get('route',{}).get('side_effects',[]))
+        expected=[]
+        if 'email_send' in requested_effects:expected.append('mail.send')
+        if 'email_draft' in requested_effects:expected.append('mail.draft')
+        if 'calendar_write' in requested_effects:expected.append('calendar.create')
+        required=set(proposal.get('completion_criteria',[]));by_id={a['action_id']:a for a in actions}
+        for _ in actions:required.update(parent for aid in list(required) for parent in by_id.get(aid,{}).get('depends_on',[]))
+        if any(not any(visible.get(a.get('capability_id'),{}).get('supported_operation')==op and a['action_id'] in required and not a.get('optional') and not a.get('when') for a in actions) for op in expected):
+            if body.get('action_plan') is None and _planning_feedback is None:
+                return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,_planning_budget=_planning_budget,_source_resolution=_source_resolution,_overview=_overview,_planning_feedback=dict(error_code='ACTION_REQUIRED_OPERATION_MISSING',correction='Preserve every user-confirmed email send/draft and Calendar create operation as required completion work. Bind the actual report and approved destinations.',invalid_proposal=deepcopy(proposal)))
+            deny('The prepared workflow omitted a confirmed delivery. Generate a new review.','ACTION_REQUIRED_OPERATION_MISSING')
+    if communication and communication.get('review'):
+        from .communication_timing import bind_reports
+        bind_reports(actions,visible,communication['review'])
     for a in actions:
         if not isinstance(a,dict) or a.get('capability_id') not in visible:deny('Plan references an unavailable capability.','ACTION_CAPABILITY_UNKNOWN')
         c=visible[a['capability_id']]
         if 'expected_output_schema' in a and a['expected_output_schema']!=c['output_schema']:deny('Model cannot change declared output schemas.')
         a['expected_output_schema']=deepcopy(c['output_schema'])
+        if body.get('action_plan') is None:
+            from .action_budgets import normalize_generated
+            minimum=current[tool_id(a['capability_id'],c)]['definition']['timeout_seconds'] if c['kind']=='tool' else None
+            normalize_generated(a,c,minimum_timeout_seconds=minimum)
         if (body.get('automatic_inputs') and body.get('action_plan') is None
                 and a['capability_id']=='data.plan_query' and a.get('budget',{}).get('max_llm_calls')==1):
             # Include one pure-model validation correction in the reviewable draft.

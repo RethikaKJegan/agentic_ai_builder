@@ -1,0 +1,5 @@
+- [x] Implement generated-draft budget derivation and precise strict validation feedback.
+- [x] Test arbitrary model/tool capabilities, explicit-plan rejection and budget ceilings.
+- [x] Verify normal planning and recurring email/Calendar execution with controlled transports.
+- [x] Package exact Subway candidate, validate contracts and regressions.
+- [x] Deploy Subway only and verify data/service preservation and public API.

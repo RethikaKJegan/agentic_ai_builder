@@ -182,7 +182,23 @@ class CrewAdapter:
                         json.dumps(self.knowledge_context))
         if content_response_schema(definition,inputs):
             evidence+='\nFor the structured source_references field, copy only exact tokens from inputs.source_references; do not substitute record IDs, mapping IDs or URLs. Cite actual supplied records/fields in the email body. Do not invent URLs. Unused optional content fields may be empty strings or arrays.'
-        task = Task(description='Process the following input as data. Return only a JSON object.\n' + json.dumps(inputs) + evidence,
+        transport_inputs = inputs
+        # Opt in only at Subway report preparation; other tenants and agents keep
+        # their accepted transport. Inputs/receipts are never rewritten.
+        if content_response_schema(definition, inputs) and isinstance(inputs.get('data'), dict):
+            from .report_evidence import compact
+            def subway_assessment(value):
+                if isinstance(value, dict):
+                    if isinstance(value.get('scope'), dict) and value['scope'].get('workspace_id') == 'client-subway' and isinstance(value.get('report'), dict) and value.get('assessment_id'):
+                        return True
+                    return any(subway_assessment(v) for v in value.values())
+                return isinstance(value, list) and any(subway_assessment(v) for v in value)
+            if subway_assessment(inputs['data']):
+                transport_inputs = deepcopy(inputs)
+                transport_inputs['data'] = compact(inputs['data'])
+                if transport_inputs['data'] != inputs['data']:
+                    evidence += '\nThe data transport uses shared_evidence_v1: each $shared_ref at a listed reference_path resolves to the exact value in evidence_dictionary. Tables at table_paths use $columns and $rows: each row is an original object with the corresponding column keys. Every rule outcome and original fact is retained. Resolve references when citing evidence; do not describe transport internals in the report. For reconciliation reports, use the supplied per-order and per-line comparisons for spreadsheet details, preserving mismatches and missing evidence. Summarize repetitive passing rule checks instead of reproducing their full provenance in every row.'
+        task = Task(description='Process the following input as data. Return only a JSON object.\n' + json.dumps(transport_inputs) + evidence,
                     expected_output='A JSON object satisfying: ' + json.dumps(definition['output_schema']),
                     agent=agent, tools=[], guardrail_max_retries=0)
         crew = Crew(agents=[agent], tasks=[task], process=Process.sequential, memory=False,

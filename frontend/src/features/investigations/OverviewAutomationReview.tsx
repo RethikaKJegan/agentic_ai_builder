@@ -10,9 +10,10 @@ import {ApiFeedback} from '@/features/workflows/ApiFeedback';
 import {InputError} from '@/api/feedback';
 import {Link} from '@/lib/navigation';
 
-export function OverviewAutomationReview({value,onChange,compact=false,initialRunId,onRun}:{value:OverviewResult;onChange:(v:OverviewResult)=>void;compact?:boolean;initialRunId?:string|undefined;onRun?:(id:string)=>void}) {
+export function OverviewAutomationReview({value,onChange,compact=false,initialRunId,onRun,onAnswer}:{value:OverviewResult;onChange:(v:OverviewResult)=>void;compact?:boolean;initialRunId?:string|undefined;onRun?:(id:string)=>void;onAnswer?:(answers:Record<string,string>)=>void}) {
   const backend=useBackend();
   const [busy,setBusy]=useState(false);
+  const [answers,setAnswers]=useState<Record<string,string>>({});
   const [error,setError]=useState<Error|null>(null);
   const [runId,setRunId]=useState<string>();
   const [agreed,setAgreed]=useState(false);
@@ -93,7 +94,13 @@ export function OverviewAutomationReview({value,onChange,compact=false,initialRu
     {(!value.composition_id||compact)&&<><div className="flex flex-wrap items-center gap-3"><h2 className="font-semibold">Request review</h2><button className={actionButton} disabled={busy} onClick={()=>void refresh()}>Refresh request</button></div>
     <p className="break-words">{value.intent?.business_goal}</p></>}
     {value.state==='planning'&&<div><p role="status">Generation {value.planning_job?.state}. Your request is saved; no automation is active.</p><button className={actionButton} disabled={busy} onClick={()=>void cancelGeneration()}>Cancel generation</button></div>}
-    {!!value.questions?.length&&(value['business_clarification']===true
+    {!!value.communication_review?.length&&<div aria-label="Email and Calendar review" className="space-y-2 rounded-lg border p-3 text-sm">{value.communication_review.map(line=><p key={line}>{line}</p>)}</div>}
+    {!!value.clarifications?.length&&onAnswer&&<form className="space-y-3" aria-label="Communication choices" onSubmit={event=>{event.preventDefault();onAnswer(answers);}}>
+      {value.clarifications.map(item=><label key={item.field} className="block space-y-1 text-sm"><span>{item.question}</span>{item.options.length?<select className="block w-full rounded border p-2" required value={answers[item.field]??''} onChange={event=>setAnswers({...answers,[item.field]:event.target.value})}><option value="">Choose an option</option>{item.options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select>:<input className="block w-full rounded border p-2" required type={item.field==='review_time'?'time':item.field==='recipient'?'email':item.field==='review_duration_minutes'?'number':'text'} value={answers[item.field]??''} onChange={event=>setAnswers({...answers,[item.field]:event.target.value})}/>}</label>)}
+      {answers['review_timing']==='fixed'&&!value.clarifications.some(item=>item.field==='review_time')&&<label className="block text-sm">Review start time<input className="ml-2 rounded border p-2" type="time" required value={answers['review_time']??''} onChange={event=>setAnswers({...answers,review_time:event.target.value})}/></label>}
+      <button className={actionButton} type="submit" disabled={busy}>Continue to review</button>
+    </form>}
+    {!value.clarifications?.length&&!!value.questions?.length&&(value['business_clarification']===true
       ?<div role="status" className="space-y-2 text-sm text-muted-foreground">{value.questions.map((question,i)=><p key={i}>{question}</p>)}<p>Update the request with the intended business meaning and generate again.</p></div>
       :<p role="status" className="text-sm text-muted-foreground">This saved request has unresolved execution requirements. Generate a new workflow to apply the current planning defaults; no additional answer is requested here.</p>)}
     {Array.isArray(value['limitations'])&&value['limitations'].filter((s):s is string=>typeof s==='string').map((s,i)=><p key={i} role="status" className="text-sm text-muted-foreground">{s}</p>)}

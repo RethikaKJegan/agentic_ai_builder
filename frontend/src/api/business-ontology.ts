@@ -17,7 +17,7 @@ export const businessOntologySchema=z.object({
  layers:z.array(layer),modules:z.array(module),
  available_sources:z.array(z.object({connection_id:z.string(),name:z.string(),engine:z.literal('mongodb'),connection_status:z.literal('connected'),metadata_revision:z.number().int().nonnegative()})),
  source_bindings:z.array(z.object({role:z.enum(['service','quality','central','finance']),connection_id:z.string(),name:z.string().nullable(),status:z.enum(['connected','metadata_changed','unavailable'])})),
- versions:z.array(z.object({version_id:z.string(),revision:z.number().int().positive(),created_at:z.string(),kind:z.enum(['foundation','draft'])})),
+ versions:z.array(z.object({version_id:z.string(),revision:z.number().int().nonnegative(),created_at:z.string(),kind:z.enum(['foundation','draft'])})),
  counts:z.object({concepts:z.number().int().nonnegative(),relationships:z.number().int().nonnegative(),rules:z.number().int().nonnegative()}),
  generation_status:z.enum(['not_started','draft_available']),
  definitions:definitions.default({concepts:[],relationships:[],rules:[]}),documents:z.array(source).default([]),questions:z.record(z.array(z.string())).default({}),current_version_id:z.string().nullable().default(null),

@@ -1,0 +1,5 @@
+- [x] Inspect saved failed execution and record diagnostic limits.
+- [x] Implement lossless report evidence compaction and typed model diagnostics.
+- [x] Implement Subway-only compact workflow cards and readable layout.
+- [x] Verify offline runtime, provider failure handling, contracts and browser layout.
+- [x] Deploy isolated artifacts and verify preservation and public application.

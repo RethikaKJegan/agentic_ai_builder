@@ -117,3 +117,22 @@ it('replaces a definition only with a selected reviewed automation',async()=>{
   fireEvent.click(screen.getByRole('button',{name:'Replace reviewed definition'}));
   await waitFor(()=>expect(calls.control).toHaveBeenCalledWith('original',expect.objectContaining({action:'replace',replacement_id:'replacement',request_key:expect.any(String)})));
 });
+
+it('asks communication choices without technical instructions or automatic activation',()=>{
+ const value=overviewResultSchema.parse({...prepared(),state:'clarification',composition_id:undefined,schedule:undefined,clarifications:[{field:'email_delivery',question:'Should I email the report or prepare a draft?',options:[{value:'send',label:'Email it to me'},{value:'draft',label:'Prepare a draft'}]},{field:'review_timing',question:'When would you like the reading session?',options:[{value:'after_ready',label:'After the report is ready'},{value:'fixed',label:'At a fixed time'}]}]});
+ const answer=vi.fn();render(<OverviewAutomationReview value={value} onChange={vi.fn()} onAnswer={answer} compact/>);
+ fireEvent.change(screen.getByLabelText('Should I email the report or prepare a draft?'),{target:{value:'send'}});
+ fireEvent.change(screen.getByLabelText('When would you like the reading session?'),{target:{value:'fixed'}});
+ fireEvent.change(screen.getByLabelText('Review start time'),{target:{value:'22:50'}});
+ fireEvent.click(screen.getByRole('button',{name:'Continue to review'}));
+ expect(answer).toHaveBeenCalledWith({email_delivery:'send',review_timing:'fixed',review_time:'22:50'});
+ expect(calls.activate).not.toHaveBeenCalled();expect(screen.queryByText(/Calendar identity must be explicit/)).not.toBeInTheDocument();
+});
+
+it('shows recipient calendar and timing policy before recurring authorization',()=>{
+ const value=overviewResultSchema.parse({...prepared(),communication_review:['Connected account: owner@example.com','Report recipient: owner@example.com','Review calendar: Primary calendar','Reading session: 30 minutes, starting 5 minutes after the report is ready.']});
+ render(<OverviewAutomationReview value={value} onChange={vi.fn()}/>);
+ expect(screen.getByLabelText('Email and Calendar review')).toHaveTextContent('owner@example.com');
+ expect(screen.getByLabelText('Email and Calendar review')).toHaveTextContent('5 minutes after the report is ready');
+ expect(screen.getByRole('button',{name:'Authorize and start schedule'})).toBeDisabled();expect(calls.activate).not.toHaveBeenCalled();
+});

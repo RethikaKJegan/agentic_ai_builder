@@ -7,6 +7,7 @@ from .service import RuntimeFailure, digest
 CATEGORIES = {
  'storage_contention': ('retry_read', True, False),
  'internal_execution_failure': ('inspect_service', False, True),
+ 'model_service_failure': ('inspect_model_service', False, True),
  'invalid_model_output': ('correct_structured_output', True, False),
  'missing_evidence': ('request_input', False, True),
  'invalid_source_values': ('refresh_evidence', False, True),
@@ -24,7 +25,15 @@ CATEGORIES = {
 }
 CODES = {
  'DATABASE_BUSY':'storage_contention','INVOCATION_FAILED':'internal_execution_failure','INVALID_USAGE':'internal_execution_failure',
+ 'MODEL_INVOCATION_FAILED':'model_service_failure','MODEL_PROVIDER_TIMEOUT':'model_service_failure',
+ 'MODEL_PROVIDER_CONNECTION':'model_service_failure','MODEL_PROVIDER_AUTH':'model_service_failure',
+ 'MODEL_PROVIDER_RATE_LIMIT':'model_service_failure','MODEL_PROVIDER_UNAVAILABLE':'model_service_failure',
+ 'MODEL_REQUEST_REJECTED':'model_service_failure',
  'ACTION_CONTENT_UNVERIFIED':'invalid_model_output',
+ 'SUBWAY_ASSESSMENT_INVALID':'incorrect_source_mapping','SUBWAY_QUERY_INVALID':'incorrect_source_mapping',
+ 'SUBWAY_ASSESSMENT_DENIED':'revoked_authorization','SUBWAY_QUERY_DENIED':'revoked_authorization',
+ 'SUBWAY_QUERY_STALE':'stale_metadata','SUBWAY_KNOWLEDGE_STALE':'stale_metadata',
+ 'SUBWAY_ASSESSMENT_LIMIT':'unsupported_capability','SUBWAY_QUERY_TIMEOUT':'connector_timeout',
  'DATA_QUERY_STALE':'stale_metadata','DATA_QUERY_RESULT_EXPIRED':'stale_metadata',
  'DATA_QUERY_INVALID':'invalid_model_output','DATA_QUERY_INCOMPLETE':'missing_evidence',
  'DATA_QUERY_SCOPE_REQUIRED':'revoked_authorization','ACTION_INPUT_REQUIRED':'missing_evidence',

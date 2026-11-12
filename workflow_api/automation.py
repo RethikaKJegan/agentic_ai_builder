@@ -184,6 +184,11 @@ class DurableAutomation:
         for tid,schema in body['operations'].items():
             if tid not in tools:fail('Authorization names an unavailable registered operation.')
             self.schema(schema)
+            if 'x-praxi-calendar-review-v1' in schema:
+                from .communication_timing import validate
+                pin=schema['x-praxi-calendar-review-v1'];validate(pin)
+                if tid!='extension_calendar_create' or pin['timezone']!=body['schedule']['timezone']:
+                    fail('The reading session must use its reviewed account, schedule and timezone.','AUTOMATION_SCOPE_DENIED',403)
             if 'x-praxi-calendar-occurrence-v1' in schema:
                 from .calendar_occurrences import values
                 pin=schema['x-praxi-calendar-occurrence-v1']
@@ -612,6 +617,14 @@ class DurableAutomation:
         self.service.registry_adapter.execution_assignments(workflow,self._fresh(auth))
         if not self._pinned(db,run,workflow,schedule) or workflow.get('metadata',{}).get('google_connection_id')!=policy['request']['connection_id']:fail('Recurring workflow/account changed.','AUTOMATION_SCOPE_DENIED',403)
         schema=policy['request']['operations'].get(node['tool_id'])
+        if schema and 'x-praxi-calendar-review-v1' in schema:
+            from .communication_timing import runtime_values
+            pin=workflow.get('metadata',{}).get('overview_intent',{}).get('communication',{}).get('review')
+            if node['tool_id']!='extension_calendar_create' or pin!=schema['x-praxi-calendar-review-v1']:
+                fail('The reading-session policy differs from its reviewed workflow.','AUTOMATION_SCOPE_DENIED',403)
+            expected=runtime_values(pin,run,node['node_id'],self.clock(),occurrence['due'])
+            if any(inputs.get('event',{}).get(field)!=expected['calendar_event_'+field] for field in ('start','end')):
+                fail('The reading-session time differs from the exact reviewed action.','AUTOMATION_SCOPE_DENIED',403)
         if schema and 'x-praxi-calendar-occurrence-v1' in schema:
             from .calendar_occurrences import values
             pin=workflow.get('metadata',{}).get('overview_intent',{}).get('calendar_occurrence')
@@ -639,12 +652,17 @@ class DurableAutomation:
     def _approve(self, auth, run):
         auth=self._fresh(auth)
         rid=run['run_id'];runtime=self.service.runtime_runner.runtime
-        with self.store.transaction(write=False) as db:
+        with self.store.transaction() as db:
             saved=runtime.load(db,rid,auth);workflow=self.store.get(db,saved['workspace_id'],saved['workflow_id'],saved['workflow_version'])
             approval=saved['approvals'][-1];gate=saved['approval_context']['node_id'];edge=next(e for e in workflow['edges'] if e['source']==gate and e.get('outcome')=='approved');node=next(n for n in workflow['nodes'] if n['node_id']==edge['target'])
             from .workflow_adaptive import effective
             try:self.check_action(db,auth,saved,effective(saved,workflow),node,approval['resolved_payload'])
-            except Exception:return False
+            except Exception as exc:
+                if getattr(exc,'code',None)=='CALENDAR_REVIEW_TIME_PASSED' and node.get('tool_id')=='extension_calendar_create' and not saved.get('node_invocations',{}).get(node['node_id']):
+                    saved['current_node_id']=node['node_id'];saved['node_states'][node['node_id']]='failed'
+                    saved.setdefault('action_instances',{}).setdefault(node['node_id'],{}).update(state='failed',external_effect_status='not_performed')
+                    self.service.runtime_runner.fail(db,saved,'CALENDAR_REVIEW_TIME_PASSED')
+                return False
             if len(saved.get('automation_approvals',{}))>=self._policy(db,auth,saved)[0]['request']['limits']['max_actions_per_occurrence']:return False
         self._connection(auth,workflow['metadata']['google_connection_id'])
         self.service.runtime_runner.decide(dict(request_id='recurring_'+approval['approval_id'],idempotency_key='recurring_'+approval['approval_id'],payload=dict(approval_id=approval['approval_id'],workflow_id=run['workflow_id'],workflow_version=run['workflow_version'],decision='approved')),auth)

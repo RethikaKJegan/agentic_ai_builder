@@ -1,0 +1,3 @@
+- [x] Make authorized same-decision submissions read-only replays.
+- [x] Verify completed-run replay, conflicting decisions and authorization.
+- [x] Deploy isolated tenant releases and verify preservation/health.

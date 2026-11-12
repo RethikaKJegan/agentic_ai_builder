@@ -68,8 +68,12 @@ export default function Overview() {
     openWhenPrepared.current=false;
     navigate({to:'/app/workflows/investigate',search:{connected:'1',composition:overview.composition_id,overview:overview.request_key}});
   },[overview,overviewScope?.workspace_id,overviewScope?.subject_id,navigate]);
-  const generate = async () => {
+  const communicationAnswers=useRef<{objective:string;values:Record<string,string>}>({objective:'',values:{}});
+  const generate = async (answers?:Record<string,string>) => {
     const prompt = description.trim();
+    if(communicationAnswers.current.objective!==prompt)communicationAnswers.current={objective:prompt,values:{}};
+    if(answers)communicationAnswers.current.values={...communicationAnswers.current.values,...answers};
+    const resolvedValues={...businessValues,...communicationAnswers.current.values};
     if (generationLock.current || !prompt) return;
     generationLock.current = true;
     restoreGeneration.current++;
@@ -88,12 +92,12 @@ export default function Overview() {
       if (!currentBackend.can("workflow.plan")) throw new InputError("Your current account does not have permission to generate workflows.");
       if (!currentBackend.session?.planning_available) throw new InputError("The backend has not enabled the workflow planner. Check its model configuration.");
       if(currentBackend.session.overview_routing_available&&workflowMode==='auto') {
-        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(businessValues);
+        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(resolvedValues);
         if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
         const key=investigationKey.current.key;
         const subject=currentBackend.session.auth.subject;
         localStorage.setItem(overviewStorageKey(subject.workspace_id,subject.subject_id),key);
-        const result=await api.overviewIntent({operation:'prepare',objective:prompt,request_key:key,business_request:evidenceContext,user_values:businessValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
+        const result=await api.overviewIntent({operation:'prepare',objective:prompt,request_key:key,business_request:evidenceContext,user_values:resolvedValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
         if(result.state!=='legacy') {
           openWhenPrepared.current=true;
           setOverview(result);
@@ -101,10 +105,10 @@ export default function Overview() {
         }
       }
       if(isInvestigationPrompt(prompt,workflowMode)||(workflowMode!=='automation'&&currentBackend.session?.dynamic_composition_available===true)||toolOptions.packageId) {
-        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(businessValues);
+        const contextKey=prompt+JSON.stringify(evidenceContext)+JSON.stringify(toolOptions)+JSON.stringify(resolvedValues);
         if(investigationKey.current?.prompt!==contextKey)investigationKey.current={prompt:contextKey,key:crypto.randomUUID()};
         const key=investigationKey.current.key;
-        const doc=await api.createActionPlan({objective:prompt,request_key:key,automatic_inputs:true,business_request:evidenceContext,user_values:businessValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
+        const doc=await api.createActionPlan({objective:prompt,request_key:key,automatic_inputs:true,business_request:evidenceContext,user_values:resolvedValues,...(toolOptions.google?{google_connection_id:toolOptions.google}:{})});
         navigate({to:'/app/workflows/investigate',search:{connected:'1',composition:doc.composition_id}});
         return;
       }
@@ -138,7 +142,7 @@ export default function Overview() {
       {planningJob && <p role="status" className="mt-3 break-all text-xs text-muted-foreground">Generation {planningJob.state} · Job {planningJob.job_id}</p>}
       {planningJob?.state === "cancelled" && <p className="mt-1 text-xs text-muted-foreground">Cancellation discards the result. Model usage already incurred cannot be undone.</p>}
       <ApiFeedback error={apiError} />
-      {overview&&!planning&&<OverviewAutomationReview value={overview} onChange={setOverview} compact/>}
+      {overview&&!planning&&<OverviewAutomationReview value={overview} onChange={setOverview} onAnswer={answers=>void generate(answers)} compact/>}
     </section>
     <section className="mt-12"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium">Recent workflows</h2><Link to="/app/workflows" className="text-sm text-primary">View all</Link></div>{workflows.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">Generate a workflow above to see it here.</p> : <div className="divide-y divide-border rounded-xl border border-border">{workflows.slice(0, 5).map((w) => <Link key={w.id} to="/app/workflows/$id" params={{ id: w.id }} className="flex items-center justify-between px-4 py-3 hover:bg-canvas"><span><span className="block font-medium">{displayText(w.name)}</span><span className="text-xs text-muted-foreground">{w.nodes.length} steps · {w.serverVersion ? `server v${w.serverVersion}` : "local draft"}</span></span><ArrowRight className="h-4 w-4 text-primary" /></Link>)}</div>}</section>
     <InvestigationList/>

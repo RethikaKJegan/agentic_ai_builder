@@ -9,15 +9,16 @@ from tests.test_subway_autonomy import start,drain,decision
 from tests.test_connected_action_plans import action,bind
 from workflow_api.subway_demonstration import install,DemoQueries
 from workflow_api.subway_assessments import definition
-from workflow_api.subway_demo_data import LABEL
+
 from workflow_api.automation import DurableAutomation
 
 @pytest.mark.parametrize('recurring',[False,True])
-def test_persistent_demo_overview_assessment_report_and_reviewed_occurrence(subway,monkeypatch,recurring):
+@pytest.mark.parametrize('extra_fields',[False,True])
+def test_persistent_demo_overview_assessment_report_and_reviewed_occurrence(subway,monkeypatch,recurring,extra_fields):
     f=subway;install(f.service.store,f.auth,f.q.version);f.q=DemoQueries(f.q,f.auth)
     f.selected_override=selection(f.q,['finance.purchaseorders','finance.invoicedatas','finance.approvals','finance.budgets'])
     c=f.q.catalog(f.auth);d=next(d for d in c['datasets'].values() if d['label']=='finance.purchaseorders');fid=next(v['field_id'] for v in d['fields'] if v['name']=='_id')
-    f.query_plans={'query_plan':dict(base_dataset_id=d['dataset_id'],fields=[fid],metrics=[],joins=[],filters=[],group_by=[],order_by=[],offset=0,limit=20)}
+    f.query_plans={'query_plan':dict(base_dataset_id=d['dataset_id'],fields=[v['field_id'] for v in d['fields']][:10] if extra_fields else [fid],metrics=[],joins=[],filters=[],group_by=[],order_by=[],offset=0,limit=20)}
     registry=f.adapter.service;policy=deepcopy(registry._policy);policy.remaining_quota['subway_assess']=100;policy.version+=1
     assert registry.update_policy(policy,f.auth)['status']==200
     assert registry.register_tool(definition(),f.auth)['status']==200
@@ -38,7 +39,7 @@ def test_persistent_demo_overview_assessment_report_and_reviewed_occurrence(subw
     out=run['action_instances']['assess']['output'];assert out['coverage']['matched_records']==8
     assert out['report']['provenance']['mode']=='modeled_demonstration' and len(out['report']['invoice_reconciliation'])==8
     assert all(r['invoice_item_comparison']!='INSUFFICIENT_EVIDENCE' for r in out['report']['reconciliations'])
-    assert LABEL in run['action_instances']['report']['output']['summary']
+    assert 'Demo data' not in run['action_instances']['report']['output']['summary']
     assert run['action_instances']['assess']['ontology_rule_usage']
     assert all(v['valid'] for v in contexts[-1]['evidence'].values())
     if recurring:

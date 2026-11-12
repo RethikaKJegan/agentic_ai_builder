@@ -1,0 +1,5 @@
+# Natural email and Calendar workflows for Simpson and Subway
+
+Resolve selected/default/sole owned Google accounts server-side. Resolve the primary calendar as a visible review default for unnamed Calendar requests; preserve explicit selections. Ask natural, structured questions for ambiguous email delivery and review timing. Persist the exact recipient, account, calendar and fixed/after-ready time policy in the existing Overview review and recurring consent. After-ready events use a pinned lead time and duration, resolved once per run after report completion before exact approval. Reject stale event times before dispatch. Show separate provider-confirmed delivery statuses. Preserve completed email receipts during partial failure handling; uncertain external effects remain reconciliation-only, with no automatic replay.
+
+Reuse existing Overview, Registry, graph, approvals, scheduler and UI. Deploy isolated backend copies for both tenants and the shared frontend; do not change their business records, ontology, credentials, existing workflows or schedules. Verify controlled transport end-to-end journeys and production read-only smoke checks.

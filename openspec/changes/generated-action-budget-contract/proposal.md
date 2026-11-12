@@ -1,0 +1,5 @@
+# Derive generated action budgets from registered capabilities
+
+Generated drafts can assign a model/tool call to the wrong allowance, causing a vague ACTION_BINDING_INVALID before compilation. Normalize only new server-generated drafts against registered capability kind before schema validation and approval. Model actions reserve at least one model call and no tool calls; tools reserve at least one tool call and no model calls, with writes limited to one dispatch. Preserve valid higher read/model allowances, schema/type gates, retry restrictions, agent policies and aggregate plan caps. Tool timeouts meet registered minimums only before review. Submitted plans and saved workflows retain strict validation. Attach exact action/capability/required allowance feedback to invalid budgets.
+
+Deploy only the isolated Subway backend; do not edit Simpson or live schedules. Test normal generation and recurring email/Calendar with controlled providers/transports, without sending real communications.

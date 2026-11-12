@@ -7,6 +7,8 @@ export const overviewResultSchema=z.object({
   workspace:z.object({workspace_id:z.string(),subject_id:z.string()}).optional(),
   intent:z.object({intent_type:z.string(),business_goal:z.string(),side_effects:z.array(z.string())}).passthrough().optional(),
   questions:z.array(z.string()).optional(),
+  clarifications:z.array(z.object({field:z.string(),question:z.string(),options:z.array(z.object({value:z.string(),label:z.string()}))})).optional(),
+  communication_review:z.array(z.string()).optional(),
   planning_job:z.object({job_id:z.string(),state:z.string()}).optional(),
   composition_id:z.string().optional(),
   schedule:z.object({cron:z.string(),timezone:z.string(),next_due:z.number(),expires_at:z.number(),max_occurrences:z.number(),missed_run_policy:z.string(),overlap_policy:z.string()}).nullable().optional(),

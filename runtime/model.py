@@ -98,7 +98,22 @@ class BoundedLLM(BaseLLM):
                 exc.usage=dict(self.actual_usage)
             raise
         except Exception as exc:
-            raise RuntimeFailure('MODEL_INVOCATION_FAILED', 'The model failed or exceeded reserved usage.') from None
+            # SDK exception bodies can contain prompts, credentials or responses.
+            # Keep only class and allowlisted status, never str(exc).
+            from openai import APITimeoutError, APIConnectionError, APIStatusError
+            code = 'MODEL_INVOCATION_FAILED'
+            if isinstance(exc, APITimeoutError):code = 'MODEL_PROVIDER_TIMEOUT'
+            elif isinstance(exc, APIConnectionError):code = 'MODEL_PROVIDER_CONNECTION'
+            elif isinstance(exc, APIStatusError):
+                status = exc.status_code
+                code = ('MODEL_PROVIDER_AUTH' if status in (401, 403) else
+                        'MODEL_PROVIDER_RATE_LIMIT' if status == 429 else
+                        'MODEL_PROVIDER_UNAVAILABLE' if status >= 500 else 'MODEL_REQUEST_REJECTED')
+            failure = RuntimeFailure(code, 'The model service could not complete this request.')
+            failure.model_diagnostic = {'exception_type': type(exc).__name__[:80]}
+            if isinstance(exc, APIStatusError):failure.model_diagnostic['http_status'] = exc.status_code
+            if self.token_policy == 'provider':failure.usage = dict(self.actual_usage)
+            raise failure from None
 
     def supports_stop_words(self):
         return False

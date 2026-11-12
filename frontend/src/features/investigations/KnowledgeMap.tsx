@@ -1,6 +1,6 @@
 'use client';
 import '@xyflow/react/dist/style.css';
-import {useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useState} from 'react';
 import {ReactFlow,ReactFlowProvider,Background,Controls,Handle,Position,MarkerType,useReactFlow,useNodesInitialized,type Node,type NodeProps} from '@xyflow/react';
 import dagre from '@dagrejs/dagre';
 import {Network,CheckCircle2,BookOpen,Layers,Search,ArrowUpRight,Info,ChevronRight,Loader2} from 'lucide-react';
@@ -11,6 +11,9 @@ import type {CompositionView} from '@/api/compositions';
 import type {KnowledgeSnapshot} from '@/api/knowledge-map';
 import {knowledgeContext} from '@/domain/knowledge-context';
 import {pinnedKnowledgeVersion,workflowKnowledge,type KnowledgeConcept} from '@/domain/workflow-knowledge';
+
+import {loadWorkflowKnowledge} from '@/domain/load-workflow-knowledge';
+import {subwayDisplay,subwayDisplayText} from '@/domain/subway-presentation';
 
 const label=(s:string)=>s.replaceAll('_',' ').replace(/([a-z])([A-Z])/g,'$1 $2');
 type Card=Node<{label:string;module:string;state:string;group:boolean;count:number},'concept'>;
@@ -37,6 +40,7 @@ export function KnowledgeMap(props:Props){
  return <ScopedKnowledgeMap key={key} {...props}/>;
 }
 function ScopedKnowledgeMap({doc,view}:Props){
+ const text=useCallback((value:string)=>subwayDisplayText(value,doc.scope.workspace),[doc.scope.workspace]);
  const pinned=pinnedKnowledgeVersion(doc,view);
  const [loaded,setLoaded]=useState<{snapshot:KnowledgeSnapshot;historical:boolean;modules:Record<string,string>}|null>(null);
  const [error,setError]=useState(false);const [retry,setRetry]=useState(0);
@@ -46,18 +50,12 @@ function ScopedKnowledgeMap({doc,view}:Props){
  useEffect(()=>{
   let live=true;setLoaded(null);setError(false);
   async function load(){
-   const ontology=await api.businessOntology();
-   let snapshot:KnowledgeSnapshot;let historical=false;
-   if(pinned){
-    try{snapshot=await api.knowledgeSnapshot(pinned);historical=true;}
-    catch{if(!ontology.current_version_id)throw new Error('No authorized snapshot');snapshot=await api.knowledgeSnapshot(ontology.current_version_id);}
-   }else{if(!ontology.current_version_id)throw new Error('No authorized ontology');snapshot=await api.knowledgeSnapshot(ontology.current_version_id);}
-   if(pinned&&historical&&snapshot.version_id!==pinned)throw new Error('Snapshot reference mismatch');
-   if(live)setLoaded({snapshot,historical,modules:Object.fromEntries(ontology.modules.map(m=>[m.id,m.label]))});
+   const loaded=await loadWorkflowKnowledge(api,pinned,doc.scope.workspace==='client-subway'&&!!pinned?.startsWith('bov_subway_demonstration'));
+   if(live)setLoaded({...loaded,modules:subwayDisplay(loaded.modules,doc.scope.workspace),snapshot:subwayDisplay(loaded.snapshot,doc.scope.workspace)});
   }
   void load().catch(()=>{if(live)setError(true);});
   return()=>{live=false;};
- },[pinned,retry]);
+ },[pinned,retry,doc.scope.workspace]);
  useEffect(()=>{
   let live=true;const id=view.run?.run_id;
   if(!id)return;
@@ -76,10 +74,10 @@ function ScopedKnowledgeMap({doc,view}:Props){
   // Layout depends on visible IDs/edges, never runtime status or node selection.
   const layout=new dagre.graphlib.Graph();layout.setGraph({rankdir:'LR',nodesep:38,ranksep:100});layout.setDefaultEdgeLabel(()=>({}));
   visible.forEach(n=>layout.setNode(n.id,{width:224,height:122}));model.edges.forEach(e=>{if(ids.has(e.source)&&ids.has(e.target))layout.setEdge(e.source,e.target);});dagre.layout(layout);
-  const nodes:Card[]=visible.map(n=>{const usages=n.usage.filter(u=>step==='all'||u.step===step);return {id:n.id,type:'concept',selected:selected===n.id,position:{x:layout.node(n.id).x,y:layout.node(n.id).y},data:{label:label(n.label),module:loaded.modules[n.module_id]??label(n.module_id),state:usages.some(u=>u.state==='executed')?'executed':context.neighbours.has(n.id)?'context':usages.length?'planned':'available',group:false,count:0}};});
+  const nodes:Card[]=visible.map(n=>{const usages=n.usage.filter(u=>step==='all'||u.step===step);return {id:n.id,type:'concept',selected:selected===n.id,position:{x:layout.node(n.id).x,y:layout.node(n.id).y},data:{label:text(label(n.label)),module:loaded.modules[n.module_id]??label(n.module_id),state:usages.some(u=>u.state==='executed')?'executed':context.neighbours.has(n.id)?'context':usages.length?'planned':'available',group:false,count:0}};});
   if(mode==='full'&&!query){let i=0;for(const module of modules){const hidden=model.nodes.filter(n=>n.module_id===module&&!ids.has(n.id));if(hidden.length&&(mode==='full'?collapsed.includes(module):!expanded.includes(module))){nodes.push({id:'module:'+module,type:'concept',position:{x:(i%3)*260-(visible.length?850:0),y:Math.floor(i/3)*155},data:{label:loaded.modules[module]??label(module),module:'More business knowledge',state:'available',group:true,count:hidden.length}});i++;}}}
-  return {nodes,edges:model.edges.filter(e=>ids.has(e.source)&&ids.has(e.target)).map(e=>({id:e.id,source:e.source,target:e.target,label:label(e.label||e.predicate),type:'smoothstep',markerEnd:{type:MarkerType.ArrowClosed},style:{stroke:e.steps.some(s=>step==='all'||s===step)?'#2563eb':'#94a3b8'},labelStyle:{fontSize:11},labelBgPadding:[6,4] as [number,number],labelBgBorderRadius:4}))};
- },[model,loaded,context,mode,step,search,selected,expanded,collapsed]);
+  return {nodes,edges:model.edges.filter(e=>ids.has(e.source)&&ids.has(e.target)).map(e=>({id:e.id,source:e.source,target:e.target,label:text(label(e.label||e.predicate)),type:'smoothstep',markerEnd:{type:MarkerType.ArrowClosed},style:{stroke:e.steps.some(s=>step==='all'||s===step)?'#2563eb':'#94a3b8'},labelStyle:{fontSize:11},labelBgPadding:[6,4] as [number,number],labelBgBorderRadius:4}))};
+ },[model,loaded,context,mode,step,search,selected,expanded,collapsed,text]);
  if(error)return <div className="rounded-xl border border-dashed p-8"><h3 className="font-semibold">Knowledge map unavailable</h3><p className="mt-2 text-sm text-muted-foreground">No authorized ontology could be loaded for this workspace. Your workflow and reports remain available.</p><button onClick={()=>setRetry(n=>n+1)} className="mt-4 rounded-lg border px-4 py-2 text-sm">Try again</button></div>;
  if(!model||!loaded)return <div role="status" className="flex min-h-96 items-center justify-center gap-3 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin"/>Loading your workspace’s knowledge…</div>;
  const concept=model.nodes.find(n=>n.id===selected);
@@ -90,7 +88,7 @@ function ScopedKnowledgeMap({doc,view}:Props){
   <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary"><Network size={15}/>Business context</p><h3 className="mt-2 text-xl font-semibold">The knowledge behind this workflow</h3><p className="mt-1 text-sm text-muted-foreground">Explore definitions, their relationships and the evidence this workflow can establish.</p></div><div className="rounded-xl border bg-muted/30 px-4 py-3 text-right"><p className="text-lg font-semibold">{associated}<span className="text-sm font-normal text-muted-foreground"> / {model.nodes.length}</span></p><p className="text-xs text-muted-foreground">concepts associated with the plan</p><p className="mt-1 text-xs text-emerald-700">{executed} with recorded execution evidence</p></div></div>
   <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-background p-3">
    <div className="inline-flex rounded-lg bg-muted p-1"><button aria-pressed={mode==='workflow'} onClick={()=>setMode('workflow')} className={`rounded-md px-3 py-2 text-sm ${mode==='workflow'?'bg-background font-medium shadow-sm':''}`}>This workflow</button><button aria-pressed={mode==='full'} onClick={()=>setMode('full')} className={`rounded-md px-3 py-2 text-sm ${mode==='full'?'bg-background font-medium shadow-sm':''}`}>Full ontology</button></div>
-   <select aria-label="Knowledge workflow step" value={step} onChange={e=>{setStep(e.target.value);setSelected(null);}} className="min-w-0 max-w-full rounded-lg border bg-background px-3 py-2 text-sm"><option value="all">All workflow steps</option>{doc.action_plan.actions.map(a=><option key={a.action_id} value={a.action_id}>{label(a.action_id)}</option>)}</select>
+   <select aria-label="Knowledge workflow step" value={step} onChange={e=>{setStep(e.target.value);setSelected(null);}} className="min-w-0 max-w-full rounded-lg border bg-background px-3 py-2 text-sm"><option value="all">All workflow steps</option>{doc.action_plan.actions.map(a=><option key={a.action_id} value={a.action_id}>{text(label(a.action_id))}</option>)}</select>
    <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2"><Search size={15} className="shrink-0 text-muted-foreground"/><input aria-label="Search ontology concepts" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search concepts…" className="w-full min-w-0 bg-transparent text-sm outline-none"/></label>
    {expanded.length>0&&<button onClick={()=>setExpanded([])} className="text-xs text-primary">Collapse groups</button>}
   </div>
@@ -107,15 +105,15 @@ function ScopedKnowledgeMap({doc,view}:Props){
      <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{loaded.modules[concept.module_id]??label(concept.module_id)}</p><h4 className="mt-1 text-lg font-semibold">{label(concept.label)}</h4></div>
      <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Business definition</h5><p className="text-sm leading-relaxed text-muted-foreground">{concept.definition||'No saved definition.'}</p><p className="mt-2 text-xs text-muted-foreground">Definition status: {concept.status}. Business validation is separate from execution usage.</p></section>
      {context?.neighbours.has(concept.id)&&<section className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50 p-3"><h5 className="text-sm font-semibold text-emerald-800">Connected context</h5><p className="mt-2 text-xs text-emerald-800">Directly connected to {Array.from(context.neighbours.get(concept.id)!).map(id=>label(model.nodes.find(n=>n.id===id)!.label)).join(', ')} in this ontology. This connection does not establish that the workflow used this concept or relationship.</p></section>}
-     <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Workflow relevance</h5>{concept.usage.length?concept.usage.filter(u=>step==='all'||u.step===step).map((u,i)=><div key={i} className="mb-2 rounded-lg bg-muted/50 p-3 text-xs"><p className="font-medium">{label(u.step)} · {u.state==='executed'?'Executed':'Planned'}</p><p className="mt-1 text-muted-foreground">{u.reason}</p>{u.reference&&<p className="mt-1 break-all">Evidence: {u.reference}</p>}</div>):<p className="text-sm text-muted-foreground">Available in the ontology. No saved workflow association.</p>}</section>
-     <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Connected data</h5>{concept.mappings.length?concept.mappings.map(m=><div key={m.id} className="mb-2 rounded-lg border p-3 text-xs"><p className="font-medium">{m.collection}</p><p className="mt-1 break-all text-muted-foreground">{m.field_path}</p><p className="mt-1 text-muted-foreground">Saved mapping · {m.source_role}</p></div>):<p className="text-sm text-muted-foreground">No saved source mapping available.</p>}</section>
+     <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Workflow relevance</h5>{concept.usage.length?concept.usage.filter(u=>step==='all'||u.step===step).map((u,i)=><div key={i} className="mb-2 rounded-lg bg-muted/50 p-3 text-xs"><p className="font-medium">{text(label(u.step))} · {u.state==='executed'?'Executed':'Planned'}</p><p className="mt-1 text-muted-foreground">{text(u.reason)}</p>{u.reference&&<p className="mt-1 break-all">Evidence: {text(u.reference)}</p>}</div>):<p className="text-sm text-muted-foreground">Available in the ontology. No saved workflow association.</p>}</section>
+     <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Connected data</h5>{concept.mappings.length?concept.mappings.map(m=><div key={m.id} className="mb-2 rounded-lg border p-3 text-xs"><p className="font-medium">{text(m.collection)}</p><p className="mt-1 break-all text-muted-foreground">{text(m.field_path)}</p><p className="mt-1 text-muted-foreground">Saved mapping · {m.source_role}</p></div>):<p className="text-sm text-muted-foreground">No saved source mapping available.</p>}</section>
      <section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Relationships</h5>{related.map(e=>{const other=model.nodes.find(n=>n.id===(e.source===concept.id?e.target:e.source));return other?<button key={e.id} onClick={()=>{setSelected(other.id);setExpanded(old=>[...old,other.module_id]);}} className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border p-3 text-left text-xs"><span><span className="text-muted-foreground">{e.source===concept.id?'→':'←'} {label(e.label||e.predicate)}</span><span className="mt-1 block font-medium">{label(other.label)}</span></span><ChevronRight size={14}/></button>:null;})}{!related.length&&<p className="text-sm text-muted-foreground">No saved relationships.</p>}</section>
-     {!!concept.unknowns.length&&<section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">Limitations</h5>{concept.unknowns.map((u,i)=><p key={i} className="mb-2 text-xs text-muted-foreground">{u}</p>)}</section>}
-     <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Technical references</summary><p className="mt-2 break-all">Concept: {concept.id}</p><p className="mt-1 break-all">Ontology: {model.version}</p>{concept.evidence.map((e,i)=><p key={i} className="mt-2 break-words">Source {e.source_id}: {e.quote}</p>)}</details>
+     {!!concept.unknowns.length&&<section><h5 className="mb-2 text-xs font-semibold uppercase tracking-wide">{doc.scope.workspace==='client-subway'?'Notes':'Limitations'}</h5>{concept.unknowns.map((u,i)=><p key={i} className="mb-2 text-xs text-muted-foreground">{text(u)}</p>)}</section>}
+     <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Technical references</summary><p className="mt-2 break-all">Concept: {text(concept.id)}</p><p className="mt-1 break-all">Ontology: {text(model.version)}</p>{concept.evidence.map((e,i)=><p key={i} className="mt-2 break-words">Source {text(e.source_id)}: {text(e.quote)}</p>)}</details>
     </>}
    </aside>
   </div>
-  {(model.limitations.length>0||runNote)&&<div role="status" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-sm"><Info size={17} className="mt-0.5 shrink-0 text-amber-700"/><div className="space-y-1">{model.limitations.map(s=><p key={s}>{s}</p>)}{runNote&&<p className="text-xs text-muted-foreground">{runNote}</p>}</div></div>}
-  {model.sourceFields.filter(f=>step==='all'||f.step===step).map(f=><details key={f.step} className="rounded-xl border p-4 text-sm"><summary className="cursor-pointer font-medium">Source evidence · {label(f.step)}</summary><p className="mt-3 text-xs text-muted-foreground">Source-query references are shown independently of ontology concept usage.</p>{f.queryId&&<p className="mt-2 flex items-center gap-2 break-all text-xs"><ArrowUpRight size={13}/>Query {f.queryId}</p>}<p className="mt-2 break-all text-xs text-muted-foreground">{f.fields.join(', ')||'No explicit field list recorded.'}</p>{f.coverage&&<p className="mt-2 text-xs">{f.coverage['complete_scan']===true?'Complete source scan.':'Source scan completeness unavailable or partial.'} {f.coverage['has_more']===true?'Additional result rows exist.':''}</p>}</details>)}
+  {(model.limitations.length>0||runNote)&&<div role="status" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-sm"><Info size={17} className="mt-0.5 shrink-0 text-amber-700"/><div className="space-y-1">{model.limitations.map(s=><p key={text(s)}>{text(s)}</p>)}{runNote&&<p className="text-xs text-muted-foreground">{text(runNote)}</p>}</div></div>}
+  {model.sourceFields.filter(f=>step==='all'||f.step===step).map(f=><details key={f.step} className="rounded-xl border p-4 text-sm"><summary className="cursor-pointer font-medium">Source evidence · {text(label(f.step))}</summary><p className="mt-3 text-xs text-muted-foreground">Source-query references are shown independently of ontology concept usage.</p>{f.queryId&&<p className="mt-2 flex items-center gap-2 break-all text-xs"><ArrowUpRight size={13}/>Query {f.queryId}</p>}<p className="mt-2 break-all text-xs text-muted-foreground">{f.fields.join(', ')||'No explicit field list recorded.'}</p>{f.coverage&&<p className="mt-2 text-xs">{f.coverage['complete_scan']===true?'Complete source scan.':'Source scan completeness unavailable or partial.'} {f.coverage['has_more']===true?'Additional result rows exist.':''}</p>}</details>)}
  </section>;
 }

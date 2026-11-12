@@ -318,6 +318,32 @@ class GraphTests(RuntimeFixture):
         self.assertEqual(runner.decide(request, self.approver()), approved)
         self.assertEqual(runner.advance(run_id, self.auth)['status'], 'completed')
 
+    def test_same_decision_with_new_key_after_completion_is_read_only(self):
+        self.approval_graph()
+        runner = self.runner()
+        paused = runner.advance(self.queue(), self.auth)
+        runner.decide(self.decision(paused, 'approved'), self.approver())
+        completed = runner.advance(paused['run_id'], self.auth)
+        self.assertEqual(completed['status'], 'completed')
+        def snapshot():
+            with self.store.transaction(write=False) as db:
+                return (db.execute('SELECT document FROM runtime_runs WHERE run_id=?', (paused['run_id'],)).fetchone()[0],
+                        db.execute('SELECT COUNT(*) FROM runtime_events WHERE run_id=?', (paused['run_id'],)).fetchone()[0])
+        before = snapshot()
+        repeated = self.decision(paused, 'approved')
+        repeated['idempotency_key'] = 'refreshed_browser_key'
+        current = runner.decide(repeated, self.approver())
+        self.assertEqual(current['status'], 'completed')
+        other = deepcopy(self.approver()); other['subject']['subject_id'] = 'other-authorized-reviewer'
+        self.assertEqual(runner.decide(repeated, other), current)
+        with self.assertRaises(RuntimeFailure):
+            runner.decide(repeated, self.auth)
+        conflict = deepcopy(repeated); conflict['payload']['decision'] = 'rejected'
+        with self.assertRaises(RuntimeFailure) as caught:
+            runner.decide(conflict, self.approver())
+        self.assertEqual(caught.exception.code, 'APPROVAL_ALREADY_DECIDED')
+        self.assertEqual(snapshot(), before)
+
     def test_workspace_members_cannot_approve_a_gate_with_an_unknown_role(self):
         self.approval_graph()
         self.workflow['approval_gates'][0]['approver_roles'] = ['workflow_owner']

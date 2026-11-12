@@ -1,0 +1,4 @@
+- [x] Infer delivery and review defaults before normal compilation.
+- [x] Suppress separate inferred-settings summary.
+- [x] Run focused execution and explicit-choice regressions.
+- [x] Deploy tenant-isolated backend releases and verify health/preservation.

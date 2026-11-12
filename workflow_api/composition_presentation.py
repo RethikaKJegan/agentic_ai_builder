@@ -177,6 +177,8 @@ class CompositionPresentation:
         if run.get('error_code')=='DATA_QUERY_INVALID' and workflow.get('metadata',{}).get('overview_intent',{}).get('route',{}).get('intent_type')=='knowledge':
             return dict(eligible=False,reason='This knowledge question was incorrectly prepared as a record query. Generate a new workflow from the original prompt to use the workspace knowledge. The failed run is preserved.',failure=failure)
         if run.get('error_code')=='UNKNOWN_INVOCATION_RESULT' and workflow['metadata'].get('composition_tasks'):failure=classify('DELEGATION_INTERRUPTED')
+        if failure['category']=='model_service_failure':
+            return dict(eligible=False, reason='Model processing could not complete because the model service failed. Completed evidence remains saved. Check the execution diagnostics and model service before starting a new run; no pending delivery was performed by this failure.', failure=failure)
         if not failure['retry_eligible']:return dict(eligible=False,reason='The service could not identify a recoverable failure. Inspect its diagnostic reference before retrying.' if failure['category']=='internal_execution_failure' else 'Resolve the evidence, knowledge or authorization issue and prepare a new workflow.',failure=failure)
         if run.get('lease_until',0)>clock:return dict(eligible=False,reason='Waiting for the previous worker lease to expire.',failure=failure)
         if clock-run['created_at']>=workflow['execution_policy']['limits']['timeout_seconds']:return dict(eligible=False,reason='The original execution deadline has expired. Start a new run.',failure=failure)

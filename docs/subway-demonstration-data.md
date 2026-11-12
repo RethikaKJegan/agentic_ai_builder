@@ -1,5 +1,7 @@
 # Persistent Subway demonstration data
 
+Subway workflow presentation and newly prepared reports, emails, Calendar text and spreadsheet reports omit demonstration prefixes and repetitive boilerplate. Actual delivery content is normalized before exact approval, with source/policy provenance retained in canonical audit records and figures/currency groups preserved. Existing delivered external records are not rewritten. Knowledge Map supports the saved demonstration ontology at revision zero. See the clean-delivery OpenSpec verification for test and deployment evidence.
+
 In the existing Subway Overview, enter an ordinary business request:
 
 > Investigate purchase-order discrepancies and prepare an evidence-backed report.

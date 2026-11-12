@@ -1,5 +1,7 @@
 # Subway procurement knowledge implementation
 
+Assessment query compatibility: the executor validates the caller's full detail projection, then selects native IDs while preserving filters, sorting and page bounds. Extra valid base fields no longer cause the former ID-only mismatch. Unsupported query shapes remain rejected with typed runtime codes. Requested/effective projection and query receipts are retained for audit. See `openspec/changes/subway-assessment-query-contract/verification.md`.
+
 This change adds `subway-procurement-v1`, a versioned, hash-bound extension of the existing `bov_subway_dump_v4` ontology. It preserves the original immutable ontology and client package, using the existing query planner, typed-condition evaluator, native identity diagnostics, Registry, CrewAI, GraphRunner, adaptive evidence, reports, document retrieval and Knowledge Map. It introduces no alternative workflow engine or UI.
 
 ## A. Exact code changes

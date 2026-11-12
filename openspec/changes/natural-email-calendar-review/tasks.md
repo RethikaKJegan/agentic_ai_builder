@@ -1,0 +1,6 @@
+- [x] Implement scoped account/default calendar resolution and natural clarifications.
+- [x] Implement pinned fixed and after-ready review timing with consent and past-time guards.
+- [x] Add plain-language review, answer controls and independent delivery statuses.
+- [x] Verify safe partial-failure handling without duplicate email or Calendar writes.
+- [x] Run tenant/runtime/scheduler/approval/integration and frontend/browser acceptance.
+- [x] Deploy isolated Simpson/Subway/frontend releases and verify preservation.

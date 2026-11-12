@@ -10,7 +10,7 @@ def action_for(workflow,node_id):
     return next((a for a in workflow.get('metadata',{}).get('connected_action_plan',{}).get('actions',[]) if a['action_id']==node_id),None)
 
 
-def params(workflow,node,run):
+def params(workflow,node,run,*,now=None):
     metadata=workflow.get('metadata',{});plan=metadata.get('connected_action_plan')
     if not plan:return None
     if plan['constraints'].get('deadline'):
@@ -32,6 +32,13 @@ def params(workflow,node,run):
             return {'condition':binding_value(action['when']['binding'],context,actions,run)==action['when']['equals']}
     action=actions.get(node['node_id'])
     if not action:return None
+    review=metadata.get('overview_intent',{}).get('communication',{}).get('review')
+    if review and action['capability_id'] in metadata.get('connected_contracts',{}) and metadata['connected_contracts'][action['capability_id']].get('supported_operation')=='calendar.create':
+        import time
+        from workflow_api.communication_timing import runtime_values
+        context=deepcopy(context)
+        context['validated_context'].update(runtime_values(review,run,node['node_id'],time.time() if now is None else now,
+            run.get('automation_reference',{}).get('scheduled_due')))
     result=resolve_inputs(action,context,actions,run)
     if action['capability_id']=='tool.subway_query':
         from workflow_api.descriptive_measures import pin,check
@@ -95,6 +102,9 @@ def params(workflow,node,run):
             action=deepcopy(action)
             action['instructions']+=' Label every recorded measure separately using descriptive_measure_basis. Preserve each requested statistic and currency group; do not infer measure equivalence, an approved basis or policy outcomes.'
         result['instructions']=action['instructions']
+        if context.get('validated_context',{}).get('demo_context'):
+            from workflow_api.subway_presentation import GUIDANCE
+            result['instructions']+=' '+GUIDANCE
         if run.get('automation_reference') and 'tool.subway_query' in metadata['connected_contracts']:
             result['data']={'primary':result['data'],'automation_trigger':deepcopy(run['automation_reference']),'original_objective':plan['goal'],'assessment':deepcopy(run.get('adaptive',{}).get('assessment'))}
             result['instructions']+=' Include the original objective, reporting period, actual source freshness, verified calculations, cited evidence, completeness, limitations and execution status. Historical snapshots do not establish current business activity; unknown sync coverage is a limitation.'
@@ -130,6 +140,9 @@ def params(workflow,node,run):
         result['context']['task']={'task_id':action['action_id'],'capability_id':action['capability_id']}
     agent=next(a for a in workflow['agents'] if a['agent_id']==node['agent_id'])
     if node['kind']=='tool':
+        if plan.get('scope',{}).get('workspace_id')=='client-subway' and context.get('validated_context',{}).get('demo_context'):
+            from workflow_api.subway_presentation import prepare_delivery
+            result=prepare_delivery(result,action['capability_id'])
         # Exact Registry schema will be checked again by prepare_tool immediately before dispatch.
         c=metadata['connected_contracts'][action['capability_id']];schema=c['input_schema']
     else:schema=agent['input_schema']
@@ -232,12 +245,11 @@ def validate_content(workflow,node,output,inputs):
 def verify(workflow,node,output,inputs):
     action=action_for(workflow,node['node_id'])
     if not action:return
-    if action['capability_id']=='content.prepare' and workflow['metadata']['action_binding_context']['validated_context'].get('demo_context'):
-        from workflow_api.subway_demo_data import LABEL
-        for field in ('summary','body'):
-            if isinstance(output.get(field),str) and not output[field].startswith(LABEL):output[field]=LABEL+'\n\n'+output[field]
-        output.setdefault('assumptions',[])
-        if LABEL not in output['assumptions']:output['assumptions'].append(LABEL)
+    if (action['capability_id']=='content.prepare' and workflow.get('metadata',{}).get('connected_action_plan',{}).get('scope',{}).get('workspace_id')=='client-subway'
+            and workflow.get('metadata',{}).get('action_binding_context',{}).get('validated_context',{}).get('demo_context')):
+        from workflow_api.subway_presentation import prepare_content
+        prepared=prepare_content(output)
+        output.clear();output.update(prepared)
     validate_content(workflow,node,output,inputs)
     if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis

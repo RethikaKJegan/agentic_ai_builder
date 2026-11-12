@@ -1,0 +1,11 @@
+# Direct generation verification — 12 November 2026
+
+Ordinary email-report and Calendar-reading requests now generate the existing workflow directly. Email delivery is inferred unless drafting/no-send is explicit; unspecified review timing uses five minutes after report completion and unspecified duration uses thirty minutes. Explicit choices, owned-account resolution, destination restrictions, approval and pinned recurring consent remain enforced. No separate communication settings summary is returned on normal generation. Genuinely blocking identity/timezone/fixed-time questions remain available.
+
+Only `workflow_api/communication_intent.py`, `workflow_api/overview_automation.py` and the focused test file differ from each tenant's prior release. The existing frontend opens prepared workflows automatically, so no frontend rebuild or restart is required. Existing saved requests/workflows are preserved; submit a fresh request to use the new defaults.
+
+Exact Subway candidate: **17 passed**. Exact Simpson candidate: **17 passed**. Each command covered `tests/test_natural_communication.py` and `tests/test_calendar_action_routing.py` using controlled model/external transports. Coverage includes ordinary-prompt generation without initial answers or settings summary, two scheduled occurrences, exact recipient/primary calendar bindings, explicit drafting/fixed timing, account isolation and Calendar-only recovery without email replay. These counts overlap. No live email, Calendar event or schedule was activated by acceptance. The initial added draft test referenced an unavailable fixture connector; the fixture was corrected and both exact candidates passed.
+
+Canonical contract validation, generated UI-contract comparison, strict scoped OpenSpec validation and whitespace checks passed. Private release manifests, consistent backups, focused logs, deployment preservation checks and authenticated public smoke checks are in `.local/direct-communication-20261112/`.
+
+Deployment completed for both tenant services. Authenticated public session, tools, worker-health and data-query endpoints returned 200 for each tenant. Protected database rows and configuration hashes remained unchanged, and unrelated service PIDs remained unchanged. No live-provider business-quality result is inferred from these read-only smoke checks.

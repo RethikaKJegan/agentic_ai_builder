@@ -157,7 +157,8 @@ def validate_plan(plan,contracts,context,scope):
         if any(actions[d]['optional'] for d in action['depends_on']):deny('A dependency cannot require a conditionally skipped action.')
         write=c['side_effect'] in ('draft','write')
         if action['required_approvals']!=(['exact_payload'] if write else []):deny('Approval assumptions differ from registered side effects.','ACTION_APPROVAL_REQUIRED')
-        if action['budget']['max_tool_calls']<(1 if c['kind']=='tool' else 0) or c['kind']=='model' and action['budget']['max_tool_calls']!=0 or action['budget']['max_llm_calls']<(1 if c['kind']=='model' else 0):deny('Action execution budget is insufficient.')
+        from .action_budgets import validate_allowance
+        validate_allowance(action,c)
         if action['budget']['max_retries']>plan['constraints'].get('max_retries',0) or write and (action['budget']['max_retries'] or action['budget']['max_tool_calls']!=1):deny('Retry allowance exceeds the reviewed plan or write boundary.')
         targets=[]
         bindings=action['bindings']+([action['when']['binding']] if action['when'] else [])

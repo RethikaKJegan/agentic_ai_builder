@@ -1,5 +1,17 @@
 # Handoff — Rethika
 
+## Generic Subway assessment query compatibility — deployed 12 November 2026
+
+Assessment selection now fully validates requested base fields, then uses canonical native IDs without changing filters, ordering or page bounds. Handles extra/missing/empty detail projections across all eight assessments. Binding/invocation API failures retain typed runtime codes and explicit recovery categories. The exact failed ten-field query now reconciles eight orders identically to an ID-only baseline in an isolated real-data replay. 74 candidate acceptance and 96 integration/isolation tests passed; focused 23-test coverage overlaps. Subway-only restart; frontend, Simpson, canonical sources, credentials, schedules and history preserved. No live workflow/model/external action was retried. See `openspec/changes/subway-assessment-query-contract/verification.md`.
+
+## Subway actual delivery cleanup — deployed 12 November 2026
+
+Removed backend-forced demonstration prefixes and normalized actual report/email/Calendar/Sheet content before exact approval. Legacy prepared content is cleaned at new delivery input resolution; recipient/resource/date authority, citations, figures and canonical provenance remain unchanged. 75 final affected tests passed; 119 wider regressions passed on the isolated candidate before the defensive legacy-context fix. Actual saved report replay verified plaintext/HTML MIME, Calendar JSON and Sheet payloads offline. Only Subway backend restarted; frontend/Simpson and protected data unchanged. One configured-provider assessment rehearsal failed before reporting, and automatic approval review rejected an additional external-model rehearsal; neither is claimed as passing evidence. See `openspec/changes/subway-clean-delivery-content/verification.md`. This supersedes the earlier backend Demo data insertion, while retaining stored provenance.
+
+## Subway compact presentation and Knowledge Map — deployed 12 November 2026
+
+Fixed the authenticated Knowledge Map list parser rejecting the demo ontology at revision zero; exact authorized demo pins load independently of optional module labels. Subway display copies and new prepared report/email/Calendar/spreadsheet content use Demo data; canonical provenance and exact payload authority remain unchanged. Deployed isolated Subway backend and frontend build `rdAkVLyxq_5vug08JkGqd`. Final affected backend 26, wider regression 119, frontend 80 and desktop/mobile browser six checks passed (overlapping suites). Hosted old-report/map/diagnostics checks and a fresh ordinary provider-backed run passed; an earlier evaluator-blocked attempt is retained and reported separately. No external delivery or Simpson account/data/workflow mutation. See `openspec/changes/subway-compact-presentation/verification.md`.
+
 ## Subway authentication — 6 November 2026, deployed
 
 Registered a separate Subway account, signed client audience, private assertion key,
@@ -1074,3 +1086,18 @@ preserved. No workflow implementation or live workflow changed. Subway alone
 reloaded; live isolation/preservation checks pass. 12 focused and 36 affected tests
 passed (overlapping), plus all 13 rule cases and 65 definitions. See
 `docs/subway-evidence-resolution.md` and its OpenSpec verification for exact scope.
+
+
+## Subway report reliability and workflow card layout — 12 November 2026
+
+Subway-only deployment reduces report transport with reversible shared evidence/tables, preserves typed model failures and safe diagnostics, corrects misleading recovery guidance and bounds workflow cards to actual layout dimensions. Original evidence and full instructions remain; no external action was repeated. See `openspec/changes/subway-report-reliability-layout/verification.md` for exact tests, deployment and the unresolved historical provider-cause/live-provider acceptance boundary. Simpson services and records are unchanged.
+
+
+## Generic generated action budgets, Subway rollout — 12 November 2026
+
+Generated model/tool allowances now follow registered capability kind before review; explicit/saved/executing plans retain strict validation. Retry, approval and aggregate/agent limits remain intact. 121 exact-candidate acceptance and 81 isolated integration tests passed; only Subway restarted, preserving original rows and unrelated services. No real communications or schedule edits. See `openspec/changes/generated-action-budget-contract/verification.md`.
+
+
+## Natural email and Calendar review — Simpson and Subway, 12 November 2026
+
+Deployed tenant-isolated owned-account/primary-calendar resolution, structured natural send/draft and timing choices, plain-language review, pinned after-ready/fixed times and provider-confirmed independent statuses. Expired undispatched Calendar actions support separately approved Calendar-only continuations; confirmed email remains unchanged, unknown writes stay reconciliation-only. 53 backend tests per candidate plus final six exact natural cases per tenant, 60 affected regressions, 23 frontend tests and 20 desktop/mobile journeys passed (overlapping). Existing data/configuration/schedules preserved; no live communication or schedule creation. See `openspec/changes/natural-email-calendar-review/verification.md` for exact boundaries and rollout details.
