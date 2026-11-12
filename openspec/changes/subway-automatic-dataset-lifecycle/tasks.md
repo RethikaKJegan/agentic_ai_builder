@@ -1,0 +1,6 @@
+- [x] Inventory current data, references and source-selection paths.
+- [x] Implement deterministic source resolution and immutable workflow pins.
+- [x] Implement validated version registration, atomic activation and protected cleanup/recovery.
+- [x] Integrate Overview, tools, knowledge and existing automation/recovery paths.
+- [x] Verify targeted acceptance and separate integration/isolation/recovery regressions.
+- [x] Deploy Subway-only, verify hosted no-prefix execution and record precise evidence.

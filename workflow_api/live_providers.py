@@ -501,7 +501,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
             install_subway_queries(app,auth)
             if env.get('BUILDER_SUBWAY_DEMO_ENABLED')=='1':
                 from .subway_demonstration import install as install_demo
-                install_demo(service.store,auth,service.subway_queries.version)
+                install_demo(service.store,auth,service.subway_queries.version,automatic_default=env.get('BUILDER_SUBWAY_DEMO_DEFAULT_ENABLED')=='1')
+                from .subway_dataset_lifecycle import install_routes as install_dataset_routes
+                install_dataset_routes(app,service.store,auth,lambda:'dataset_'+__import__('uuid').uuid4().hex)
     if procurement_settings:
         from .procurement import install
         procurement_worker = install(app, procurement_settings, env, client, model, auth)

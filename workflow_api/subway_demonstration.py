@@ -24,8 +24,16 @@ def authorize(auth):
 
 def descriptor(document):return {k:deepcopy(document[k]) for k in ('dataset_id','revision','sha256','mode','label','as_of')}
 
-def install(store,auth,base_version):
-    authorize(auth);document=generate();ontology=build_ontology(base_version,document)
+def install(store,auth,base_version,*,automatic_default=False):
+    authorize(auth)
+    from .subway_dataset_lifecycle import bootstrap,read_dataset
+    with store.transaction(write=False) as db:
+        present=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='subway_demo_datasets'").fetchone()
+        existing=db.execute('SELECT 1 FROM subway_demo_datasets WHERE workspace=? AND owner=? AND dataset_id=?',(*SCOPE,DATASET)).fetchone() if present else None
+    if existing:
+        header,_=read_dataset(store,auth,DATASET);bootstrap(store,auth,automatic_default)
+        return descriptor(header)
+    document=generate();ontology=build_ontology(base_version,document)
     from .business_compiler import check_snapshot
     check_snapshot(ontology)
     with store.transaction() as db:
@@ -44,26 +52,13 @@ def install(store,auth,base_version):
         old=db.execute('SELECT document FROM business_ontology_versions WHERE workspace=? AND owner=? AND version_id=?',(*SCOPE,VERSION)).fetchone()
         if old and digest(json.loads(old[0]))!=digest(ontology):raise ApiFailure('SUBWAY_DEMO_CONFLICT','Demonstration ontology version changed.',409)
         if not old:db.execute('INSERT INTO business_ontology_versions VALUES (?,?,?,?)',(*SCOPE,VERSION,json.dumps(ontology)))
+    bootstrap(store,auth,automatic_default)
     return descriptor(document)
 
-def read(store,auth):
-    authorize(auth)
-    with store.transaction(write=False) as db:
-        if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='subway_demo_datasets'").fetchone():raise ApiFailure('SUBWAY_DEMO_UNAVAILABLE','Demonstration data is not provisioned.',409)
-        row=db.execute('SELECT document FROM subway_demo_datasets WHERE workspace=? AND owner=? AND dataset_id=?',(*SCOPE,DATASET)).fetchone()
-        if not row:raise ApiFailure('SUBWAY_DEMO_UNAVAILABLE','Provision Subway demonstration dataset v1 before selecting it.',409)
-        header=json.loads(row[0]);records={}
-        for collection,raw in db.execute('SELECT collection,document FROM subway_demo_records WHERE workspace=? AND owner=? AND dataset_id=? ORDER BY collection,native_id',(*SCOPE,DATASET)):
-            records.setdefault(collection,[]).append(json.loads(raw))
-    hashes={c:sorted(digest(r) for r in rows) for c,rows in records.items()}
-    if hashes!={c:sorted(rows) for c,rows in header['record_hashes'].items()}:raise ApiFailure('SUBWAY_DEMO_INTEGRITY','Persisted demo records differ from their immutable manifest.',409)
-    document={k:v for k,v in header.items() if k not in ('record_hashes','sha256')};document['records']=records
-    # The manifest also binds record order; normalize back to deterministic native ID order.
-    for rows in records.values():rows.sort(key=lambda r:r['_id'])
-    expected=generate()
-    if header['sha256']!=expected['sha256'] or any(sorted(digest(r) for r in records[c])!=sorted(digest(r) for r in expected['records'][c]) for c in records):
-        raise ApiFailure('SUBWAY_DEMO_INTEGRITY','Demo version/policy manifest mismatch.',409)
-    return header,records
+def read(store,auth,dataset_id=DATASET):
+    from .subway_dataset_lifecycle import read_dataset
+    return read_dataset(store,auth,dataset_id)
+
 
 def infer(value):
     if value is None:return 'null'
@@ -128,7 +123,7 @@ class DemoAdapter:
     def __init__(self,queries):self.queries=queries
     @contextmanager
     def connection(self,config):
-        header,records=read(self.queries.store,self.queries.auth)
+        header,records=read(self.queries.store,self.queries.auth,self.queries.dataset_id)
         yield {role:Database({c.split('.')[1]:rows for c,rows in records.items() if c.startswith(role+'.')}) for role in ('central','finance')}
     def business_freshness(self,config):return dict(status='modeled_demonstration',source_version=self.queries.demo_context['sha256'],refresh_available=False)
 class Cipher:
@@ -138,13 +133,24 @@ class DemoSources:
     def bound(self,db,auth,cid):
         authorize(auth)
         if cid not in ('demo_central','demo_finance'):deny('Historical source bindings are unavailable in demo context.')
-        return None,json.dumps(dict(database=cid.removeprefix('demo_'),demo_dataset=DATASET)),None,None
+        return None,json.dumps(dict(database=cid.removeprefix('demo_'),demo_dataset=self.queries.dataset_id)),None,None
 
 class DemoQueries(SubwayQueries):
-    def __init__(self,real,auth):
+    def __init__(self,real,auth,dataset_id=DATASET):
         real.authorize(auth);self.real=real;self.app=real.app;self.service=real.service;self.store=real.store;self.auth=deepcopy(auth)
-        self.header,self.records=read(self.store,auth);self.demo_context=descriptor(self.header)
-        self.version=self.app.state.business_ontology.version(auth,VERSION)
+        from .subway_dataset_lifecycle import state,RULE_VERSION
+        self.dataset_id=dataset_id
+        self.header,self.records=read(self.store,auth,dataset_id);self.demo_context=descriptor(self.header)
+        with self.store.transaction(write=False) as db:
+            registry=state(db);self.entry=deepcopy((registry or {}).get('versions',{}).get(dataset_id))
+        if not self.entry or self.entry['status'] not in {'ACTIVE','RETIRED','VALIDATED'} or self.entry['validation_status']!='passed' or self.entry['sha256']!=self.header['sha256'] or self.entry['business_rule_version']!=RULE_VERSION:
+            raise ApiFailure('SUBWAY_DEMO_STALE','The selected demonstration version is unavailable or incompatible.',409)
+        namespace='demo_v1' if dataset_id==DATASET else 'demo_'+digest([dataset_id,self.header['revision']])[:12]
+        if self.entry['query_namespace']!=namespace or self.entry['validation']['policy_sha256']!=digest(self.header['policy']):
+            raise ApiFailure('SUBWAY_DEMO_STALE','The reviewed source compatibility metadata changed.',409)
+        self.version=self.app.state.business_ontology.version(auth,self.entry['ontology_version'])
+        if digest(self.version)!=self.entry['validation']['ontology_sha256']:
+            raise ApiFailure('SUBWAY_DEMO_STALE','The reviewed demonstration ontology changed.',409)
         self.sources=DemoSources(self)
     def authorize(self,auth):self.real.authorize(auth);authorize(auth)
     def for_workflow(self,workflow,auth):return from_workflow(self.real,workflow,auth)
@@ -155,9 +161,9 @@ class DemoQueries(SubwayQueries):
         for state in b['state_models']:state['values']=[v for v in state['values'] if v['raw'] in ('created','draft','approval_in_progress','approved','rejected','reconsider','cancelled')]
         b.update(extension_version='subway-demo-procurement-v1',demo_policy=deepcopy(POLICY),unresolved=[],definition_sha256=digest(self.version));b['sha256']=digest({k:v for k,v in b.items() if k!='sha256'});return b
     def source_catalog(self,auth):
-        self.authorize(auth);header,records=read(self.store,auth);datasets={};fs={};by={}
+        self.authorize(auth);header,records=read(self.store,auth,self.dataset_id);datasets={};fs={};by={}
         for label,rows in records.items():
-            role,col=label.split('.');did='demo_v1_'+role+'_'+col;by[(role,col)]=did
+            role,col=label.split('.');did=self.entry['query_namespace']+'_'+role+'_'+col;by[(role,col)]=did
             fields_=[]
             for f in fields(rows):
                 f['field_id']=did+'_'+f['name'];fields_.append(f);fs[f['field_id']]={**f,'dataset_id':did}
@@ -195,7 +201,13 @@ class DemoQueries(SubwayQueries):
 
 def from_workflow(real,workflow,auth):
     pin=workflow.get('metadata',{}).get('action_binding_context',{}).get('validated_context',{}).get('demo_context')
+    resolution=workflow.get('metadata',{}).get('action_binding_context',{}).get('validated_context',{}).get('source_resolution')
+    if resolution:
+        from .subway_dataset_lifecycle import resolve
+        q,_=resolve(real,auth,'',resolution)
+        if pin and getattr(q,'demo_context',None)!=pin:raise ApiFailure('SUBWAY_DEMO_STALE','The saved source contracts conflict.',409)
+        return q
     if not pin:return real
-    q=DemoQueries(real,auth)
+    q=DemoQueries(real,auth,pin['dataset_id'])
     if pin!=q.demo_context:raise ApiFailure('SUBWAY_DEMO_STALE','The reviewed demo dataset pin changed.',409)
     return q

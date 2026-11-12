@@ -187,9 +187,15 @@ class SubwayQueries:
   self.collection_scope={(c['role'],c['collection']) for c in self.version['dump_grounding']['correspondence']}
   from .subway_onboarding import build_package
   self.binding_stamps={b['connection_id']:(b['metadata_revision'],b['generation']) for b in build_package(self.version,4)['resource_bindings'].values()}
- def for_objective(self,auth,objective):
-  from .subway_demonstration import selected, DemoQueries
-  return DemoQueries(self,auth) if selected(objective) else self
+ def for_objective(self,auth,objective,resolution=None):
+  from .subway_dataset_lifecycle import resolve
+  queries,pin=resolve(getattr(self,'real',self),auth,objective,resolution)
+  # Historical service instances are shared: never mutate their source contract.
+  if queries is getattr(self,'real',self):
+   from copy import copy
+   queries=copy(queries)
+  queries.source_resolution=pin
+  return queries
  def for_workflow(self,workflow,auth):
   from .subway_demonstration import from_workflow
   return from_workflow(self,workflow,auth)

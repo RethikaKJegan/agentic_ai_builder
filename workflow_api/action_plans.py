@@ -55,7 +55,7 @@ def trusted_context(composition,auth,body,prepared):
     return context
 
 
-def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_planning_budget=None,_planning_feedback=None,_overview=None):
+def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_planning_budget=None,_planning_feedback=None,_overview=None,_source_resolution=None):
     auth,scope=composition.authorize(auth)
     allowed={'objective','request_key','action_plan','user_values','client_id','preparation_id','business_request','resources','google_connection_id','constraints','automatic_inputs'}
     if not isinstance(body,dict) or set(body)-allowed:deny('Use supported connected-plan request fields.')
@@ -105,7 +105,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if _revision and 'tool.subway_query' not in _revision.get('contracts',{}):full_queries=None
     if source_free:full_queries=None
     if full_queries:
-        full_queries=full_queries.for_objective(auth,objective)
+        full_queries=full_queries.for_objective(auth,objective,_source_resolution or (_overview or {}).get('source_resolution'))
+        _source_resolution=deepcopy(full_queries.source_resolution)
+        context['validated_context']['source_resolution']=deepcopy(full_queries.source_resolution)
         if getattr(full_queries,'demo_context',None):context['validated_context']['demo_context']=deepcopy(full_queries.demo_context)
     if full_queries:
         from .subway_queries import planning_contract
@@ -261,7 +263,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
                    for cid in actual):
             if _planning_feedback is None and body.get('action_plan') is None:
                 return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
-                    _planning_budget=_planning_budget,_overview=_overview,_planning_feedback=dict(
+                    _planning_budget=_planning_budget,_source_resolution=_source_resolution,_overview=_overview,_planning_feedback=dict(
                         error_code='ACTION_REQUIRED_OPERATION_MISSING',invalid_proposal=deepcopy(proposal),
                         correction='Preserve the explicitly requested Calendar write using the registered Calendar capability and exact-payload approval. Do not substitute a report-only workflow.'))
             deny('The plan omitted the requested Calendar action.','ACTION_REQUIRED_OPERATION_MISSING')
@@ -272,7 +274,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         except Exception as exc:
             if getattr(exc,'code',None) in ('ACTION_BINDING_INVALID','ACTION_CONTENT_UNVERIFIED') and _planning_feedback is None:
                 return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
-                    _planning_budget=_planning_budget,_overview=_overview,_planning_feedback=dict(error_code=exc.code,message=str(exc),invalid_proposal=deepcopy(proposal),correction='Preserve all interpreted alternatives. Supply exactly one unconditional subway.plan_query template and its directly bound tool.subway_query read, followed by a content.prepare depending on that read. The server expands all pinned categories. Keep the remaining requested report/delivery actions.'))
+                    _planning_budget=_planning_budget,_source_resolution=_source_resolution,_overview=_overview,_planning_feedback=dict(error_code=exc.code,message=str(exc),invalid_proposal=deepcopy(proposal),correction='Preserve all interpreted alternatives. Supply exactly one unconditional subway.plan_query template and its directly bound tool.subway_query read, followed by a content.prepare depending on that read. The server expands all pinned categories. Keep the remaining requested report/delivery actions.'))
             raise
         proposal=deepcopy(proposal);proposal['completion_criteria']=completion
         if branch_pins:
@@ -313,7 +315,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
     if needed and prepared and not prepared['inputs']['identifiers']:
         if ('data.plan_query' in visible and body.get('automatic_inputs') and body.get('action_plan') is None and _planning_feedback is None):
             return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
-                _planning_budget=_planning_budget,_overview=_overview,_planning_feedback=dict(error_code='CASE_IDENTIFIER_REQUIRED',
+                _planning_budget=_planning_budget,_source_resolution=_source_resolution,_overview=_overview,_planning_feedback=dict(error_code='CASE_IDENTIFIER_REQUIRED',
                     message='Case evidence readers need one complaint ID or serial. If this goal requests filtering, lists or population statistics, use data.plan_query then tool.workflow_data_query instead. If it is a single-case investigation, ask for the actual missing identifier. Never invent an identifier.',invalid_proposal=deepcopy(proposal)))
         from runtime.service import RuntimeFailure
         error=RuntimeFailure('ACTION_INPUT_REQUIRED',
@@ -401,7 +403,7 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
             feedback=dict(error_code=exc.code,message=str(exc),binding_issue=getattr(exc,'binding_issue',None),invalid_proposal=deepcopy(proposal),
                 correction='Use only declared existing binding_context keys or verified dependency output paths. Match source_schema to target_schema; a response envelope is not its nested query value. Evidence references must identify actual declared dependency action IDs or pinned evidence keys from allowed_references, never dataset/field/capability IDs or invented labels. Preserve genuine source-backed evidence and requested work; do not discard citations to evade validation. Never invent context keys. An absent internal binding is a planner error; ask the user only for genuinely unknown business information.')
             return prepare(composition,auth,body,lifecycle_context=lifecycle_context,_revision=_revision,
-                _planning_budget=_planning_budget,_planning_feedback=feedback,_overview=_overview)
+                _planning_budget=_planning_budget,_source_resolution=_source_resolution,_planning_feedback=feedback,_overview=_overview)
         if getattr(exc,'code',None)=='ACTION_INPUT_REQUIRED':
             schemas={key:{'type':'string','minLength':1,'maxLength':2000} for key in proposal.get('missing_inputs',[]) if isinstance(key,str) and 1<=len(key)<=160}
             for a in actions:

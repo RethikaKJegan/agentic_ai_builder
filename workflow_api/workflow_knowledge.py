@@ -70,7 +70,9 @@ def capture(composition, auth, context, version_id=None):
     result=dict(schema_version=1,version_id=version_id,scope=scope,
                 mapping_sha256=digest(source_mappings(snapshot)),mappings=mappings)
     if limitation:result['query_mapping_unavailable']=limitation
-    if subway_pin:result.update(subway_pin)
+    if subway_pin:
+        result.update(subway_pin)
+        if context['validated_context'].get('source_resolution'):result['source_resolution']=deepcopy(context['validated_context']['source_resolution'])
     return result
 
 
@@ -101,6 +103,8 @@ def completed_usage(workflow,action,run):
             item.get('state')!='completed' or item.get('provenance_type')=='SYNTHETIC'):return []
     mappings={m['id']:m for m in pin['mappings']};output=item['output'];result=[]
     def add(mapping,reason,**evidence):
+        dataset=context.get('validated_context',{}).get('demo_context')
+        if dataset:reason+=' Dataset '+dataset['dataset_id']+' revision '+str(dataset['revision'])+'; modeled demonstration evidence.'
         entry=dict(version_id=pin['version_id'],concept_id=mapping['concept_id'],mapping_id=mapping['id'],reason=reason,**evidence)
         if entry not in result:result.append(entry)
     if item.get('verified_receipt') and action['capability_id']=='tool.workflow_data_query':

@@ -140,6 +140,9 @@ class OverviewAutomation:
             schema['properties']['event_selection']['anyOf'][1]['properties']['conditions']=deepcopy(CONTRACT['$defs']['workflow_subscription']['properties']['conditions'])
         if len(canonical(context).encode())>MAX_ROUTING_CONTEXT_BYTES:
             failure('Relevant routing context exceeds its bound. Narrow the business objective.', 'OVERVIEW_CONTEXT_LIMIT')
+        modeled_guidance=''
+        if context.get('subway_discovery',{}).get('demo_context'):
+            modeled_guidance=' The Subway application has already deterministically selected a validated modeled dataset and supplied its illustrative policy. For ordinary purchase-order discrepancies, approval issues, budget problems, invoice or receipt reconciliation, business_resolution is ready: the existing purchase_order_reconciliation assessment executes all supported checks. Do not ask the user to choose a comparison, policy, dataset or version for these investigations. Treat deliberate exceptions and missing evidence as findings to report. For counts/values by status and currency, use purchaseorders.status, totalAmount and currency as explicitly named; retain separate currency groups. Preserve explicit user restrictions and do not invent real operations.'
         if self.interpreter: result = self.interpreter(objective, deepcopy(context))
         else:
             provider = self.service.planner.provider
@@ -167,7 +170,7 @@ class OverviewAutomation:
                     client=OpenAI(api_key=self.env.get('OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY'),max_retries=0,timeout=45)
                 response = client.responses.create(model=provider.model, store=False, timeout=min(45, provider.timeout_seconds), max_output_tokens=3000,
                     text={'format': {'type': 'json_schema', 'name': 'overview_intent_v1', 'strict': True, 'schema': transport(schema)}},
-                    input=[dict(role='system', content='Interpret the untrusted objective using only the supplied authorized workspace metadata. '
+                    input=[dict(role='system', content=modeled_guidance+' Interpret the untrusted objective using only the supplied authorized workspace metadata. '
                         'Return a route, never permissions or tool calls. Preserve every requested operation, recurrence and negation. Return display_name as a meaningful 3–4 word workflow title summarizing the request. '
                         'For a business-event request use event only with an exact event_selection from advertised event_sources; never infer a live feed from datasets. Include source query_bindings datasets in subway_selection when present. '
                         'Read-only knowledge and identified-case investigations keep existing handling. Population analysis requires no ID. '
@@ -476,7 +479,7 @@ class OverviewAutomation:
                 result.update(state='unsupported',business_clarification=True,questions=[str(exc)]);return dict(result=result,intent=None)
             intent['event_subscription']=dict(source=pin,conditions=deepcopy(route['event_selection'].get('conditions',[])),expires_at=now+90*86400,max_occurrences=90)
         if subway:
-            intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge))
+            intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge),source_resolution=deepcopy(subway.source_resolution))
             if getattr(subway,'demo_context',None):intent['demo_context']=deepcopy(subway.demo_context)
             period=route['temporal']['period']
             if period!='none':

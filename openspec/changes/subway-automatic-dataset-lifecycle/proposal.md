@@ -1,0 +1,7 @@
+# Automatic Subway dataset resolution and lifecycle
+
+Reuse the persistent Subway demonstration records and ontology. Introduce a Subway-only lifecycle document in the existing workspace settings and append-only lifecycle audit in the same application store. Bootstrap validated v1 without rewriting records/ontology; enable automatic selection only on the dedicated Subway deployment. Select new eligible workflows before model routing, persist a common source-resolution contract and reuse it through preparation, replanning, execution, recovery and scheduling. Honor explicit historical/version choices and reject real-current requests unsupported by historical snapshots.
+
+Register compatible immutable versions, validate schema/relationships/arithmetic/ontology/policy, activate numeric versions atomically and retain old pinned sources. Inventory dependencies in saved compositions, revisions, runs, receipts, schedules, maps and resolution audit; only retire/archive/remove unreferenced demo operational rows, retaining recoverable archives, audit and shared ontology. No Simpson or external action changes.
+
+Verify focused lifecycle, race/pinning/recovery and application integration tests; existing isolation, adaptive and Google regressions; genuine no-prefix Overview investigations/summaries and controlled scheduled execution. Deploy an isolated Subway release under the user's explicit deployment authorization, with backups and exact-artifact/preservation/HTTPS checks.
