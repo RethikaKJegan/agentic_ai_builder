@@ -471,6 +471,18 @@ def finalize_verified_actions(runtime, db, run, workflow, auth):
     return True
 
 
+def format_correction_checkpoint(exc, workflow, run):
+    """Only trusted Subway transport failures; no semantic validation bypass."""
+    from planner.errors import PlannerFailure
+    scope=workflow.get('metadata',{}).get('connected_action_plan',{}).get('scope',{})
+    if (scope.get('client_id')!='subway' or scope.get('workspace_id')!=run['workspace_id']
+            or not isinstance(exc,PlannerFailure) or exc.code!='ADAPTIVE_DECISION_INVALID'
+            or exc.details.get('validation_stage') not in ('response','incomplete','transport','encoded_value','canonical')):
+        return None
+    return digest([run['adaptive']['revision'],sorted((aid,item.get('state'),item.get('output_fingerprint'))
+        for aid,item in run.get('action_instances',{}).items())])
+
+
 def _drive(runner, run_id, auth, raw_advance):
     runtime = runner.runtime; service = runtime.workflows
     for _ in range(4):  # One worker tick is bounded; the durable worker continues.
@@ -630,6 +642,19 @@ def _drive(runner, run_id, auth, raw_advance):
                     if stage in ('response','incomplete','transport','encoded_value','canonical'):
                         diagnostics['validation_stage'] = stage
                     runtime.event(db,current,'adaptive.evaluation_failed',diagnostics)
+                    # Only a provider transport-format failure is correctable.
+                    # Keep every reservation charged and go through the ordinary
+                    # turn/token/deadline checks again; never run a chosen action
+                    # or relax canonical/evidence checks on malformed output.
+                    checkpoint=format_correction_checkpoint(exc,workflow,current)
+                    if checkpoint is not None:
+                        if current['adaptive'].get('format_correction_checkpoint')!=checkpoint:
+                            current['adaptive']['format_correction_checkpoint']=checkpoint
+                            current['adaptive']['decision_feedback']=dict(code='ADAPTIVE_DECISION_INVALID',
+                                validation_stage=stage,message='The previous evaluator response failed structured decoding and was NOT accepted. Return a fresh decision using the strict transport schema. JSON-encoded fields must contain exactly one serialized JSON value (a string needs JSON quotes; null is null). Use null for absent optional fields. Preserve the objective, frozen requirements and executed evidence. Do not invent findings, change completed actions or bypass evidence/approval checks.')
+                            runtime.event(db,current,'adaptive.format_correction_scheduled',dict(validation_stage=stage,attempt=1))
+                            runtime.save(db,current)
+                            continue
                     # Explicit provider rejection is safe to retry. Unknown
                     # outcomes remain blocked; their usage reservation is kept.
                     if getattr(exc,'status_code',None) in (429,503):

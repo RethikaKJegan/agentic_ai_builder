@@ -1,0 +1,2 @@
+# Subway evaluator format recovery
+The supplied run completed metrics retrieval, then blocked on strict evaluator decoding at encoded_value. Add one charged correction per unchanged evidence checkpoint for malformed evaluator transport, scoped to authenticated Subway plans. Keep canonical validation, receipt checks, budgets, external approval and all completed actions unchanged. Deploy Subway only; do not replay historical failed occurrences.

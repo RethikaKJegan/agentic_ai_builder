@@ -1,0 +1,3 @@
+- [x] Add bounded, budgeted Subway evaluator formatting correction.
+- [x] Verify genuine decoder failure, receipt preservation, repeated failures and tenant isolation.
+- [x] Deploy Subway-only candidate and verify protected data and service health.
