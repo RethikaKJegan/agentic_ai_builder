@@ -59,6 +59,7 @@ def install(app, service, auth, reference, env=None):
     app.state.business_retrieval=retrieval
     from .business_investigations import BusinessInvestigations
     investigations=BusinessInvestigations(retrieval,env=env)
+    investigations.workflow_service = service
     app.state.business_investigations=investigations
     service.business_preparation=investigations.coverage.preparation
     service.business_preparation.registry=service.registry_adapter
@@ -95,7 +96,9 @@ def install(app, service, auth, reference, env=None):
 
     async def call(fn, *args):
         try:
-            data = await run_in_threadpool(fn, getattr(app.state,'workflow_auth',auth), *args)
+            current = getattr(app.state,'workflow_auth',auth)
+            from runtime.operation_control import controlled_operation
+            data = await run_in_threadpool(controlled_operation, service, current, reference(), lambda: fn(current, *args), resources=list(args))
             return JSONResponse(service.envelope(reference(),200,data),headers={'Cache-Control':'no-store'})
         except (ApiFailure, RuntimeFailure) as exc:
             if isinstance(exc,RuntimeFailure):

@@ -35,6 +35,8 @@ class JSONTransport:
         self.max_bytes = max_bytes
 
     def request(self, method, url, headers, body=None, timeout=30):
+        from runtime.execution_control import check_execution
+        check_execution()
         if urlparse(url).scheme != 'https' or not 0 < timeout <= 30:
             denied('PROVIDER_REQUEST_INVALID', 'Use a bounded HTTPS provider request.', 400)
         data = None if body is None else json.dumps(body, allow_nan=False).encode()
@@ -185,6 +187,8 @@ class Connector:
         return {'tool_calls': 1, 'estimated_cost_usd': 0}
 
     def invoke(self, grant, inputs, effect_id):
+        from runtime.execution_control import check_execution
+        check_execution()
         reject_secrets(inputs)
         tool = self.definition
         if (grant.get('tool_id') != tool['tool_id'] or grant.get('authorization_state') != 'authorized'

@@ -241,6 +241,9 @@ class LivePlannerProvider:
         from .inventory_report_planner import seed_inventory_report
         seed = seed_inventory_report(objective, supplied)
         for attempt in range(2):
+            if attempt:
+                from runtime.execution_control import reserve_retry
+                reserve_retry()
             from shared.llm_feedback import feedback
             try:
                 workflow = deepcopy(seed) if seed is not None else self.provider.generate(objective, supplied)

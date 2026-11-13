@@ -85,9 +85,10 @@ class WorkflowQueries:
     retry_safe=True
     timeout=1
     durable_query=True
-    def __init__(self, queries, jobs, auth=None, pin=None, source_ids=None):
+    def __init__(self, queries, jobs, auth=None, pin=None, source_ids=None, runtime_reference=None):
         self.queries,self.jobs,self.auth,self.pin=queries,jobs,auth,pin
         self.source_ids=source_ids
+        self.runtime_reference=runtime_reference
     def reservation(self,grant):return dict(tool_calls=1,tokens=0,llm_calls=0,estimated_cost_usd=0)
     def bind_context(self,workflow,run,auth,node):
         catalog=workflow.get('metadata',{}).get('action_binding_context',{}).get('validated_context',{}).get('data_query_catalog',{})
@@ -100,7 +101,8 @@ class WorkflowQueries:
         except ApiFailure as exc:
             raise RuntimeFailure(exc.code,str(exc),exc.status) from exc
         return WorkflowQueries(self.queries,self.jobs,deepcopy(auth),pin,
-            {d['dataset_id'] for d in catalog['datasets']} if 'datasets' in catalog else None)
+            {d['dataset_id'] for d in catalog['datasets']} if 'datasets' in catalog else None,
+            runtime_reference=dict(run_id=run['run_id'], node_id=node['node_id']) if run.get('run_id') and node.get('node_id') else None)
     def invoke(self,grant,inputs,effect_id):
         if self.auth is None or grant.get('tool_id')!='workflow_data_query':
             raise RuntimeFailure('DATA_QUERY_SCOPE_REQUIRED','Use the workflow-bound query capability.',403)
@@ -134,7 +136,7 @@ class WorkflowQueries:
         else:
             saved=self.queries.save_typed_plan(self.auth,'Reviewed workflow data query',query,context_hash=self.pin,
                 plan_id='dq_'+digest([self.auth['subject'],effect_id,query])[:32])
-            job=self.jobs.submit(self.auth,{'plan_id':saved['plan_id']},retry)
+            job=self.jobs.submit(self.auth,{'plan_id':saved['plan_id']},retry,runtime_reference=self.runtime_reference)
         if job['state'] not in ('succeeded','failed','cancelled'):
             raise QueryPending(job)
         if job['state']!='succeeded':

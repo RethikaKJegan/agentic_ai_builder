@@ -44,11 +44,14 @@ class RuntimeService:
             db.execute('CREATE TABLE IF NOT EXISTS runtime_trace_exports (observer TEXT, sequence INTEGER, PRIMARY KEY(observer, sequence))')
             db.execute('CREATE TABLE IF NOT EXISTS runtime_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT, run_id TEXT, document TEXT NOT NULL)')
             db.execute('CREATE INDEX IF NOT EXISTS runtime_events_workspace_run_sequence ON runtime_events(workspace,run_id,sequence)')
+            db.execute('CREATE TABLE IF NOT EXISTS runtime_action_effects (workspace TEXT, run_id TEXT, action_key TEXT, state TEXT NOT NULL, reference TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,run_id,action_key))')
         from .memory import WorkingMemory, ExperienceMemory
         from .recovery import RecoveryService
         self.working_memory = WorkingMemory(self)
         self.experience_memory = ExperienceMemory(self)
         self.recovery = RecoveryService(self)
+        from .governance import GovernancePolicy
+        self.governance = GovernancePolicy(self)
 
     @staticmethod
     def authorize(auth, permission, roles):
@@ -131,7 +134,9 @@ class RuntimeService:
         if digest(approved) != run['workflow_digest']:
             raise RuntimeFailure('REVISION_CHANGED', 'The approved revision changed after execution was queued.')
         from workflow_api.workflow_adaptive import effective
-        return effective(run, approved), grants
+        workflow = effective(run, approved)
+        self.governance.check_run(db, run, workflow)
+        return workflow, grants
 
     def create_run(self, request, auth, *, on_created=None):
         # Trusted in-process persistence hook; never accepted from an API payload.
@@ -170,6 +175,7 @@ class RuntimeService:
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
                        request_id=request['request_id'], release_bound=allow_superseded)
+            run['governance_policy'] = self.governance.read(db, workspace)
             from workflow_api.workflow_adaptive import initialize
             initialize(run, workflow)
             previous=db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? AND version=? AND json_extract(document,'$.status') IN ('failed','blocked') ORDER BY rowid DESC LIMIT 1",(workspace,subject,workflow['workflow_id'],workflow['version'])).fetchone()
@@ -195,6 +201,156 @@ class RuntimeService:
             result['adaptive'] = {k:deepcopy(a[k]) for k in ('objective','status','revision','turns','assessment','pending_wait','decisions','revisions','blocker','deterministic_limitations') if k in a}
         return result
 
+    def expire_runs(self):
+        """Expire queued, active and approval-waiting work, including live leases."""
+        with self.store.transaction() as db:
+            rows = db.execute("SELECT document FROM runtime_runs WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval')").fetchall()
+            for row in rows:
+                run = json.loads(row[0])
+                workflow = self.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version'])
+                if not workflow:
+                    continue
+                try:
+                    self.check_deadlines(run, workflow)
+                except RuntimeFailure as error:
+                    run['error_code'] = error.code
+                    run['lease_until'] = 0
+                    for approval in run.get('approvals', []):
+                        if approval['status'] == 'pending':
+                            approval.update(status='timed_out', allowed_decisions=[])
+                    self.event(db, run, 'run.timeout', dict(error_code=error.code))
+                    self.transition(db, run, 'blocked')
+
+    def cancel_run(self, run_id, auth):
+        with self.store.transaction() as db:
+            run = self.load(db, run_id, auth, 'workflow.execute')
+            if run['subject_id'] != auth['subject']['subject_id'] and 'admin' not in auth['roles']:
+                raise RuntimeFailure('SUBJECT_MISMATCH', 'Only the execution owner or an administrator can stop this run.', 403)
+            if run['status'] in {'queued', 'running', 'paused_for_approval'}:
+                run['cancellation'] = dict(requested_at=self.clock(), requested_by=auth['subject']['subject_id'], reason='user_requested')
+                for approval in run.get('approvals', []):
+                    if approval['status'] == 'pending':
+                        approval.update(status='rejected', allowed_decisions=[])
+                run['lease_until'] = 0
+                self.event(db, run, 'run.cancellation_requested', dict(actor_id=auth['subject']['subject_id'], reason='user_requested'))
+                self.transition(db, run, 'cancelled')
+            return self.public(run)
+
+    def _record_revoked_invocation(self, run_id, auth, worker, claim_token):
+        # Trusted invocation bookkeeping must survive revocation of the actor.
+        # The opaque worker/claim token still fences which invocation may stop.
+        with self.store.transaction() as db:
+            row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND run_id=?',
+                (auth['subject']['workspace_id'], auth['subject']['subject_id'], run_id)).fetchone()
+            if row is None:
+                return
+            current = json.loads(row[0])
+            owns = (current['status'] in {'queued', 'running'} and current.get('adaptive', {}).get('claim', {}).get('token') == claim_token) if claim_token else self.owns_execution(current, worker)
+            if owns:
+                current['error_code'] = 'OPERATION_NOT_AUTHORIZED'
+                current['lease_until'] = 0
+                self.event(db, current, 'runtime.denied', dict(error_code='OPERATION_NOT_AUTHORIZED'))
+                self.transition(db, current, 'blocked')
+
+    def invoke_guarded(self, run_id, auth, worker, invoke, *, agent=None, kind='model', adapter=None, reference=None, claim_token=None, tool_node=None, effect_schema=None):
+        from .execution_control import guarded_call, model_limits_required, policy_resolver, retry_reserver
+        def check():
+            current_auth = auth
+            if authenticate := getattr(self, 'authenticate_current', None):
+                current_auth = authenticate(auth['subject']['workspace_id'], auth['subject']['subject_id'])
+                if current_auth is None or current_auth['subject'] != auth['subject']:
+                    raise RuntimeFailure('OPERATION_NOT_AUTHORIZED', 'Execution authority was revoked.', 403)
+            with self.store.transaction(write=False) as db:
+                run = self.load(db, run_id, current_auth, 'workflow.execute')
+                owns = (run['status'] in {'queued', 'running'} and run.get('adaptive', {}).get('claim', {}).get('token') == claim_token) if claim_token else self.owns_execution(run, worker)
+                if not owns:
+                    raise RuntimeFailure('EXECUTION_STOPPED', 'Execution was stopped or its lease changed.')
+                workflow, _ = self.execution_revision(db, run, current_auth)
+                self.check_deadlines(run, workflow, agent)
+                self.governance.check_run(db, run, workflow)
+                if tool_node is not None:
+                    from .graph import GraphRunner
+                    self.governance.check_tool(run, workflow, tool_node, adapter, {}, GraphRunner.params(tool_node, run, workflow, now=self.clock()))
+            return run, workflow
+        try:
+            run, workflow = check()
+        except RuntimeFailure as error:
+            if error.code == 'OPERATION_NOT_AUTHORIZED':
+                self._record_revoked_invocation(run_id, auth, worker, claim_token)
+            raise
+        timeout = self.governance.invocation_timeout(run, workflow, agent, kind)
+        if kind == 'tool':
+            timeout = min(timeout, getattr(adapter, 'timeout', float('inf')))
+        cancel_method = getattr(adapter, 'cancel_invocation', None)
+        cancel = (lambda: cancel_method(reference)) if callable(cancel_method) else None
+        original_invoke = invoke
+        action_key = None
+        if kind == 'tool' and getattr(adapter, 'external_write', False):
+            from .graph import GraphRunner
+            params = GraphRunner.params(tool_node, run, workflow, now=self.clock())
+            action_key = digest(dict(tool_id=tool_node['tool_id'], params=params, workflow_digest=run['workflow_digest']))
+            def invoke():
+                check()
+                with self.store.transaction() as db:
+                    row = db.execute('SELECT state,document FROM runtime_action_effects WHERE workspace=? AND run_id=? AND action_key=?', (run['workspace_id'], run_id, action_key)).fetchone()
+                    if row:
+                        if row[0] == 'completed':
+                            receipt = json.loads(row[1])
+                            if digest(receipt['output']) != receipt['output_sha256']:
+                                raise RuntimeFailure('ACTION_RECEIPT_INVALID', 'The saved action receipt changed.')
+                            return receipt['output']
+                        raise RuntimeFailure('ACTION_OUTCOME_UNKNOWN', 'This exact action was already submitted. Reconcile its provider outcome before retrying.')
+                    db.execute('INSERT INTO runtime_action_effects VALUES (?,?,?,?,?,?)', (run['workspace_id'], run_id, action_key, 'submitted', reference, '{}'))
+                output = original_invoke()
+                if effect_schema is None or list(Draft202012Validator(effect_schema).iter_errors(output)):
+                    raise RuntimeFailure('ACTION_EFFECT_UNVERIFIED', 'The submitted action did not return a valid receipt.')
+                reject_secrets(output)
+                with self.store.transaction() as db:
+                    db.execute('UPDATE runtime_action_effects SET state=?,document=? WHERE workspace=? AND run_id=? AND action_key=? AND reference=?', ('completed', json.dumps(dict(output=output, output_sha256=digest(output))), run['workspace_id'], run_id, action_key, reference))
+                    stored = json.loads(db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (run['workspace_id'], run_id)).fetchone()[0])
+                    stored['uncertain_effects'] = [item for item in stored.get('uncertain_effects', []) if item.get('effect_reference') != reference]
+                    self.event(db, stored, 'action.receipt_recorded', dict(effect_reference=reference, action_key=action_key, outcome='confirmed'))
+                    self.save(db, stored)
+                return output
+        def reserve_correction():
+            if 'max_retries' not in self.governance.effective(run)['limits']:
+                return
+            check()
+            with self.store.transaction() as db:
+                saved = self.load(db, run_id, auth, 'workflow.execute')
+                owns = (saved['status'] in {'queued', 'running'} and saved.get('adaptive', {}).get('claim', {}).get('token') == claim_token) if claim_token else self.owns_execution(saved, worker)
+                if not owns:
+                    raise RuntimeFailure('EXECUTION_STOPPED', 'The run no longer owns this correction.')
+                reviewed, _ = self.execution_revision(db, saved, auth)
+                from .graph import GraphRunner
+                GraphRunner(self).reserve(db, saved, reviewed, agent, {'retries': 1})
+                self.save(db, saved)
+        retry_marker = retry_reserver.set(reserve_correction)
+        policy_marker = policy_resolver.set(lambda: self.governance.effective(run))
+        marker = model_limits_required.set('max_tokens' in self.governance.effective(run)['limits'])
+        try:
+            return guarded_call(check, invoke, timeout=timeout, timeout_code=kind.upper() + '_TIMEOUT', cancel=cancel)
+        except RuntimeFailure as error:
+            if error.code == 'OPERATION_NOT_AUTHORIZED':
+                self._record_revoked_invocation(run_id, auth, worker, claim_token)
+            # Preserve unknown external outcomes even after cancellation fenced the worker.
+            if getattr(adapter, 'external_write', False):
+                with self.store.transaction() as db:
+                    stored = json.loads(db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (run['workspace_id'], run_id)).fetchone()[0])
+                    receipt = db.execute('SELECT state,reference FROM runtime_action_effects WHERE workspace=? AND run_id=? AND action_key=?', (run['workspace_id'], run_id, action_key)).fetchone()
+                    if not receipt or receipt[0] == 'completed':
+                        raise
+                    original_reference = receipt[1]
+                    self.event(db, stored, 'action.reconciliation_required', dict(error_code=error.code, effect_reference=original_reference, outcome='unknown'))
+                    if not any(item.get('effect_reference') == original_reference for item in stored.get('uncertain_effects', [])):
+                        stored.setdefault('uncertain_effects', []).append(dict(effect_reference=original_reference, outcome='unknown'))
+                    self.save(db, stored)
+            raise
+        finally:
+            retry_reserver.reset(retry_marker)
+            policy_resolver.reset(policy_marker)
+            model_limits_required.reset(marker)
+
     def owns_execution(self, run, worker):
         """An owner token is executable authority only while its lease is live."""
         return (run['status'] == 'running' and run.get('worker') == worker
@@ -202,7 +358,9 @@ class RuntimeService:
 
     def check_deadlines(self, run, workflow, agent=None):
         now = self.clock()
-        if now - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
+        policy = self.governance.effective(run)
+        limit = min(workflow['execution_policy']['limits']['timeout_seconds'], policy['limits'].get('timeout_seconds', float('inf')))
+        if now - run['created_at'] >= limit:
             raise RuntimeFailure('RUN_TIMEOUT', 'The workflow duration budget is exhausted.')
         if agent and now - run.get('agent_started_at', {}).get(agent['agent_id'], now) >= agent['limits']['timeout_seconds']:
             raise RuntimeFailure('AGENT_TIMEOUT', 'The agent execution duration budget is exhausted.')
@@ -219,7 +377,7 @@ class RuntimeService:
         reject_secrets(details)
         event = dict(event_id='evt_' + uuid4().hex, run_id=run['run_id'], workflow_id=run['workflow_id'],
                      workflow_version=run['workflow_version'], timestamp=datetime.fromtimestamp(self.clock(), timezone.utc).isoformat(),
-                     source='runtime', event_type=event_type, details={**details, 'correlation_id': run['correlation_id'], 'trace_reference': run['trace_reference']})
+                     source='runtime', event_type=event_type, details={**details, 'correlation_id': run['correlation_id'], 'trace_reference': run['trace_reference'], 'workspace_id': run['workspace_id'], 'actor_id': details.get('actor_id', run['subject_id'])})
         Draft202012Validator(schema('run_status')['properties']['run_event']).validate(event)
         db.execute('INSERT INTO runtime_events(workspace, run_id, document) VALUES (?, ?, ?)', (run['workspace_id'], run['run_id'], json.dumps(event)))
 
@@ -227,6 +385,8 @@ class RuntimeService:
         if target not in TRANSITIONS[run['status']]:
             raise RuntimeFailure('INVALID_RUN_TRANSITION', 'The requested run transition is not legal.')
         run['status'] = target
+        if target in {'completed', 'failed', 'blocked', 'cancelled', 'rejected'}:
+            run['finished_at'] = self.clock()
         if run.get('adaptive',{}).get('kind')=='workflow-investigation' and target in {'failed','blocked','cancelled','rejected'}:
             run['adaptive']['status']=target
         if target in {'completed','failed','blocked','cancelled','rejected'}:

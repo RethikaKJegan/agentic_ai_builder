@@ -207,6 +207,9 @@ class RecoveryService:
             if snapshot['status'] not in ('failed','blocked'):raise RuntimeFailure('RECOVERY_STATE','Only failed or blocked runs can be resumed.')
             if snapshot.get('lease_until',0)>rt.clock():raise RuntimeFailure('RECOVERY_LEASE','Wait for the previous execution lease to expire.')
             snapshot_workflow,_=rt.revision(db,snapshot['workflow_id'],snapshot['workflow_version'],auth,snapshot.get('release_bound',False))
+        rt.check_deadlines(snapshot, snapshot_workflow)
+        with rt.store.transaction(write=False) as db:
+            rt.governance.check_run(db, snapshot, snapshot_workflow)
         observed_changes,source_receipts=self.revalidate_sources(snapshot,snapshot_workflow,auth)
         requested_changes=list(changed_dependencies)
         changed_dependencies=list(dict.fromkeys([*requested_changes,*observed_changes]))

@@ -58,6 +58,8 @@ class GoogleAPI:
         token = self.token(scopes, min(30, remaining))
         remaining = deadline - time.monotonic()
         if remaining <= 0: denied('CONNECTOR_TIMEOUT', 'The connector operation timed out.', 504)
+        from runtime.execution_control import check_execution
+        check_execution()
         return self.transport.request(method, self.HOSTS[provider] + '/' + path,
             {'Authorization': 'Bearer ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json'},
             body, timeout=min(30, remaining))

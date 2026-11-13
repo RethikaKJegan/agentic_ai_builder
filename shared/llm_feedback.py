@@ -46,4 +46,6 @@ def correct_once(invoke, before_correction):
             item['hint'] = error.validation_hint[:400]
         if before_correction(item) is False:
             raise
+        from runtime.execution_control import reserve_retry
+        reserve_retry()
         return invoke(item)

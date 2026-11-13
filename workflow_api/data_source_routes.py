@@ -44,9 +44,15 @@ def install(app,service,auth,env,reference):
         service.runtime_runner.connectors.update(database_workflows.connectors())
 
     async def call(fn,*args,status=200):
+        from runtime.service import RuntimeFailure
         try:
-            data=await run_in_threadpool(fn,getattr(app.state,'workflow_auth',auth),*args)
+            from runtime.operation_control import controlled_operation
+            current=getattr(app.state,'workflow_auth',auth)
+            data=await run_in_threadpool(controlled_operation,service,current,reference(),lambda:fn(current,*args),resources=list(args))
             return JSONResponse(service.envelope(reference(),status,data),status_code=status,headers={'Cache-Control':'no-store'})
+        except RuntimeFailure as error:
+            exc=ApiFailure(error.code,str(error),error.status)
+            return JSONResponse(service.failure(reference(),exc),status_code=exc.status,headers={'Cache-Control':'no-store'})
         except ApiFailure as exc:
             return JSONResponse(service.failure(reference(),exc),status_code=exc.status,headers={'Cache-Control':'no-store'})
         except Exception:

@@ -194,8 +194,9 @@ class DelegationSession:
             corrected = deepcopy(binding)
             if item and schema is None:
                 corrected['_validation_feedback'] = item
-            output = self._model_turn(agent, corrected, with_feedback(inputs, item) if item and schema is not None else inputs,
-                                      invocation_id, schema, reservation)
+            output = self.runtime.invoke_guarded(self.run_id, self.auth, self.worker,
+                lambda: self._model_turn(agent, corrected, with_feedback(inputs, item) if item and schema is not None else inputs, invocation_id, schema, reservation),
+                agent=agent, kind='model', adapter=self.runner.agents, reference=self.run_id + ':' + invocation_id)
             expected = schema or agent['output_schema']
             if list(Draft202012Validator(expected).iter_errors(output)):
                 raise RuntimeFailure('AGENT_OUTPUT_INVALID', 'Model output failed the required schema.')
@@ -262,6 +263,9 @@ class DelegationSession:
         return correct_once(invoke, prepare)
 
     def _model_turn(self, agent, binding, inputs, invocation_id, schema, reservation):
+        with self.runtime.store.transaction(write=False) as db:
+            self.current(db, agent)
+        reservation = {k: v for k, v in reservation.items() if k != 'delegation_calls'}
         accounted = getattr(self.runner.agents, 'invoke_accounted', None)
         if not callable(accounted):
             if schema is DECISION_SCHEMA:
@@ -308,6 +312,8 @@ class DelegationSession:
             # Reserve per actual turn/task. The normal graph path does not reserve
             # an additional copy of the master call for a dynamic session.
             reservation = dict(llm_calls=0,tokens=0,estimated_cost_usd=0) if blocked_output is not None else self.runner.agents.reservation(binding)
+            if not decision:
+                reservation['delegation_calls'] = 1
             self.runner.reserve(db, run, self.workflow, agent, reservation)
             if decision:
                 run.setdefault('delegation_turns', {})[node_id] = invocation_id
@@ -399,9 +405,12 @@ class DelegationSession:
                 raise RuntimeFailure('TOOL_METADATA_REQUIRED', 'Current authorized tool metadata is required.', 403)
             tools = [{k: deepcopy(item['definition'][k]) for k in ('tool_id', 'description', 'input_schema', 'output_schema')}
                      for item in discovery['data']['items'] if item['tool_id'] in assigned]
+            policy = self.runtime.governance.effective(run, db)
             affordable = []
             for tool in tools:
                 connector = self.runner.connectors.get(tool['tool_id'])
+                if tool['tool_id'] in policy['restricted_tools'] or (policy['read_only'] and getattr(connector, 'external_write', True)):
+                    continue
                 reserve = getattr(connector, 'reservation', None)
                 if callable(reserve):
                     amount = reserve(assigned[tool['tool_id']])
@@ -498,7 +507,9 @@ class DelegationSession:
                 run = self.current(db)
                 workflow, grants = self.runtime.revision(db, run['workflow_id'], run['workflow_version'], self.auth, run.get('release_bound', False))
                 self.runner.prepare_tool(run, workflow, grants, node, self.auth)
-            output = connector.invoke(grant, params, self.run_id + ':' + invocation_id)
+            output = self.runtime.invoke_guarded(self.run_id, self.auth, self.worker,
+                lambda: connector.invoke(grant, params, self.run_id + ':' + invocation_id),
+                agent=agent, kind='tool', adapter=connector, reference=self.run_id + ':' + invocation_id, tool_node=node, effect_schema=grant['output_schema'])
             reject_secrets(output)
             if list(Draft202012Validator(grant['output_schema']).iter_errors(output)):
                 raise RuntimeFailure('CONNECTOR_OUTPUT_INVALID', 'Connector output failed its schema.')

@@ -312,6 +312,16 @@ class DataOperations:
                    operation_id, index, step['tool_id'], step['state'], step['matched_records'], step['affected_records'], time.time()))
 
     def execute(self, auth, operation_id, body):
+        def write_policy():
+            from runtime.execution_control import policy_resolver, check_execution
+            check_execution()
+            resolve=policy_resolver.get()
+            policy=resolve() if resolve is not None else {}
+            if policy.get('read_only'):
+                fail('Read-only policy blocks database changes.', 'READ_ONLY_VIOLATION', 403)
+            if policy.get('require_action_approval') and self.workflow_authorize is None:
+                fail('Execute this change through an exact approved workflow action.', 'APPROVAL_REQUIRED', 403)
+        write_policy()
         validate('execute', body)
         workspace, owner = self.identity(auth, True)
         if self.workflow_authorize is not None:
@@ -339,6 +349,7 @@ class DataOperations:
             db.execute("UPDATE data_write_operations SET state='running',started=?,token=?,summary=? WHERE operation_id=?", (time.time(), token, json.dumps(summary), operation_id))
         deadline = time.monotonic()+90
         def guard(step):
+            write_policy()
             if time.monotonic() >= deadline:
                 fail('The operation deadline elapsed before commit.', 'DATA_WRITE_TIMEOUT', 409)
             return self.guard(auth, step)

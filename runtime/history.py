@@ -40,6 +40,7 @@ def public_run(runtime, db, run, auth):
     for key in ('created_at', 'finished_at'):
         if isinstance(run.get(key), (int, float)):
             result[key] = run[key]
+    result['safety'] = dict(error_code=run.get('error_code'), cancellation=run.get('cancellation'), usage=run.get('usage', {}).get('workflow', {}), uncertain_effects=run.get('uncertain_effects', []), effective_policy=runtime.governance.effective(run, db), policy_revision=runtime.governance.read(db, run['workspace_id'])['revision'])
     workflow = None
     gates_by_approval = {}
     if result['approvals']:
@@ -54,8 +55,12 @@ def public_run(runtime, db, run, auth):
         node = next((n for n in workflow.get('nodes', []) if n['node_id'] == node_id), None)
         gate_id = node.get('approval_gate_id') if node else context.get('gate_id') if approval['status'] == 'pending' else None
         gate = next((g for g in workflow.get('approval_gates', []) if g['approval_gate_id'] == gate_id), None)
+        if context.get('policy_review') and approval['status'] == 'pending':
+            gate = dict(approver_roles=['admin', 'approver'])
         roles = gate['approver_roles'] if gate else []
         approval['required_roles'] = roles
+        if context.get('node_id') == node_id:
+            approval['expires_at'] = context.get('expires_at')
         eligible = (gate and auth.get('decision') == 'allow' and 'workflow.approve' in auth.get('permissions', [])
                     and bool(set(auth.get('roles', [])) & set(roles))
                     and bool(set(auth.get('scopes', [])) & {'workspace:read', 'workspace:write'}))
@@ -124,6 +129,21 @@ def events(runtime, run_id, auth, limit=100, after_sequence=0):
     return dict(items=items, total=total, has_more=more, next_cursor=str(rows[limit - 1][0]) if more else None)
 
 
+def hierarchy_limits(workflow, runtime):
+    agents = workflow.get('agents', [])
+    parents = {a['agent_id']: a.get('parent_agent_id') for a in agents}
+    def depth(identifier):
+        seen = set()
+        while parents.get(identifier) in parents and identifier not in seen:
+            seen.add(identifier)
+            identifier = parents[identifier]
+        return len(seen)
+    controls = getattr(runtime, 'resource_controls', None)
+    return dict(agents_per_workflow=len(agents), subagent_depth=max((depth(k) for k in parents), default=0),
+        subagents_per_agent=max((sum(parent == k for parent in parents.values()) for k in parents), default=0),
+        concurrent_agents=controls.policy.agents_per_workflow if controls else None)
+
+
 def monitoring(runtime, auth, limit=50, source_cursor=None, policy_cursor=None):
     runtime.authorize(auth, 'runs.view', ROLES)
     workspace = auth['subject']['workspace_id']; limit = integer(limit, 1, 500)
@@ -168,11 +188,11 @@ def monitoring(runtime, auth, limit=50, source_cursor=None, policy_cursor=None):
                 workflow = runtime.store.get(db, workspace, workflow['workflow_id'], active[0])
             policies.append(dict(workflow_id=workflow['workflow_id'], version=workflow['version'], scope='workspace:'+workspace,
                 enforcement='active_release' if active else 'approved_revision', policy_version=json.loads(active[1])['policy_version'] if active else None,
-                action_approval_required=bool(workflow.get('approval_gates')),
+                action_approval_required=bool(workflow.get('approval_gates')), hierarchy=hierarchy_limits(workflow,runtime),
                 agents=[{key: agent.get(key) for key in ('agent_id','guardrails','limits','approval_requirements')} for agent in workflow['agents']]))
         policy_more = len(rows) > limit
         policy_cursor = str(rows[limit-1][0]) if policy_more else None
     return dict(runs=dict(total=sum(by_status.values()), active=sum(by_status[s] for s in ('queued','running','paused_for_approval')), completed=by_status['completed'], failed=by_status['failed']+by_status['blocked']),
         status_breakdown=by_status, duration_seconds=dict(count=duration[0],avg=max(0,float(duration[1]))), events=count, usage=usage, latest=latest,
         sources=sources, policies=policies, source_next_cursor=source_cursor, policy_next_cursor=policy_cursor,
-        audit=[{key:event.get(key) for key in ('event_id','event_type','run_id','timestamp')} for event in audit])
+        audit=[{**{key:event.get(key) for key in ('event_id','event_type','run_id','timestamp')}, 'actor_id':event.get('details', {}).get('actor_id'), 'error_code':event.get('details', {}).get('error_code')} for event in audit])

@@ -1,4 +1,5 @@
 """Strict OpenAI extraction and deterministic draft checks; no execution engine."""
+from runtime.execution_control import controlled_response
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -173,7 +174,7 @@ class OpenAIExtraction:
         encoded=json.dumps(payload,ensure_ascii=False)
         if len(encoded)>100000:fail('Selected sources exceed the generation input limit.')
         try:
-            response=client.responses.create(model=self.model,
+            response=controlled_response(client, model=self.model,
                 input=[{'role':'system','content':SYSTEM},{'role':'user','content':encoded}],
                 text={'format':{'type':'json_schema','name':'simpson_module','strict':True,'schema':generation_schema(payload.get('documents',[]))}},
                 max_output_tokens=8000,timeout=180,store=False)

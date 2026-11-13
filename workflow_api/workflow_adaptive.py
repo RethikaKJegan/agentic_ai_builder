@@ -504,6 +504,12 @@ def _drive(runner, run_id, auth, raw_advance):
                     block(runtime,db,run,error.code);return runtime.public(run)
             if run.get('lease_until', 0) > runtime.clock() or run.get('available_at', 0) > runtime.clock():
                 return runtime.public(run)
+            try:
+                runtime.check_deadlines(run, workflow)
+                runtime.governance.check_run(db, run, workflow)
+            except RuntimeFailure as error:
+                block(runtime, db, run, error.code)
+                return runtime.public(run)
             if a.get('claim'):
                 if a['claim']['until'] > runtime.clock():
                     return runtime.public(run)
@@ -533,6 +539,7 @@ def _drive(runner, run_id, auth, raw_advance):
                 a['deterministic_limitations']=deepcopy(limitations)
                 reservation = len(json.dumps(dict(schema=CONTRACT, context=ctx)).encode()) + a['limits']['evaluator_output_tokens']
                 from runtime.adaptive_control import reserve
+                runtime.governance.reserve(db, run, workflow, dict(tokens=reservation, llm_calls=1))
                 reserve(run, workflow, dict(tokens=reservation, llm_calls=1))
                 if controls:=getattr(runtime,'resource_controls',None):
                     from .resource_limits import CapacityDeferred
@@ -553,7 +560,9 @@ def _drive(runner, run_id, auth, raw_advance):
                 return outcome
             continue
         try:
-            decision = service.planner.provider.evaluate_actions(ctx, max_output_tokens=run['adaptive']['limits']['evaluator_output_tokens'])
+            decision = runtime.invoke_guarded(run_id, auth, None,
+                lambda: service.planner.provider.evaluate_actions(ctx, max_output_tokens=run['adaptive']['limits']['evaluator_output_tokens']),
+                kind='model', claim_token=token)
             with runtime.store.transaction() as db:
                 current = runtime.load(db, run_id, auth, 'workflow.execute')
                 if current['status'] not in ('queued', 'running') or current['adaptive'].get('claim', {}).get('token') != token:
@@ -646,6 +655,13 @@ def _drive(runner, run_id, auth, raw_advance):
                     # Keep every reservation charged and go through the ordinary
                     # turn/token/deadline checks again; never run a chosen action
                     # or relax canonical/evidence checks on malformed output.
+                    retry_configured='max_retries' in runtime.governance.effective(current,db)['limits']
+                    if retry_configured and (getattr(exc,'status_code',None) in (429,503) or format_correction_checkpoint(exc,workflow,current) is not None):
+                        try:
+                            runner.reserve(db,current,workflow,None,{'retries':1})
+                        except RuntimeFailure as limit_error:
+                            block(runtime,db,current,limit_error.code)
+                            return runtime.public(current)
                     checkpoint=format_correction_checkpoint(exc,workflow,current)
                     if checkpoint is not None:
                         if current['adaptive'].get('format_correction_checkpoint')!=checkpoint:

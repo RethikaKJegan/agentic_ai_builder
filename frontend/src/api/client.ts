@@ -1,3 +1,4 @@
+import {governancePolicySchema, runSafetySchema} from './governance';
 import {runKnowledgeSchema,recoveryInspectionSchema,operationalAlertsSchema} from './reliability';
 import {adaptiveRunSchema} from './adaptive';
 import {knowledgeSnapshotSchema} from './knowledge-map';
@@ -54,9 +55,10 @@ const capabilitiesData = CollectionSchema.extend({ items: z.array(z.object({ cap
 const workflowsData = CollectionSchema.extend({ items: z.array(CanonicalWorkflowSchema), ...metadata });
 export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(),
   status: z.enum(["pending", "approved", "rejected", "timed_out", "unmatched"]), action_digest: z.string().nullable().optional(),
+  resolved_payload:z.record(z.unknown()).optional(), tool_id:z.string().optional(), operation:z.string().optional(), expires_at:z.number().optional(),
   allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
 const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
-  adaptive: adaptiveRunSchema.optional(),
+  adaptive: adaptiveRunSchema.optional(), safety: runSafetySchema.optional(),
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
@@ -470,13 +472,21 @@ export class WorkflowClient {
     return result.data;
   }
 
+  async governancePolicy() { return governancePolicySchema.parse(await this.read('governance/policy')); }
+  async saveGovernancePolicy(body: Pick<z.infer<typeof governancePolicySchema>, 'revision' | 'policy'>) {
+    return governancePolicySchema.parse(await this.read('governance/policy', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+  }
+  async stopRun(runId: string) {
+    return runData.parse(await this.read(`runs/${encodeURIComponent(runId)}/cancel`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).run;
+  }
+
   async monitoring(cursors:{source_cursor?:string|undefined;policy_cursor?:string|undefined}={}) {
     const count=z.number().finite().nonnegative();
     const schema=z.object({runs:z.object({total:count,active:count,completed:count,failed:count}),events:count,status_breakdown:z.record(z.string(),count).optional(),duration_seconds:z.object({avg:count}).passthrough().optional(),
       usage:z.object({llm_calls:count,tool_calls:count,tokens:count,retries:count,estimated_cost_usd:count}),latest:z.array(z.object({run_id:z.string(),status:RunStatusSchema,correlation_id:z.string(),trace_reference:z.string()})),
       sources:z.array(z.object({binding_id:z.string(),workflow_id:z.string(),provider_id:z.string(),health:z.string(),error_code:z.string().nullable().optional(),baseline_ready:z.boolean(),last_successful_poll:z.string().nullable().optional(),state:z.string().optional(),release_state:z.string().optional(),workflow_version:z.number().optional(),delivery:z.string().optional(),event_type:z.string().optional(),source:z.string().optional(),schedule:z.string().nullable().optional(),timezone:z.string().nullable().optional(),preparation_succeeded:z.boolean().optional()})).optional(),
-      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
-      source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string()})).optional(),...metadata});
+      policies:z.array(z.object({workflow_id:z.string(),version:z.number().int().positive(),action_approval_required:z.boolean(),hierarchy:z.object({agents_per_workflow:count,subagent_depth:count,subagents_per_agent:count,concurrent_agents:count.nullable()}).optional(),scope:z.string().optional(),enforcement:z.string().optional(),policy_version:z.number().nullable().optional(),agents:z.array(z.object({agent_id:z.string(),guardrails:z.record(z.string(),z.boolean()).nullish().transform(value=>value??{}),limits:z.object({max_llm_calls:count,max_tool_calls:count,max_retries:count}).passthrough()}))})).optional(),
+      source_next_cursor:z.string().nullable().optional(),policy_next_cursor:z.string().nullable().optional(),audit:z.array(z.object({event_id:z.string(),event_type:z.string(),run_id:z.string(),timestamp:z.string(),actor_id:z.string().nullable().optional(),error_code:z.string().nullable().optional()})).optional(),...metadata});
     const result=schema.safeParse(await this.read(`monitoring${queryString(cursors)}`));
     if(!result.success)return fail("INVALID_API_DATA","The monitoring response is invalid.");
     return result.data;

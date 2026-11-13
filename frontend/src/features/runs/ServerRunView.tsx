@@ -1,4 +1,5 @@
 "use client";
+import { StopRun, RunSafety } from "./StopRun";
 import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, type ApprovalRecord, type RunRecord } from "@/api/client";
@@ -31,6 +32,9 @@ export function ApprovalControl({ approval, emailPreview, databaseOperationId, o
     <p className="text-sm">Approval {record.approval_id} · {record.status} · v{record.workflow_version}</p>
     <p className="text-xs text-muted-foreground">Required roles: {record.required_roles?.join(", ") || "Determined by the server gate"}</p>
     <p className="text-xs text-muted-foreground">Workflow {record.workflow_id}{record.action_digest ? ` · approved action ${record.action_digest.slice(0, 12)}…` : ""}</p>
+    {record.tool_id && <p className="text-xs">Tool: {record.tool_id} · {record.operation}</p>}
+    {record.expires_at && <p className="text-xs">Expires: {new Date(record.expires_at * 1000).toLocaleString()}</p>}
+    {record.resolved_payload && <details className="text-xs"><summary>Exact proposed action</summary><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all">{displayText(JSON.stringify(record.resolved_payload,null,2))}</pre></details>}
     {emailPreview != null && <pre aria-label="Email awaiting approval" className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{displayText(JSON.stringify(emailPreview, null, 2))}</pre>}
     {databaseOperationId && record.status === "pending" && <DatabaseApprovalPreview key={databaseOperationId} operationId={databaseOperationId} onReviewed={setDatabaseReviewed} />}
     {record.status === "pending" && backend.session?.approval_service_available && backend.can("runs.view") && backend.can("workflow.approve") && <div className="flex gap-2">{record.allowed_decisions.map((decision) => <button key={decision} className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40" disabled={busy || (decision === "approved" && !!databaseOperationId && !databaseReviewed)} onClick={() => void decide(decision)}>{decision === "approved" ? "Approve" : "Reject"}</button>)}</div>}
@@ -97,7 +101,7 @@ export function ServerRunView({ approvalsOnly = false }: { approvalsOnly?: boole
     </form>
     <ApiFeedback error={error??feed.error} />
     {run && <><p className="text-sm">{run.run_id} · {run.workflow_id} · v{run.workflow_version} <StatusPill status={run.status} /></p>
-      {run.approvals.map((approval) => {
+      <StopRun run={run} onStopped={feed.refresh}/><RunSafety run={run}/>{run.approvals.map((approval) => {
         const matched = approval.workflow_id === run.workflow_id && approval.workflow_version === run.workflow_version;
         const record = matched ? approval : { ...approval, status: "unmatched" as const, allowed_decisions: [] };
         const preview = events.find((event) => event.event_type === "approval.pending" && event.details?.["approval_id"] === record.approval_id)?.details?.["email_preview"];

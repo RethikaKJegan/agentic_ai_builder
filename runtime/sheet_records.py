@@ -271,6 +271,8 @@ class GoogleSheetsRecordConnector:
             base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(inputs['spreadsheet_id'], safe='')
 
             def request(url, data=None):
+                from .execution_control import check_execution
+                check_execution()
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise RuntimeFailure('SHEETS_TIMEOUT', 'The record operation exceeded its time limit.')

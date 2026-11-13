@@ -1,4 +1,5 @@
 """CrewAI model bridge with server-owned usage policy and call/time controls."""
+from runtime.execution_control import controlled_response
 import json
 import math
 import os
@@ -44,6 +45,10 @@ class BoundedLLM(BaseLLM):
             raise
 
     def _call(self, messages, tools=None, callbacks=None, available_functions=None, **kwargs):
+        from .execution_control import check_execution, model_limits_required
+        check_execution()
+        if model_limits_required.get():
+            self.token_policy = 'bounded'
         if tools or available_functions:
             raise RuntimeFailure('MODEL_TOOL_CALL_DENIED', 'Tools are dispatched only through the authorized application boundary.', 403)
         reject_secrets(messages)
@@ -71,6 +76,7 @@ class BoundedLLM(BaseLLM):
         self.reserved_cost += cost
         try:
             text, actual_input, actual_output = self.provider_call(safe_messages, completion_cap, duration)
+            check_execution()
             if (type(actual_input) is not int or type(actual_output) is not int or min(actual_input, actual_output) < 0 or
                     (self.token_policy=='bounded' and actual_input > input_size) or
                     (completion_cap is not None and actual_output > completion_cap) or self.clock() - self.started > self.limits['timeout_seconds']):
@@ -163,7 +169,7 @@ class OpenAIModelFactory:
             elif bridge.structured_format is not None:
                 response_format = bridge.structured_format
             options={} if cap is None else dict(max_output_tokens=cap)
-            response = client.responses.create(model=model['model_id'], input=messages, **options,
+            response = controlled_response(client, model=model['model_id'], input=messages, **options,
                                                timeout=timeout, store=False, text={'format': response_format})
             if getattr(response, 'status', None) == 'incomplete':
                 reason=getattr(getattr(response,'incomplete_details',None),'reason',None)

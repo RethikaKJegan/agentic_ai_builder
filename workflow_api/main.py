@@ -169,7 +169,18 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             elif not isolation and not google_callback and request.url.path != '/session' and not request.url.path.startswith('/webhooks/') and not hmac.compare_digest(request.cookies.get(COOKIE, ''), session):
                 response = error('AUTHENTICATION_REQUIRED', 'Your local session expired or is invalid. Reopen the workspace to recover it.', 401)
             else:
-                response = await call_next(request)
+                from runtime.execution_control import policy_resolver, request_method
+                method_marker = request_method.set(request.method)
+                runtime = getattr(getattr(workflow_service, 'runtime_runner', None), 'runtime', None)
+                def current_policy():
+                    with workflow_service.store.transaction(write=False) as db:
+                        return runtime.governance.read(db, auth['subject']['workspace_id'])['policy']
+                policy_marker = policy_resolver.set(current_policy if runtime is not None else None)
+                try:
+                    response = await call_next(request)
+                finally:
+                    policy_resolver.reset(policy_marker)
+                    request_method.reset(method_marker)
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-Builder-Service'] = 'workflow-api'
             if isolation:
@@ -192,6 +203,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         return response
 
     async def dispatch(request, operation, additions=None):
+        from runtime.service import RuntimeFailure
         try:
             if request.method == 'GET':
                 body = dict(request_id=request.query_params.get('request_id', f'req_{uuid4().hex}'), operation=operation, payload={})
@@ -203,11 +215,16 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
                 if key in body['payload'] and body['payload'][key] != value:
                     return error('REFERENCE_MISMATCH', 'Route and payload revision references must match.', 400)
                 body['payload'][key] = value
-            if operation == 'list_workflows':
+            if operation == 'plan_workflow':
+                from runtime.operation_control import controlled_operation
+                result = await run_in_threadpool(controlled_operation, workflow_service, auth, body.get('idempotency_key') or body['request_id'], lambda: workflow_service.handle(body, auth), resources=body['payload'])
+            elif operation == 'list_workflows':
                 result = await run_in_threadpool(workflow_service.handle, body, auth, read_cursor=request.query_params.get('cursor'))
             else:
                 result = await run_in_threadpool(workflow_service.handle, body, auth)
             return JSONResponse(result, status_code=result['status'])
+        except RuntimeFailure as exc:
+            return error(exc.code, str(exc), exc.status)
         except Exception:
             return error('INVALID_REQUEST', 'The request must contain valid JSON and revision references.', 400)
 
@@ -402,6 +419,37 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.get('/runs/{run_id}')
     async def run(run_id: str, request: Request):
         return await dispatch(request, 'get_run', {'run_id': run_id})
+
+    @app.post('/runs/{run_id}/cancel')
+    async def cancel_run(run_id: str, request: Request):
+        from runtime.service import RuntimeFailure
+        if workflow_service.runtime_runner is None:
+            return error('SERVICE_UNAVAILABLE', 'The runtime is not connected.', 503)
+        try:
+            if await request.json() != {}:
+                return error('INVALID_REQUEST', 'Stop run accepts an empty object.', 400)
+            runtime = workflow_service.runtime_runner.runtime
+            result = await run_in_threadpool(runtime.cancel_run, run_id, auth)
+            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, dict(run=result)))
+        except RuntimeFailure as exc:
+            return error(exc.code, str(exc), exc.status)
+        except ValueError:
+            return error('INVALID_REQUEST', 'Use a JSON object.', 400)
+
+    @app.get('/governance/policy')
+    @app.put('/governance/policy')
+    async def governance_policy(request: Request):
+        from runtime.service import RuntimeFailure
+        if workflow_service.runtime_runner is None:
+            return error('SERVICE_UNAVAILABLE', 'The runtime is not connected.', 503)
+        try:
+            policy = workflow_service.runtime_runner.runtime.governance
+            result = await run_in_threadpool(policy.update, auth, await request.json()) if request.method == 'PUT' else await run_in_threadpool(policy.get, auth)
+            return JSONResponse(workflow_service.envelope(request_reference.get(), 200, result))
+        except RuntimeFailure as exc:
+            return error(exc.code, str(exc), exc.status)
+        except ValueError:
+            return error('INVALID_REQUEST', 'Use a JSON object.', 400)
 
     @app.get('/runs/{run_id}/recovery')
     async def recovery(run_id: str, request: Request):

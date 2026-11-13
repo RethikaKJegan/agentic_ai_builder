@@ -1,3 +1,4 @@
+import { StopRun, RunSafety } from "@/features/runs/StopRun";
 import { displayText } from "@/lib/display-text";
 import { useMemo, useState } from "react";
 import {
@@ -81,6 +82,8 @@ export function ExecutionView({ trace, workflow, onDesign, preferRun = false }: 
             </option>
           ))}
         </select>
+        {trace.run && <StopRun run={trace.run} onStopped={trace.retry}/>}
+        {trace.run && <RunSafety run={trace.run}/>}
         {trace.hasMoreRuns && <button type="button" onClick={trace.loadMoreRuns} className="rounded-lg border px-3 py-2">Older workflow runs</button>}
         {trace.hasMoreEvents && <span role="status">Loading more recorded events…</span>}
         <button

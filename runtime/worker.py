@@ -9,6 +9,7 @@ from threading import Event, Thread
 class RuntimeWorker:
     def __init__(self, runner, authenticate, interval=1, batch_size=100,concurrency=1,fair=False):
         self.runner, self.authenticate, self.interval = runner, authenticate, interval
+        runner.runtime.authenticate_current = authenticate
         self.batch_size = min(max(int(batch_size),1),1000)
         self.health = {"state":"starting","last_success":None,"last_error":None}
         self.cursor = 0
@@ -20,6 +21,7 @@ class RuntimeWorker:
 
     def drain(self):
         runtime = self.runner.runtime
+        runtime.expire_runs()
         with runtime.store.transaction(write=False) as db:
             if self.fair:
                 workspaces=[r[0] for r in db.execute("SELECT DISTINCT workspace FROM runtime_runs WHERE json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY workspace LIMIT 1000").fetchall()]
@@ -50,7 +52,22 @@ class RuntimeWorker:
             # worker does not reconstruct executable authority from run records.
             try:
                 auth = self.authenticate(run['workspace_id'], run['subject_id'])
-                if auth is None or auth['subject'] != dict(workspace_id=run['workspace_id'], subject_id=run['subject_id']):
+                revoked = auth is None or auth['subject'] != dict(workspace_id=run['workspace_id'], subject_id=run['subject_id'])
+                if not revoked:
+                    try:
+                        runtime.authorize(auth, 'workflow.execute', {'admin', 'builder'})
+                    except Exception:
+                        revoked = True
+                if revoked:
+                    # Only the trusted worker performs this transition. Stored
+                    # identities do not supply a replacement execution grant.
+                    with runtime.store.transaction() as db:
+                        row = db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (run['workspace_id'], run['run_id'])).fetchone()
+                        current = json.loads(row[0]) if row else None
+                        if current and current['status'] in {'queued', 'running', 'paused_for_approval'} and current.get('lease_until', 0) <= runtime.clock():
+                            current['error_code'] = 'EXECUTION_AUTHORITY_REVOKED'
+                            runtime.event(db, current, 'runtime.denied', dict(error_code='EXECUTION_AUTHORITY_REVOKED'))
+                            runtime.transition(db, current, 'blocked')
                     return None
                 return self.runner.advance(run['run_id'], auth)
             except Exception:

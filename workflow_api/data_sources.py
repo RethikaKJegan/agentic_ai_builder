@@ -90,6 +90,10 @@ class DataSources:
             raise ApiFailure('DATA_SOURCE_SETUP_REQUIRED', 'Configure BUILDER_DATA_SOURCE_KEY_FILE with a persistent Fernet key on the backend and worker.', 503)
 
     def owned(self, db, auth, cid):
+        from runtime.execution_control import check_source
+        from runtime.service import RuntimeFailure
+        try:check_source(cid)
+        except RuntimeFailure as exc:raise ApiFailure(exc.code, str(exc), exc.status) from None
         workspace, owner = GoogleConnections.identity(auth)
         if self.client_sources is not None and cid not in self.client_sources:
             raise ApiFailure('DATA_SOURCE_NOT_FOUND', 'Database connection not found.', 404)
@@ -110,6 +114,8 @@ class DataSources:
         workspace, owner = GoogleConnections.identity(auth)
         with self.store.transaction(write=False) as db:
             rows=db.execute('SELECT document FROM data_source_connections WHERE workspace=? AND owner=? ORDER BY connection_id',(workspace,owner)).fetchall()
+        from runtime.execution_control import resource_allowed
+        rows = [r for r in rows if resource_allowed(json.loads(r[0])['connection_id'], 'sources')]
         return {'configured':bool(self.cipher),'shared_demo_identity':auth['subject']['subject_id']=='local-builder','items':[d for r in rows for d in [json.loads(r[0])] if self.client_sources is None or d['connection_id'] in self.client_sources]}
 
     def require_source_management(self):
@@ -266,7 +272,11 @@ class DataSources:
         with self.store.transaction(write=False) as db:
             _,doc=self.owned(db,auth,cid)
             row=db.execute('SELECT document FROM data_source_snapshots WHERE connection_id=? AND revision=?',(cid,doc['metadata_revision'])).fetchone()
-        return {'connection':doc,'snapshot':json.loads(row[0]) if row else None}
+        snapshot = json.loads(row[0]) if row else None
+        if snapshot:
+            from runtime.execution_control import resource_allowed
+            snapshot['datasets'] = [d for d in snapshot.get('datasets', []) if resource_allowed(d['dataset_id'], 'sources')]
+        return {'connection':doc,'snapshot':snapshot}
 
     def tick(self):
         self.refresh.schedule()

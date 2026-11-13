@@ -114,16 +114,24 @@ class PlanningJobs:
             correlation=request.pop('_planning_correlation_id',None)
             context=request.get('payload',{}).get('context',{})
             overview=context.get('praxi_overview_request_v1') if isinstance(context,dict) else None
-            if overview is not None:
-                adapter=getattr(self.service,'overview_automation',None)
-                if (not adapter or not adapter.enabled(auth) or not isinstance(overview,dict)
-                        or overview.get('operation','prepare')!='prepare'
-                        or overview.get('objective')!=request['payload']['objective']
-                        or overview.get('request_key')!=request['idempotency_key']):
-                    raise ApiFailure('OVERVIEW_ROUTING_UNAVAILABLE','Overview routing is unavailable or the queued request changed.',409)
-                result=self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
-            else:
-                result = self.service.handle(request, deepcopy(auth))
+            def execute():
+                if overview is not None:
+                    adapter=getattr(self.service,'overview_automation',None)
+                    if (not adapter or not adapter.enabled(auth) or not isinstance(overview,dict)
+                            or overview.get('operation','prepare')!='prepare'
+                            or overview.get('objective')!=request['payload']['objective']
+                            or overview.get('request_key')!=request['idempotency_key']):
+                        raise ApiFailure('OVERVIEW_ROUTING_UNAVAILABLE','Overview routing is unavailable or the queued request changed.',409)
+                    return self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
+                else:
+                    return self.service.handle(request, deepcopy(auth))
+            def active():
+                with self.store.transaction(write=False) as db:
+                    current = db.execute('SELECT state,claim,lease_until FROM builder_planning_jobs WHERE job_id=? AND workspace=? AND subject=?', (row[0], row[1], row[2])).fetchone()
+                if not current or current[0] != 'running' or current[1] != claim or current[2] <= time.time():
+                    raise RuntimeFailure('EXECUTION_STOPPED', 'The planning job was stopped or its deadline expired.')
+            from runtime.operation_control import controlled_operation
+            result = controlled_operation(self.service, auth, row[0], execute, active=active, resources=context)
         except (ApiFailure,RuntimeFailure,PlannerFailure) as exc:
             if isinstance(exc,PlannerFailure):
                 exc=ApiFailure(exc.code,'The planner returned an invalid or unavailable proposal. Regenerate using the same business objective.',502,retryable=exc.retryable)

@@ -130,6 +130,8 @@ class SMTPConnector:
         try:
             deadline = time.monotonic() + self.timeout
             def remaining(smtp=None):
+                from .execution_control import check_execution
+                check_execution()
                 seconds = deadline - time.monotonic()
                 if seconds <= 0:
                     raise RuntimeFailure('SMTP_DELIVERY_UNCERTAIN', 'The SMTP invocation duration expired.')
@@ -199,6 +201,8 @@ class GoogleSheetsConnector:
         base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='')
         headers = {'Authorization': 'Bearer ' + credentials.token, 'Accept': 'application/json'}
         def read(url):
+            from .execution_control import check_execution
+            check_execution()
             with urlopen(Request(url, headers=headers), timeout=self.timeout) as response:
                 return json.load(response)
         def column(number):
@@ -270,6 +274,8 @@ class GoogleSheetsConnector:
             base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(spreadsheet_id, safe='')
             headers = {'Authorization': 'Bearer ' + credentials.token, 'Accept': 'application/json'}
             def read(url):
+                from .execution_control import check_execution
+                check_execution()
                 with urlopen(Request(url, headers=headers), timeout=self.timeout) as response:
                     return json.load(response)
             try:
@@ -399,6 +405,8 @@ class GoogleSheetsUpdateConnector(GoogleSheetsConnector):
                 '/values/' + quote(cell_range, safe='') + '?valueInputOption=USER_ENTERED',
                 data=body, method='PUT', headers={'Authorization': 'Bearer ' + credentials.token,
                 'Content-Type': 'application/json', 'Accept': 'application/json'})
+            from .execution_control import check_execution
+            check_execution()
             with urlopen(request, timeout=self.timeout) as response:
                 payload = json.load(response)
             output = {'updated_cells': int(payload.get('updatedCells', 0))}
@@ -472,6 +480,8 @@ class HTTPJSONConnector:
             headers['Content-Type'] = 'application/json'
         try:
             request = Request(url, data=data, method=self.method, headers=headers)
+            from .execution_control import check_execution
+            check_execution()
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read()
                 payload = json.loads(raw.decode() or '{}')
@@ -505,6 +515,8 @@ class SlackWebhookConnector(HTTPJSONConnector):
         try:
             request = Request(webhook, data=json.dumps({'text': inputs.get('text', inputs.get('message', ''))}).encode(),
                               method='POST', headers={'Content-Type': 'application/json', 'Accept': 'text/plain'})
+            from .execution_control import check_execution
+            check_execution()
             with urlopen(request, timeout=self.timeout) as response:
                 result = response.read().decode() or 'ok'
         except Exception:

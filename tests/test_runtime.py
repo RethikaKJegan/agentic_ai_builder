@@ -593,13 +593,15 @@ class ToolGraphTests(RuntimeFixture):
     approver = GraphTests.approver
     queue = GraphTests.queue
     # Test-only trusted registry configuration; never installed as product metadata.
-    def configure(self):
+    def configure(self, *, agent_timeout=None):
         import time
         from registry import RegistryService, WorkspacePolicy
         from workflow_api.registry_adapter import RegistryAdapter
         agent = json.loads((ROOT / 'shared/contracts/examples/agents/valid-classifier.json').read_text())
         agent.update(capabilities=['send_email'], permissions=['communication.send'], approval_requirements=['gate'])
         agent['limits'].update(max_tool_calls=2, max_retries=2)
+        if agent_timeout is not None:
+            agent['limits']['timeout_seconds'] = agent_timeout
         agent['retry_policy']['max_retries'] = 2
         tool = json.loads((ROOT / 'shared/contracts/examples/tools/smtp-send-email.json').read_text())
         scopes = ['communication.send', 'email.send']
@@ -847,7 +849,9 @@ class WorkerTests(RuntimeFixture):
         run = self.runtime.create_run(self.request(), self.auth)
         worker = RuntimeWorker(GraphRunner(self.runtime), lambda workspace, subject: None)
         self.assertEqual(worker.drain(), [])
-        self.assertEqual(self.runtime.get_run(run['run_id'], self.auth)['status'], 'queued')
+        stopped = self.runtime.get_run(run['run_id'], self.auth)
+        self.assertEqual(stopped['status'], 'blocked')
+        self.assertEqual(stopped['safety']['error_code'], 'EXECUTION_AUTHORITY_REVOKED')
 
 
 class TimeoutPolicyTests(RuntimeFixture):

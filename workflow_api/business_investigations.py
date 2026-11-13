@@ -407,7 +407,21 @@ class BusinessInvestigations:
 
     def invoke_timed(self,auth,p,run,node):
         started=time.monotonic()
-        result=self.invoke(auth,p,run,node)
+        def active():
+            self.authorize(auth, True)
+            with self.store.transaction(write=False) as db:
+                current = self.row(db, 'business_investigation_runs', identity(auth), 'run_id', run['run_id'])
+            if current['status'] != 'running' or current['invocations'].get(node['id']) != run['invocations'].get(node['id']):
+                fail('The investigation was stopped or its invocation changed.', 'INVESTIGATION_CANCELED', 409)
+        service = getattr(self, 'workflow_service', None)
+        if service is None:
+            result = self.invoke(auth, p, run, node)
+        else:
+            from runtime.operation_control import controlled_operation
+            from datetime import datetime
+            created = datetime.fromisoformat(run['created_at'].replace('Z', '+00:00')).timestamp()
+            result = controlled_operation(service, auth, run['run_id'], lambda: self.invoke(auth, p, run, node),
+                active=active, resources=p, created_at=created)
         if time.monotonic()-started>node['constraints']['timeout_seconds']:
             fail('Node duration exceeded its declared bound.','INVESTIGATION_NODE_TIMEOUT',408)
         return result

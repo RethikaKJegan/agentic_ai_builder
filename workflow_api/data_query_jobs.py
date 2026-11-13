@@ -59,6 +59,7 @@ class DataQueryJobs:
             db.execute('CREATE TABLE IF NOT EXISTS data_query_jobs (job_id TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner TEXT NOT NULL, retry_key TEXT NOT NULL, plan_id TEXT NOT NULL, state TEXT NOT NULL, token TEXT, lease_until REAL NOT NULL, attempts INTEGER NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, deadline REAL NOT NULL, plan_expires REAL NOT NULL, document TEXT NOT NULL, progress TEXT NOT NULL, error_code TEXT, error_message TEXT, result_secret TEXT, result_expires REAL, UNIQUE(workspace,owner,retry_key))')
             db.execute('CREATE INDEX IF NOT EXISTS data_query_job_queue ON data_query_jobs(state,created)')
             db.execute('CREATE INDEX IF NOT EXISTS data_query_job_owner ON data_query_jobs(workspace,owner,created)')
+            db.execute('CREATE TABLE IF NOT EXISTS data_query_governance (job_id TEXT PRIMARY KEY, workspace TEXT, owner TEXT, run_id TEXT, node_id TEXT, policy TEXT NOT NULL)')
 
     @staticmethod
     def decode(row):
@@ -104,7 +105,7 @@ class DataQueryJobs:
             db.execute('UPDATE data_query_jobs SET state=?,token=NULL,lease_until=0,updated=?,progress=?,error_code=?,error_message=?,result_secret=NULL WHERE job_id=?',
                        (state,current,json.dumps(progress_value(stage)),code,message,row['job_id']))
 
-    def submit(self, auth, body, retry_key):
+    def submit(self, auth, body, retry_key, *, runtime_reference=None):
         workspace, owner = identity(auth)
         self.manager.configured()
         if not isinstance(body,dict) or set(body)!={'plan_id'} or not isinstance(body['plan_id'],str):
@@ -143,6 +144,11 @@ class DataQueryJobs:
             values=(job_id,workspace,owner,retry_key,body['plan_id'],'queued',None,0,0,current,current,current+self.timeout,
                     saved['expires_at'],json.dumps(saved),json.dumps(progress_value()),None,None,None,None)
             db.execute('INSERT INTO data_query_jobs ('+SELECT+') VALUES ('+','.join('?' for _ in COLUMNS)+')',values)
+            from runtime.execution_control import policy_resolver
+            resolve=policy_resolver.get()
+            pin=resolve() if resolve is not None else {}
+            reference=runtime_reference or {}
+            db.execute('INSERT INTO data_query_governance VALUES (?,?,?,?,?,?)', (job_id,workspace,owner,reference.get('run_id'),reference.get('node_id'),json.dumps(pin)))
         self.wake.set()
         return self.get(auth,job_id)
 
@@ -200,6 +206,7 @@ class DataQueryJobs:
 
     def valid_result_authority(self, auth, row):
         identity(auth)
+        self.effective_policy(row, execution=False)
         saved=json.loads(row['document'])
         # Plan TTL limits execution, not retrieval of an already completed result.
         if fingerprint(self.queries.context(auth)[0])!=saved['context_hash']:
@@ -235,7 +242,31 @@ class DataQueryJobs:
         if min(current['deadline'],current['plan_expires'])<=self.clock():
             failure('DATA_QUERY_TIMEOUT','Query execution deadline exceeded.',504)
 
+    def effective_policy(self, row, *, execution=True):
+        from runtime.governance import GovernancePolicy
+        with self.store.transaction(write=False) as db:
+            binding=db.execute('SELECT run_id,policy FROM data_query_governance WHERE job_id=? AND workspace=? AND owner=?', (row['job_id'],row['workspace'],row['owner'])).fetchone()
+            current={}
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_governance'").fetchone():
+                value=db.execute('SELECT document FROM runtime_governance WHERE workspace=?',(row['workspace'],)).fetchone()
+                current=json.loads(value[0]) if value else {}
+            policy=GovernancePolicy.intersect(json.loads(binding[1]) if binding else {}, current)
+            if binding and binding[0]:
+                parent=db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND run_id=?',(row['workspace'],row['owner'],binding[0])).fetchone()
+                parent=json.loads(parent[0]) if parent else None
+                if not parent or execution and parent['status'] not in ('queued','running'):
+                    failure('DATA_QUERY_CANCELLED','The owning workflow stopped. No query result will be published.')
+                policy=GovernancePolicy.intersect(policy,parent.get('governance_policy',{}).get('policy',{}))
+            if self.clock()-row['created']>=policy['limits'].get('timeout_seconds',float('inf')):
+                failure('DATA_QUERY_TIMEOUT','The original query execution budget is exhausted.',504)
+            saved=json.loads(row['document'])
+            selected={saved['plan']['base_dataset_id'],*[join['target_dataset_id'] for join in saved['plan']['joins']]}
+            if selected & set(policy['restricted_sources']):
+                failure('SOURCE_RESTRICTED','The selected query source is restricted.',403)
+            return policy
+
     def pulse(self, row):
+        self.effective_policy(row)
         if self.stop_event.is_set():
             failure('DATA_QUERY_INTERRUPTED','Worker is restarting. No partial result was published.',503)
         with self.store.transaction() as db:
@@ -297,6 +328,8 @@ class DataQueryJobs:
     def tick(self):
         row=self.claim()
         if row is None:return False
+        from runtime.execution_control import policy_resolver
+        policy_marker=policy_resolver.set(lambda:self.effective_policy(row))
         try:
             with QueryExecutionControl(self,row) as control:
                 auth=self.authority(row)
@@ -314,6 +347,8 @@ class DataQueryJobs:
         except Exception:
             self.finish_failure(row,ApiFailure('DATA_QUERY_JOB_FAILED','Query execution failed. Check source access and create a fresh job.',503))
             self.health=dict(state='ready',last_error='DATA_QUERY_JOB_FAILED')
+        finally:
+            policy_resolver.reset(policy_marker)
         return True
 
     def start(self):

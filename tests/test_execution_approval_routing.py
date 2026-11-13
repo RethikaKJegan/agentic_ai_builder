@@ -45,15 +45,18 @@ def test_disabled_mode_preserves_legacy_requirement_handling():
  route=intent('one_time');route['missing_requirements']=['Approval is required.']
  assert OverviewAutomation(None,interpreter=lambda *_:route).interpret('Prepare.',{})==route
 
-def test_mixed_approval_and_actual_missing_input_still_creates_blocked_draft(automation):
+def test_mixed_approval_and_actual_missing_input_creates_read_only_report(automation):
  route=empty_once();route['missing_requirements']=['Approval is required before sending email.','The manager email is unknown.']
  def unresolved(*_):
   from runtime.service import RuntimeFailure
   raise RuntimeFailure('ACTION_INPUT_REQUIRED','The manager email remains unknown.',422)
  automation.general.planner.provider=SimpleNamespace(plan_actions=unresolved)
  result=router(automation,route).handle(automation.x.a,dict(objective='Email my manager.',request_key='approval_mixed_actual_gap'))
- assert result['blocked'] and result['questions']==[] and result['schedule'] is None
- assert not automation.http.sent
+ assert result['report_only'] and result['questions']==[] and result['schedule'] is None
+ doc=automation.c.get(automation.x.a,result['composition_id'])
+ assert not doc['selected_tools']
+ assert not automation.c.workflow(automation.x.a,result['composition_id'])['execution_policy']['allow_external_writes']
+ assert not automation.http.sent and automation.http.write_count==0
 
 def test_actual_faulty_route_reaches_action_planning_and_keeps_email_gate(automation,queries):
  from tests.test_question_free_workflows import test_supported_qualitative_workflow_receives_policy_at_planning_and_runtime_without_blocker

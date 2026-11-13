@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, BookOpen, ChevronRight, FileText, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { api } from "@/api/client";
 import { AgentBehaviourPanel } from "@/features/governance/AgentBehaviourPanel";
+import { ExecutionPolicyPanel } from "@/features/governance/ExecutionPolicyPanel";
 import { UsageLimits } from "@/features/governance/UsageLimits";
 import { Link } from "@/lib/navigation";
 import { displayText } from "@/lib/display-text";
@@ -55,7 +56,7 @@ export default function Governance() {
   return <div className="mx-auto max-w-6xl p-5 md:p-10">
     <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
       <div><p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Organization governance</p><h1 className="font-display text-3xl font-semibold tracking-tight">Governance</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">A clear reference for policies, usage boundaries and execution evidence.</p></div>
-      <div className="flex items-center gap-3"><Tag>Read-only</Tag><button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">{loading ? "Loading…" : "Refresh evidence"}</button></div>
+      <div className="flex items-center gap-3"><Tag>Runtime evidence</Tag><button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">{loading ? "Loading…" : "Refresh evidence"}</button></div>
     </div>
     <Tabs value={activeTab} onValueChange={setActiveTab}>
       <TabsList className="mb-6 grid h-auto w-full grid-cols-1 gap-1 rounded-xl bg-muted/50 p-1 sm:grid-cols-3">
@@ -65,7 +66,7 @@ export default function Governance() {
       </TabsList>
       <ApiFeedback error={error}/>
       {loading && <p role="status" className="mb-4 text-sm text-muted-foreground">Loading reported policies and activity…</p>}
-      <TabsContent value="policies" className="mt-0">
+      <TabsContent value="policies" className="mt-0"><ExecutionPolicyPanel/>
         <AgentBehaviourPanel policies={policies} onViewLimits={()=>setActiveTab("limits")}/>
         <div className="grid gap-6 lg:grid-cols-[225px_minmax(0,1fr)]">
           <nav aria-label="Policy sections" className="space-y-1 lg:border-r lg:pr-5"><p className="mb-3 px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Policy reference</p>{sections.map(item => <button type="button" key={item.id} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors ${section === item.id ? "bg-primary/5 font-medium text-primary" : "text-muted-foreground hover:bg-muted"}`}>{item.label}<ChevronRight className="h-3.5 w-3.5"/></button>)}</nav>
@@ -88,10 +89,10 @@ export default function Governance() {
         {data && <p className="text-xs text-muted-foreground">Showing {filtered.length} of {events.length} returned events</p>}
         <div className="divide-y rounded-xl border">{filtered.map(event => <button key={event.event_id} type="button" onClick={() => setSelected(event)} className="flex w-full items-start gap-3 p-4 text-left hover:bg-muted/40"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary/60"/><span className="min-w-0 flex-1"><span className="block break-words text-sm font-medium">{displayText(event.event_type)}</span><span className="mt-1 block break-all text-xs text-muted-foreground">{event.timestamp} · {event.run_id}</span><span className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">{event.event_id}</span></span><ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground"/></button>)}</div>
         {!loading && !error && !filtered.length && <Empty>{events.length ? "No events match your search or filter." : "No runtime audit events were returned. Browser-local activity is not included."}</Empty>}
-        <p className="text-xs leading-5 text-muted-foreground">Actor identity and a separate outcome field are not supplied in these event records. Inspect the linked run for further execution evidence.</p>
+        <p className="text-xs leading-5 text-muted-foreground">Actor and stop reasons are shown when supplied by the runtime. Inspect the linked run for further execution evidence.</p>
       </TabsContent>
     </Tabs>
-    {data && <p className="mt-8 border-t pt-4 text-xs text-muted-foreground">Evidence retrieved {retrieved} · Read-only snapshot · Source: existing runtime monitoring service</p>}
-    <Sheet open={!!selected} onOpenChange={open => { if (!open) setSelected(undefined); }}><SheetContent className="w-full overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>Event evidence</SheetTitle><SheetDescription>Original fields returned by the runtime service.</SheetDescription></SheetHeader>{selected && <div className="mt-6"><dl><Value label="Event ID">{selected.event_id}</Value><Value label="Event type">{selected.event_type}</Value><Value label="Timestamp">{selected.timestamp}</Value><Value label="Run ID">{selected.run_id}</Value><Value label="Actor">Not supplied</Value><Value label="Outcome">Not supplied separately</Value></dl><Link to={runHref(selected.run_id)} className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary">Inspect run<ArrowRight className="h-4 w-4"/></Link><details className="mt-6 rounded-lg border p-3"><summary className="cursor-pointer text-xs font-medium">Original event record</summary><pre className="mt-3 whitespace-pre-wrap break-all text-xs text-muted-foreground">{JSON.stringify(selected, null, 2)}</pre></details></div>}</SheetContent></Sheet>
+    {data && <p className="mt-8 border-t pt-4 text-xs text-muted-foreground">Evidence retrieved {retrieved} · Monitoring snapshot · Source: existing runtime monitoring service</p>}
+    <Sheet open={!!selected} onOpenChange={open => { if (!open) setSelected(undefined); }}><SheetContent className="w-full overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>Event evidence</SheetTitle><SheetDescription>Original fields returned by the runtime service.</SheetDescription></SheetHeader>{selected && <div className="mt-6"><dl><Value label="Event ID">{selected.event_id}</Value><Value label="Event type">{selected.event_type}</Value><Value label="Timestamp">{selected.timestamp}</Value><Value label="Run ID">{selected.run_id}</Value><Value label="Actor">{selected.actor_id ?? "Not supplied"}</Value><Value label="Outcome">{selected.error_code ?? "Not supplied separately"}</Value></dl><Link to={runHref(selected.run_id)} className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary">Inspect run<ArrowRight className="h-4 w-4"/></Link><details className="mt-6 rounded-lg border p-3"><summary className="cursor-pointer text-xs font-medium">Original event record</summary><pre className="mt-3 whitespace-pre-wrap break-all text-xs text-muted-foreground">{JSON.stringify(selected, null, 2)}</pre></details></div>}</SheetContent></Sheet>
   </div>;
 }

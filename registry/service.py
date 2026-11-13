@@ -135,6 +135,9 @@ class RegistryService:
         return self._respond(auth, 'tools.read', operation, request_id)
 
     def _can_view(self, record, auth):
+        from runtime.execution_control import resource_allowed
+        if not resource_allowed(record['definition']['tool_id'], 'tools'):
+            return False
         tool = record['definition']
         required = set(tool['permission_scopes'])
         scopes = required | set(tool['authentication'].get('scopes', []))

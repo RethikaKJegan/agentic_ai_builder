@@ -224,5 +224,4 @@ class CompositionPresentation:
         with self.store.transaction() as db:
             run=runtime.load(db,run_id,auth,'workflow.execute')
             if run['subject_id']!=doc['scope']['owner'] or run['workflow_id']!=wid:fail('Run is outside this composition.','RUN_NOT_FOUND',404)
-            if run['status'] in ('queued','running','paused_for_approval'):runtime.transition(db,run,'cancelled')
-        return runtime.public(run)
+        return runtime.cancel_run(run_id, auth)

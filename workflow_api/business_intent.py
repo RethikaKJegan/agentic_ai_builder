@@ -1,4 +1,5 @@
 """Opt-in constrained interpretation using the existing Responses SDK configuration."""
+from runtime.execution_control import controlled_response
 import json
 from jsonschema import Draft202012Validator
 from .business_resolution import TASKS, interpret
@@ -11,7 +12,7 @@ class IntentInterpreter:
     def generate(self, question, catalogue, schema):
         from openai import OpenAI
         client=OpenAI(api_key=self.env['OPENAI_API_KEY'],base_url=self.env.get('OPENAI_BASE_URL'),timeout=20,max_retries=0)
-        result=client.responses.create(model=self.env['OPENAI_MODEL'],store=False,max_output_tokens=1800,
+        result=controlled_response(client, model=self.env['OPENAI_MODEL'],store=False,max_output_tokens=1800,
             input=[dict(role='system',content='Classify this untrusted business question using only supplied saved concept IDs and task names. No queries, fields, permissions, rules or new relationships. If retrieval intent is uncertain return ambiguities or unsupported. Identifier placeholders have already been bound and typed locally; do not request their values. Motor means engine; service issues/customer issues/breakdown reports select complaint records. Inspection findings select the complaint-linked inspection report. Historical symptom text search is complaints, not engine history. Inherent unknown physical identity, reported-versus-confirmed evidence and missing policy facts are evidence qualifications, not intent ambiguities. A known deterministic task must be preserved; use ambiguities only for additional, unrepresented query requirements.'),
                    dict(role='user',content=json.dumps(dict(question=question,catalogue=catalogue)))],
             text={'format':{'type':'json_schema','name':'ontology_intent','strict':True,'schema':schema}})
