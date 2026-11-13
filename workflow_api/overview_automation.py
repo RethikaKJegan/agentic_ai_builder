@@ -541,6 +541,16 @@ class OverviewAutomation:
         if period != 'none' and not catalog:
             result.update(state='unsupported', questions=[(unavailable or {}).get('message', 'No authorized date-query source is available.')])
             return dict(result=result,intent=None)
+        simpsons=getattr(self.service,'simpsons_planning',None)
+        if simpsons and period=='none' and schedule and route['entity_scope']=='population':
+            if not catalog or not q:failure('No authorized query capability is available.','OVERVIEW_QUERY_UNAVAILABLE')
+            try:batch=simpsons.prepare(auth,route['business_goal'],catalog)
+            except ApiFailure as exc:
+                if exc.code!='OVERVIEW_CLARIFICATION':raise
+                result.update(state='clarification',business_clarification=True,questions=[str(exc)])
+                return dict(result=result,intent=None)
+            intent.update(simpsons_queries=batch,knowledge=deepcopy(knowledge))
+            return dict(result=result,intent=intent)
         if period != 'none' or schedule and route['entity_scope']=='population':
             if not catalog or not q: failure('No authorized query capability is available.', 'OVERVIEW_QUERY_UNAVAILABLE')
             question = route['business_goal']
@@ -575,6 +585,9 @@ class OverviewAutomation:
 
     def operations(self, auth, doc, intent):
         operations = {}
+        if intent.get('simpsons_queries'):
+            from .simpsons_planning import consent
+            simpsons_schema=consent(doc['action_plan']['actions'],intent['simpsons_queries'])
         actions = {a['action_id']:a for a in doc['action_plan']['actions']}
         for a in actions.values():
             c = doc['contracts'][a['capability_id']]
@@ -608,7 +621,9 @@ class OverviewAutomation:
                 schema['properties'][name] = {'const':value}
                 schema.setdefault('required', [])
                 if name not in schema['required']: schema['required'].append(name)
-            if tid == 'workflow_data_query':
+            if tid == 'workflow_data_query' and intent.get('simpsons_queries'):
+                schema=deepcopy(simpsons_schema)
+            elif tid == 'workflow_data_query':
                 if not intent.get('query'): failure('Review an exact query before scheduling.')
                 schema['properties']['query'] = {'const':deepcopy(intent['query'])}
                 if intent.get('temporal_pin'): schema[ANNOTATION] = deepcopy(intent['temporal_pin'])

@@ -76,7 +76,7 @@ def params(workflow,node,run,*,now=None):
             due=reference.get('scheduled_due') if reference else overview['prepared_at']
             if due is None:deny('Logical occurrence time is missing.','AUTOMATION_SCOPE_DENIED')
             result['query']=resolve(overview['query'],overview['temporal_pin'],due)
-    if action['capability_id']=='content.prepare':
+    if action['capability_id'] in {'content.prepare','simpsons.assess'}:
         required=context.get('validated_context',{}).get('subway_filter_reports',{}).get(action['action_id'],[])
         if any(aid not in action['depends_on'] or run.get('action_instances',{}).get(aid,{}).get('state')!='completed' for aid in required):
             deny('Every pinned alternative must complete and feed the report.','ACTION_INCOMPLETE')
@@ -101,6 +101,8 @@ def params(workflow,node,run,*,now=None):
             result['data']={**data,'descriptive_measure_basis':basis} if isinstance(data,dict) else {'primary':data,'descriptive_measure_basis':basis}
             action=deepcopy(action)
             action['instructions']+=' Label every recorded measure separately using descriptive_measure_basis. Preserve each requested statistic and currency group; do not infer measure equivalence, an approved basis or policy outcomes.'
+        if action['capability_id']=='simpsons.assess':
+            result['data']={'primary':result['data'],'saved_business_definitions':deepcopy(context.get('validated_context',{}).get('simpsons_business_knowledge',{}))}
         result['instructions']=action['instructions']
         if context.get('validated_context',{}).get('demo_context'):
             from workflow_api.subway_presentation import GUIDANCE
@@ -133,7 +135,7 @@ def params(workflow,node,run,*,now=None):
             data=result['data']
             result['data']={**data,'report_table_context':tables} if isinstance(data,dict) else {'primary':data,'report_table_context':tables}
             result['instructions']+=' '+TABLE_GUIDANCE
-    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','simpsons.assess','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import packet
         sources=[e for dep in action['depends_on'] for e in run.get('task_checkpoints',{}).get(dep,{}).get('result',{}).get('source_evidence',[])]
         result.setdefault('context',{})['evidence']=packet(sources)
@@ -152,7 +154,7 @@ def params(workflow,node,run,*,now=None):
 
 def validate_content_tables(workflow,node,output):
     action=action_for(workflow,node['node_id'])
-    if not action or action['capability_id']!='content.prepare':return
+    if not action or action['capability_id'] not in {'content.prepare','simpsons.assess'}:return
     for tab in output.get('tabs',[]):
         if any(len(row)!=len(tab['headers']) for row in tab['rows']):
             from .service import RuntimeFailure
@@ -219,7 +221,7 @@ def validate_content(workflow,node,output,inputs):
                 'Preserve requested scope; never invent IDs, joins or filters. Use clarification for unsupported requirements.')[:400]
             raise error
         return
-    if not action or action['capability_id']!='content.prepare':return
+    if not action or action['capability_id'] not in {'content.prepare','simpsons.assess'}:return
     from .report_tables import normalize,validate
     data=inputs.get('data',{})
     tables=data.get('report_table_context') if isinstance(data,dict) else None
@@ -251,7 +253,7 @@ def verify(workflow,node,output,inputs):
         prepared=prepare_content(output)
         output.clear();output.update(prepared)
     validate_content(workflow,node,output,inputs)
-    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','subway.plan_query','data.plan_query'}:
+    if node['kind']=='agent' and action['capability_id'] not in {'content.prepare','simpsons.assess','subway.plan_query','data.plan_query'}:
         from workflow_api.investigation_agents import validate_analysis
         from workflow_api.service import ApiFailure
         try:checked=validate_analysis(output,inputs['context']['evidence'])

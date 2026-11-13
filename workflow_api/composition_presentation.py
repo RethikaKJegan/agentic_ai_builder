@@ -1,5 +1,6 @@
 """Owner-scoped UI projection of composition and existing durable runtime state."""
 from copy import deepcopy
+from .simpsons_planning import presentation_title
 import json
 from uuid import uuid4
 from .investigation_graph import fail
@@ -75,7 +76,7 @@ class CompositionPresentation:
             doc=json.loads(row[0]);wid='cw_'+doc['composition_id'].removeprefix('composition_');meta=metadata.get(wid,{})
             if wid in deleted or meta.get('deleted'):continue
             run=next((r for r in runs if r['workflow_id']==wid),None)
-            items.append(dict(workflow_id=wid,composition_id=doc['composition_id'],display_name=meta.get('name') or display_title(doc),objective=doc['objective'],created_at=doc['created_at'],node_count=len(doc['tasks']),run_id=run['run_id'] if run else None,status=run['status'] if run else doc['state'],kind='composition'))
+            items.append(dict(workflow_id=wid,composition_id=doc['composition_id'],display_name=presentation_title(self.service,doc,meta.get('name') or display_title(doc)),objective=doc['objective'],created_at=doc['created_at'],node_count=len(doc['tasks']),run_id=run['run_id'] if run else None,status=run['status'] if run else doc['state'],kind='composition'))
         return items
 
     def view(self,auth,cid,run_id=None):
@@ -178,7 +179,7 @@ class CompositionPresentation:
             if prepared.get('evidence_context'):request_context['business_request']['evidence_context']={k:prepared['evidence_context'][k] for k in ('dataset_id','case_id')}
         if doc.get('client_package_context'):
             package=doc['client_package_context']['package'];request_context.update(client_package_id=package['package_id'],client_package_revision=package['revision'])
-        return dict(composition_id=cid,workflow_id=wid,display_name=meta[0] if meta and meta[0] else display_title(doc),objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=doc['master'],workflow_status=workflow['status'] if workflow else None,workflow_version=workflow['version'] if workflow else None,run=public_run,knowledge=knowledge,memory=memory,recovery=recovery,planning=doc['planning'],resources=doc['resources'],request_context=request_context)
+        return dict(composition_id=cid,workflow_id=wid,display_name=presentation_title(self.service,doc,meta[0] if meta and meta[0] else display_title(doc)),objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=doc['master'],workflow_status=workflow['status'] if workflow else None,workflow_version=workflow['version'] if workflow else None,run=public_run,knowledge=knowledge,memory=memory,recovery=recovery,planning=doc['planning'],resources=doc['resources'],request_context=request_context)
 
     @staticmethod
     def recovery_view(run,workflow,clock):

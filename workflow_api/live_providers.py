@@ -474,6 +474,9 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
         install_tenant_google(app,env)
     runner.connectors.update(app.state.database_workflows.connectors())
     runner.connectors['workflow_data_query'] = service.workflow_queries
+    if isolation and env.get('BUILDER_CLIENT_ID') == 'simpsons':
+        from .simpsons_planning import SimpsonsPlanning
+        service.simpsons_planning = SimpsonsPlanning(service,env)
     if direct_write:
         runner.direct_write_tools |= {'google_sheets_upsert_record'}
     from .source_context import knowledge_documents

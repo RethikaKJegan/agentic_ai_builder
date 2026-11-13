@@ -223,7 +223,11 @@ class DurableAutomation:
                 from .subway_automation import validate_consent
                 validate_consent(schema,body['schedule']['timezone'])
             # Bound authority fields explicitly; OAuth is not business consent.
-            if tid=='workflow_data_query':
+            if tid=='workflow_data_query' and 'x-praxi-simpsons-query-set-v1' in schema:
+                if not getattr(self.service,'simpsons_planning',None):fail('Simpsons consent is unavailable in this workspace.','AUTOMATION_SCOPE_DENIED',403)
+                from .simpsons_planning import validate_consent
+                validate_consent(schema,auth)
+            elif tid=='workflow_data_query':
                 # A fresh executable plan may be prepared each day, but the model
                 # cannot expand the reviewed query meaning under recurring consent.
                 query_scope=schema.get('properties',{}).get('query',{})
@@ -652,6 +656,10 @@ class DurableAutomation:
         if node['tool_id']=='subway_query':
             from .subway_automation import check_query
             check_query(schema,inputs,workflow,run,self.service.subway_queries,auth)
+        if schema and 'x-praxi-simpsons-query-set-v1' in schema:
+            if not getattr(self.service,'simpsons_planning',None):fail('Simpsons consent is unavailable in this workspace.','AUTOMATION_SCOPE_DENIED',403)
+            from .simpsons_planning import check_action
+            check_action(schema,workflow,node,inputs,auth)
         from .temporal_queries import ANNOTATION,consent_schema
         if schema and ANNOTATION in schema:
             overview=workflow.get('metadata',{}).get('overview_intent',{})
