@@ -55,6 +55,6 @@ for(const mobile of [false,true]){
     await page.goto("/app/governance");await expect(page.getByRole("tab",{name:"Organization Policies"})).toBeVisible();
     await page.getByRole("tab",{name:"Usage & Limits"}).click();await expect(page.getByRole("tab",{name:"Usage & Limits"})).toHaveAttribute("aria-selected","true");await expect(page.getByRole("button",{name:"Save policy"})).toHaveCount(0);
     expect(errors).toEqual([]);
-    await page.screenshot({path:`../.local/execution-controls-release-20261113/safety-${mobile?'mobile':'desktop'}.png`,fullPage:true});
+    await page.screenshot({path:`${process.env['BUILDER_BROWSER_ARTIFACT_DIR']??'../.local/execution-controls-release-20261113'}/safety-${mobile?'mobile':'desktop'}.png`,fullPage:true});
   });
 }

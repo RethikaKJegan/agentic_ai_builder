@@ -34,16 +34,4 @@ it('requires confirmation before deleting and refreshes the connection list',asy
  await waitFor(()=>expect(screen.queryByRole('button',{name:'Delete connection'})).toBeNull());
 });
 
-it.each([true,false])('opens existing data questions with management permission %s',async(canManage)=>{
- useBackend.setState({can:permission=>permission==='tools.read'||(canManage&&permission==='tools.assign')});
- vi.spyOn(api,'dataQueryStatus').mockResolvedValue({configured:true,max_rows_per_dataset:5000,max_bytes:2000000,max_datasets:4,max_result_rows:500,plan_ttl_seconds:600});
- const plan=vi.spyOn(api,'planDataQuestion');
- const execute=vi.spyOn(api,'executeDataQuestion');
- render(<DataIntelligence/>);
- fireEvent.click(await screen.findByRole('tab',{name:'Questions'}));
- fireEvent.change(screen.getByLabelText('Your data question'),{target:{value:'Count orders'}});
- await waitFor(()=>expect(api.dataQueryStatus).toHaveBeenCalled());
- await waitFor(()=>canManage?expect(screen.getByRole('button',{name:'Create query plan'})).toBeEnabled():expect(screen.getByRole('button',{name:'Create query plan'})).toBeDisabled());
- expect(plan).not.toHaveBeenCalled();
- expect(execute).not.toHaveBeenCalled();
-});
+it('hides Questions and Operations without invoking their APIs',async()=>{const plan=vi.spyOn(api,'planDataQuestion');const execute=vi.spyOn(api,'executeDataQuestion');render(<DataIntelligence/>);expect(await screen.findByRole('tab',{name:'Ontology'})).toBeVisible();expect(screen.queryByRole('tab',{name:'Questions'})).toBeNull();expect(screen.queryByRole('tab',{name:'Operations'})).toBeNull();expect(plan).not.toHaveBeenCalled();expect(execute).not.toHaveBeenCalled();});

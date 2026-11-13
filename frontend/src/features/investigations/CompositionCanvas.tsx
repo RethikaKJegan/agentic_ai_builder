@@ -17,7 +17,7 @@ function TaskCard({data,selected}:NodeProps<Card>) {
 const nodeTypes={task:TaskCard};
 export function CompositionCanvas({view:sourceView,onSelect}:{view:CompositionView;onSelect:(id:string)=>void}) {
  const workspace=useBackend(s=>s.session?.auth.subject.workspace_id);const view=useMemo(()=>subwayDisplay(sourceView,workspace),[sourceView,workspace]);
- const compact=workspace==='client-subway';
+ const compact=true;
  const graph=useMemo(()=>{
   const gates=view.tasks.flatMap(t=>t.approval_gate?[{...t.approval_gate,kind:'approval',condition:false}]:[]);const gateByTask=Object.fromEntries(view.tasks.filter(t=>t.approval_gate).map(t=>[t.id,t.approval_gate!.id]));
   const edges=[...taskEdges(view.tasks).map(e=>({...e,target:gateByTask[e.target]??e.target})),...view.tasks.filter(t=>t.approval_gate).map(t=>({id:`${t.approval_gate!.id}-${t.id}`,source:t.approval_gate!.id,target:t.id}))];const root='coordinator';

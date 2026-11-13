@@ -120,3 +120,24 @@ def test_reviewed_objective_scope_cannot_expand_to_other_owned_sources(capabilit
     with pytest.raises(RuntimeFailure) as error:invoke(scoped)
     assert error.value.code=='DATA_QUERY_SCOPE_DENIED'
     assert not c.queries.reader.calls
+
+
+def test_slow_durable_handoff_uses_registered_deadline_and_reattaches(capability, monkeypatch):
+    import time
+    from runtime.execution_control import guarded_call
+    from workflow_api.workflow_queries import definition
+    c,_=capability
+    original=c.jobs.submit
+    def slow_submit(*args,**kwargs):
+        time.sleep(1.2)
+        return original(*args,**kwargs)
+    monkeypatch.setattr(c.jobs,'submit',slow_submit)
+    with pytest.raises(QueryPending):
+        guarded_call(lambda:None,lambda:invoke(c),timeout=c.timeout,timeout_code='TOOL_TIMEOUT')
+    assert c.timeout==definition()['timeout_seconds']==10
+    assert len(c.jobs.list(auth())['items'])==1
+    assert c.jobs.tick()
+    result=invoke(c)
+    assert result['coverage']['complete_scan']
+    assert len(c.jobs.list(auth())['items'])==1
+    assert len(c.queries.reader.calls)==1

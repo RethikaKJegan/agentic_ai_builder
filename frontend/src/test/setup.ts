@@ -28,3 +28,9 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// Browser-only pointer/layout methods used by the accessible Radix account picker.
+HTMLElement.prototype.scrollIntoView ??= () => {};
+HTMLElement.prototype.hasPointerCapture ??= () => false;
+HTMLElement.prototype.setPointerCapture ??= () => {};
+HTMLElement.prototype.releasePointerCapture ??= () => {};

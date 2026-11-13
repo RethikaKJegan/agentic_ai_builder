@@ -58,7 +58,7 @@ export const approvalRecordSchema = z.object({ approval_id: z.string(), workflow
   resolved_payload:z.record(z.unknown()).optional(), tool_id:z.string().optional(), operation:z.string().optional(), expires_at:z.number().optional(),
   allowed_decisions: z.array(z.enum(["approved", "rejected"])).default([]), required_roles: z.array(z.string()).optional() });
 const runData = z.object({ run: z.object({ run_id: z.string(), workflow_id: z.string(), workflow_version: z.number().int().positive(), status: RunStatusSchema,
-  adaptive: adaptiveRunSchema.optional(), safety: runSafetySchema.optional(),
+  adaptive: adaptiveRunSchema.optional(), safety: runSafetySchema.optional(), workflow_name:z.string().optional(),composition_id:z.string().nullable().optional(),result_summary:z.string().nullable().optional(),created_at:z.number().optional(),finished_at:z.number().optional(),duration_seconds:z.number().optional(),
   approvals: z.array(approvalRecordSchema).default([]) }).passthrough(), ...metadata });
 const eventsData = CollectionSchema.extend({ items: z.array(RunEventSchema), ...metadata });
 const approvalData = approvalRecordSchema.extend(metadata);
@@ -687,7 +687,7 @@ export class WorkflowClient {
     return job.result.data;
   }
 
-  async runs(filters: {limit?:number;cursor?:string|undefined;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean} = {}) {
+  async runs(filters: {limit?:number;cursor?:string|undefined;workflow_id?:string;status?:string;from_date?:string;to_date?:string;pending_only?:boolean;search?:string;sort?:string} = {}) {
     const schema = CollectionSchema.extend({ items: z.array(runData.shape.run), ...metadata });
     const result = schema.safeParse(await this.read(`runs${queryString(filters)}`));
     if (!result.success) return fail("INVALID_API_DATA", "The run collection response is invalid.");

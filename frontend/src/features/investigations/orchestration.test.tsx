@@ -494,8 +494,23 @@ it('loads continuation automation only inside the selected workflow Background t
  render(<ConnectedPlan id={doc().composition_id}/>);
  await screen.findByRole('tab',{name:'Background'});
  expect(api.automationRecords).not.toHaveBeenCalled();
- expect(screen.queryByText('Background continuation & recurring automation')).toBeNull();
+ expect(screen.queryByText('Automations')).toBeNull();
  fireEvent.click(screen.getByRole('tab',{name:'Background'}));
- expect(await screen.findByText('Background continuation & recurring automation')).toBeVisible();
+ expect(await screen.findByText('Automations')).toBeVisible();
  expect(api.automationRecords).toHaveBeenCalledWith(undefined,view().workflow_id);
+});
+
+it('shows validation progress immediately and prevents duplicate submissions',async()=>{
+ const current=view();current.run=null;current.workflow_status='draft';vi.mocked(api.compositionView).mockResolvedValue(current);
+ let complete!:(value:never)=>void;vi.mocked(api.request).mockImplementation(()=>new Promise(resolve=>{complete=resolve;}));
+ render(<ConnectedPlan id={doc().composition_id}/>);const validate=await screen.findByRole('button',{name:'Validate'});await waitFor(()=>expect(validate).toBeEnabled());fireEvent.click(validate);
+ expect(await screen.findByRole('button',{name:'Validating…'})).toBeDisabled();fireEvent.click(validate);await waitFor(()=>expect(api.request).toHaveBeenCalledTimes(1));
+ await act(async()=>complete({} as never));await waitFor(()=>expect(screen.getByRole('button',{name:'Validate'})).toBeEnabled());
+});
+it('uses a distinct execution key for each reviewed Run again attempt and preserves old history',async()=>{
+ const current=view();current.workflow_status='approved';current.run!.status='completed';vi.mocked(api.compositionView).mockResolvedValue(current);const original=structuredClone(current.run);
+ let count=0;const started=vi.fn();vi.mocked(api.request).mockImplementation(async(op)=>{expect(op).toBe('execute_workflow');return {run:{run_id:'run_new_'+(++count)}} as never;});
+ render(<ConnectedPlan id={doc().composition_id} onRun={started}/>);
+ for(let i=1;i<=2;i++){const again=await screen.findByRole('button',{name:'Run again'});await waitFor(()=>expect(again).toBeEnabled());fireEvent.click(again);fireEvent.click(screen.getByRole('button',{name:'Confirm new run'}));await waitFor(()=>expect(started).toHaveBeenCalledWith('run_new_'+i));}
+ const calls=vi.mocked(api.request).mock.calls.filter(call=>call[0]==='execute_workflow');expect(calls).toHaveLength(2);expect(calls[0]![2]).not.toBe(calls[1]![2]);expect(current.run).toEqual(original);
 });

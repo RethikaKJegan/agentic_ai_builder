@@ -10,12 +10,59 @@ import { SavedDetails, Outcome } from "./LifecyclePanels";
 import { actionButton } from "./ConnectedPlan";
 import { useOrchestrationCommand } from "./useOrchestrationCommand";
 
+const object = (v: unknown): Record<string, unknown> =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const field = "mt-1 w-full rounded-lg border bg-background p-2 text-sm";
 export function epochDisplay(value: unknown) {
-  return typeof value === "number" ? new Date(value * 1000).toISOString() : "Not recorded";
+  return typeof value === "number"
+    ? new Date(value * 1000).toLocaleString(undefined, { timeZone: "Asia/Kolkata" }) + " IST"
+    : "Not recorded";
+}
+export function scheduleDate(value: unknown, timezone: unknown) {
+  if (typeof value !== "number") return "Not recorded";
+  if (typeof timezone !== "string" || !timezone)
+    return new Date(value * 1000).toISOString() + " (UTC)";
+  try {
+    return (
+      new Date(value * 1000).toLocaleString(undefined, { timeZone: timezone }) + " · " + timezone
+    );
+  } catch {
+    return new Date(value * 1000).toISOString() + " (UTC; saved timezone unavailable)";
+  }
+}
+export function scheduleLabel(request: Record<string, unknown>) {
+  const cron = typeof request["cron"] === "string" ? request["cron"] : "";
+  const zone = typeof request["timezone"] === "string" ? request["timezone"] : "";
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length === 5) {
+    const [minute, hour, day, month, weekday] = fields;
+    const clock =
+      /^\d+$/.test(minute!) && /^\d+$/.test(hour!) && Number(minute) < 60 && Number(hour) < 24
+        ? `${String(Number(hour)).padStart(2, "0")}:${String(Number(minute)).padStart(2, "0")}`
+        : null;
+    if (clock && month === "*") {
+      if (day === "*" && weekday === "*")
+        return `Every day at ${clock} · ${zone || "Timezone not recorded"}`;
+      if (day === "1" && weekday === "*")
+        return `First day of each month at ${clock} · ${zone || "Timezone not recorded"}`;
+      if (day === "*" && /^[0-7]$/.test(weekday!))
+        return `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][Number(weekday)]} at ${clock} · ${zone || "Timezone not recorded"}`;
+    }
+  }
+  return cron
+    ? `Custom schedule · ${cron} · ${zone || "Timezone not recorded"}`
+    : typeof request["purpose"] === "string"
+      ? request["purpose"]
+      : "Event-driven automation";
 }
 type Target = { caseId: string; waitId: string; stageId: string };
-export function AutomationPanel({ target, workflowId }: { target?: Target | undefined; workflowId?: string | undefined }) {
+export function AutomationPanel({
+  target,
+  workflowId,
+}: {
+  target?: Target | undefined;
+  workflowId?: string | undefined;
+}) {
   const session = useBackend((s) => s.session);
   if (!session) return null;
   return (
@@ -32,7 +79,13 @@ export function AutomationPanel({ target, workflowId }: { target?: Target | unde
     />
   );
 }
-function AutomationWorkspace({ target, workflowId }: { target?: Target | undefined; workflowId?: string | undefined }) {
+function AutomationWorkspace({
+  target,
+  workflowId,
+}: {
+  target?: Target | undefined;
+  workflowId?: string | undefined;
+}) {
   const backend = useBackend();
   const command = useOrchestrationCommand();
   const [records, setRecords] = useState<AutomationRecord[]>([]);
@@ -79,7 +132,7 @@ function AutomationWorkspace({ target, workflowId }: { target?: Target | undefin
         setRecords(data.items);
         setCursor(data.next_cursor);
         setJobs(data.jobs);
-        setHealth({...data.health,...(data.metrics?{metrics:data.metrics}:{})});
+        setHealth({ ...data.health, ...(data.metrics ? { metrics: data.metrics } : {}) });
         setError(null);
         timer = setTimeout(() => void read(), 5000);
       } catch (e) {
@@ -100,7 +153,13 @@ function AutomationWorkspace({ target, workflowId }: { target?: Target | undefin
       .request("list_workflows", {})
       .then((data) => {
         if (live)
-          setWorkflows(data.items.filter((w) => (!workflowId || w.workflow_id === workflowId) && ["approved", "published"].includes(w.status)));
+          setWorkflows(
+            data.items.filter(
+              (w) =>
+                (!workflowId || w.workflow_id === workflowId) &&
+                ["approved", "published"].includes(w.status),
+            ),
+          );
       })
       .catch((e) => {
         if (live) setError(e as Error);
@@ -184,7 +243,7 @@ function AutomationWorkspace({ target, workflowId }: { target?: Target | undefin
   const visible = records.filter((r) => !target || r.request["case_id"] === target.caseId);
   return (
     <section className="min-w-0 space-y-4 rounded-xl border p-4" aria-label="Background automation">
-      <h2 className="font-semibold">Background continuation & recurring automation</h2>
+      <h2 className="font-semibold">Automations</h2>
       <p className="text-sm text-muted-foreground">
         A Gmail reply resumes its existing case. A schedule creates a new execution occurrence with
         fresh source reads.
@@ -208,25 +267,57 @@ function AutomationWorkspace({ target, workflowId }: { target?: Target | undefin
         <p className="text-sm">No automation records on this page.</p>
       ) : (
         visible.map((r) => (
-          <article key={r.id} className="min-w-0 space-y-2 rounded-lg border p-3">
+          <article
+            key={r.id}
+            className="min-w-0 space-y-3 rounded-xl border bg-background p-5 shadow-sm"
+          >
             <h3 className="break-all text-sm font-medium">
-              {r.kind} · {r.id}
+              {String(object(r["presentation"])["workflow_name"] ?? r.kind.replaceAll("_", " "))}
             </h3>
-            <Outcome value={r.state} />
-            <p className="text-xs">
-              Next due: {epochDisplay(r["due"])} · Latest occurrence on this page:{" "}
-              {epochDisplay(
-                records
-                  .filter((o) => o.kind === "occurrence" && o["schedule_id"] === r.id)
-                  .sort((a, b) => Number(b["due"]) - Number(a["due"]))[0]?.["due"],
-              )}
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Outcome value={r.state} />
+              <span className="text-sm">{scheduleLabel(r.request)}</span>
+            </div>
+            {typeof object(r["presentation"])["objective"] === "string" && (
+              <p className="text-sm text-muted-foreground">
+                {String(object(r["presentation"])["objective"])}
+              </p>
+            )}
+            <div className="grid gap-3 rounded-lg bg-muted/30 p-3 text-xs sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground">Next scheduled run</p>
+                <p className="mt-1">
+                  {r.kind === "schedule" && r.state === "active"
+                    ? scheduleDate(r["due"], r.request["timezone"])
+                    : r.state === "paused"
+                      ? "Paused"
+                      : r.kind === "schedule"
+                        ? "Inactive"
+                        : "Not a schedule"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Last occurrence</p>
+                <p className="mt-1">
+                  {scheduleDate(
+                    object(object(r["presentation"])["last_occurrence"])["due"],
+                    r.request["timezone"],
+                  )}
+                </p>
+                <p className="mt-1">
+                  {String(
+                    object(object(r["presentation"])["last_occurrence"])["state"] ??
+                      "No occurrence recorded",
+                  )}
+                </p>
+              </div>
+            </div>
             {!!r["last_error_code"] && (
               <p role="alert" className="text-sm">
                 {String(r["last_error_code"])}
               </p>
             )}
-            <SavedDetails label="Saved scope, history and receipt references" value={r} />
+            <SavedDetails label="Advanced — saved scope, schedule and receipts" value={r} />
             {r.kind === "occurrence" && typeof r["run_id"] === "string" && (
               <a
                 className="text-sm text-primary underline"

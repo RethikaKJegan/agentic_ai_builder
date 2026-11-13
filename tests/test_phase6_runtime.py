@@ -179,3 +179,19 @@ def test_historical_approvals_keep_their_own_gate_roles():
         replay=runner.decide(f.decision(first,'approved'),f.approver())
         assert replay['status']=='paused_for_approval' and replay['approvals'][-1]['status']=='pending'
     finally:f.doCleanups()
+
+
+def test_run_presentation_search_groups_and_chronological_pagination(context):
+ ids=seed(context)
+ assert context.runtime.list_runs(context.auth,status='needs_attention')['total']==3
+ assert context.runtime.list_runs(context.auth,status='active')['total']==3
+ oldest=context.runtime.list_runs(context.auth,sort='oldest',limit=2)
+ assert [r['run_id'] for r in oldest['items']]==ids[:2]
+ following=context.runtime.list_runs(context.auth,sort='oldest',limit=2,cursor=oldest['next_cursor'])
+ assert [r['run_id'] for r in following['items']]==ids[2:4]
+ row=oldest['items'][0]
+ assert row['workflow_name']
+ assert context.runtime.list_runs(context.auth,search=row['workflow_name'])['total']==6
+ assert context.runtime.list_runs(context.auth,search="%' OR 1=1 --")['total']==0
+ foreign=deepcopy(context.auth);foreign['subject']['workspace_id']='other'
+ assert context.runtime.list_runs(foreign,search=row['workflow_name'])['items']==[]

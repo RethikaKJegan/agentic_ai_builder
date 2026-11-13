@@ -18,10 +18,10 @@ afterEach(cleanup);
 it('submits the main goal and selected account to connected planning with no connector payload form',async()=>{
  const create=vi.spyOn(api,'createActionPlan').mockResolvedValue({composition_id:'composition_goal'} as never);
  const legacy=vi.spyOn(api,'submitInvestigation');render(<Overview/>);
- await screen.findByText(/owner@example.com/);
+ await waitFor(()=>expect(screen.getByRole('combobox')).toBeEnabled());fireEvent.keyDown(screen.getByRole('combobox'),{key:'ArrowDown'});await screen.findByRole('option',{name:/owner@example.com/});
  expect(screen.queryByLabelText('Optional connected action')).not.toBeInTheDocument();
  expect(screen.queryByLabelText('project_id')).not.toBeInTheDocument();
- fireEvent.change(screen.getByLabelText('Workflow Google account'),{target:{value:'gc_owned'}});
+ fireEvent.click(screen.getByRole('option',{name:/owner@example.com/}));
  fireEvent.change(screen.getByLabelText('Process description'),{target:{value:'Search public guidance and prepare a report using available tools.'}});
  fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
  await waitFor(()=>expect(create).toHaveBeenCalledTimes(1));
@@ -32,15 +32,15 @@ it('submits the main goal and selected account to connected planning with no con
 });
 it('preserves the goal and account without showing follow-up recipient fields',async()=>{
  const create=vi.spyOn(api,'createActionPlan').mockRejectedValue(new ApiError({error_code:'ACTION_INPUT_REQUIRED',message:'Recipient needed.',request_id:'req_goal',retryable:false,details:{required_inputs:{recipient:{type:'string',format:'email'}}}},undefined,{outcome:'rejected'}));
- render(<Overview/>);await screen.findByText(/owner@example.com/);
- fireEvent.change(screen.getByLabelText('Workflow Google account'),{target:{value:'gc_owned'}});
+ render(<Overview/>);await waitFor(()=>expect(screen.getByRole('combobox')).toBeEnabled());fireEvent.keyDown(screen.getByRole('combobox'),{key:'ArrowDown'});await screen.findByRole('option',{name:/owner@example.com/});
+ fireEvent.click(screen.getByRole('option',{name:/owner@example.com/}));
  const goal='Investigate complaint C123 and email the findings to the engineer.';
  fireEvent.change(screen.getByLabelText('Process description'),{target:{value:goal}});
  fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
  await screen.findByText('Recipient needed.');
  expect(screen.queryByLabelText('Email recipient')).toBeNull();
  expect(screen.getByLabelText('Process description')).toHaveValue(goal);
- expect(screen.getByLabelText('Workflow Google account')).toHaveValue('gc_owned');
+ expect(screen.getByRole('combobox')).toHaveTextContent('owner@example.com');
  expect(create).toHaveBeenCalledTimes(1);
 });
 it('retains the original planning key when retrying an unconfirmed unchanged request',async()=>{
@@ -49,4 +49,35 @@ it('retains the original planning key when retrying an unconfirmed unchanged req
  fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));await screen.findByText('Unconfirmed.');
  fireEvent.click(screen.getByRole('button',{name:'Retry generation'}));await waitFor(()=>expect(create).toHaveBeenCalledTimes(2));
  expect(create.mock.calls[0]![0]['request_key']).toBe(create.mock.calls[1]![0]['request_key']);
+});
+
+it('continues polling a queued Overview request without the removed review panel',async()=>{
+ localStorage.clear();
+ const session=useBackend.getState().session!;
+ useBackend.setState({session:{...session,overview_routing_available:true}});
+ const intent=vi.spyOn(api,'overviewIntent').mockResolvedValueOnce({version:'overview-intent-v1',state:'planning',request_key:'queued_goal',workspace:{workspace_id:'one',subject_id:'alice'}} as never).mockResolvedValue({version:'overview-intent-v1',state:'prepared',request_key:'queued_goal',composition_id:'composition_queued',workspace:{workspace_id:'one',subject_id:'alice'}} as never);
+ render(<Overview/>);
+ expect(screen.queryByText('Workflow options')).toBeNull();
+ expect(screen.queryByLabelText('Overview request review')).toBeNull();
+ fireEvent.change(screen.getByLabelText('Process description'),{target:{value:'Prepare a source report.'}});
+ fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
+ await screen.findByText('Preparing your workflow…');
+ await waitFor(()=>expect(navigate).toHaveBeenCalledWith({to:'/app/workflows/investigate',search:{connected:'1',composition:'composition_queued',overview:'queued_goal'}}),{timeout:4000});
+ expect(intent).toHaveBeenCalledWith({operation:'get',request_key:'queued_goal'});
+ localStorage.clear();
+});
+it('keeps cancellation available while the saved Overview job is queued',async()=>{
+ localStorage.clear();
+ useBackend.setState({session:{...useBackend.getState().session!,overview_routing_available:true}});
+ vi.spyOn(api,'overviewIntent').mockResolvedValueOnce({version:'overview-intent-v1',state:'planning',request_key:'queued_cancel',planning_job:{job_id:'job_cancel',state:'queued'}} as never).mockResolvedValue({version:'overview-intent-v1',state:'cancelled',request_key:'queued_cancel'} as never);
+ const cancel=vi.spyOn(api,'cancelPlanning').mockResolvedValue({} as never);
+ render(<Overview/>);
+ fireEvent.change(screen.getByLabelText('Process description'),{target:{value:'Prepare a report.'}});
+ fireEvent.click(screen.getByRole('button',{name:'Generate workflow'}));
+ await screen.findByText('Preparing your workflow…');
+ expect(screen.getByRole('button',{name:'Generating workflow'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Cancel generation'}));
+ await waitFor(()=>expect(cancel).toHaveBeenCalledExactlyOnceWith('job_cancel'));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Generate workflow'})).toBeEnabled());
+ localStorage.clear();
 });

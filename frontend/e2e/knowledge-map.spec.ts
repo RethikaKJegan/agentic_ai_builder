@@ -28,9 +28,9 @@ for(const mobile of [false,true])for(const [tenant,title] of [['simpsons','Compl
   await route.fulfill({json:{request_id:'knowledge_browser',status:200,data}});
  });
  await page.goto('/app/workflows/investigate?connected=1&composition='+f.doc.composition_id);
- await page.getByRole('tab',{name:'Knowledge Map',exact:true}).click();
+ await page.getByRole('tab',{name:'Ontology',exact:true}).click();
  await expect(page.getByRole('heading',{name:'The knowledge behind this workflow'})).toBeVisible();
- const node=page.locator('.react-flow__node').filter({hasText:title!}).filter({hasText:'Executed · mapped evidence'});
+ const node=page.locator('.react-flow__node').filter({hasText:title!}).filter({hasText:'Used in this run'});
  await expect(page.getByText('1 with recorded execution evidence',{exact:true})).toBeVisible();
  await expect(node).toHaveCount(1);await node.click();
  await expect(page.getByLabel('Knowledge concept details').getByRole('heading',{name:title!,exact:true})).toBeVisible();
@@ -39,14 +39,14 @@ for(const mobile of [false,true])for(const [tenant,title] of [['simpsons','Compl
  await expect(page.getByLabel('Business module groups')).toBeVisible();
  await page.getByLabel('Search ontology concepts').fill('Related');
  await expect(page.locator('.react-flow__node').filter({hasText:'Related '+title})).toHaveCount(1);
- await expect(page.locator('.react-flow__node').filter({hasText:'Related '+title}).filter({hasText:'Connected context · usage unverified'})).toHaveCount(1);
+ await expect(page.locator('.react-flow__node').filter({hasText:'Related '+title}).filter({hasText:'Related concept'})).toHaveCount(1);
  await page.getByLabel('Search ontology concepts').clear();
  await page.getByRole('button',{name:'zoom in'}).click();await page.getByRole('button',{name:'fit view'}).click();
  await page.getByLabel('Knowledge workflow step').selectOption(f.doc.action_plan.actions[0]!.action_id);
  await page.getByRole('button',{name:'Details',exact:true}).click();await expect(page.getByRole('heading',{name:'Workflow details'})).toBeVisible();await page.keyboard.press('Escape');
  await page.getByRole('tab',{name:'Background',exact:true}).click();await expect(page.getByText('Behind the workflow',{exact:true})).toBeVisible();
  await page.getByRole('tab',{name:'Reports',exact:true}).click();await expect(page.getByRole('tabpanel',{name:'Investigation report'})).toBeVisible();
- await page.getByRole('tab',{name:'Knowledge Map',exact:true}).click();await page.getByRole('button',{name:'Full ontology',exact:true}).click();
+ await page.getByRole('tab',{name:'Ontology',exact:true}).click();await page.getByRole('button',{name:'Full ontology',exact:true}).click();
  await page.screenshot({path:`/tmp/knowledge-map-${tenant}-${mobile?'mobile':'desktop'}.png`,fullPage:true});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  expect(writes).toEqual([]);expect(errors).toEqual([]);

@@ -280,3 +280,24 @@ def test_tool_receipts_report_zero_results_and_real_provider_identifiers():
     assert tool_receipt({'records':[]})['returned_records']==0
     assert tool_receipt({'message_id':'actual_message','thread_id':'actual_thread'})=={'message_id':'actual_message','thread_id':'actual_thread'}
     assert tool_receipt({'custom_result':{'private':'not exposed'}})=={'returned_fields':['custom_result']}
+
+
+def test_web_receipt_retains_genuine_bounded_sources_without_transport_secrets():
+ from workflow_api.composition_presentation import tool_receipt
+ output={'results':[{'title':'Supplier','url':'https://example.com/catalogue','snippet':'Actual search excerpt','headers':{'Authorization':'private'}}], 'headers':{'Authorization':'private'}}
+ receipt=tool_receipt(output)
+ assert receipt['web_sources']==[{'title':'Supplier','url':'https://example.com/catalogue','snippet':'Actual search excerpt'}]
+ assert 'private' not in str(receipt)
+ page=tool_receipt({'url':'https://example.com','text':'x'*25000,'content_sha256':'hash','truncated':True})['web_sources'][0]
+ assert len(page['text'])==24000 and page['truncated'] is True
+ for url in ['javascript:alert(1)','https://user:password@example.com','data:text/html,private']:
+  assert 'web_sources' not in tool_receipt({'url':url,'text':'Never linked'})
+
+
+@pytest.mark.parametrize('external_write',[False,True])
+def test_guarded_tool_timeout_has_read_safe_recovery_or_write_reconciliation(external_write):
+ from runtime.recovery import classify
+ result=classify('TOOL_TIMEOUT',task='read_internal_documents',source='workflow_data_query',external_write=external_write)
+ assert result['category']==('uncertain_external_write' if external_write else 'connector_timeout')
+ assert result['retry_eligible'] is (not external_write)
+ assert result['recovery_strategy']==('reconcile_effect' if external_write else 'retry_read')

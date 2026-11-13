@@ -91,7 +91,20 @@ class DurableAutomation:
             totals=db.execute("SELECT COALESCE(SUM(CAST(json_extract(document,'$.duplicate_count') AS INTEGER)),0),COALESCE(SUM(CAST(json_extract(document,'$.rejected_count') AS INTEGER)),0) FROM automation_records WHERE workspace=? AND owner=? AND kind='subscription'",scope).fetchone()
         terminal=counts.get('completed',0)+sum(counts.get(s,0) for s in ('failed','dead_letter','requires_reconciliation'))
         metrics=dict(occurrence_states=counts,terminal_success_rate=counts.get('completed',0)/terminal if terminal else None,duplicate_events=totals[0],rejected_events=totals[1])
-        return dict(items=[json.loads(r[2]) for r in rows[:limit]],has_more=len(rows)>limit,next_cursor=rows[limit-1][1] if len(rows)>limit else None,jobs=[j for j in jobs if j.get('automation_kind')],health=deepcopy(self.health),metrics=metrics)
+        return dict(items=self.presentation(auth,[json.loads(r[2]) for r in rows[:limit]]),has_more=len(rows)>limit,next_cursor=rows[limit-1][1] if len(rows)>limit else None,jobs=[j for j in jobs if j.get('automation_kind')],health=deepcopy(self.health),metrics=metrics)
+
+    def presentation(self,auth,records):
+        """Read-only enrichment across all authorized occurrences, independent of page size."""
+        workspace,owner=self.scope(auth)
+        with self.store.transaction(write=False) as db:
+            for record in records:
+                request=record.get('request',{});ref=request.get('workflow') or request.get('poll_workflow') or {}
+                if not isinstance(ref,dict):ref={}
+                workflow=self.store.get(db,workspace,ref.get('workflow_id'),ref.get('workflow_version')) if ref.get('workflow_id') else None
+                latest=db.execute("SELECT document FROM automation_records WHERE workspace=? AND owner=? AND kind='occurrence' AND json_extract(document,'$.schedule_id')=? ORDER BY due DESC LIMIT 1",(workspace,owner,record['id'])).fetchone()
+                occurrence=json.loads(latest[0]) if latest else None
+                record['presentation']=dict(workflow_name=workflow.get('name') if workflow else None,objective=(workflow or {}).get('description'),last_occurrence={key:occurrence.get(key) for key in ('id','due','state','run_id','last_error_code')} if occurrence else None)
+        return records
 
     def workflow_listing(self, auth, workflow_id, kind, before, limit):
         """Filter before pagination; include related consent and occurrence records."""
@@ -122,7 +135,7 @@ class DurableAutomation:
         metrics=dict(occurrence_states=counts,terminal_success_rate=counts.get('completed',0)/terminal if terminal else None,
             duplicate_events=sum(d.get('duplicate_count',0) for d in scoped if d['kind']=='subscription'),
             rejected_events=sum(d.get('rejected_count',0) for d in scoped if d['kind']=='subscription'))
-        return dict(items=visible[:limit],has_more=len(visible)>limit,next_cursor=visible[limit-1]['id'] if len(visible)>limit else None,
+        return dict(items=self.presentation(auth,visible[:limit]),has_more=len(visible)>limit,next_cursor=visible[limit-1]['id'] if len(visible)>limit else None,
             jobs=[j for j in jobs if j.get('automation_kind') and (j.get('target_id') in ids or j.get('schedule_id') in ids or j.get('target_id') in cases or j.get('workflow_id')==workflow_id)],health=deepcopy(self.health),metrics=metrics)
 
     def _document(self, auth, kind, body):

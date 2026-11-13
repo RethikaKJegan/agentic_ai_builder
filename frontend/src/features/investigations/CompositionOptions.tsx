@@ -41,5 +41,5 @@ export function compositionActionInputs(value:CompositionOptionsValue,tools:Tool
  body['operations']=[{capability_id:cid,inputs}];body['resources']={operation_inputs:{[cid]:inputs},...(value.destination?{destination:value.destination}:{}),...(value.engineer.trim()?{engineer_id:value.engineer.trim()}:{})};return body;
 }
 export function CompositionOptions({value,onChange}:{value:CompositionOptionsValue;onChange:(v:CompositionOptionsValue)=>void}){
- return <section className="mt-3 space-y-3 rounded-lg border p-3 text-foreground" aria-label="Connected account"><GoogleAccountSelect value={value.google} onChange={google=>onChange({...value,google})}/><p className="text-xs text-muted-foreground">Describe the result you want. Available tools and their inputs are selected from the workspace Registry.</p></section>;
+ return <section className="mt-3 space-y-3 rounded-lg border p-3 text-foreground" aria-label="Connected account"><GoogleAccountSelect value={value.google} onChange={google=>onChange({...value,google})}/></section>;
 }

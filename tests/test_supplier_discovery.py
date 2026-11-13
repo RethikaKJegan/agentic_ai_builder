@@ -48,8 +48,9 @@ class DiscoveryTests(unittest.TestCase):
         return native.IntegratedTests.prepare(self)
     def select(self,state,ids=None):
         chosen=ids if ids is not None else [c['candidate_id'] for c in state['candidates'] if c['email']]
-        return self.procurement.review_suppliers(self.plan['project_id'],{'decision':'approved','candidate_ids':chosen,
+        result=self.procurement.review_suppliers(self.plan['project_id'],{'decision':'approved','candidate_ids':chosen,
             'expected_digest':state['shortlist_digest']},self.auth)
+        return self.advance() if result['phase']=='INGESTING' else result
     def test_discovery_review_then_rfq_delivery_and_unified_trace(self):
         before=deepcopy(self.http.books);state=self.prepare()
         self.assertEqual(state['phase'],'SHORTLIST_REVIEW');self.assertEqual(self.http.sent,[]);self.assertEqual(self.http.write_count,0)

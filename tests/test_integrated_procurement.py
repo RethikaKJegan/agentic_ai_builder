@@ -95,14 +95,33 @@ class IntegratedTests(unittest.TestCase):
         activation=self.service.lifecycle.activate({'request_id':'activate','idempotency_key':'native_activate','payload':{**self.ref,'triggers':[]}},self.auth)
         self.release_id=activation['release']['release_id']
         run=self.call('execute_workflow',{**self.ref,'inputs':{}})['run']
+        import time
+        deadline=time.monotonic()+15
+        while run['status'] in ('queued','running') and time.monotonic()<deadline:
+            from runtime.worker import RuntimeWorker
+            next(w for w in self.app.state.live_workers if isinstance(w,RuntimeWorker)).drain()
+            run=self.call('get_run',{'run_id':run['run_id']})['run']
         self.assertEqual(run['status'],'completed',run)
-        return self.procurement.status('local-workspace',self.plan['project_id'])
+        state=self.procurement.status('local-workspace',self.plan['project_id'])
+        if self.plan.get('supplier_mode')=='discover':
+            deadline=time.monotonic()+15
+            while state['phase']=='DISCOVERING' and time.monotonic()<deadline:
+                state=self.advance()
+        return state
     def approve(self,state,decision='approved'):
         action=next(a for a in state['actions'].values() if a['state']=='paused_for_approval')
         approval=next(a for a in action['approvals'] if a['status']=='pending')
         self.call('decide_approval',{'workflow_id':action['workflow_id'],'workflow_version':1,
             'approval_id':approval['approval_id'],'decision':decision})
-    def advance(self):return self.procurement.advance(self.plan['project_id'],self.auth)
+    def advance(self):
+        from runtime.worker import RuntimeWorker
+        worker=next(w for w in self.app.state.live_workers if isinstance(w,RuntimeWorker))
+        for _ in range(80):
+            worker.drain()
+            state=self.procurement.advance(self.plan['project_id'],self.auth)
+            if state['phase'] in ('SHORTLIST_REVIEW','STOPPED','RFQS_SENT','COMPLETED'):return state
+            if any(a.get('state')=='paused_for_approval' for a in state.get('actions',{}).values()):return state
+        self.fail('Asynchronous procurement did not reach a review or terminal boundary')
     def to_sending(self):
         state=self.prepare()
         for _ in range(25):

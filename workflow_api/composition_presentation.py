@@ -16,6 +16,26 @@ def tool_receipt(output):
     if isinstance(output.get('records'),list):
         receipt['returned_records']=len(output['records'])
         receipt['collections']=sorted({r['collection'] for r in output['records'] if isinstance(r,dict) and isinstance(r.get('collection'),str)})
+    def public_link(value):
+        from urllib.parse import urlsplit
+        if not isinstance(value,str) or len(value)>2000:return None
+        try:
+            parsed=urlsplit(value)
+            return value if parsed.scheme in ('http','https') and parsed.hostname and not parsed.username and not parsed.password else None
+        except ValueError:return None
+    websites=[]
+    for item in output.get('results',[])[:20] if isinstance(output.get('results'),list) else []:
+        if not isinstance(item,dict):continue
+        url=public_link(item.get('url'))
+        if url:
+            websites.append(dict(url=url,**{k:item[k][:limit] for k,limit in [('title',500),('snippet',3000)] if isinstance(item.get(k),str)}))
+    if public_link(output.get('url')):
+        page=dict(url=output['url'])
+        for key,limit in [('title',500),('text',24000),('content_sha256',64),('retrieved_at',100),('status',100)]:
+            if isinstance(output.get(key),str):page[key]=output[key][:limit]
+        if isinstance(output.get('truncated'),bool):page['truncated']=output['truncated']
+        websites.append(page)
+    if websites:receipt['web_sources']=websites
     return receipt or {'returned_fields':sorted(output)}
 
 

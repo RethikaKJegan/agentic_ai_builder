@@ -44,7 +44,7 @@ CODES = {
  'BUSINESS_RETRIEVAL_NOT_READY':'missing_evidence','EVIDENCE_MISSING':'missing_evidence','INVALID_INPUT':'missing_evidence',
  'EVIDENCE_VALUE_INVALID':'invalid_source_values','BUSINESS_VALUE_INVALID':'invalid_source_values',
  'BUSINESS_SOURCE_STALE':'stale_metadata','SOURCE_METADATA_STALE':'stale_metadata','BUSINESS_PREPARATION_STALE':'stale_metadata','ONTOLOGY_SELECTION_STALE':'stale_metadata',
- 'MAPPING_INVALID':'incorrect_source_mapping','CONNECTOR_TIMEOUT':'connector_timeout','RETRYABLE_INVOCATION_FAILED':'connector_timeout',
+ 'MAPPING_INVALID':'incorrect_source_mapping','TOOL_TIMEOUT':'connector_timeout','CONNECTOR_TIMEOUT':'connector_timeout','RETRYABLE_INVOCATION_FAILED':'connector_timeout',
  'CONNECTOR_AUTH_FAILED':'connector_authentication','OPERATION_NOT_AUTHORIZED':'revoked_authorization',
  'ASSIGNMENT_MISMATCH':'revoked_authorization','TOOL_ISOLATION_DENIED':'revoked_authorization',
  'EVIDENCE_CONFLICT':'conflicting_business_evidence','CAPABILITY_UNSUPPORTED':'unsupported_capability',

@@ -97,3 +97,13 @@ it('distinguishes unattached individual records from aggregate query evidence',(
  expect(screen.getByText('No individual records are attached to this report. Aggregate query results are shown separately.')).toBeVisible();
  expect(screen.queryByText('No mapped records have been retrieved.')).toBeNull();
 });
+
+it('explains the real goal and dependencies when the plan has no coordinator agent',()=>{
+ const view=compositionViewSchema.parse(dynamicView());view.master=null;
+ render(<CompositionInspector view={view} section="coordinator" onClose={()=>{}}/>);
+ expect(screen.getByText(view.objective)).toBeVisible();expect(screen.getByText('Task dependencies')).toBeVisible();expect(screen.getByText(/This node represents the saved workflow plan/)).toBeVisible();expect(screen.queryByText('null')).toBeNull();
+});
+it('renders genuine web snippets and extracted text safely as separate evidence',()=>{
+ render(<ToolReceipt value={{tool_id:'supplier_web_search',receipt:{web_sources:[{title:'Actual source',url:'https://example.com/path',snippet:'<script>not executable</script>'},{url:'https://example.com/page',text:'Actual extracted text'}]}}}/>);
+ expect(screen.getByRole('link',{name:'https://example.com/path'})).toHaveAttribute('href','https://example.com/path');expect(screen.getByText('<script>not executable</script>')).toBeVisible();expect(document.querySelector('script')).toBeNull();expect(screen.getByText(/Search snippet only/)).toBeVisible();fireEvent.click(screen.getByText('Extracted page content'));expect(screen.getByText('Actual extracted text')).toBeVisible();
+});

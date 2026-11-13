@@ -18,7 +18,7 @@ def integer(value, minimum=0, maximum=9223372036854775807):
 
 
 def query_options(query, kind):
-    allowed = {'limit', 'after_sequence'} if kind == 'events' else {'limit', 'cursor', 'workflow_id', 'status', 'from_date', 'to_date', 'pending_only'}
+    allowed = {'limit', 'after_sequence'} if kind == 'events' else {'limit', 'cursor', 'workflow_id', 'status', 'from_date', 'to_date', 'pending_only', 'search', 'sort'}
     if kind == 'monitoring':
         allowed = {'limit', 'source_cursor', 'policy_cursor'}
     if kind == 'recovery':
@@ -41,7 +41,14 @@ def public_run(runtime, db, run, auth):
         if isinstance(run.get(key), (int, float)):
             result[key] = run[key]
     result['safety'] = dict(error_code=run.get('error_code'), cancellation=run.get('cancellation'), usage=run.get('usage', {}).get('workflow', {}), uncertain_effects=run.get('uncertain_effects', []), effective_policy=runtime.governance.effective(run, db), policy_revision=runtime.governance.read(db, run['workspace_id'])['revision'])
-    workflow = None
+    workflow = runtime.store.get(db,run['workspace_id'],run['workflow_id'],run['workflow_version']) or {}
+    result['workflow_name']=workflow.get('name') or run['workflow_id']
+    result['result_summary']=(run.get('outcome_evaluation') or {}).get('achieved_outcome') or run.get('error_code')
+    metadata=workflow.get('metadata',{})
+    plan=metadata.get('connected_action_plan') or {}
+    result['composition_id']=plan.get('composition_id') or ('composition_'+run['workflow_id'][3:] if run['workflow_id'].startswith('cw_') else None)
+    if isinstance(run.get('finished_at'),(int,float)) and isinstance(run.get('created_at'),(int,float)):
+        result['duration_seconds']=max(0,run['finished_at']-run['created_at'])
     gates_by_approval = {}
     if result['approvals']:
         for encoded, in db.execute("SELECT document FROM runtime_events WHERE workspace=? AND run_id=? AND json_extract(document,'$.event_type')='approval.pending' ORDER BY sequence", (run['workspace_id'], run['run_id'])):
@@ -79,14 +86,16 @@ def date_value(value, end=False):
         raise RuntimeFailure('INVALID_REQUEST', 'Use an ISO date or timestamp for run filters.', 400) from None
 
 
-def runs(runtime, auth, limit=100, status=None, cursor=None, workflow_id=None, from_date=None, to_date=None, pending_only=False):
+def runs(runtime, auth, limit=100, status=None, cursor=None, workflow_id=None, from_date=None, to_date=None, pending_only=False, search=None, sort="newest"):
     runtime.authorize(auth, 'runs.view', ROLES)
     limit = integer(limit, 1, 500)
     clauses, values = ['workspace=?'], [auth['subject']['workspace_id']]
     if status:
-        if status not in TRANSITIONS:
+        groups={'active':['queued','running','paused_for_approval'],'needs_attention':['failed','blocked','rejected']}
+        if status not in TRANSITIONS and status not in groups:
             raise RuntimeFailure('INVALID_REQUEST', 'Choose a supported run status.', 400)
-        clauses.append("json_extract(document,'$.status')=?"); values.append(status)
+        statuses=groups.get(status,[status])
+        clauses.append("json_extract(document,'$.status') IN ("+','.join('?' for _ in statuses)+")");values.extend(statuses)
     if workflow_id:
         if not isinstance(workflow_id, str) or len(workflow_id) > 256:
             raise RuntimeFailure('INVALID_REQUEST', 'Use a valid workflow filter.', 400)
@@ -101,12 +110,21 @@ def runs(runtime, auth, limit=100, status=None, cursor=None, workflow_id=None, f
         # Pending approval runs remain visible even if their gate has expired;
         # the decision endpoint owns expiration and rejects stale decisions.
         clauses.append("json_extract(document,'$.status')='paused_for_approval'")
+    if sort not in ('newest','oldest'):raise RuntimeFailure('INVALID_REQUEST','Choose newest or oldest order.',400)
+    if search:
+        if not isinstance(search,str) or len(search)>200:raise RuntimeFailure('INVALID_REQUEST','Use a search of at most 200 characters.',400)
+        # Bound literal search to the exact workspace/revision; SQL parameters own all user text.
+        clauses.append("(instr(lower(workflow_id),lower(?))>0 OR EXISTS(SELECT 1 FROM revisions v WHERE v.workspace=runtime_runs.workspace AND v.workflow_id=runtime_runs.workflow_id AND v.version=CAST(json_extract(runtime_runs.document,'$.workflow_version') AS INTEGER) AND instr(lower(json_extract(v.document,'$.name')),lower(?))>0))")
+        values.extend([search,search])
     base = ' AND '.join(clauses)
     with runtime.store.transaction(write=False) as db:
         total = db.execute('SELECT COUNT(*) FROM runtime_runs WHERE ' + base, values).fetchone()[0]
         if cursor is not None:
-            clauses.append('rowid<?'); values.append(integer(cursor))
-        rows = db.execute('SELECT rowid,document FROM runtime_runs WHERE ' + ' AND '.join(clauses) + ' ORDER BY rowid DESC LIMIT ?', (*values, limit + 1)).fetchall()
+            boundary=db.execute("SELECT document FROM runtime_runs WHERE workspace=? AND rowid=?",(auth['subject']['workspace_id'],integer(cursor))).fetchone()
+            if not boundary:return dict(items=[],total=total,has_more=False,next_cursor=None)
+            timestamp=json.loads(boundary[0]).get('created_at',0);operator='<' if sort=='newest' else '>'
+            clauses.append("(CAST(json_extract(document,'$.created_at') AS DOUBLE PRECISION)"+operator+"? OR (CAST(json_extract(document,'$.created_at') AS DOUBLE PRECISION)=? AND rowid"+operator+"?))");values.extend([timestamp,timestamp,integer(cursor)])
+        rows = db.execute('SELECT rowid,document FROM runtime_runs WHERE ' + ' AND '.join(clauses) + " ORDER BY CAST(json_extract(document,'$.created_at') AS DOUBLE PRECISION) "+('DESC' if sort=='newest' else 'ASC')+",rowid "+('DESC' if sort=='newest' else 'ASC')+" LIMIT ?", (*values, limit + 1)).fetchall()
         page = rows[:limit]
         items = [public_run(runtime, db, json.loads(row[1]), auth) for row in page]
     more = len(rows) > limit

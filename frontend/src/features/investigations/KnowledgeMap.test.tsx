@@ -48,8 +48,8 @@ it('shows direct context separately and clears it when another step is selected'
  expect(neighbour).toHaveAttribute('data-state','context');
  expect(screen.getByRole('button',{name:'Complaint'})).toHaveAttribute('data-state','executed');
  expect(screen.getByText('1 with recorded execution evidence')).toBeVisible();
- fireEvent.click(neighbour);expect(screen.getByRole('heading',{name:'Connected context'})).toBeVisible();
- expect(screen.getByText(/This connection does not establish/)).toBeVisible();
+ fireEvent.click(neighbour);expect(screen.getByRole('heading',{name:'Related concept'})).toBeVisible();
+ expect(screen.queryByText(/This connection does not establish/)).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'Full ontology'}));
  fireEvent.change(screen.getByLabelText('Knowledge workflow step'),{target:{value:'other'}});
  expect(screen.getByRole('button',{name:'Related Complaint'})).toHaveAttribute('data-state','available');

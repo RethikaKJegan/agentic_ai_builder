@@ -10,6 +10,9 @@ from .data_relationships import fingerprint
 from .google_connections import GoogleConnections
 from .service import ApiFailure
 
+# Time for local validation/job handoff, not the background source query.
+DISPATCH_TIMEOUT_SECONDS = 10
+
 INPUT = dict(type='object', additionalProperties=False, required=['query'], properties={'query':deepcopy(SCHEMA)})
 INPUT['properties']['query'].pop('$id', None)
 INPUT['properties']['query'].pop('$schema', None)
@@ -76,14 +79,14 @@ def definition():
     from .business_preparation import retrieval_tool_definition
     tool=retrieval_tool_definition()
     tool.update(tool_id='workflow_data_query',capability='data.query',input_schema=INPUT,output_schema=OUTPUT,
-        description='Execute a validated account-scoped read-only data query as a durable job. Supports authorized filters, reviewed joins, grouping and exact aggregates. Display limits never define aggregate denominators. No complaint ID required.',timeout_seconds=10)
+        description='Execute a validated account-scoped read-only data query as a durable job. Supports authorized filters, reviewed joins, grouping and exact aggregates. Display limits never define aggregate denominators. No complaint ID required.',timeout_seconds=DISPATCH_TIMEOUT_SECONDS)
     return tool
 
 
 class WorkflowQueries:
     external_write=False
     retry_safe=True
-    timeout=1
+    timeout=DISPATCH_TIMEOUT_SECONDS
     durable_query=True
     def __init__(self, queries, jobs, auth=None, pin=None, source_ids=None, runtime_reference=None):
         self.queries,self.jobs,self.auth,self.pin=queries,jobs,auth,pin
