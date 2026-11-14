@@ -1,42 +1,22 @@
 "use client";
-import { InputError } from "@/api/feedback";
-import { useEffect, useRef, useState } from "react";
-import { PageHeader } from "@/features/runs/RunTrace";
-import { api } from "@/api/client";
-import { useBackend } from "@/api/state";
-import { ApiFeedback } from "@/features/workflows/ApiFeedback";
-export default function Screen() {
-  const backend = useBackend(); const [value, setValue] = useState(""); const [saved, setSaved] = useState("");
-  const [timestamp, setTimestamp] = useState(""); const [loaded, setLoaded] = useState(false); const [reload, setReload] = useState(0); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<Error>(); const [success, setSuccess] = useState(""); const pending = useRef(false);
-  const administrative = backend.session?.auth.decision === "allow" && backend.session.auth.roles.includes("admin") && backend.session.auth.scopes.includes("workspace:write");
-  useEffect(() => {
-    if (backend.status !== "connected") return;
-    let active = true;
-    api.settings().then(result => {
-      if (!active) return;
-      const item = result.items.find(item => item.key === "notifications");
-      if (item && typeof item.value !== "string") throw new InputError("The notification setting is not text. Ask the administrator to correct it.");
-      const initial = typeof item?.value === "string" ? item.value : "";
-      setLoaded(true); setValue(initial); setSaved(initial); setTimestamp(item?.updated_at ?? ""); setError(undefined);
-    }).catch(caught => { if (active) setError(caught instanceof Error ? caught : new InputError("Settings could not be loaded.")); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [backend.status, reload]);
-  const save = async () => {
-    if (pending.current || !loaded || loading || !administrative || value === saved) return;
-    pending.current = true; setBusy(true); setError(undefined); setSuccess("");
-    try { const item = await api.saveNotification(value); setSaved(item.value); setTimestamp(item.updated_at); setSuccess("Setting saved on the server."); }
-    catch (caught) { setError(caught instanceof Error ? caught : new InputError("The setting was not saved.")); }
-    finally { pending.current = false; setBusy(false); }
-  };
-  return <div className="mx-auto max-w-5xl space-y-5 p-6 md:p-10"><PageHeader title="Settings" sub="Persisted workspace settings." />
-    <ApiFeedback error={error ?? backend.error} />
-    <button type="button" disabled={busy || backend.status !== "connected"} onClick={() => { if (value !== saved && !window.confirm("Reload settings and discard unsaved changes?")) return; setLoading(true); setReload(current => current + 1); }} className="rounded border px-3 py-2 text-sm disabled:opacity-40">Reload settings</button>
-    <form onSubmit={event => { event.preventDefault(); void save(); }} className="rounded-2xl border border-border p-4">
-      <label className="text-sm">Notification preference<input disabled={!loaded || loading || busy || !administrative} value={value} maxLength={2000} onChange={event => { setValue(event.target.value); setSuccess(""); }} className="mt-2 block w-full rounded-lg border border-border bg-background p-2 disabled:opacity-40" placeholder="email" /></label>
-      <p role="status" className="mt-2 text-xs text-muted-foreground">{loading ? "Loading confirmed settings…" : value !== saved ? "Unsaved changes" : timestamp ? `Saved ${new Date(timestamp).toLocaleString()}` : "No notification preference saved yet."}</p>
-      {!administrative && <p className="mt-2 text-sm text-muted-foreground">Workspace administrator access is required to save settings.</p>}
-      <button type="submit" disabled={!loaded || loading || busy || !administrative || value === saved} className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40">{busy ? "Saving…" : "Save setting"}</button>
-      {success && <p role="status" className="mt-2 text-sm text-emerald-700">{success}</p>}
-    </form></div>;
+import { useEffect,useState } from 'react';
+import { z } from 'zod';
+import { api } from '@/api/client';
+import { useBackend } from '@/api/state';
+import { AppearanceControls } from '@/lib/appearance';
+import { DisplayTime,useDisplayPreferences } from '@/lib/display-preferences';
+import type { ExecutionPreferences } from '@/api/execution-preferences';
+import { PageHeader } from '@/features/runs/RunTrace';
+import { ApiFeedback } from '@/features/workflows/ApiFeedback';
+import { InputError } from '@/api/feedback';
+const accountSchema=z.object({email:z.string().nullable(),account:z.string(),status:z.literal('authenticated'),password_change:z.object({available:z.literal(false),reason:z.string()})});
+export default function Screen() {const subject=useBackend(s=>s.session?.auth.subject);return <Settings key={JSON.stringify(subject)}/>;}
+function Settings() {
+ const backend=useBackend();const [data,setData]=useState<ExecutionPreferences>();const [account,setAccount]=useState<z.infer<typeof accountSchema>>();const [zone,setZone]=useState('');const [format,setFormat]=useState<'locale'|'iso'|'day-first'|'month-first'>('locale');const [error,setError]=useState<Error>();const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const [zones,setZones]=useState<string[]>([]);
+ useEffect(()=>{const available=(Intl as typeof Intl&{supportedValuesOf?:(key:string)=>string[]}).supportedValuesOf?.('timeZone')??[];setZones(available);},[]);
+ useEffect(()=>{let live=true;if(backend.status!=='connected')return;Promise.all([api.executionPreferences(),fetch('/api/workspace-auth/account',{credentials:'same-origin',cache:'no-store'}).then(async r=>{if(!r.ok)throw new InputError('Authenticated account details could not be loaded.');return accountSchema.parse(await r.json());})]).then(([preferences,identity])=>{if(!live)return;setData(preferences);setZone(preferences.settings.display.timezone);setFormat(preferences.settings.display.date_format);setAccount(identity);}).catch(e=>{if(live)setError(e instanceof Error?e:new InputError('Settings unavailable.'));});return()=>{live=false;};},[backend.status]);
+ const dirty=!!data&&(zone!==data.settings.display.timezone||format!==data.settings.display.date_format);
+ return <div className="mx-auto max-w-4xl space-y-6 p-6 md:p-10"><PageHeader title="Settings" sub="Appearance, authenticated account and supported preferences."/><ApiFeedback error={error??backend.error}/><section className="rounded-2xl border bg-background p-5"><h2 className="mb-4 text-lg font-semibold">Appearance</h2><AppearanceControls/><p className="mt-3 text-xs text-muted-foreground">Saved in this browser. System follows your device appearance.</p></section>
+ <section className="space-y-4 rounded-2xl border bg-background p-5"><h2 className="text-lg font-semibold">Account &amp; Security</h2>{account?<dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Signed-in account</dt><dd>{account.email??'Email not supplied by authentication configuration'}</dd></div><div><dt className="text-muted-foreground">Workspace</dt><dd>{backend.session?.auth.subject.workspace_id}</dd></div><div><dt className="text-muted-foreground">Account status</dt><dd>{account.status}</dd></div></dl>:<p className="text-sm text-muted-foreground">{error?'Account details unavailable.':'Loading authenticated account…'}</p>}<div className="rounded-xl border p-4"><h3 className="text-sm font-medium">Change password</h3><p className="mt-2 text-xs text-muted-foreground">{account?.password_change.reason??'Load authenticated account details to check password support.'}</p><button type="button" disabled className="mt-3 rounded border px-3 py-2 text-xs opacity-50">Self-service unavailable</button></div><div className="flex flex-wrap items-center justify-between gap-3"><button type="button" disabled={busy||!account} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-40" onClick={async()=>{setBusy(true);setError(undefined);try{const response=await fetch('/api/workspace-auth/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});if(!response.ok)throw new InputError('Sign out could not be confirmed. Try again.');useBackend.setState({session:null,status:'unavailable',tools:[],reviews:{},overview:{}});useDisplayPreferences.setState({scope:null,value:{timezone:'UTC',date_format:'locale'}});window.location.assign('/login');}catch(e){setError(e instanceof Error?e:new InputError('Sign out failed.'));setBusy(false);}}}>Sign out</button><button type="button" disabled aria-disabled="true" className="rounded-lg border px-4 py-2 text-sm text-muted-foreground opacity-50">Delete account — Coming soon</button></div></section>
+ <section className="space-y-4 rounded-2xl border bg-background p-5"><h2 className="text-lg font-semibold">Preferences</h2><label className="block text-sm">Display timezone<select aria-label="Display timezone" value={zone} disabled={!data||busy} onChange={e=>{setZone(e.target.value);setMessage('');}} className="mt-2 w-full rounded-lg border bg-background p-2">{[...new Set(['UTC',...zones,...(zone?[zone]:[])])].map(z=><option value={z} key={z}>{z}</option>)}</select></label><p className="text-xs text-muted-foreground">Applies to supported Runs, ontology and settings timestamps. Explicit workflow schedule timezones and approved automations are unchanged.</p><label className="block text-sm">Date format<select aria-label="Date format" value={format} disabled={!data||busy} onChange={e=>{setFormat(e.target.value as typeof format);setMessage('');}} className="mt-2 w-full rounded-lg border bg-background p-2"><option value="locale">Browser locale</option><option value="iso">Year–month–day</option><option value="day-first">Day/month/year</option><option value="month-first">Month/day/year</option></select></label><div className="rounded-xl border p-4"><h3 className="text-sm font-medium">Notifications</h3><p className="mt-2 text-xs text-muted-foreground">Account-level notification subscriptions are unavailable. Runs, Approvals and Automations show their existing in-app status. No email or push subscription is enabled here.</p></div><button type="button" disabled={!dirty||busy} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-40" onClick={async()=>{if(!data)return;setBusy(true);setError(undefined);setMessage('');try{const r=await api.saveExecutionPreferences({expected_revision:data.settings.revision,display:{timezone:zone,date_format:format}});setData(r);useDisplayPreferences.setState({value:r.settings.display,scope:JSON.stringify(backend.session?.auth.subject)});setMessage('Display preferences saved on the server.');}catch(e){setError(e instanceof Error?e:new InputError('Preferences were not saved.'));}finally{setBusy(false);}}}>{busy?'Saving…':'Save preferences'}</button>{data?.settings.updated_at&&<p className="text-xs text-muted-foreground">Saved <DisplayTime value={data.settings.updated_at}/></p>}{message&&<p role="status" className="text-sm">{message}</p>}</section></div>;
 }

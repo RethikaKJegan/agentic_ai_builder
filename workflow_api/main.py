@@ -645,6 +645,19 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
         except RuntimeFailure as exc:return error(exc.code,str(exc),exc.status)
         except (ValueError,TypeError):return error('INVALID_REQUEST','Use valid graph traversal JSON.',400)
 
+    @app.get('/execution-preferences')
+    async def execution_preferences_read(workflow_id: str = None, workflow_version: int = None, agent_id: str = None):
+        from .execution_preferences import read
+        try:return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}',200,read(workflow_service.store,auth,workflow_id,workflow_version,agent_id)))
+        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
+
+    @app.put('/execution-preferences')
+    async def execution_preferences_save(request: Request):
+        from .execution_preferences import save
+        try:return JSONResponse(workflow_service.envelope(f'req_{uuid4().hex}',200,save(workflow_service.store,auth,await request.json())))
+        except ApiFailure as exc:return error(exc.code,str(exc),exc.status)
+        except (ValueError,TypeError):return error('SETTING_INVALID','Use supported preference JSON.',400)
+
     @app.get('/workspace/{collection}')
     async def workspace_collection(collection: str, request: Request):
         if collection not in {'settings', 'knowledge', 'governance'}:
@@ -656,7 +669,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             with workflow_service.store.transaction(write=False) as db:
                 if collection == 'settings':
                     rows = db.execute('SELECT key, value, updated_at FROM workspace_settings WHERE workspace=? ORDER BY key', (auth['subject']['workspace_id'],)).fetchall()
-                    items = [{'key': k, 'value': json.loads(v), 'updated_at': t} for k, v, t in rows]
+                    items = [{'key': k, 'value': json.loads(v), 'updated_at': t} for k, v, t in rows if not k.startswith('exec_')]
                 else:
                     rows = db.execute(f'SELECT document FROM {table} WHERE workspace=? ORDER BY updated_at DESC', (auth['subject']['workspace_id'],)).fetchall()
                     items = [json.loads(row[0]) for row in rows]
@@ -677,6 +690,7 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
             if not isinstance(payload,dict) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}',item_id):
                 return error('INVALID_REQUEST','Use a valid workspace item identifier and JSON object.',400)
             if collection=='settings':
+                if item_id.startswith('exec_'):return error('SETTING_INVALID','Use the scoped execution-preferences API.',400)
                 if set(payload)!={'value'} or len(json.dumps(payload,allow_nan=False).encode())>16000:
                     return error('SETTING_INVALID','Use a value smaller than 16 KiB.',400)
                 if item_id=='notifications' and (not isinstance(payload['value'],str) or len(payload['value'])>2000):

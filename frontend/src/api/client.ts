@@ -1,3 +1,4 @@
+import { executionPreferencesSchema, type PreferenceUpdate } from "./execution-preferences";
 import {governancePolicySchema, runSafetySchema} from './governance';
 import {runKnowledgeSchema,recoveryInspectionSchema,operationalAlertsSchema} from './reliability';
 import {adaptiveRunSchema} from './adaptive';
@@ -496,6 +497,12 @@ export class WorkflowClient {
     const parsed = z.object({ items: z.array(z.record(z.string(), z.unknown())), total: z.number() }).safeParse(await this.read("workspace/knowledge"));
     if (!parsed.success) return fail("INVALID_API_DATA", "The knowledge response is invalid.");
     return parsed.data;
+  }
+  async executionPreferences(workflow_id?:string,workflow_version?:number,agent_id?:string) {
+    return executionPreferencesSchema.parse(await this.read('execution-preferences'+queryString({workflow_id,workflow_version,agent_id})));
+  }
+  async saveExecutionPreferences(value:PreferenceUpdate) {
+    return executionPreferencesSchema.parse(await this.read('execution-preferences',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));
   }
   async settings() {
     const parsed = z.object({ items: z.array(z.object({ key: z.string(), value: z.unknown(), updated_at: z.string() })), total: z.number() }).safeParse(await this.read("workspace/settings"));

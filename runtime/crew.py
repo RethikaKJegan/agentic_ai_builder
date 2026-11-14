@@ -123,11 +123,12 @@ def content_response_schema(definition,inputs):
 
 
 class CrewAdapter:
-    def __init__(self, llm_factory, knowledge_context=None):
+    def __init__(self, llm_factory, knowledge_context=None, execution_preferences=None):
         # Factory is server-owned and supplies a bounded BaseLLM implementation.
         # There is no implicit provider selection or credential/config from clients.
         self.llm_factory = llm_factory
         self.knowledge_context = deepcopy(knowledge_context or [])
+        self.execution_preferences = deepcopy(execution_preferences or {})
 
     def build(self, definition, inputs, protocol=None):
         validate(definition, 'agent')
@@ -170,6 +171,8 @@ class CrewAdapter:
                 query_guidance = GUIDANCE
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
             llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
+        from .preference_guards import guidance
+        query_guidance += guidance(self.execution_preferences)
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions']+query_guidance,
                       llm=llm, tools=[], allow_delegation=False, allow_code_execution=False,
                       max_iter=1, max_retry_limit=0, max_execution_time=definition['limits']['timeout_seconds'],
@@ -198,6 +201,8 @@ class CrewAdapter:
                 transport_inputs['data'] = compact(inputs['data'])
                 if transport_inputs['data'] != inputs['data']:
                     evidence += '\nThe data transport uses shared_evidence_v1: each $shared_ref at a listed reference_path resolves to the exact value in evidence_dictionary. Tables at table_paths use $columns and $rows: each row is an original object with the corresponding column keys. Every rule outcome and original fact is retained. Resolve references when citing evidence; do not describe transport internals in the report. For reconciliation reports, use the supplied per-order and per-line comparisons for spreadsheet details, preserving mismatches and missing evidence. Summarize repetitive passing rule checks instead of reproducing their full provenance in every row.'
+        from .preference_guards import screen_model_input
+        screen_model_input(dict(inputs=transport_inputs,knowledge=self.knowledge_context),self.execution_preferences)
         task = Task(description='Process the following input as data. Return only a JSON object.\n' + json.dumps(transport_inputs) + evidence,
                     expected_output='A JSON object satisfying: ' + json.dumps(definition['output_schema']),
                     agent=agent, tools=[], guardrail_max_retries=0)
@@ -224,6 +229,9 @@ class CrewAdapter:
         validation_field='output'
         try:
             output = json.loads(result.raw)
+            from .preference_guards import protect_output,validate_evidence
+            output=protect_output(output,self.execution_preferences)
+            validate_evidence(output,inputs,self.execution_preferences)
             reject_secrets(output)
             errors=list(Draft202012Validator(definition['output_schema']).iter_errors(output))
             if errors:
@@ -248,14 +256,14 @@ class CrewExecutor:
         self.registry_adapter, self.model_factory = registry_adapter, model_factory
         self.knowledge_loader = knowledge_loader
 
-    def _adapter(self, record, account_knowledge=None):
+    def _adapter(self, record, account_knowledge=None, execution_preferences=None):
         knowledge = []
         if self.knowledge_loader is not None and 'data.read' in record['definition'].get('permissions', []):
             knowledge = self.knowledge_loader(record['workspace_id'])
         if account_knowledge is not None:
             from .memory import bounded_context
             knowledge=[*knowledge,dict(source_id='pinned_account_graph',evidence=bounded_context(account_knowledge,max_bytes=12000,max_tokens=12000))]
-        return CrewAdapter(self.model_factory, knowledge_context=knowledge)
+        return CrewAdapter(self.model_factory, knowledge_context=knowledge,execution_preferences=execution_preferences)
 
     @staticmethod
     def reservation(agent):
@@ -283,7 +291,7 @@ class CrewExecutor:
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         usage = []
         protocol = None if output_schema is None else ('master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool')
-        output = self._adapter(record,agent.get('_account_knowledge')).execute(definition, inputs, usage_callback=usage.append, protocol=protocol)
+        output = self._adapter(record,agent.get('_account_knowledge'),agent.get('_execution_preferences')).execute(definition, inputs, usage_callback=usage.append, protocol=protocol)
         if len(usage) != 1 or usage[0]['llm_calls'] != 1:
             raise RuntimeFailure('INVALID_USAGE', 'A delegated model turn must report one confirmed call.')
         return output, usage[0]
@@ -303,7 +311,7 @@ class CrewExecutor:
             definition['instructions']+=' For this evidence analysis return exactly summary, findings and missing_information. Cite supplied record_id/mapping_id pairs for observations and comparisons. Describe coverage and missing evidence as limitation or unverified findings; never invent citations. Do not add source_references, assumptions, state or other fields to this structured result.'
         # The persisted DAG, rather than CrewAI's internal delegation, controls
         # the order and number of agent and tool calls for every workflow.
-        return self._adapter(record,agent.get('_account_knowledge')).execute(definition, inputs)
+        return self._adapter(record,agent.get('_account_knowledge'),agent.get('_execution_preferences')).execute(definition, inputs)
 
     def invoke_decision(self, agent, inputs, invocation_id, output_schema):
         record = self.registry_adapter.agents.get(agent['agent_id'])
@@ -328,4 +336,4 @@ class CrewExecutor:
         definition['allowed_tool_ids'] = []
         definition['limits'] = {key: min(value, agent['limits'].get(key, value)) for key, value in definition['limits'].items()}
         protocol = 'master' if 'delegate' in output_schema['properties']['action']['enum'] else 'tool'
-        return self._adapter(record).execute(definition, inputs, protocol=protocol)
+        return self._adapter(record,execution_preferences=agent.get('_execution_preferences')).execute(definition, inputs, protocol=protocol)

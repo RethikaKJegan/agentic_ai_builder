@@ -1,3 +1,4 @@
+import { ValidationResults } from "./ValidationResults";
 import { displayText } from "@/lib/display-text";
 import { knowledgePreviewSchema } from "@/api/knowledge-graph";
 import { KnowledgeSourcePreview } from "./KnowledgeSourcePreview";
@@ -79,6 +80,7 @@ export function PlanReview({
         </div>
       </dl>
       {retrieved.success&&<KnowledgeSourcePreview view={retrieved.data}/>}
+      <ValidationResults value={canonical?.metadata["validation_report"]} />
       <BusinessOntologyReview document={canonical} />
       <DatabaseWorkflowReview document={canonical} />
       {Array.isArray(canonical?.metadata["report_limitations"]) && canonical.metadata["report_limitations"].length > 0 && <details className="rounded-lg border p-3 text-sm"><summary className="cursor-pointer font-medium">Investigation scope and limitations</summary><ul className="mt-2 list-disc space-y-2 pl-4">{canonical.metadata["report_limitations"].filter((item): item is string => typeof item === "string").map((item, i) => <li key={i}>{displayText(item)}</li>)}</ul></details>}

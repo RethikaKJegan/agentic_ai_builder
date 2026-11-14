@@ -1,5 +1,7 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 /** Server-side only. Never import into client components. */
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 export const WORKSPACE_COOKIE = "builder_workspace_access";
@@ -26,7 +28,17 @@ export function createClientSession(account: WorkspaceAccount, now = Date.now())
   const payload = `${account}.${Math.floor(now / 1000) + SESSION_SECONDS}.${randomBytes(24).toString("hex")}`;
   return `${payload}.${signature(payload)}`;
 }
+function revocationPath(value:string) {
+  return join(process.env['BUILDER_AUTH_STATE_DIR']||join(process.cwd(),'.local','auth-revocations'),createHash('sha256').update(value).digest('hex'));
+}
+export function revokeWorkspaceSession(value:string|undefined) {
+  if(!value||!workspaceAccount(value))return;
+  const root=process.env['BUILDER_AUTH_STATE_DIR']||join(process.cwd(),'.local','auth-revocations');
+  mkdirSync(root,{recursive:true,mode:0o700});
+  try{writeFileSync(revocationPath(value),'revoked\n',{mode:0o600,flag:'wx'});}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
+}
 export function workspaceAccount(value: string | undefined, now = Date.now()): WorkspaceAccount | null {
+  if(value&&(value.length>256||existsSync(revocationPath(value))))return null;
   if (!value) return null;
   if (/^(simpsons|subway)\.\d{10}\.[a-f0-9]{48}\.[a-f0-9]{64}$/.test(value)) {
     const parts = value.split(".");

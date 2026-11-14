@@ -307,13 +307,33 @@ class WorkflowService:
                 raise ApiFailure('INVALID_IDEMPOTENCY_KEY', 'A retry key of 8–128 characters is required.', field='idempotency_key')
             fingerprint = hashlib.sha256(json.dumps({'operation': operation, 'payload': payload}, sort_keys=True).encode()).hexdigest()
             subject = auth['subject']['subject_id']
+            prepared_validation=None
+            if operation=='validate_workflow':
+                # Provider assessment must not hold the SQLite writer lock.
+                with self.store.transaction(write=False) as read_db:
+                    cached=read_db.execute('SELECT fingerprint,response FROM mutations WHERE workspace=? AND subject=? AND key=?',(workspace,subject,key)).fetchone()
+                    if cached:
+                        if cached[0]!=fingerprint:raise ApiFailure('IDEMPOTENCY_KEY_REUSED','This retry key belongs to a different mutation.',409)
+                        return json.loads(cached[1])
+                    candidate_workflow=self.store.get(read_db,workspace,payload.get('workflow_id'),payload.get('workflow_version'))
+                    if candidate_workflow and candidate_workflow['status'] in {'draft','validated'}:
+                        try:
+                            from .readiness import repair_draft
+                            repair_draft(self,candidate_workflow,auth,read_db)
+                            self.validate_document(candidate_workflow)
+                        except PlannerFailure:
+                            # Persist structural failures in the existing mutation path.
+                            pass
+                        else:
+                            from .readiness import assess
+                            prepared_validation=assess(self,candidate_workflow,auth,read_db,semantic=True)
             with self.store.transaction() as db:
                 old = db.execute('SELECT fingerprint, response FROM mutations WHERE workspace=? AND subject=? AND key=?', (workspace, subject, key)).fetchone()
                 if old:
                     if old[0] != fingerprint:
                         raise ApiFailure('IDEMPOTENCY_KEY_REUSED', 'This retry key belongs to a different mutation.', 409)
                     return json.loads(old[1])
-                result = self.mutate(db, workspace, operation, payload, auth, request_id)
+                result = self.mutate(db, workspace, operation, payload, auth, request_id, prepared_validation=prepared_validation)
                 db.execute('INSERT INTO mutations VALUES (?, ?, ?, ?, ?)', (workspace, subject, key, fingerprint, json.dumps(result)))
                 return result
         except RuntimeFailure as exc:
@@ -418,7 +438,7 @@ class WorkflowService:
         if workflow['workflow_id'] != previous:
             PlannerService._scope_planned_agents(workflow, previous_workflow_id=previous)
 
-    def mutate(self, db, workspace, operation, payload, auth, request_id):
+    def mutate(self, db, workspace, operation, payload, auth, request_id, *, prepared_validation=None):
         workflow_id = payload.get('workflow_id')
         current = self.store.get(db, workspace, workflow_id)
         if operation == 'save_workflow_version':
@@ -468,12 +488,24 @@ class WorkflowService:
             if workflow['status'] not in {'draft', 'validated'}:
                 raise ApiFailure('INVALID_TRANSITION', 'This revision cannot be validated again.', 409)
             try:
+                from .readiness import repair_draft
+                repair_draft(self,workflow,auth,db)
                 self.validate_document(workflow)
                 if getattr(self, 'configuration_validator', None):
                     self.configuration_validator(workflow)
                 if databases := getattr(self, 'database_workflows', None):
                     databases.validate_workflow(workflow, auth)
-                # A structurally valid draft may still lack executable tool assignments.
+                from .readiness import assess,fingerprint as readiness_fingerprint
+                report=assess(self,workflow,auth,db)
+                if prepared_validation:
+                    if prepared_validation['workflow_fingerprint']!=readiness_fingerprint(workflow):
+                        raise ApiFailure('REVISION_CONFLICT','The workflow changed during validation. Validate the current revision.',409)
+                    report['model_assessment']=prepared_validation['model_assessment']
+                    report['issues'].extend(i for i in prepared_validation['issues'] if i['method']=='model_assessment' or i['problem'].startswith('Original-request'))
+                    report['ready']=not any(i['blocking'] for i in report['issues'])
+                from .readiness import readiness_state
+                report['readiness_state']=readiness_state(workflow,report['issues'])
+                workflow['metadata']['validation_report']=report
                 workflow['status'] = 'validated'
                 workflow['metadata']['validation_state'] = 'validated'
             except PlannerFailure as exc:
@@ -481,7 +513,7 @@ class WorkflowService:
                 workflow['status'] = 'draft'
                 workflow['metadata']['validation_state'] = 'validation_failed'
                 self.store.put(db, workspace, workflow)
-                return self.failure(request_id, ApiFailure(exc.code, 'Correct the workflow graph before continuing.', 400, exc.field))
+                return self.failure(request_id, ApiFailure(exc.code, str(exc), 400, exc.field))
         elif operation == 'approve_workflow':
             action = payload.get('action', 'approve')
             if action not in {'approve', 'publish'}:
@@ -491,6 +523,10 @@ class WorkflowService:
             expected = 'validated' if action == 'approve' else 'approved'
             if workflow['status'] != expected:
                 raise ApiFailure('INVALID_TRANSITION', f'The revision must be {expected} first.', 409)
+            report=workflow.get('metadata',{}).get('validation_report')
+            if report:
+                gaps=[i for i in report['issues'] if i['blocking'] and (i['method']=='model_assessment' or i['category'] in {'Missing source mapping','Missing relationship','Needs input','Evidence limitation'})]
+                if gaps:raise ApiFailure('WORKFLOW_READINESS_FAILED','Resolve the workflow readiness issues before approval.',409,details={'issues':gaps})
             self.validate_document(workflow)
             if getattr(self, 'configuration_validator', None):
                 self.configuration_validator(workflow)
@@ -524,6 +560,9 @@ class WorkflowService:
                     requirements.append('Load trusted agent/tool registrations with BUILDER_REGISTRY_CONFIG before publication.')
                 raise ApiFailure(code, 'Publication needs the setup requirements listed below.', 409,
                     details={'requirements': list(dict.fromkeys(requirements)), 'reason_codes': review['reason_codes']})
+            if report:
+                gaps=[i for i in report['issues'] if i['blocking']]
+                if gaps:raise ApiFailure('WORKFLOW_READINESS_FAILED','Resolve the workflow readiness issues before approval.',409,details={'issues':gaps})
             workflow['status'] = 'approved' if action == 'approve' else 'published'
             assignments = self.registry_adapter.execution_assignments(workflow, auth)
             for agent in workflow['agents']:

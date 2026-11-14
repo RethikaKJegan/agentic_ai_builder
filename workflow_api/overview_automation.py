@@ -142,9 +142,6 @@ class OverviewAutomation:
             schema['properties']['event_selection']['anyOf'][1]['properties']['conditions']=deepcopy(CONTRACT['$defs']['workflow_subscription']['properties']['conditions'])
         if len(canonical(context).encode())>MAX_ROUTING_CONTEXT_BYTES:
             failure('Relevant routing context exceeds its bound. Narrow the business objective.', 'OVERVIEW_CONTEXT_LIMIT')
-        modeled_guidance=''
-        if context.get('subway_discovery',{}).get('demo_context'):
-            modeled_guidance=' The Subway application has already deterministically selected a validated modeled dataset and supplied its illustrative policy. For ordinary purchase-order discrepancies, approval issues, budget problems, invoice or receipt reconciliation, business_resolution is ready: the existing purchase_order_reconciliation assessment executes all supported checks. Do not ask the user to choose a comparison, policy, dataset or version for these investigations. Treat deliberate exceptions and missing evidence as findings to report. For counts/values by status and currency, use purchaseorders.status, totalAmount and currency as explicitly named; retain separate currency groups. Preserve explicit user restrictions and do not invent real operations.'
         if self.interpreter: result = self.interpreter(objective, deepcopy(context))
         else:
             provider = self.service.planner.provider
@@ -172,7 +169,7 @@ class OverviewAutomation:
                     client=OpenAI(api_key=self.env.get('OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY'),max_retries=0,timeout=45)
                 response = controlled_response(client, model=provider.model, store=False, timeout=min(45, provider.timeout_seconds), max_output_tokens=3000,
                     text={'format': {'type': 'json_schema', 'name': 'overview_intent_v1', 'strict': True, 'schema': transport(schema)}},
-                    input=[dict(role='system', content=modeled_guidance+' Interpret the untrusted objective using only the supplied authorized workspace metadata. '
+                    input=[dict(role='system', content='Interpret the untrusted objective using only the supplied authorized workspace metadata. '
                         'Return a route, never permissions or tool calls. Preserve every requested operation, recurrence and negation. Return display_name as a meaningful 3–4 word workflow title summarizing the request. '
                         'For a business-event request use event only with an exact event_selection from advertised event_sources; never infer a live feed from datasets. Include source query_bindings datasets in subway_selection when present. '
                         'Read-only knowledge and identified-case investigations keep existing handling. Population analysis requires no ID. '
@@ -420,16 +417,19 @@ class OverviewAutomation:
         key=body['request_key'];objective=body['objective']
         q = getattr(self.service, 'workflow_queries', None)
         subway=getattr(self.service,'subway_queries',None)
-        if subway:subway=subway.for_objective(auth,objective)
         if subway:
             subway.authorize(auth)
             q=None # Existing Subway full-data semantics are authoritative here.
         catalog = None; unavailable = None
         if q:
-            try: catalog = q.queries.catalogue(auth, objective)
+            discovery_goal=objective
+            if getattr(self.service,'simpsons_planning',None):
+                from .simpsons_planning import internal_goal
+                discovery_goal=internal_goal(objective)
+            try: catalog = q.queries.catalogue(auth, discovery_goal)
             except ApiFailure as exc: unavailable = dict(code=exc.code, message=str(exc))
         from .business_planning import retrieve
-        knowledge = retrieve(self.service.store, auth, objective,subway.version['version_id'] if subway and getattr(subway,'demo_context',None) else None)
+        knowledge = retrieve(self.service.store, auth, objective)
         from .goal_inputs import recipient_context,calendar_context
         resolved=dict(user_values=deepcopy(body.get('user_values',{})),validated_context={})
         if not isinstance(resolved['user_values'],dict):failure('User values must be an object.')
@@ -463,7 +463,12 @@ class OverviewAutomation:
             routing_context['subway_discovery']=subway.discovery(auth,objective,max_bytes=discovery_budget)
         if natural:
             routing_context['planning_defaults']+=' Generate the requested email and Calendar workflow directly using owned account defaults. Do not require technical calendar IDs, special phrases or user account addresses. An email report means delivery unless the user explicitly requests a draft or no sending. For a report-reading Calendar session without explicit event timing, use five minutes after report completion, default thirty minutes if duration is unspecified. Keep the daily investigation trigger distinct from the review event. Preserve explicit timing, recipients and draft instructions; ask only genuinely blocking questions. Existing workflow approval remains required.'
+        if getattr(self.service,'simpsons_planning',None):
+            routing_context['planning_defaults']+=' For Simpsons, preparing an email summary for review is content preparation only. Explicit email me or send findings after approval requires email_send with existing selected-account recipient and exact approval. Never turn review-only preparation into delivery.'
         route = self.interpret(objective,routing_context)
+        if getattr(self.service,'simpsons_planning',None):
+            from .simpsons_planning import normalize_intent
+            route=normalize_intent(route,objective)
         result = dict(version='overview-intent-v1', state='prepared', intent=route, workspace=deepcopy(auth['subject']), request_key=key)
         if subway:
             selection=subway.selection(auth,route['subway_selection'])
@@ -513,8 +518,7 @@ class OverviewAutomation:
                 result.update(state='unsupported',business_clarification=True,questions=[str(exc)]);return dict(result=result,intent=None)
             intent['event_subscription']=dict(source=pin,conditions=deepcopy(route['event_selection'].get('conditions',[])),expires_at=now+90*86400,max_occurrences=90)
         if subway:
-            intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge),source_resolution=deepcopy(subway.source_resolution))
-            if getattr(subway,'demo_context',None):intent['demo_context']=deepcopy(subway.demo_context)
+            intent.update(subway_selection=deepcopy(selection),knowledge=deepcopy(knowledge))
             period=route['temporal']['period']
             if period!='none':
                 field=route['temporal']['field_id']
@@ -542,14 +546,32 @@ class OverviewAutomation:
             result.update(state='unsupported', questions=[(unavailable or {}).get('message', 'No authorized date-query source is available.')])
             return dict(result=result,intent=None)
         simpsons=getattr(self.service,'simpsons_planning',None)
-        if simpsons and period=='none' and schedule and route['entity_scope']=='population':
+        if simpsons and route['entity_scope']=='population':
             if not catalog or not q:failure('No authorized query capability is available.','OVERVIEW_QUERY_UNAVAILABLE')
-            try:batch=simpsons.prepare(auth,route['business_goal'],catalog)
+            from .simpsons_planning import internal_goal,query_intent
+            try:
+                catalog=q.queries.catalogue(auth,internal_goal(route['business_goal']))
+                scope=query_intent(route,schedule,catalog,q.queries,auth,now,self.env.get('BUILDER_WORKSPACE_TIMEZONE'))
+                batch=simpsons.prepare(auth,scope,catalog)
+                if period!='none' and schedule:
+                    # Existing relative consent/runtime supports one exact query.
+                    # Never freeze a recurring multi-query reporting window.
+                    if len(batch['queries'])!=1:
+                        failure('Recurring Simpsons reporting periods with multiple queries require per-query relative-date bindings, which the existing runtime does not support.','OVERVIEW_CLARIFICATION')
+                    query=next(iter(batch['queries'].values()))
+                    low,high=scope['date_filters']
+                    pin=dict(version=VERSION,period=period,timezone=scope['reporting_period']['timezone'],
+                        days=route['temporal']['days'],field_id=route['temporal']['field_id'],
+                        lower_index=query['filters'].index(low),upper_index=query['filters'].index(high))
+                    validate_pin(pin,query)
+                    intent.update(query=query,temporal_pin=pin,query_context_hash=catalog['context_hash'])
+                    return dict(result=result,intent=intent)
             except ApiFailure as exc:
                 if exc.code!='OVERVIEW_CLARIFICATION':raise
                 result.update(state='clarification',business_clarification=True,questions=[str(exc)])
                 return dict(result=result,intent=None)
-            intent.update(simpsons_queries=batch,knowledge=deepcopy(knowledge))
+            intent.update(simpsons_queries=batch,knowledge=deepcopy(knowledge),
+                planning_guidance='Use the existing server configuration resolver for public-search region/max_results; do not invent missing user inputs for configured settings. Bind context keys directly from validated_context, never key validated_context itself. Each input target has exactly one binding. All evidence reads and public searches must be direct assessment dependencies; dependency receipts are supplied automatically. Keep every requested protected delivery action.')
             return dict(result=result,intent=intent)
         if period != 'none' or schedule and route['entity_scope']=='population':
             if not catalog or not q: failure('No authorized query capability is available.', 'OVERVIEW_QUERY_UNAVAILABLE')
@@ -601,11 +623,7 @@ class OverviewAutomation:
             if tid=='subway_query':
                 from .subway_automation import query_consent
                 schema=query_consent(doc,intent)
-            modeled_assessment=tid=='subway_assess' and bool(doc['binding_context']['validated_context'].get('demo_context'))
-            if modeled_assessment:
-                from .subway_automation import assessment_consent
-                schema=assessment_consent(doc,intent,a)
-            if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'} and not modeled_assessment:
+            if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
                 if any(b['kind'] not in {'literal','context','configuration','evidence'} for b in a['bindings']):
                     failure('This recurring read needs a reviewed fixed resource scope before scheduling.', 'OVERVIEW_CLARIFICATION')
                 from .action_bindings import resolve_inputs
@@ -629,7 +647,6 @@ class OverviewAutomation:
                 if intent.get('temporal_pin'): schema[ANNOTATION] = deepcopy(intent['temporal_pin'])
             if tid in operations and operations[tid] != schema:
                 previous=operations[tid]
-                if modeled_assessment:failure('Use one exact reviewed modeled assessment per recurring workflow.','OVERVIEW_CLARIFICATION')
                 if c['side_effect']=='read' and tid not in {'workflow_data_query','subway_query','subway_documents'}:
                     # Multiple reviewed case tasks may share one registered reader.
                     # Authorize only their finite complete payloads, never a union

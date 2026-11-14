@@ -13,7 +13,7 @@ it.each([['client-simpsons','Complaint'],['client-subway','Purchase order']])('l
  vi.spyOn(api,'businessOntology').mockResolvedValue(f.ontology);const read=vi.spyOn(api,'knowledgeSnapshot').mockResolvedValue(f.snapshot);
  render(<ClientOntology/>);await within(await screen.findByLabelText('Ontology business areas')).findByRole('button',{name:'Operations'});expect(screen.queryByRole('button',{name:title})).toBeNull();
  fireEvent.click(within(screen.getByLabelText('Ontology business areas')).getByRole('button',{name:'Operations'}));fireEvent.click(screen.getByRole('button',{name:title}));
- expect(await screen.findByRole('heading',{name:title})).toBeVisible();expect(screen.getByText(f.snapshot.concepts[0]!.definition)).toBeVisible();expect(within(screen.getByLabelText('Client ontology concept details')).getByText(new RegExp(tenant+'_records'))).toBeVisible();expect(read).toHaveBeenCalledWith(tenant+'_v1');
+ expect(await screen.findByRole('heading',{name:title})).toBeVisible();expect(screen.getByText(f.snapshot.concepts[0]!.definition)).toBeVisible();expect(within(screen.getByLabelText('Concept source fields')).getByText(new RegExp(tenant+'_records'))).toBeVisible();expect(read).toHaveBeenCalledWith(tenant+'_v1');
  fireEvent.change(screen.getByLabelText('Search complete ontology'),{target:{value:'Related'}});expect(screen.queryByRole('button',{name:title})).toBeNull();expect(screen.getByRole('button',{name:'Related '+title})).toBeVisible();
 });
 it('does not show ontology from an account whose response arrived late',async()=>{

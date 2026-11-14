@@ -47,6 +47,10 @@ class OpenAIStructuredOutputProvider:
             raise ValueError('Planning timeout must be between 30 and 300 seconds.')
         self.timeout_seconds = timeout_seconds
 
+    def review_requirements(self, objective, context):
+        from workflow_api.readiness import model_review
+        return model_review(self, objective, context)
+
     def workflow_title(self, objective: str) -> str:
         client = self._client
         if client is None:
@@ -109,6 +113,8 @@ class OpenAIStructuredOutputProvider:
         except (ValueError,TypeError,AttributeError):raise PlannerFailure('ADAPTIVE_DECISION_INVALID','The evaluator did not return a valid structured decision.') from None
 
     def plan_actions(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
+        from runtime.preference_guards import screen_input
+        screen_input(dict(objective=objective))
         from workflow_api.action_bindings import SCHEMA
         from .errors import PlannerFailure
         catalog=context.get('capabilities',{})
@@ -164,6 +170,8 @@ class OpenAIStructuredOutputProvider:
         except (ValueError,TypeError,AttributeError):raise PlannerFailure('ACTION_PLAN_INVALID','The provider did not return a usable structured action plan.') from None
 
     def select_capabilities(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
+        from runtime.preference_guards import screen_input
+        screen_input(dict(objective=objective))
         """Select registered IDs; executable graphs and resources remain compiler-owned."""
         from jsonschema import Draft202012Validator
         from .errors import PlannerFailure
@@ -193,6 +201,8 @@ class OpenAIStructuredOutputProvider:
         return result
 
     def generate(self, objective: str, context: dict[str, Any]) -> dict[str, Any]:
+        from runtime.preference_guards import screen_input
+        screen_input(dict(objective=objective))
         client = self._client
         if client is None:
             try:

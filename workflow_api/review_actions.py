@@ -25,6 +25,8 @@ def submit(service,request,auth):
         workflow=service.store.get(db,workspace,payload['workflow_id'])
         if not workflow or workflow['version']!=payload['workflow_version']:raise ApiFailure('REVISION_CONFLICT','Reload the current revision before submitting.',409)
         if workflow['status']!='validated':raise ApiFailure('INVALID_TRANSITION','Validate this revision before submitting for approval.',409)
+        from .readiness import enforce
+        enforce(service,workflow,auth,db)
         review=service.registry_adapter.review(workflow,auth)
         # Submission requests review; it does not grant approval. Pending tool
         # approvals must be reviewable without accepting denied/missing grants.

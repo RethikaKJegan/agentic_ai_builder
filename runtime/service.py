@@ -100,6 +100,10 @@ class RuntimeService:
             verify_composition(db,auth,document)
         except ApiFailure as exc:raise RuntimeFailure(exc.code,str(exc),exc.status) from None
         self.workflows.validate_document(document)
+        if document.get('metadata',{}).get('validation_report'):
+            from workflow_api.readiness import enforce
+            try:enforce(self.workflows,document,auth,db)
+            except ApiFailure as exc:raise RuntimeFailure(exc.code,str(exc),exc.status) from None
         reject_secrets(document)
         grants = self.workflows.registry_adapter.execution_assignments(document, auth)
         actual = {(g['agent_id'], g['tool_id']) for g in grants}
@@ -175,6 +179,8 @@ class RuntimeService:
                        inputs=deepcopy(payload.get('inputs', {})), outputs={}, node_states={}, edge_states={}, usage={},
                        created_at=self.clock(), correlation_id='corr_' + uuid4().hex, trace_reference='trace_' + uuid4().hex,
                        request_id=request['request_id'], release_bound=allow_superseded)
+            from workflow_api.execution_preferences import snapshot
+            run['execution_preferences'] = snapshot(db,auth,workflow)
             run['governance_policy'] = self.governance.read(db, workspace)
             from workflow_api.workflow_adaptive import initialize
             initialize(run, workflow)

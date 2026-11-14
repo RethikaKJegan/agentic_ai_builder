@@ -1,0 +1,14 @@
+import { beforeEach,afterEach,it,expect,vi } from 'vitest';
+import { mkdtempSync,rmSync,readdirSync,readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { NextRequest } from 'next/server';
+import { createClientSession,workspaceAccount,WORKSPACE_COOKIE } from './workspace-auth';
+import { POST } from '@/app/api/workspace-auth/logout/route';
+import { GET } from '@/app/api/workspace-auth/account/route';
+let directory:string;
+beforeEach(()=>{directory=mkdtempSync(join(tmpdir(),'praxi-session-test-'));vi.stubEnv('BUILDER_AUTH_STATE_DIR',directory);vi.stubEnv('BUILDER_LOGIN_SECRET','isolated-settings-test-secret-32-characters-long');vi.stubEnv('BUILDER_SIMpsons_LOGIN_EMAIL','');vi.stubEnv('BUILDER_SIMPSONS_LOGIN_EMAIL','simpsons-test@example.com');vi.stubEnv('BUILDER_SUBWAY_LOGIN_EMAIL','subway-test@example.com');vi.stubEnv('BUILDER_UI_ORIGINS','http://127.0.0.1:3100');});
+afterEach(()=>{vi.unstubAllEnvs();rmSync(directory,{recursive:true,force:true});});
+it.each(['simpsons','subway'] as const)('revokes only the selected %s session and persists no raw tokens',async account=>{const token=createClientSession(account),other=createClientSession(account);const req=new NextRequest('http://127.0.0.1:3100/api/workspace-auth/logout',{method:'POST',headers:{origin:'http://127.0.0.1:3100',host:'127.0.0.1:3100',cookie:`${WORKSPACE_COOKIE}=${token}`}});const response=await POST(req);expect(response.status).toBe(200);expect(workspaceAccount(token)).toBeNull();expect(workspaceAccount(other)).toBe(account);expect((await POST(req)).status).toBe(200);const files=readdirSync(directory);expect(files).toHaveLength(1);expect(files[0]).toMatch(/^[a-f0-9]{64}$/);expect(readFileSync(join(directory,files[0]!),'utf8')).not.toContain(token);});
+it.each(['simpsons','subway'] as const)('returns trusted %s identity and honest password support',async account=>{const result=await GET(new NextRequest('http://127.0.0.1:3100/api/workspace-auth/account',{headers:{cookie:`${WORKSPACE_COOKIE}=${createClientSession(account)}`}}));const body=await result.json();expect(body.email).toBe(account+'-test@example.com');expect(body.password_change.available).toBe(false);expect(body).not.toHaveProperty('token');expect(result.headers.get('cache-control')).toBe('no-store');});
+it('denies anonymous account access',async()=>{expect((await GET(new NextRequest('http://127.0.0.1:3100/api/workspace-auth/account'))).status).toBe(401);});

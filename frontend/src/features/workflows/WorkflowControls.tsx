@@ -1,4 +1,5 @@
 "use client";
+import { ValidationResults } from "./ValidationResults";
 import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -39,6 +40,8 @@ export function WorkflowControls({ workflow, onStarted, compact = false }: { wor
     if (dirty) return "Save draft before this action.";
     if (!version || !document) return "Save this draft first.";
     if (action === "validate") return document.status === "draft" || document.status === "validated" ? "" : "Save an edited draft to validate a new revision.";
+    const report = document.metadata["validation_report"];
+    if ((action === "submit" || action === "approve") && report && typeof report === "object" && "ready" in report && report.ready === false) return "Resolve the blocking validation findings before review.";
     if (action === "submit") return document.status !== "validated" ? "Validate this revision first." : document.metadata["approval_submission"] ? "This revision is submitted for review." : "";
     if (action === "approve") return document.status === "validated" ? "" : "A validated revision is required.";
     if (action === "publish") return document.status === "approved" ? "" : "Explicit approval is required before publication.";
@@ -81,6 +84,7 @@ export function WorkflowControls({ workflow, onStarted, compact = false }: { wor
   const renderAction=(action:Action)=>{const reason=blocker(action);return <div key={action}><button type="button" disabled={!!busy||!!reason} title={displayText(reason||labels[action])} aria-describedby={`${workflow.id}-${action}-reason`} onClick={()=>void act(action)} className={`rounded-lg border px-3 py-2 text-xs disabled:opacity-40 ${action===primary?'border-primary bg-primary text-primary-foreground':'border-border hover:bg-muted'}`}>{displayText(busy===action?`${labels[action]}…`:labels[action])}</button><span id={`${workflow.id}-${action}-reason`} className="sr-only">{displayText(reason)}</span></div>;};
   return <section aria-label="Workflow actions" className={`flex flex-wrap items-center gap-2 ${compact?"":"w-full"}`}>
     {!compact && <div className="text-[11px] leading-5 text-muted-foreground" role="status">{document ? `${document.status} · server revision v${version}` : "Local draft · no server revision"} · {dirty ? "Unsaved changes" : "No unsaved changes"}{saved ? ` · Saved ${saved}` : version ? " · Saved timestamp unavailable" : ""}</div>}
+    <ValidationResults value={document?.metadata["validation_report"]} />
     <ProcurementReview workflow={workflow} onStarted={onStarted} />
     <SheetAccessReview targets={document?.metadata["sheet_write_targets"]} />
     <CustomerAutomationReview policy={document?.metadata["customer_automation"]} emailPolicy={document?.metadata["email_recipient_policy"]} />

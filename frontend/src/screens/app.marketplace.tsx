@@ -1,4 +1,5 @@
 "use client";
+import { GuardrailSelection } from "@/features/marketplace/GuardrailSelection";
 import { displayText } from "@/lib/display-text";
 import { Link, useRouteSearch } from "@/lib/navigation";
 import { useNavigate } from "@/lib/navigation";
@@ -42,7 +43,7 @@ export default function Marketplace() {
   const sel = MARKETPLACE.find((a) => a.id === selId) ?? list[0];
 
   const isInstalled = (a: MarketplaceAsset) =>
-    a.kind === "tool" ? connectors.find((c) => c.id === a.ref)?.status === "demo-connected" : a.kind !== "workflow" && a.kind !== "agent" ? !!installed[a.id] : false;
+    a.kind === "tool" ? connectors.find((c) => c.id === a.ref)?.status === "demo-connected" : a.kind !== "workflow" && a.kind !== "agent" && a.kind !== "guardrail" ? !!installed[a.id] : false;
   const timesInstalled = (a: MarketplaceAsset) => (installed[a.id] ? 1 : 0);
 
   const doInstall = (a: MarketplaceAsset) => {
@@ -134,8 +135,9 @@ export default function Marketplace() {
             )}
           </div>
 
-          {sel.kind !== "tool" && <button onClick={() => doInstall(sel)} disabled={isInstalled(sel)} className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-deep disabled:bg-muted disabled:text-muted-foreground">
-            {isInstalled(sel) ? <><Check className="h-4 w-4" />Installed</> : sel.kind === "workflow" ? "Use template" : sel.kind === "guardrail" ? "Apply to drafts" : "Add to drafts"}
+          {sel.kind === "guardrail" && <GuardrailSelection packId={sel.id} />}
+          {sel.kind !== "tool" && sel.kind !== "guardrail" && <button onClick={() => doInstall(sel)} disabled={isInstalled(sel)} className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-deep disabled:bg-muted disabled:text-muted-foreground">
+            {isInstalled(sel) ? <><Check className="h-4 w-4" />Installed</> : sel.kind === "workflow" ? "Use template" : "Add to drafts"}
           </button>}
           {(sel.kind === "workflow" || sel.kind === "agent") && timesInstalled(sel) > 0 && <p className="mt-2 text-center text-xs text-muted-foreground">Already added once — installing again creates another copy.</p>}
         </aside>

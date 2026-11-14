@@ -263,6 +263,10 @@ class DelegationSession:
         return correct_once(invoke, prepare)
 
     def _model_turn(self, agent, binding, inputs, invocation_id, schema, reservation):
+        with self.runtime.store.transaction(write=False) as policy_db:
+            policy_run=self.current(policy_db,agent)
+            binding=deepcopy(binding)
+            binding['_execution_preferences']=deepcopy(policy_run.get('execution_preferences',{}).get('agents',{}).get(agent['agent_id'],{}))
         with self.runtime.store.transaction(write=False) as db:
             self.current(db, agent)
         reservation = {k: v for k, v in reservation.items() if k != 'delegation_calls'}

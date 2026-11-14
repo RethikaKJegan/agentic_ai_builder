@@ -1,0 +1,13 @@
+import { render,screen,fireEvent,waitFor,cleanup } from '@testing-library/react';
+import { beforeEach,afterEach,it,expect,vi } from 'vitest';
+import Screen from './app.settings';
+const api=vi.hoisted(()=>({executionPreferences:vi.fn(),saveExecutionPreferences:vi.fn()}));
+vi.mock('@/api/client',()=>({api}));
+vi.mock('@/features/runs/RunTrace',()=>({PageHeader:({title}:{title:string})=><h1>{title}</h1>}));
+vi.mock('@/features/workflows/ApiFeedback',()=>({ApiFeedback:()=>null}));
+vi.mock('@/api/state',()=>({useBackend:Object.assign((selector?: (value:unknown)=>unknown)=>{const v={status:'connected',session:{auth:{subject:{workspace_id:'client-test',subject_id:'owner'}}}};return selector?selector(v):v;},{setState:vi.fn()})}));
+const base={settings:{revision:0,behaviours:{},packs:[],display:{timezone:'UTC',date_format:'locale'},updated_at:null}};
+beforeEach(()=>{api.executionPreferences.mockResolvedValue(structuredClone(base));api.saveExecutionPreferences.mockImplementation(async v=>({...base,settings:{...base.settings,revision:1,display:v.display}}));vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({email:'real-account@example.com',account:'test',status:'authenticated',password_change:{available:false,reason:'Managed through deployment configuration.'}})}));});
+afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.clearAllMocks();});
+it('uses authenticated identity and never enables unsupported password, notification or delete actions',async()=>{render(<Screen/>);expect(await screen.findByText('real-account@example.com')).toBeVisible();expect(screen.getByText('client-test')).toBeVisible();expect(screen.getByRole('button',{name:'Delete account — Coming soon'})).toBeDisabled();expect(screen.getByRole('button',{name:'Self-service unavailable'})).toBeDisabled();expect(screen.queryByRole('textbox',{name:/password/i})).toBeNull();expect(screen.queryByRole('switch',{name:/notification/i})).toBeNull();});
+it('persists display preferences through the scoped API',async()=>{render(<Screen/>);await screen.findByText('real-account@example.com');fireEvent.change(screen.getByRole('combobox',{name:'Date format'}),{target:{value:'day-first'}});fireEvent.click(screen.getByRole('button',{name:'Save preferences'}));await waitFor(()=>expect(api.saveExecutionPreferences).toHaveBeenCalledWith({expected_revision:0,display:{timezone:'UTC',date_format:'day-first'}}));expect(await screen.findByText('Display preferences saved on the server.')).toBeVisible();});

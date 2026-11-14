@@ -151,3 +151,250 @@ def test_simpsons_assessment_rejects_invented_citations_and_links():
     for output in [dict(source_references=['invented_record']),dict(source_references=['read_0'],body='https://invented.example/diagnosis')]:
         with pytest.raises(RuntimeFailure) as exc:validate_content(workflow,{'node_id':'assess'},output,inputs)
         assert exc.value.code=='ACTION_CONTENT_UNVERIFIED'
+
+
+@pytest.mark.parametrize('defect,reason',[
+    ('web','outside the reviewed Simpsons catalogue'),
+    ('source','outside the reviewed Simpsons catalogue'),
+    ('field','unavailable field'),
+    ('join','unsupported relationship'),
+    ('email','Additional properties'),
+    ('date','Unrequested business-date filter'),
+    ('mode','Aggregate plans output group keys and metrics only'),
+])
+@pytest.mark.parametrize('corrected',[False,True])
+def test_semantic_correction_is_bounded_and_authorized(queries,defect,reason,corrected):
+    from tests.test_data_relationships import auth
+    actor=auth();catalog=queries.catalogue(actor);good=plan();bad=deepcopy(good)
+    if defect in {'web','source'}:bad['base_dataset_id']='public_web_search' if defect=='web' else 'other_tenant'
+    elif defect=='field':bad['filters']=[dict(field_id='nonexistent',op='eq',value=1)]
+    elif defect=='join':bad['joins']=[dict(relationship_id='fictional',target_dataset_id='mongo_categories')]
+    elif defect=='email':bad['email_send']={'to':'someone@example.com'}
+    elif defect=='mode':bad['fields']=['pg_lines_qty']
+    else:
+        # A date value in a string field is also an unrequested date restriction.
+        bad.update(base_dataset_id='mongo_categories',fields=['mongo_categories_name'],metrics=[],
+            filters=[dict(field_id='mongo_categories_name',op='eq',value='2026-11-13')])
+    calls=[]
+    def generate(objective,catalog):
+        calls.append(deepcopy(objective))
+        return dict(queries=[good if corrected and len(calls)==2 else bad],clarification='',limitations=[])
+    planner=SimpsonsPlanning(SimpleNamespace(workflow_queries=SimpleNamespace(queries=queries)),{},generator=generate)
+    scope=dict(internal_query='Read available complaints.',date_filters=[])
+    if corrected:
+        result=planner.prepare(actor,scope,catalog)
+        assert result['queries']=={'query_0':good}
+        # Execute the corrected plan through the existing authorized query API.
+        queries.planner.output=result['queries']['query_0']
+        saved=queries.plan(actor,{'question':'Read authorized records'})
+        assert queries.execute(actor,{'plan_id':saved['plan_id']})['matched_rows']==3
+    else:
+        with pytest.raises(ApiFailure,match=reason):planner.prepare(actor,scope,catalog)
+        assert not queries.reader.calls
+    assert len(calls)==2
+    assert reason in calls[1]['correction']['message']
+    assert calls[1]['internal_intent']==scope
+
+
+@pytest.mark.parametrize('prompt,period,kind',[
+    ('Every day at 8:35 PM India time, summarize available Simpsons complaints.','none','daily'),
+    ("Every day at 8:35 PM India time, summarize today's Simpsons complaints.",'today','daily'),
+    ('Investigate Simpsons complaints and research public diesel-engine maintenance guidance. Prepare a report.','none','none'),
+    ('Every day at 8:35 PM India time, investigate Simpsons engine complaints, research general public diesel-engine troubleshooting guidance, and prepare an evidence-backed email summary for approval. Do not restrict complaints by date.','none','daily'),
+    ('Every Monday at 9 AM India time, summarize Simpsons complaints from the previous calendar month.','previous_month','weekly'),
+    ('Find all complaints associated with engine serial number X.','none','none'),
+    ('Find complaints with operating hours between 0 and 100 inclusive.','none','none'),
+])
+def test_real_prompt_internal_normalization(prompt,period,kind):
+    from workflow_api.simpsons_planning import internal_goal,query_intent
+    route=intent();route['business_goal']=prompt;route['temporal'].update(period=period,field_id='complaint_date' if period!='none' else None)
+    route['recurrence'].update(kind=kind,hour=9 if kind=='weekly' else 20,minute=0 if kind=='weekly' else 35)
+    catalog={'datasets':[{'fields':[{'field_id':'complaint_date'}]}]}
+    queries=SimpleNamespace(context=lambda _:({}, {}, {'complaint_date':{'types':['timestamp with time zone']}},{}))
+    scope=query_intent(route,None,catalog,queries,{},1794614400,'Asia/Kolkata')
+    text=scope['internal_query'].lower()
+    assert 'complaints' in text and '8:35' not in text and '9 am' not in text
+    assert 'public' not in text and 'email' not in text and 'prepare' not in text
+    assert scope['execution_schedule']['kind']==kind
+    assert bool(scope['date_filters'])==(period!='none')
+    if period=='previous_month':
+        assert [p['value'] for p in scope['date_filters']]==['2026-09-30T18:30:00+00:00','2026-10-31T18:30:00+00:00']
+    if 'serial number' in prompt:assert internal_goal(prompt)==prompt
+    if 'operating hours' in prompt:assert 'between 0 and 100 inclusive' in text
+
+
+def test_one_time_mixed_scope_preserves_original_goal_and_public_action(pipeline):
+    p=pipeline;route=p.router.interpreter('',{})
+    route['intent_type']='one_time';route['recurrence'].update(kind='none',hour=None)
+    route['business_goal']='Investigate Simpsons complaints and research public diesel-engine maintenance guidance. Prepare a report.'
+    p.router.interpreter=lambda *_:deepcopy(route)
+    seen=[]
+    original=p.f.general.simpsons_planning.generator
+    p.f.general.simpsons_planning.generator=lambda goal,catalog:(seen.append(deepcopy(goal)) or original(goal,catalog))
+    p.body['objective']=route['business_goal']
+    result=p.router.prepare_intent(p.f.x.a,p.body)
+    assert result['result']['state']=='prepared' and result['intent']['schedule'] is None
+    assert len(result['intent']['simpsons_queries']['queries'])==2
+    assert 'public' not in seen[0]['internal_query']
+    assert seen[0]['excluded_workflow_intents']['public_research']==[PUBLIC]
+    assert result['intent']['route']['side_effects']==['email_send']
+    assert p.body['objective']==route['business_goal']
+    assert not p.searches and not p.f.http.sent
+
+
+@pytest.mark.parametrize('period',['today','previous_month'])
+@pytest.mark.parametrize('count',[1,2])
+def test_dated_preliminary_handoff_uses_existing_relative_binding(pipeline,period,count):
+    from workflow_api.temporal_queries import resolve,window
+    p=pipeline
+    with p.queries.store.transaction() as db:
+        raw=db.execute("SELECT document FROM data_source_snapshots WHERE connection_id='pg'").fetchone()[0]
+        snapshot=json.loads(raw)
+        snapshot['datasets'][0]['fields'].append(dict(field_id='pg_lines_created',name='created',types=['timestamp with time zone'],nullable=True))
+        db.execute("UPDATE data_source_snapshots SET document=? WHERE connection_id='pg'",(json.dumps(snapshot),))
+    p.queries.manager.relationships.request(p.f.x.a);p.queries.manager.relationships.tick()
+    route=p.router.interpreter('',{});route['temporal'].update(period=period,field_id='pg_lines_created')
+    p.router.interpreter=lambda *_:deepcopy(route)
+    def generator(scope,catalog):
+        first=plan();first['filters']=deepcopy(scope['date_filters'])
+        second=plan();second.update(base_dataset_id='mongo_categories',metrics=[],fields=['mongo_categories_name'])
+        return dict(queries=[first,second][:count],clarification='',limitations=[])
+    p.f.general.simpsons_planning.generator=generator
+    result=p.router.prepare_intent(p.f.x.a,p.body)
+    if count==2:
+        assert result['result']['state']=='clarification'
+        assert 'per-query relative-date bindings' in result['result']['questions'][0]
+        assert result['intent'] is None
+    else:
+        prepared=result['intent'];assert prepared['temporal_pin']['period']==period
+        due=prepared['schedule']['next_due']+32*86400
+        resolved=resolve(prepared['query'],prepared['temporal_pin'],due)
+        assert [f['value'] for f in resolved['filters']]==list(window(period,'Asia/Kolkata',due))
+        assert resolved['metrics']==prepared['query']['metrics']
+    assert not p.jobs.list(p.f.x.a)['items'] and not p.searches and not p.f.http.sent
+
+
+def test_identity_route_does_not_prepare_population_queries(pipeline):
+    p=pipeline;route=p.router.interpreter('',{})
+    route.update(intent_type='investigation',entity_scope='identified_case',side_effects=[],business_goal='Find all complaints associated with engine serial number X.')
+    route['recurrence'].update(kind='none',hour=None)
+    p.router.interpreter=lambda *_:deepcopy(route)
+    p.f.general.simpsons_planning.generator=lambda *_:pytest.fail('Identity investigation entered population planner')
+    p.body['objective']=route['business_goal']
+    assert 'simpsons_queries' not in p.router.prepare_intent(p.f.x.a,p.body)['intent']
+
+
+def test_correction_respects_existing_retry_budget(queries,monkeypatch):
+    from tests.test_data_relationships import auth
+    actor=auth();calls=[]
+    bad=plan();bad['base_dataset_id']='fictional'
+    planner=SimpsonsPlanning(SimpleNamespace(workflow_queries=SimpleNamespace(queries=queries)),{},
+        generator=lambda *_:(calls.append(True) or dict(queries=[bad],clarification='',limitations=[])))
+    def deny():raise ApiFailure('BUDGET_EXHAUSTED','No correction budget remains.',403)
+    monkeypatch.setattr('runtime.execution_control.reserve_retry',deny)
+    with pytest.raises(ApiFailure,match='No correction budget remains'):
+        planner.prepare(actor,dict(internal_query='Read complaints',date_filters=[]),queries.catalogue(actor))
+    assert len(calls)==1 and not queries.reader.calls
+
+
+def test_real_router_paraphrase_excludes_public_synthesis_from_internal_scope():
+    from workflow_api.simpsons_planning import internal_goal
+    goal = 'Investigate engine complaints without a date restriction and synthesize findings with general public diesel-engine troubleshooting guidance.'
+    assert internal_goal(goal) == 'Investigate engine complaints without a date restriction'
+    assert internal_goal('Investigate complaints and combine general internal evidence.') == 'Investigate complaints combine general internal evidence.'
+
+
+@pytest.mark.parametrize('position',['fields','group_by','filter','sort'])
+def test_catalog_schema_rejects_unavailable_identifiers(queries,position):
+    from jsonschema import Draft202012Validator
+    from workflow_api.simpsons_planning import model_schema
+    from tests.test_data_relationships import auth
+    catalog=queries.catalogue(auth());catalog['relationships']=[]
+    query=plan();query.update(metrics=[],fields=['pg_lines_qty'],order_by=[],group_by=[])
+    good=dict(queries=[query],clarification='',limitations=[])
+    validator=Draft202012Validator(model_schema(catalog))
+    assert validator.is_valid(good)
+    if position=='fields':query['fields']=['invented']
+    elif position=='group_by':query.update(fields=[],group_by=['invented'],metrics=[dict(op='count',expression='',label='count')])
+    elif position=='filter':query['filters']=[dict(field_id='invented',op='eq',value=1)]
+    else:query['order_by']=[dict(column='invented',direction='asc')]
+    assert not validator.is_valid(good)
+
+
+@pytest.mark.parametrize('position',['fields','group_by','filter','sort','expression'])
+def test_correction_identifies_field_dataset_and_allowed_alternatives(queries,position):
+    from tests.test_data_relationships import auth
+    actor=auth();catalog=queries.catalogue(actor);bad=plan();calls=[]
+    if position=='fields':bad['fields']=['invented']
+    elif position=='group_by':bad['group_by']=['invented']
+    elif position=='filter':bad['filters']=[dict(field_id='invented',op='eq',value=1)]
+    elif position=='sort':bad.update(metrics=[],fields=['pg_lines_qty'],order_by=[dict(column='invented',direction='asc')])
+    else:bad['metrics'][0]['expression']='invented * 2'
+    def generate(scope,catalog):
+        calls.append(deepcopy(scope))
+        return dict(queries=[bad],clarification='',limitations=[])
+    planner=SimpsonsPlanning(SimpleNamespace(workflow_queries=SimpleNamespace(queries=queries)),{},generator=generate)
+    scope=dict(internal_query='Review complaints without date restriction',date_filters=[])
+    with pytest.raises(ApiFailure,match='unavailable field'):planner.prepare(actor,scope,catalog)
+    assert len(calls)==2 and not queries.reader.calls
+    correction=calls[1]['correction'];details=correction['details']
+    assert details['datasets']==['pg_lines']
+    assert details['invalid_references'][0]['field_id']=='invented'
+    assert 'pg_lines_qty' in json.dumps(details['allowed_fields'])
+    assert details['query_mode'] in ('detail','aggregate')
+    assert correction['requirements']==scope
+
+
+@pytest.mark.parametrize('text,initial,expected',[
+    ('Prepare an email summary for my review.',[],False),
+    ('Prepare an email summary for my review.',['email_send'],False),
+    ('Email me the findings after I approve them.',[],True),
+    ('Every day at 8:35 PM India time, review complaints and email me findings after approval.',[],True),
+    ('Prepare a report. Do not email me.',[],False),
+    ('Send the report to Slack after approval.',[],False),
+    ('Deliver the summary to a shared drive.',[],False),
+    ('Email me a draft; no external writes.',['email_send'],False),
+])
+def test_simpsons_delivery_intent_does_not_grant_draft_sending(text,initial,expected):
+    from workflow_api.simpsons_planning import normalize_intent
+    route=intent();route['side_effects']=initial
+    result=normalize_intent(route,text)
+    assert ('email_send' in result['side_effects']) is expected
+    assert route['side_effects']==initial
+    if expected:assert result['recipient_mode']=='selected_account'
+
+
+@pytest.mark.parametrize('name,day',[('Monday',1),('Wednesday',3),('Sunday',0)])
+def test_simpsons_named_weekly_day_preserves_exact_cron_day(name,day):
+    from workflow_api.simpsons_planning import normalize_intent
+    route=intent();route['recurrence'].update(kind='weekdays',weekdays=[day])
+    result=normalize_intent(route,'Every '+name+' at 9 AM India time, summarize complaints.')
+    assert result['recurrence']['kind']=='weekly'
+    assert result['recurrence']['weekdays']==[day]
+    assert route['recurrence']['kind']=='weekdays'
+
+
+def test_simpsons_named_weekly_days_keep_all_reviewed_days():
+    from workflow_api.simpsons_planning import normalize_intent
+    route=intent();route['recurrence'].update(kind='weekdays',weekdays=[1,3])
+    result=normalize_intent(route,'Every Monday and Wednesday at 9 AM, summarize complaints.')
+    assert result['recurrence']['kind']=='weekly'
+    assert result['recurrence']['weekdays']==[1,3]
+
+
+@pytest.mark.parametrize('with_relationships',[False,True])
+def test_large_catalog_enum_respects_individual_provider_string_budget(with_relationships):
+    from workflow_api.simpsons_planning import model_schema
+    fields=[dict(field_id='field_'+str(i).zfill(32),name='Field '+str(i),types=['number']) for i in range(600)]
+    catalog=dict(datasets=[dict(dataset_id='authorized',fields=fields)],relationships=[dict(relationship_id='reviewed')] if with_relationships else [])
+    schema=model_schema(catalog)
+    def enums(value):
+        if isinstance(value,dict):
+            if 'enum' in value:yield value['enum']
+            for child in value.values():yield from enums(child)
+        elif isinstance(value,list):
+            for child in value:yield from enums(child)
+    values=list(enums(schema))
+    assert sum(map(len,values))<=1000
+    assert all(len(e)<=250 or sum(len(v) for v in e if isinstance(v,str))<=15000 for e in values)
+    assert {f['field_id'] for f in fields}<=set(v for e in values for v in e)

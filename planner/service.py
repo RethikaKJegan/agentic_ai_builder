@@ -85,6 +85,7 @@ class PlannerService:
             workflow["workflow_id"] = self._workflow_id(workspace_id, identity_objective)
             self._scope_planned_agents(workflow)
             workflow["metadata"] = {**workflow.get("metadata", {}), "contract_versions": CONTRACT_VERSIONS, "unresolved_requirements": workflow.get("metadata", {}).get("unresolved_requirements", [])}
+            workflow['metadata']['original_objective'] = objective.strip()
             preserve_unmapped_conditions(workflow)
             normalized = validate_workflow(workflow)
             response = {"request_id": request_id, "status": 200, "data": {"workflow": normalized, "correlation_id": f"corr_{uuid.uuid4().hex}", "contract_versions": CONTRACT_VERSIONS}}

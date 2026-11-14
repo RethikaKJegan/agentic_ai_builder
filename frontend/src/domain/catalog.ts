@@ -23,8 +23,8 @@ export const MARKETPLACE: MarketplaceAsset[] = [
     agent: { name: "Expense Auditor", role: "Reviewer", purpose: "Audit expense claims against policy.", instructions: "Flag duplicates, out-of-policy items and missing receipts. Summarise per claim.", modelId: "gpt-5-mini", tools: ["Document parser"], knowledge: ["Finance approval matrix"] },
   },
   { id: "mk_tl_google", kind: "tool", ref: "con_google", name: "Google", domain: "Productivity", publisher: "Google", description: "Connect a Google account in Integrations to authorize Gmail, Sheets and Calendar for your workflows.", dependencies: [] },
-  { id: "mk_gr_pii", kind: "guardrail", name: "PII protection pack", domain: "Governance", publisher: "PraxilonAI", description: "Turns on PII redaction and output validation for every agent in the workspace.", dependencies: [], guardrails: { piiRedaction: true, outputValidation: true } },
-  { id: "mk_gr_injection", kind: "guardrail", name: "Prompt-injection shield", domain: "Governance", publisher: "PraxilonAI", description: "Enables injection detection on every agent so manipulated inputs are blocked.", dependencies: [], guardrails: { injectionDetection: true } },
+  { id: "mk_gr_pii", kind: "guardrail", name: "PII protection pack", domain: "Governance", publisher: "PraxilonAI", description: "Select supported email and US SSN masking and schema validation for a saved workflow or agent. Other sensitive data is not comprehensively detected.", dependencies: [], guardrails: { piiRedaction: true, outputValidation: true } },
+  { id: "mk_gr_injection", kind: "guardrail", name: "Prompt-injection shield", domain: "Governance", publisher: "PraxilonAI", description: "Apply known instruction-override screening at supported model boundaries. It cannot detect every prompt injection.", dependencies: [], guardrails: { injectionDetection: true } },
 ];
 
 export const SEED_CONNECTORS: Connector[] = [

@@ -1,4 +1,5 @@
 "use client";
+import { DisplayTime } from "@/lib/display-preferences";
 import { StopRun, RunSafety } from "./StopRun";
 import { displayText } from "@/lib/display-text";
 import { useEffect, useRef, useState } from "react";
@@ -72,7 +73,7 @@ export function ApprovalControl({
         </p>
       )}
       {record.expires_at && (
-        <p className="text-xs">Expires: {new Date(record.expires_at * 1000).toLocaleString()}</p>
+        <p className="text-xs">Expires: {<DisplayTime value={record.expires_at * 1000}/>}</p>
       )}
       {record.resolved_payload && (
         <details className="text-xs">
@@ -395,7 +396,7 @@ export function ServerRunView({
                     </td>
                     <td className="p-3 text-xs">
                       {item.created_at
-                        ? new Date(item.created_at * 1000).toLocaleString()
+                        ? <DisplayTime value={item.created_at * 1000}/>
                         : "Not recorded"}
                     </td>
                     <td className="p-3 text-xs">

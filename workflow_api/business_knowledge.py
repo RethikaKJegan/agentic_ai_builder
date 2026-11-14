@@ -219,7 +219,7 @@ class BusinessKnowledge:
             if concept is None:fail('Concept not found.','BUSINESS_CONCEPT_NOT_FOUND',404)
             return dict(version_id=version_id,concept=concept,parents=[c for c in concepts if c['id']==concept['parent_id']],children=[c for c in concepts if c['parent_id']==concept_id],relationships=[r for r in snapshot['relationships'] if concept_id in (r['source'],r['target'])],details=next((d for d in (knowledge or {}).get('concept_details',[]) if d['concept_id']==concept_id),None),mappings=[m for m in (knowledge or {}).get('source_mappings',[]) if m['concept_id']==concept_id],states=[s for s in (knowledge or {}).get('state_models',[]) if s['concept_id']==concept_id],dates=[t for t in (knowledge or {}).get('temporal_models',[]) if t['concept_id']==concept_id],dependencies=[d for d in (knowledge or {}).get('dependencies',[]) if d['subject_id']==concept_id],knowledge_sha256=snapshot.get('knowledge_sha256'))
         from .workflow_knowledge import source_mappings
-        return dict(version_id=version_id,revision=snapshot['revision'],concepts=concepts,relationships=snapshot['relationships'],rules=snapshot['rules'],knowledge=knowledge,source_mappings=source_mappings(snapshot),knowledge_sha256=snapshot.get('knowledge_sha256'))
+        return dict(version_id=version_id,revision=snapshot['revision'],created_at=snapshot.get('created_at'),modules=deepcopy(snapshot.get('modules',[])),concepts=concepts,relationships=snapshot['relationships'],rules=snapshot['rules'],knowledge=knowledge,source_mappings=source_mappings(snapshot),knowledge_sha256=snapshot.get('knowledge_sha256'))
 
     def diagnose(self,auth,version_id,body):
         view=self.inspect(auth,version_id);k=view['knowledge']

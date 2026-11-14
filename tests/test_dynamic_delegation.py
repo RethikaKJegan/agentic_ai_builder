@@ -346,6 +346,38 @@ class DynamicDelegationTests(RuntimeFixture):
         self.assertEqual(result['status'], 'completed', json.dumps(events))
         self.assertEqual(turns[-1]['results'][0]['result'], {'verified': True})
 
+    def test_delegation_uses_durable_protection_snapshot_after_preferences_change(self):
+        from workflow_api.execution_preferences import save
+        policy_auth=deepcopy(self.auth)
+        policy_auth['permissions']+=['workflow.edit','workflow.view']
+        policy_auth['scopes']+=['workspace:write']
+        save(self.store,policy_auth,dict(expected_revision=0,behaviours={'formalTone':True}))
+        self.workflow['status']='draft';self.put()
+        save(self.store,policy_auth,dict(workflow_id=self.workflow['workflow_id'],workflow_version=1,expected_revision=0,packs=[dict(id='mk_gr_injection',version=1,controls=['instruction_override_screening'])]))
+        self.workflow['status']='approved';self.put()
+        run_id=self.runtime.create_run(self.request(),self.auth)['run_id']
+        save(self.store,policy_auth,dict(expected_revision=1,behaviours={'formalTone':False}))
+        with self.store.transaction(write=False) as db:
+            before=deepcopy(self.runtime.load(db,run_id,self.auth)['execution_preferences'])
+        # Reconstruct runtime/runner as a resumed worker would.
+        restored=RuntimeService(self.workflows);seen=[];owner=self
+        class Offline:
+            retry_safe=False;external_write=False
+            def reservation(self,agent):return {'llm_calls':1,'tokens':10}
+            def invoke_decision(self,agent,inputs,reference,schema):
+                seen.append(deepcopy(agent['_execution_preferences']))
+                return owner.decision(inputs)
+            def invoke(self,agent,inputs,reference):
+                seen.append(deepcopy(agent['_execution_preferences']))
+                return {'facts':inputs['task']}
+        result=GraphRunner(restored,agents=Offline()).advance(run_id,self.auth)
+        self.assertEqual(result['status'],'completed')
+        self.assertGreaterEqual(len(seen),3)
+        self.assertTrue(all(v['behaviours']['formalTone'] for v in seen))
+        self.assertTrue(all(v['packs'][0]['version']==1 for v in seen))
+        with self.store.transaction(write=False) as db:
+            self.assertEqual(restored.load(db,run_id,self.auth)['execution_preferences'],before)
+
     def setUp(self):
         RuntimeFixture.setUp(self)
         registry = RegistryService(WorkspacePolicy('local-workspace'))

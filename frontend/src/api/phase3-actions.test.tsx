@@ -127,18 +127,20 @@ it("run controls explain missing permission and event-only execution", () => {
   view.unmount(); useBackend.setState({ session: session() }); original.metadata = { execution_input_mode: "automatic", trigger_templates: [{ provider_id: "google_sheets" }] };
   render(<RunWorkflowDialog workflow={original} onClose={vi.fn()} />); expect(screen.getByText(/waits for its configured event/)).toBeVisible(); expect(screen.queryByRole("button", { name: "Start run" })).toBeNull();
 });
-it("failed settings save remains unsaved, and repeated clicks do not duplicate the request", async () => {
-  vi.spyOn(api, "settings").mockResolvedValue({ items: [{ key: "notifications", value: "email", updated_at: "2026-10-17T08:00:00Z" }], total: 1 });
-  const save = vi.spyOn(api, "saveNotification").mockRejectedValue(failure("OPERATION_NOT_AUTHORIZED")); render(<Settings />);
-  await waitFor(() => expect(screen.getByLabelText("Notification preference")).toHaveValue("email"));
-  fireEvent.change(screen.getByLabelText("Notification preference"), { target: { value: "daily" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save setting" })); fireEvent.click(screen.getByRole("button", { name: "Saving…" }));
-  await waitFor(() => expect(screen.getByRole("alert")).toBeVisible()); expect(screen.getByLabelText("Notification preference")).toHaveValue("daily"); expect(screen.getByText("Unsaved changes")).toBeVisible();
-  expect(screen.queryByText("Setting saved on the server.")).toBeNull(); expect(save).toHaveBeenCalledTimes(1);
+it("failed settings save retains edits, and repeated clicks do not duplicate requests", async () => {
+  const initial={settings:{revision:0,behaviours:{formalTone:false,conciseResponses:false,clarifyUncertainty:false,requireSupportingEvidence:false},packs:[],display:{timezone:'UTC',date_format:'locale'},updated_at:null}};
+  vi.spyOn(api,'executionPreferences').mockResolvedValue(initial as never);
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({email:'account@example.com',account:'operator',status:'authenticated',password_change:{available:false,reason:'Deployment-managed password'}})}));
+  const save=vi.spyOn(api,'saveExecutionPreferences').mockRejectedValue(failure('OPERATION_NOT_AUTHORIZED'));render(<Settings/>);
+  await waitFor(()=>expect(screen.getByLabelText('Date format')).not.toBeDisabled());
+  fireEvent.change(screen.getByLabelText('Date format'),{target:{value:'day-first'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save preferences'}));fireEvent.click(screen.getByRole('button',{name:'Saving…'}));
+  await waitFor(()=>expect(screen.getByRole('alert')).toBeVisible());expect(screen.getByLabelText('Date format')).toHaveValue('day-first');
+  expect(screen.queryByText('Display preferences saved on the server.')).toBeNull();expect(save).toHaveBeenCalledTimes(1);
 });
 it("failed initial settings load never enables saving over an unknown value", async () => {
-  vi.spyOn(api, "settings").mockRejectedValue(failure("API_UNAVAILABLE")); render(<Settings />);
-  await waitFor(() => expect(screen.getByRole("alert")).toBeVisible()); expect(screen.getByLabelText("Notification preference")).toBeDisabled(); expect(screen.getByRole("button", { name: "Save setting" })).toBeDisabled();
+  vi.spyOn(api,'executionPreferences').mockRejectedValue(failure('API_UNAVAILABLE'));vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false}));render(<Settings/>);
+  await waitFor(()=>expect(screen.getByRole('alert')).toBeVisible());expect(screen.getByLabelText('Display timezone')).toBeDisabled();expect(screen.getByRole('button',{name:'Save preferences'})).toBeDisabled();
 });
 it("integrations offers Google account setup without technical provider cards", async () => {
   const tool = CanonicalToolSchema.parse(fixture("tools/google-sheets-read.json")); tool.provider_id = "smtp"; tool.availability = "enabled";

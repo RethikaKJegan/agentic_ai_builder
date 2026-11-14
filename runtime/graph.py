@@ -66,6 +66,9 @@ class GraphRunner:
         attempt_binding=binding
         def invoke(item):
             agent = deepcopy(attempt_binding)
+            with self.runtime.store.transaction(write=False) as policy_db:
+                policy_run=self.runtime.load(policy_db,run_id,auth,'workflow.execute')
+                agent['_execution_preferences']=deepcopy(policy_run.get('execution_preferences',{}).get('agents',{}).get(agent['agent_id'],{}))
             graph=getattr(self.runtime.workflows,'account_graph',None)
             pin=workflow.get('metadata',{}).get('account_graph_pin')
             if graph and pin:agent['_account_knowledge']=graph.context(auth,pin,node.get('label',''))

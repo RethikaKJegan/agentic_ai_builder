@@ -5,6 +5,8 @@ const sourceMapping=z.object({id:z.string(),concept_id:z.string(),source_role:z.
 
 // Projection of the existing knowledge inspection response, not a new ontology.
 export const knowledgeSnapshotSchema=businessVersionSchema.pick({version_id:true,revision:true,concepts:true,relationships:true,rules:true}).extend({
+  created_at:z.string().nullable().optional(),
+  modules:z.array(z.object({id:z.string(),label:z.string()})).optional(),
   source_mappings:z.array(sourceMapping).optional(),
   knowledge:z.object({source_mappings:z.array(sourceMapping).default([])}).passthrough().nullable().optional(),
 });

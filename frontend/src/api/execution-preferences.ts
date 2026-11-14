@@ -1,0 +1,7 @@
+import { z } from "zod";
+export const behavioursSchema=z.object({formalTone:z.boolean(),conciseResponses:z.boolean(),clarifyUncertainty:z.boolean(),requireSupportingEvidence:z.boolean()});
+const pack=z.object({id:z.string(),version:z.number().int(),name:z.string().optional(),controls:z.array(z.string()),limitations:z.array(z.string()),effective_controls:z.array(z.string()).optional(),status:z.string().optional()});
+export const executionPreferencesSchema=z.object({settings:z.object({version:z.number(),revision:z.number(),behaviours:behavioursSchema,packs:z.array(pack),display:z.object({timezone:z.string(),date_format:z.enum(['locale','iso','day-first','month-first'])}),updated_at:z.string().nullable()}),packs:z.array(pack),coverage:z.record(z.boolean()),scope:z.object({workspace_id:z.string(),subject_id:z.string(),workflow_id:z.string().nullable(),workflow_version:z.number().nullable(),agent_id:z.string().nullable()})});
+export type ExecutionPreferences=z.infer<typeof executionPreferencesSchema>;
+export type BehaviourPreferences=z.infer<typeof behavioursSchema>;
+export type PreferenceUpdate={expected_revision:number;workflow_id?:string;workflow_version?:number;agent_id?:string;behaviours?:Partial<BehaviourPreferences>;packs?:{id:string;version:number;controls:string[]}[];display?:{timezone:string;date_format:'locale'|'iso'|'day-first'|'month-first'}};

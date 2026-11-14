@@ -1,4 +1,5 @@
 "use client";
+import { DisplayTime } from "@/lib/display-preferences";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import dagre from "@dagrejs/dagre";
@@ -56,6 +57,7 @@ function Workspace() {
   } | null>(null);
   const [error, setError] = useState<Error>();
   const [retry, setRetry] = useState(0);
+  const [version,setVersion]=useState("");
   const [query, setQuery] = useState("");
   const canvasRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(3);
@@ -81,8 +83,10 @@ function Workspace() {
           throw new InputError(
             "No saved ontology is available. Create or review it in Business Ontology.",
           );
-        const snapshot = await api.knowledgeSnapshot(ontology.current_version_id);
-        if (snapshot.version_id !== ontology.current_version_id)
+        const selectedVersion=version||ontology.current_version_id;
+        if(version&&!ontology.versions.some(v=>v.version_id===version))throw new InputError("This ontology version is unavailable in the authenticated workspace.");
+        const snapshot = await api.knowledgeSnapshot(selectedVersion);
+        if (snapshot.version_id !== selectedVersion)
           throw new InputError("Ontology version changed. Refresh to try again.");
         if (live) setLoaded({ ontology, snapshot });
       } catch (e) {
@@ -93,13 +97,13 @@ function Workspace() {
     return () => {
       live = false;
     };
-  }, [retry]);
+  }, [retry,version]);
   const areas = useMemo(
-    () => (loaded ? [...new Set(loaded.snapshot.concepts.map((c) => c.module_id))] : []),
+    () => (loaded ? [...new Set(loaded.snapshot.modules?.map(m=>m.id)??loaded.snapshot.concepts.map((c) => c.module_id))] : []),
     [loaded],
   );
   const areaLabel = (id: string) =>
-    loaded?.ontology.modules.find((m) => m.id === id)?.label ?? label(id);
+    loaded?.snapshot.modules?.find(m=>m.id===id)?.label ?? loaded?.ontology.modules.find((m) => m.id === id)?.label ?? label(id);
   const graph = useMemo(() => {
     if (!loaded) return { nodes: [] as ConceptNode[], edges: [] };
     const { snapshot } = loaded;
@@ -175,6 +179,20 @@ function Workspace() {
   const mappings =
     loaded?.snapshot.source_mappings ?? loaded?.snapshot.knowledge?.source_mappings ?? [];
   const rules = loaded?.snapshot.rules.filter((r) => r.inputs.includes(selected ?? "")) ?? [];
+  const records=(value:unknown):Record<string,unknown>[]=>Array.isArray(value)?value.filter((v):v is Record<string,unknown>=>!!v&&typeof v==='object'):[];
+  const knowledge=loaded?.snapshot.knowledge;
+  const extensionRules=records(knowledge?.['structured_rules']);
+  const allRuleIds=new Set([...(loaded?.snapshot.rules.map(r=>r.id)??[]),...extensionRules.flatMap(r=>typeof r['id']==='string'?[r['id']]:[])]);
+  const selectedMappings=mappings.filter(m=>m.concept_id===selected);
+  const matchesBinding=(binding:unknown)=>!!binding&&typeof binding==='object'&&selectedMappings.some(m=>m.collection===(binding as Record<string,unknown>)['collection']&&m.source_role===(binding as Record<string,unknown>)['source_role']);
+  const identities=records(knowledge?.['identity_rules']).filter(r=>matchesBinding(r['source'])||matchesBinding(r['target']));
+  const states=records(knowledge?.['state_models']).filter(r=>r['concept_id']===selected);
+  const dates=records(knowledge?.['temporal_models']).filter(r=>r['concept_id']===selected);
+  const dependencies=records(knowledge?.['dependencies']).filter(r=>r['subject_id']===selected);
+  const extension=knowledge?.['manifest'] as Record<string,unknown>|undefined;
+  const savedVersion=loaded?.ontology.versions.find(v=>v.version_id===loaded.snapshot.version_id);
+  const overview=[['Business concepts',new Set(loaded?.snapshot.concepts.map(c=>c.id)).size],['Relationships',new Set(loaded?.snapshot.relationships.map(r=>r.id)).size],['Business rules',allRuleIds.size],['Business areas',areas.length]] as const;
+
   return (
     <section className="min-w-0 space-y-4" aria-label="Complete client ontology">
       <header>
@@ -193,12 +211,9 @@ function Workspace() {
       {!loaded && !error && <p role="status">Loading your workspace ontology…</p>}
       {loaded && (
         <>
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            <span>{loaded.snapshot.concepts.length} concepts</span>
-            <span>{loaded.snapshot.relationships.length} relationships</span>
-            <span>{loaded.snapshot.rules.length} rules</span>
-            <span>Revision {loaded.snapshot.revision}</span>
-          </div>
+          <div aria-label="Ontology overview statistics" className="grid grid-cols-2 gap-3 lg:grid-cols-4">{overview.map(([name,count])=><section key={name} aria-label={name} className="rounded-xl border bg-background p-4"><p className="text-xs text-muted-foreground">{name}</p><p className="mt-2 text-2xl font-semibold">{count}</p></section>)}</div>
+          <p className="text-xs text-muted-foreground">Counts use unique saved definition IDs in the selected version, including its knowledge-extension rules. Rules describe support; they are not proof of a passed execution.</p>
+          <div aria-label="Ontology version and source status" className="flex flex-wrap items-center gap-3 rounded-xl border p-3 text-xs"><label>Ontology version <select aria-label="Selected ontology version" value={loaded.snapshot.version_id} onChange={e=>{setVersion(e.target.value);setSelected(null);setExpanded([]);setQuery('');}} className="rounded border bg-background p-1">{loaded.ontology.versions.map(v=><option key={v.version_id} value={v.version_id}>Revision {v.revision} · {v.kind}</option>)}</select></label><span>Saved: {(loaded.snapshot.created_at??savedVersion?.created_at)?<DisplayTime value={(loaded.snapshot.created_at??savedVersion?.created_at)!}/>: 'Saved date unavailable'}</span><span>{loaded.snapshot.version_id===loaded.ontology.current_version_id?'Current saved definitions':'Historical definitions; not live source records'}</span>{loaded.ontology.source_bindings.map(source=><span key={source.role}>{source.name??label(source.role)}: {label(source.status)} (current connection)</span>)}{!loaded.ontology.source_bindings.length&&<span>No saved source connections</span>}{extension&&<span>Knowledge extension: {String(extension['package_id']??'version unavailable')} · revision {String(extension['package_revision']??'unavailable')}</span>}</div>
           <div className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
             <label className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -227,16 +242,17 @@ function Workspace() {
             </button>
           </div>
           <div className="flex flex-wrap gap-2" aria-label="Ontology business areas">
+            <button type="button" onClick={()=>{setExpanded([]);setSelected(null);setQuery('');}} className="rounded-xl border px-4 py-3 text-xs" aria-pressed={!expanded.length&&!query}>Complete ontology</button>
             {areas.map((area) => (
               <button
                 key={area}
                 aria-pressed={expanded.includes(area)}
                 onClick={() =>
                   setExpanded((old) =>
-                    old.includes(area) ? old.filter((a) => a !== area) : [...old, area],
+                    old.length===1&&old[0]===area ? [] : [area],
                   )
                 }
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${expanded.includes(area) ? "border-primary bg-primary/5 text-primary" : ""}`}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${expanded.includes(area) ? "border-primary bg-primary/5 text-primary" : ""}`}
               >
                 <Layers3 size={13} />
                 {areaLabel(area)}
@@ -334,7 +350,7 @@ function Workspace() {
                       <p className="mt-2 text-xs text-muted-foreground">No saved relationships.</p>
                     )}
                   </section>
-                  <section>
+                  <section aria-label="Concept source fields">
                     <h4 className="text-sm font-semibold">Source fields</h4>
                     {mappings
                       .filter((m) => m.concept_id === concept.id)
@@ -370,10 +386,19 @@ function Workspace() {
                       </p>
                     )}
                   </section>
+                  <DefinitionDetails title="Knowledge-extension rule references" entries={extensionRules.filter(r=>dependencies.some(d=>Array.isArray(d['rules'])&&d['rules'].includes(r['id'])))}/>
+                  <DefinitionDetails title="Identity definitions" entries={identities}/>
+                  <DefinitionDetails title="State and status definitions" entries={states}/>
+                  <DefinitionDetails title="Temporal definitions" entries={dates}/>
+                  <DefinitionDetails title="Required evidence and rule dependencies" entries={dependencies}/>
+                  <section><h4 className="text-sm font-semibold">Definition provenance</h4>{concept.evidence.length?concept.evidence.map((e,i)=><blockquote key={i} className="mt-2 border-l pl-3 text-xs">{e.quote}<p className="text-muted-foreground">Saved source: {e.source_id}</p></blockquote>):<p className="mt-2 text-xs text-muted-foreground">No source evidence reference is saved for this definition.</p>}<p className="mt-2 text-xs text-muted-foreground">These are saved definitions and source references, not evidence that this concept was used in a run.</p></section>
                   <details className="text-xs">
-                    <summary>Properties and provenance</summary>
+                    <summary>Technical details and raw provenance</summary>
                     <Saved
                       value={{
+                        concept_id: concept.id,
+                        mappings:selectedMappings,
+                        relationships:connections,
                         properties: concept.properties,
                         evidence: concept.evidence,
                         unknowns: concept.unknowns,
@@ -417,4 +442,8 @@ function Workspace() {
       )}
     </section>
   );
+}
+
+function DefinitionDetails({title,entries}:{title:string;entries:Record<string,unknown>[]}) {
+ return <section><h4 className="text-sm font-semibold">{title}</h4>{entries.length?entries.map((entry,i)=><div key={i} className="mt-2 rounded-lg border p-3 text-xs">{['label','meaning','kind','semantic_kind','attribute','comparison','precision','unknown_behavior'].map(key=>typeof entry[key]==='string'?<p key={key}>{key.replaceAll('_',' ')}: {String(entry[key]).replaceAll('_',' ')}</p>:null)}{Array.isArray(entry['values'])&&<ul>{(entry['values'] as {raw:string;meaning:string}[]).map((v,j)=><li key={j}>{v.raw}: {v.meaning}</li>)}</ul>}<details className="mt-2"><summary>Technical definition</summary><Saved value={entry}/></details></div>):<p className="mt-2 text-xs text-muted-foreground">No explicit saved definition is linked to this concept.</p>}</section>;
 }
