@@ -91,7 +91,7 @@ class CrossSegmentIntegrationTests(unittest.TestCase):
         self.assertTrue(any(node['kind'] == 'tool' and node['tool_id'] == 'smtp_send_email' for node in resolved['nodes']))
         self.assertEqual(saved.json()['data']['registry_review']['items'][0]['authorization_state'], 'pending_approval')
         ref = {'workflow_id': workflow['workflow_id'], 'workflow_version': 1}
-        validated = self.request('validate_workflow', 'validate_auto_123456', ref, f"/workflows/{workflow['workflow_id']}/validate")
+        validated = self.request('submit_workflow_for_approval', 'validate_auto_123456', ref, f"/workflows/{workflow['workflow_id']}/submit-for-approval")
         self.assertEqual(validated.status_code, 200, validated.text)
         approved = self.request('approve_workflow', 'approve_auto_123456', {**ref, 'action': 'approve'}, f"/workflows/{workflow['workflow_id']}/approve")
         self.assertEqual(approved.status_code, 200, approved.text)
@@ -117,9 +117,14 @@ class CrossSegmentIntegrationTests(unittest.TestCase):
         with self.app.state.workflow_service.store.transaction() as db:
             self.app.state.workflow_service.store.put(db, 'local-workspace', legacy)
         ref = {'workflow_id': workflow['workflow_id'], 'workflow_version': 1}
-        self.assertEqual(self.request('validate_workflow', 'validate_hierarchy_123456', ref, f"/workflows/{workflow['workflow_id']}/validate").status_code, 200)
+        self.assertEqual(self.request('submit_workflow_for_approval', 'validate_hierarchy_123456', ref, f"/workflows/{workflow['workflow_id']}/submit-for-approval").status_code, 409)
         approved = self.request('approve_workflow', 'approve_hierarchy_123456', {**ref, 'action': 'approve'}, f"/workflows/{workflow['workflow_id']}/approve")
         self.assertEqual(approved.status_code, 200, approved.text)
+        reconciled=approved.json()['data']['workflow']
+        self.assertTrue(reconciled['metadata']['validation_report']['ready'])
+        from workflow_api.readiness import enforce
+        with self.app.state.workflow_service.store.transaction(write=False) as db:
+            enforce(self.app.state.workflow_service,reconciled,self.app.state.workflow_auth,db)
 
     def test_missing_capability_remains_unresolved(self):
         planned = self.request('plan_workflow', 'plan_unknown_123456', {'objective': 'Notify the team through an unknown provider'}, '/workflows/plan')
@@ -135,7 +140,7 @@ class CrossSegmentIntegrationTests(unittest.TestCase):
             'payload': {'workflow_id': workflow['workflow_id'], 'workflow_version': 1, 'base_version': 0, 'workflow': workflow},
         })
         ref = {'workflow_id': workflow['workflow_id'], 'workflow_version': 1}
-        self.request('validate_workflow', 'validate_run_123456', ref, f"/workflows/{workflow['workflow_id']}/validate")
+        self.request('submit_workflow_for_approval', 'validate_run_123456', ref, f"/workflows/{workflow['workflow_id']}/submit-for-approval")
         self.request('approve_workflow', 'approve_run_123456', {**ref, 'action': 'approve'}, f"/workflows/{workflow['workflow_id']}/approve")
         published = self.request('approve_workflow', 'publish_run_123456', {**ref, 'action': 'publish'}, f"/workflows/{workflow['workflow_id']}/approve")
         self.assertEqual(published.status_code, 200, published.text)

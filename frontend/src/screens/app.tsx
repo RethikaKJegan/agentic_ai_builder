@@ -91,7 +91,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <aside className={`hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 md:flex ${collapsed || inBuilder ? "w-[60px]" : "w-[60px] lg:w-60"}`}>
+      <aside className={`hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 md:flex ${collapsed || inBuilder ? "w-[60px]" : "w-[60px] lg:w-64"}`}>
         <div className="flex min-h-24 items-center justify-center px-3 py-5 lg:justify-start lg:px-4">
           <Link to="/" aria-label="PraxilonAI home" title="PraxilonAI" className="flex min-w-0 items-center gap-3">
             <LogoMark className="h-9 w-9 shrink-0" />
@@ -110,10 +110,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   to={it.to}
                   activeOptions={{ exact: it.exact }}
                   title={displayText(it.label)}
-                  className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  activeProps={{ className: "bg-sidebar-accent !text-sidebar-accent-foreground font-medium" }}
+                  className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-sidebar-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+                  activeProps={{ className: "bg-sidebar-accent !text-sidebar-accent-foreground !font-bold shadow-sm" }}
                 >
-                  <it.icon className="h-4 w-4 shrink-0" />
+                  <it.icon className="h-[18px] w-[18px] shrink-0" />
                   {!(collapsed || inBuilder) && <span className="hidden flex-1 lg:inline">{displayText(it.label)}</span>}
                 </Link>
               ))}

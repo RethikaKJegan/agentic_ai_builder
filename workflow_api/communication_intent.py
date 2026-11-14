@@ -4,7 +4,7 @@ import re
 
 
 def requested(text):
-    return bool(re.search(r'\b(?:email|mail|calendar|meeting|appointment)\b',text,re.I))
+    return bool(re.search(r'\b(?:email|mail|calendar|meeting|appointment)\b|\b(?:schedule|arrange|set up|book)\b[^.!?]{0,100}\breview\b',text,re.I))
 
 
 def question(field, text, options):
@@ -29,7 +29,7 @@ def account(service, auth, body):
     return None,question('communication_connection_id','Which connected Google account should I use?' if choices else 'Connect a Google account to send email or schedule a review.',[(item['connection_id'],item['account_email']) for item in choices])
 
 
-def prepare(service,auth,body,route,schedule,resolved,timezone=None):
+def prepare(service,auth,body,route,schedule,resolved,timezone=None,reference_time=None):
     """All choices become reviewed source values; never model authority."""
     text=body['objective'];answers=body.get('user_values',{});route=deepcopy(route)
     selected,missing=account(service,auth,body)
@@ -76,7 +76,18 @@ def prepare(service,auth,body,route,schedule,resolved,timezone=None):
         if mode not in (None,'fixed','after_ready'):
             questions.append(question('review_timing','When should the reading session start?',[('after_ready','After the report is ready'),('fixed','At a fixed time')]));mode=None
         if not mode and re.search(r'\bafter\b[^.!?]{0,70}\b(?:ready|completed|finished|report|findings)\b',text,re.I):mode='after_ready'
+        from .calendar_intent import explicit_timing
+        explicit=explicit_timing(text,schedule is not None)
+        if explicit and not resolved['validated_context'].get('calendar_event_start'):
+            from .goal_inputs import calendar_context
+            calendar_context(resolved,text,True,now=reference_time,timezone=answers.get('review_timezone') or timezone or route['recurrence'].get('timezone'))
         fixed=resolved['validated_context'].get('calendar_event_start')
+        if explicit and not fixed:
+            questions.append(question('review_time','Specify the meeting date, exact time and IANA timezone; the requested time could not be resolved safely.',[]))
+            return route,info,questions
+        if explicit and mode=='after_ready':
+            questions.append(question('review_timing','The requested fixed meeting time conflicts with after-report timing. Confirm the intended schedule.',[]))
+            return route,info,questions
         if fixed and mode is None:mode='fixed'
         if mode is None:
             mode='fixed' if answers.get('review_time') or re.search(r'\b(?:fixed time|specific time)\b',text,re.I) else 'after_ready'
@@ -119,7 +130,7 @@ def review_lines(info):
     if info.get('calendar_id'):lines.append('Review calendar: '+('Primary calendar' if info['calendar_id']=='primary' else 'Selected calendar'))
     pin=info.get('review')
     if pin:
-        when='5 minutes after the report is ready' if pin['mode']=='after_ready' else f"{pin['hour']:02d}:{pin['minute']:02d} ({pin['timezone']})"
+        when='5 minutes after the report is ready' if pin['mode']=='after_ready' else f"{pin.get('on_date','')} {pin['hour']:02d}:{pin['minute']:02d} ({pin['timezone']})".strip()
         lines.append(f"Reading session: {pin['duration_minutes']} minutes, starting {when}.")
     return lines
 

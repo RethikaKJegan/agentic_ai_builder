@@ -190,7 +190,6 @@ describe("workflow UI integration", () => {
     const saved = { ...original, version: original.version + 1, name: "Invoice edits", status: "draft" as const, metadata: { ...original.metadata, workspace_id: "local-workspace" } };
     const save = vi.spyOn(api, "request").mockImplementation(async (operation, payload) => {
       if (operation === "save_workflow_version") return { workflow: { ...saved, ...("workflow" in payload ? payload.workflow : {}) }, correlation_id: "corr_saved" } as never;
-      if (operation === "validate_workflow") return { workflow: { ...saved, status: "validated" }, correlation_id: "corr_validated" } as never;
       if (operation === "approve_workflow" && "action" in payload && payload.action === "approve") return { workflow: { ...saved, status: "approved" }, correlation_id: "corr_approved" } as never;
       return { workflow: { ...saved, status: "published" }, correlation_id: "corr_published" } as never;
     });
@@ -209,17 +208,17 @@ describe("workflow UI integration", () => {
     const view = render(<WorkflowControls workflow={mapped.workflow} />);
     expect(screen.queryByRole("button", { name: "Test workflow" })).toBeNull();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Validate" })).toBeNull();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
     view.unmount();
   });
   it("renders safe validation failures without changing revision state", async () => {
     const mapped = fromCanonical(document());
     useMesh.setState({ agents: mapped.agents });
-    vi.spyOn(api, "request").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
+    vi.spyOn(api, "submitApproval").mockRejectedValue(new ApiError({ error_code: "WORKFLOW_VALIDATION_FAILED", message: "Correct the edge.", request_id: "req_validate", retryable: false, field: "edges[0].source" }, "corr_validate"));
     useBackend.setState({ session: session(["workflow.validate"]) });
     render(<WorkflowControls workflow={mapped.workflow} />);
-    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit for approval" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Correct the edge."));
   });
 });

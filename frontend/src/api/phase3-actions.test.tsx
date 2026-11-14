@@ -42,15 +42,15 @@ it("publish makes only the explicit publication request and never activates", as
   expect(request).toHaveBeenCalledTimes(1); expect(request).toHaveBeenCalledWith("approve_workflow", { workflow_id: original.workflow_id, workflow_version: original.version, action: "publish" });
   expect(activation).not.toHaveBeenCalled();
 });
-it("validation and approval are explicit independent transitions", async () => {
-  const original = workflow(); original.status = "draft"; useMesh.getState().acceptWorkflow(original);
-  const request = vi.spyOn(api, "request").mockImplementation(async operation => ({ workflow: { ...original, status: operation === "validate_workflow" ? "validated" : "approved" } }) as never);
-  render(<Controls />); expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Validate" }));
-  await waitFor(() => expect(screen.getByText(/Validate confirmed/)).toBeVisible()); expect(request).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole("button", { name: /^Approve$/ }));
-  await waitFor(() => expect(screen.getByText(/Approve confirmed/)).toBeVisible());
-  expect(request.mock.calls.map(call => call[0])).toEqual(["validate_workflow", "approve_workflow"]);
+it("automatic checks on submission never grant workflow approval", async () => {
+ const original=workflow();original.status='draft';useMesh.getState().acceptWorkflow(original);
+ const submit=vi.spyOn(api,'submitApproval').mockResolvedValue({workflow:{...original,status:'validated',metadata:{approval_submission:{workflow_version:original.version}}}} as never);
+ const request=vi.spyOn(api,'request').mockResolvedValue({workflow:{...original,status:'approved'}} as never);
+ render(<Controls/>);expect(screen.queryByRole('button',{name:'Validate'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Submit for approval'}));await waitFor(()=>expect(submit).toHaveBeenCalledOnce());
+ expect(request).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:/^Approve$/}));await waitFor(()=>expect(request).toHaveBeenCalledOnce());
+ expect(request.mock.calls[0]?.[0]).toBe('approve_workflow');
 });
 it("submission never approves and activation can be cancelled", async () => {
   const original = workflow(); original.status = "validated"; useMesh.getState().acceptWorkflow(original);

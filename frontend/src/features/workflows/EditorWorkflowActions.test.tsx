@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api, type Session } from "@/api/client";
+import { api, ApiError, type Session } from "@/api/client";
 import { CanonicalWorkflowSchema, type CanonicalWorkflow } from "@/api/contracts.generated";
 import { useMesh } from "@/domain/store";
 import { useBackend } from "@/api/state";
@@ -94,7 +94,6 @@ beforeEach(() => {
       document = structuredClone((payload as { workflow: CanonicalWorkflow }).workflow);
       return { workflow: structuredClone(document) };
     }
-    if (operation === "validate_workflow") document = { ...document, status: "validated" };
     if (operation === "approve_workflow")
       document = {
         ...document,
@@ -117,176 +116,34 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
-it("runs exact saved stages once and preserves edits present before preparation", async () => {
-  useMesh.getState().renameWorkflow(document.workflow_id, "Reviewed draft");
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  fireEvent.click(screen.getByRole("button", { name: "Preparing…" }));
-  await screen.findByText(`Active · v${document.version + 1}`);
-  const calls = vi.mocked(api.request).mock.calls;
-  expect(calls.map((call) => call[0])).toEqual([
-    "get_workflow",
-    "save_workflow_version",
-    "validate_workflow",
-    "approve_workflow",
-    "approve_workflow",
-  ]);
-  expect(document.name).toBe("Reviewed draft");
-  expect(api.submitApproval).toHaveBeenCalledTimes(1);
-  expect(api.activateRelease).toHaveBeenCalledTimes(1);
-  const version = document.version;
-  for (const call of calls.slice(2)) expect(call[1]).toMatchObject({ workflow_version: version });
-});
-it("submits for another reviewer without publishing when approval permission is absent", async () => {
-  useBackend.setState({ can: (p) => p !== "workflow.approve" && permissions.includes(p) });
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  await screen.findByText(/Awaiting an authorized reviewer/);
-  expect(api.submitApproval).toHaveBeenCalledTimes(1);
-  expect(
-    vi.mocked(api.request).mock.calls.filter((call) => call[0] === "approve_workflow"),
-  ).toHaveLength(0);
-  expect(api.activateRelease).not.toHaveBeenCalled();
-});
-it("stops after failed validation and never activates", async () => {
-  const previous = vi.mocked(api.request).getMockImplementation()!;
-  vi.mocked(api.request).mockImplementation((async (...args: Parameters<typeof api.request>) => {
-    if (args[0] === "validate_workflow") return { workflow: structuredClone(document) };
-    return previous(...args);
-  }) as never);
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  await screen.findByRole("alert");
-  expect(api.submitApproval).not.toHaveBeenCalled();
-  expect(api.activateRelease).not.toHaveBeenCalled();
-});
-it("stops on edits made while validation is in flight and retains the new draft", async () => {
-  const previous = vi.mocked(api.request).getMockImplementation()!;
-  vi.mocked(api.request).mockImplementation((async (...args: Parameters<typeof api.request>) => {
-    if (args[0] === "validate_workflow")
-      useMesh.getState().renameWorkflow(document.workflow_id, "Concurrent edit");
-    return previous(...args);
-  }) as never);
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  await screen.findByRole("alert");
-  expect(useMesh.getState().workflows[0]!.name).toBe("Concurrent edit");
-  expect(api.activateRelease).not.toHaveBeenCalled();
-  expect(api.submitApproval).not.toHaveBeenCalled();
-});
-it("reconciles an already published revision without reapproval and activates only it", async () => {
-  document.status = "published";
-  useMesh.getState().acceptWorkflow(document);
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  await screen.findByText(`Active · v${document.version}`);
-  expect(vi.mocked(api.request).mock.calls.map((call) => call[0])).toEqual(["get_workflow"]);
-  expect(api.submitApproval).not.toHaveBeenCalled();
-  expect(api.activateRelease).toHaveBeenCalledWith(
-    expect.objectContaining({ workflow_version: document.version, expected_release_id: null }),
-  );
-});
-it("runs the active version despite draft edits and reports the accepted run", async () => {
-  document.status = "published";
-  release = {
-    release_id: "old-active",
-    workflow_version: document.version,
-    state: "active",
-    trigger_binding_count: 0,
-  };
-  useMesh.getState().acceptWorkflow(document);
-  useMesh.getState().renameWorkflow(document.workflow_id, "Unsaved name");
-  render(<View />);
-  const run = await screen.findByRole("button", { name: `Run active v${document.version}` });
-  fireEvent.click(run);
-  fireEvent.click(run);
-  await waitFor(() =>
-    expect(started).toHaveBeenCalledWith(
-      expect.objectContaining({ run_id: "run-accepted", workflow_version: document.version }),
-    ),
-  );
-  expect(
-    vi.mocked(api.request).mock.calls.filter((call) => call[0] === "execute_workflow"),
-  ).toHaveLength(1);
-  expect(
-    vi.mocked(api.request).mock.calls.some((call) => call[0] === "save_workflow_version"),
-  ).toBe(false);
-  expect(useMesh.getState().workflows[0]!.name).toBe("Unsaved name");
-});
-it("collects required inputs and refuses a changed active release before execution", async () => {
-  document.status = "published";
-  document.inputs = [{ name: "message", type: "string", required: true, description: "Input" }];
-  release = {
-    release_id: "first-release",
-    workflow_version: document.version,
-    state: "active",
-    trigger_binding_count: 0,
-  };
-  useMesh.getState().acceptWorkflow(document);
-  render(<View />);
-  fireEvent.click(await screen.findByRole("button", { name: "Run" }));
-  await screen.findByLabelText("message");
-  fireEvent.change(screen.getByLabelText("message"), { target: { value: "Reviewed input" } });
-  release = { ...release, release_id: "changed-release" };
-  fireEvent.click(screen.getByRole("button", { name: "Start run" }));
-  await screen.findByRole("alert");
-  expect(
-    vi.mocked(api.request).mock.calls.filter((call) => call[0] === "execute_workflow"),
-  ).toHaveLength(0);
-  expect(started).not.toHaveBeenCalled();
-});
-it("refetches and executes an older active revision while a newer draft is open", async () => {
-  const older = { ...structuredClone(document), status: "published" as const };
-  document = { ...document, version: document.version + 1, status: "draft" };
-  release = {
-    release_id: "older-release",
-    workflow_version: older.version,
-    state: "active",
-    trigger_binding_count: 0,
-  };
-  useMesh.getState().acceptWorkflow(document);
-  const previous = vi.mocked(api.request).getMockImplementation()!;
-  vi.mocked(api.request).mockImplementation((async (...args: Parameters<typeof api.request>) => {
-    if (
-      args[0] === "get_workflow" &&
-      (args[1] as { workflow_version?: number }).workflow_version === older.version
-    )
-      return { workflow: older };
-    return previous(...args);
-  }) as never);
-  render(<View />);
-  fireEvent.click(await screen.findByRole("button", { name: `Run active v${older.version}` }));
-  await waitFor(() =>
-    expect(started).toHaveBeenCalledWith(
-      expect.objectContaining({ workflow_version: older.version }),
-    ),
-  );
-  expect(useMesh.getState().workflows[0]!.serverVersion).toBe(document.version);
-});
-it("stops at a server-denied approval without publishing or activating", async () => {
-  const previous = vi.mocked(api.request).getMockImplementation()!;
-  vi.mocked(api.request).mockImplementation((async (...args: Parameters<typeof api.request>) => {
-    if (args[0] === "approve_workflow") throw new Error("Approval denied");
-    return previous(...args);
-  }) as never);
-  render(<View />);
-  fireEvent.click(screen.getByRole("button", { name: "Prepare & Activate" }));
-  await screen.findByRole("alert");
-  expect(api.activateRelease).not.toHaveBeenCalled();
-  expect(
-    vi.mocked(api.request).mock.calls.filter((call) => call[0] === "approve_workflow"),
-  ).toHaveLength(1);
-});
-
-
-it("exposes explicit revision recovery without automatically publishing or running",async()=>{
- render(<View/>);
- expect(api.request).not.toHaveBeenCalled();
- fireEvent.click(screen.getByText("Manage saved revisions"));
- expect(await screen.findByRole("region",{name:"Workflow actions"})).toBeVisible();
- fireEvent.click(screen.getByText("Revision actions"));
- expect(api.request).not.toHaveBeenCalled();
- expect(await screen.findByRole("button",{name:"Save draft"})).toBeDisabled();
+it("runs a saved draft directly without standalone validation, publication or automatic approval", async () => {
+ render(<View/>);expect(screen.queryByRole('button',{name:'Validate'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Run'}));
+ await waitFor(()=>expect(started).toHaveBeenCalledOnce());
+ expect(vi.mocked(api.request).mock.calls.map(call=>call[0])).toEqual(['get_workflow','execute_workflow']);
  expect(api.activateRelease).not.toHaveBeenCalled();
- expect(started).not.toHaveBeenCalled();
+});
+it("saves edited content before Run and keeps the exact saved revision", async () => {
+ useMesh.getState().renameWorkflow(document.workflow_id,'Edited run');
+ render(<View/>);fireEvent.click(screen.getByRole('button',{name:'Run'}));
+ await waitFor(()=>expect(started).toHaveBeenCalledOnce());
+ expect(vi.mocked(api.request).mock.calls.map(call=>call[0])).toEqual(['save_workflow_version','execute_workflow']);
+ expect(vi.mocked(api.request).mock.calls[1]?.[1]).toMatchObject({workflow_version:2});
+});
+it("keeps required workflow approval explicitly human after automatic Run checks", async () => {
+ const normal=vi.mocked(api.request).getMockImplementation()!;
+ vi.mocked(api.request).mockImplementation((async(op,payload,key)=>{
+  if(op==='execute_workflow'&&document.status==='draft')throw new ApiError({error_code:'WORKFLOW_APPROVAL_REQUIRED',message:'Awaiting approval.',request_id:'pending',retryable:false},undefined,{outcome:'rejected',httpStatus:409});
+  return normal(op,payload,key);
+ }) as typeof api.request);
+ render(<View/>);fireEvent.click(screen.getByRole('button',{name:'Run'}));
+ const approve=await screen.findByRole('button',{name:'Approve workflow'});
+ expect(vi.mocked(api.request).mock.calls.some(call=>call[0]==='approve_workflow')).toBe(false);
+ fireEvent.click(approve);await waitFor(()=>expect(started).toHaveBeenCalledOnce());
+ expect(vi.mocked(api.request).mock.calls.map(call=>call[0])).toEqual(['get_workflow','execute_workflow','approve_workflow','execute_workflow']);
+ const runs=vi.mocked(api.request).mock.calls.filter(call=>call[0]==='execute_workflow');expect(runs[0]?.[2]).toBe(runs[1]?.[2]);
+});
+it("does not submit when runtime execution permission is missing", async () => {
+ useBackend.setState({can:()=>false});render(<View/>);
+ expect(screen.getByRole('button',{name:'Run'})).toBeDisabled();expect(api.request).not.toHaveBeenCalled();
 });

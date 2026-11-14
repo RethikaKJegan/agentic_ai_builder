@@ -85,7 +85,9 @@ def prepare(composition,auth,body,*,lifecycle_context=None,_revision=None,_plann
         if communication.get('calendar_id'):context['validated_context']['primary_calendar_id']=communication['calendar_id']
         if communication.get('review'):
             from .communication_timing import preview_values
-            context['validated_context'].update(preview_values(communication['review'],(_overview.get('schedule') or {}).get('next_due',composition.service.lifecycle.clock())))
+            context['validated_context'].update(preview_values(communication['review'],(_overview.get('schedule') or {}).get('next_due',_overview.get('prepared_at',composition.service.lifecycle.clock()))))
+            if communication['review']['mode']=='fixed' and communication['review'].get('on_date'):
+                context['validated_context']['calendar_original_timing']={k:deepcopy(context['validated_context'][k]) for k in ('calendar_event_start','calendar_event_end')}
 
     if source_free:context['validated_context']['connected_request']=dict(objective=objective)
     if (_overview or {}).get('calendar_occurrence'):
@@ -583,6 +585,8 @@ def compile_workflow(doc):
         metadata=dict(domain='registered_capability_composition',workspace_id=doc['scope']['workspace'],composition_id=doc['composition_id'],composition_sha256=doc['sha256'],
             composition_tasks={},connected_tasks={c['configuration_id']:{**deepcopy(next(t for t in doc['tasks'] if t['task_id']==c['assigned_task'])),'retrieval_task':doc['contracts'][next(t['capability_id'] for t in doc['tasks'] if t['task_id']==c['assigned_task'])].get('retrieval_task'),'dependency_refs':[]} for c in doc['configurations']},composition_action_verifiers={},composition_preparation_id=doc['preparation_id'],unresolved_requirements=[],
             connected_action_plan=deepcopy(doc['action_plan']),connected_contracts=deepcopy(doc['contracts']),action_binding_context=deepcopy(doc['binding_context'])))
+    corrections=doc['binding_context'].get('validated_context',{}).get('calendar_timing_corrections',[])
+    if corrections:w['metadata']['validation_repairs']=deepcopy(corrections)
     if doc.get('interaction_mode')=='goal':w['metadata']['goal_planning']=True
     if doc.get('overview_intent',{}).get('blocked_requirements'):
         w['metadata']['unresolved_requirements']=deepcopy(doc['overview_intent']['blocked_requirements'])

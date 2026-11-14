@@ -157,12 +157,18 @@ class GraphRunner:
             selected = (edge.get('outcome') != error_outcome or error_outcome is None) if outcome is None else edge.get('outcome') == outcome
             run['edge_states'][edge['edge_id']] = 'selected' if selected else 'skipped'
         self.runtime.event(db, run, 'node.completed', {'node_id': node_id, 'invocation_id': run.get('node_invocations', {}).get(node_id), 'output': snapshot(output), 'selected_edges': [e['edge_id'] for e in edges if run['edge_states'][e['edge_id']] == 'selected'], 'next_nodes': [e['target'] for e in edges if run['edge_states'][e['edge_id']] == 'selected'], **({'outcome': outcome} if outcome is not None else {}), **(evidence or {})})
+        if node['kind']=='agent':
+            settings=run.get('execution_preferences',{}).get('agents',{}).get(node.get('agent_id'),{})
+            if settings.get('packs') or any(v is True or (k=='preferredLanguage' and v!='Auto') for k,v in settings.get('behaviours',{}).items()):
+                self.runtime.event(db,run,'agent.preferences_checked',dict(node_id=node_id,agent_id=node.get('agent_id'),settings_revision=settings.get('revision',0),pack_pins=[dict(id=p['id'],version=p['version'],controls=p.get('effective_controls',[])) for p in settings.get('packs',[])],scope='supported model boundaries; direct tools unchanged'))
         run.pop('current_node_id', None)
         self.runtime.save(db, run)
 
-    def next_node(self, db, run, workflow):
+    def next_node(self, db, run, workflow, excluded=()):
         while True:
             ready, skipped = ready_frontier(workflow['nodes'], workflow['edges'], run['node_states'], run['edge_states'])
+            from .query_parallel import eligible
+            ready=eligible(self,run,ready,excluded)
             # Adaptive ordering is a hint only; the case-owned guard revalidates authority.
             preferred=run.get('adaptive_next_action') if workflow.get('metadata',{}).get('adaptive_control') else None
             if preferred:
@@ -428,6 +434,7 @@ class GraphRunner:
             if run['status'] == 'queued':
                 runtime.transition(db, run, 'running')
             runtime.save(db, run)
+        query_polled=set()
         while True:
             invocation = None
             with runtime.store.transaction() as db:
@@ -445,9 +452,14 @@ class GraphRunner:
                     if adaptive_suspended(db,runtime,run,workflow):return runtime.public(run)
                     if runtime.clock() - run['created_at'] >= workflow['execution_policy']['limits']['timeout_seconds']:
                         raise RuntimeFailure('RUN_TIMEOUT', 'The execution duration budget is exhausted.')
-                    node = self.next_node(db, run, workflow)
+                    node = self.next_node(db, run, workflow, query_polled)
                     if node is None:
                         run.pop('current_node_id', None)
+                        if run.get('query_waits'):
+                            run['lease_until']=0
+                            run['available_at']=runtime.clock()+1
+                            runtime.save(db,run)
+                            return runtime.public(run)
                         if len(run['node_states']) != len(workflow['nodes']):
                             raise RuntimeFailure('UNMATCHED_BRANCH', 'Graph dependencies cannot advance.')
                         runtime.transition(db, run, 'completed')
@@ -622,14 +634,19 @@ class GraphRunner:
                         run=runtime.load(db,run_id,auth,'workflow.execute')
                         if not runtime.owns_execution(run,worker):return runtime.public(run)
                         run['node_states'].pop(node['node_id'],None)
-                        run['lease_until']=0
-                        run['available_at']=runtime.clock()+1
+                        if 'query_concurrency' not in run:
+                            from .query_parallel import query_limit
+                            controls=getattr(runtime,'resource_controls',None)
+                            env=getattr(adapter,'manager',None) or getattr(getattr(adapter,'queries',None),'manager',None)
+                            run['query_concurrency']=query_limit(getattr(env,'env',{}),controls.policy if controls else None)
+                            runtime.event(db,run,'query.concurrency',dict(limit=run['query_concurrency'],eligible_tool=node.get('tool_id')))
                         run.setdefault('query_waits',{})[node['node_id']]=pending.job
                         if node['node_id'] in run.get('action_instances',{}):
                             run['action_instances'][node['node_id']].update(state='waiting_for_query',query_job=dict(job_id=pending.job['job_id'],state=pending.job['state'],progress=pending.job['progress']))
                         runtime.event(db,run,'query.waiting',dict(node_id=node['node_id'],job_id=pending.job['job_id'],state=pending.job['state'],progress=pending.job['progress']))
                         runtime.save(db,run)
-                        return runtime.public(run)
+                    query_polled.add(node['node_id'])
+                    continue
                 except RetryableInvocation:
                     output, code = None, 'RETRYABLE_INVOCATION_FAILED'
                 except RuntimeFailure as failure:
@@ -756,6 +773,8 @@ class GraphRunner:
             decision = payload.get('decision')
             if decision not in {'approved', 'rejected'}:
                 raise RuntimeFailure('INVALID_APPROVAL_DECISION', 'Choose approved or rejected.', 400)
+            if approval['status'] == 'superseded':
+                raise RuntimeFailure('APPROVAL_NOT_PENDING', 'This approval was superseded by a reviewed revision.')
             old = run.get('approval_decisions', {}).get(approval['approval_id'])
             if old:
                 # A refreshed browser or scheduler can use a new transport key.

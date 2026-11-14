@@ -279,7 +279,7 @@ export default function Overview() {
         What should we automate today?
       </motion.h1>
       <p className="mt-2 text-sm text-muted-foreground">Turn your request into a workflow.</p>
-      <section aria-label="Workflow prompt" className="mt-5 rounded-2xl border border-border-accent bg-background p-5 shadow-lift">
+      <section aria-label="Workflow prompt" className="mt-5 rounded-2xl border border-border-accent bg-background p-5 md:p-6 shadow-lift">
         <textarea
           value={description}
           disabled={generating}
@@ -288,8 +288,8 @@ export default function Overview() {
             setBusinessValues({});
             setApiError(null);
           }}
-          rows={4}
-          className="min-h-[120px] max-h-[35dvh] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80"
+          rows={7}
+          className="min-h-[180px] md:min-h-[220px] max-h-[50dvh] w-full resize-y border-0 bg-transparent text-lg outline-none placeholder:text-muted-foreground/80"
           aria-label="Process description"
         />
         <CompositionOptions

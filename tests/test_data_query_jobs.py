@@ -184,7 +184,7 @@ def test_parallel_claims_enforce_owner_and_global_limit(jobs):
     with jobs.store.transaction() as db:
         base=list(db.execute('SELECT '+','.join(COLUMNS)+' FROM data_query_jobs WHERE job_id=?',(item['job_id'],)).fetchone())
         for i in range(6):
-            values=base.copy();changes={'job_id':'dqj_'+uuid4().hex,'owner':'other'+str(i),'retry_key':'other'+str(i),'state':'queued','token':None,'attempts':0,'lease_until':0}
+            values=base.copy();changes={'job_id':'dqj_'+uuid4().hex,'owner':'other'+str(i),'workspace':'other'+str(i),'retry_key':'other'+str(i),'state':'queued','token':None,'attempts':0,'lease_until':0}
             for key,value in changes.items():values[COLUMNS.index(key)]=value
             db.execute('INSERT INTO data_query_jobs ('+','.join(COLUMNS)+') VALUES ('+','.join('?' for _ in COLUMNS)+')',values)
     assert sum(jobs.claim() is not None for _ in range(6))==3
@@ -358,3 +358,18 @@ def test_publication_capacity_is_bounded_even_with_already_queued_work(jobs):
     with pytest.raises(ApiFailure) as error:jobs.publish(row,result)
     assert error.value.code=='DATA_QUERY_BUSY'
     assert raw(jobs,item['job_id'])['result_secret'] is None
+
+
+@pytest.mark.parametrize('failures',[1,2])
+def test_coordination_contention_uses_bounded_fresh_read_recovery(jobs,monkeypatch,failures):
+    item=submit(jobs);original=jobs.queries.execute;attempts=[]
+    def execute(*args,**kwargs):
+        attempts.append(1)
+        if len(attempts)<=failures:
+            error=RuntimeError('Controlled queue contention');error.code='DATABASE_BUSY';raise error
+        return original(*args,**kwargs)
+    monkeypatch.setattr(jobs.queries,'execute',execute)
+    assert jobs.tick();assert jobs.get(auth(),item['job_id'])['state']=='queued'
+    assert jobs.tick();final=jobs.get(auth(),item['job_id'])
+    assert final['attempt']==2 and final['state']==('succeeded' if failures==1 else 'failed')
+    assert not jobs.tick() and len(attempts)==2

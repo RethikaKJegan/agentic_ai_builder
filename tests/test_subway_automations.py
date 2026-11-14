@@ -297,6 +297,9 @@ def test_scheduled_native_analysis_requires_exact_external_approval(subway,googl
     f.service.google_tools=GoogleTools(manager,f.service);f.service.bind_google_connector=f.service.google_tools.bind
     alias=SimpleNamespace(registry=f.adapter.service,x=SimpleNamespace(a=f.auth,current=f.auth),connectors=f.service.runtime_runner.connectors)
     tool,connector=install_external(alias,'extension_mail_draft');connector.definition=tool
+    # Match the registered transport budget; a one-second fake deadline also
+    # includes guarded database checks and flakes under concurrent regression load.
+    connector.timeout=min(15,tool['timeout_seconds'])
     policy=deepcopy(f.adapter.service._policy);policy.version+=1;policy.max_risk='high'
     assert f.adapter.service.update_policy(policy,f.auth)['status']==200
     from registry.policy import authorize_tool

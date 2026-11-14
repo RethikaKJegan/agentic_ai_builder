@@ -571,7 +571,13 @@ def planning_contract():
 
 def install(app,auth):
  queries=SubwayQueries(app,auth);service=app.state.workflow_service;service.subway_queries=queries
- service.runtime_runner.connectors['subway_query']=SubwayQueryConnector(queries)
+ connector=SubwayQueryConnector(queries)
+ jobs=getattr(app.state,'data_query_jobs',None)
+ if jobs is not None and (getattr(service,'background_execution',False) or getattr(service,'durable_queries',False)):
+  from .subway_query_jobs import SubwayJobEngine,DurableSubwayQuery
+  jobs.engines['subway']=SubwayJobEngine(queries)
+  connector=DurableSubwayQuery(connector,jobs)
+ service.runtime_runner.connectors['subway_query']=connector
  from .subway_documents import SubwayDocuments
  service.runtime_runner.connectors['subway_documents']=SubwayDocuments(queries)
  from .subway_assessments import SubwayAssessments

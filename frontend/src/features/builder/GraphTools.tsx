@@ -33,7 +33,7 @@ export function GraphTools({
         {issues.length ? `${issues.length} issues to review` : "No local topology issues"}
       </summary>
       <p className="my-2 text-muted-foreground">
-        Start → dependencies → end. Local diagnostics are advisory; use Validate for authoritative
+        Start → dependencies → end. Local diagnostics are advisory; Run performs authoritative
         contract and Registry checks. Undo/redo affects draft edits only.
       </p>
       {issues.length > 0 && (

@@ -90,14 +90,8 @@ def allowed_write(kind, contract):
     if contract.get('side_effect') == 'read' or contract.get('kind') == 'model': return True
     # Classification uses declared provider operation semantics, never a tool-name
     # substring. Unknown write contracts are excluded until explicitly supported.
-    operations = {
-        'email_send': {'tool.extension_mail_send', 'tool.smtp_send_email'},
-        'email_draft': {'tool.extension_mail_draft'},
-        'sheet_create': {'tool.extension_sheets_create_report', 'tool.extension_sheets_create'},
-        'sheet_update': {'tool.google_sheets_update_row', 'tool.google_sheets_upsert_record', 'tool.extension_sheets_add_tabs'},
-        'calendar_write': {'tool.extension_calendar_create', 'tool.extension_calendar_update', 'tool.extension_calendar_cancel'},
-    }
-    return contract.get('capability_id') in set().union(*(operations.get(k, set()) for k in kind))
+    from .capability_contracts import fulfills
+    return any(fulfills(k,contract) for k in kind)
 
 
 class OverviewAutomation:
@@ -415,6 +409,8 @@ class OverviewAutomation:
     def prepare_intent(self,auth,body):
         """Persist this bounded stage before compiling, so crash/retry reuses it."""
         key=body['request_key'];objective=body['objective']
+        from .calendar_intent import request_timestamp
+        received_at=request_timestamp(self.service.lifecycle.clock())
         q = getattr(self.service, 'workflow_queries', None)
         subway=getattr(self.service,'subway_queries',None)
         if subway:
@@ -445,8 +441,8 @@ class OverviewAutomation:
                     return dict(result=result,intent=None)
                 body={**body,'google_connection_id':selected['connection_id']}
         recipient_context(resolved,self.service.business_composition,auth,body)
-        now = self.service.lifecycle.clock()
-        calendar_context(resolved,objective,bool(body.get('google_connection_id')),now=now)
+        now = received_at
+        calendar_context(resolved,objective,bool(body.get('google_connection_id')),now=now,timezone=self.env.get('BUILDER_WORKSPACE_TIMEZONE'))
         routing_context=dict(workspace=deepcopy(auth['subject']), catalog=catalog,
             knowledge=knowledge, query_unavailable=unavailable, selected_google_account=body.get('google_connection_id'),
             resolved_inputs=resolved, planning_defaults=GUIDANCE+(QUESTION_FREE_GUIDANCE if self.question_free() else ''),
@@ -496,8 +492,8 @@ class OverviewAutomation:
         intent = dict(version='overview-intent-v1', route=route, schedule=schedule, prepared_at=now)
         if natural:
             from .communication_intent import requested,prepare as prepare_communication
-            if requested(objective):
-                route,communication,questions=prepare_communication(self.service,auth,body,route,schedule,resolved,timezone=self.env.get('BUILDER_WORKSPACE_TIMEZONE'))
+            if requested(objective) or 'calendar_write' in route['side_effects']:
+                route,communication,questions=prepare_communication(self.service,auth,body,route,schedule,resolved,timezone=self.env.get('BUILDER_WORKSPACE_TIMEZONE'),reference_time=now)
                 result['intent']=route;intent['route']=route
                 if questions:
                     result.update(state='clarification',business_clarification=True,questions=[q['question'] for q in questions],clarifications=questions)

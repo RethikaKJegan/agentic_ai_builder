@@ -179,7 +179,7 @@ def test_chat_planning_jobs_and_saved_workflow_execute_under_client_identity(iso
         ref = dict(workflow_id=document['workflow_id'], workflow_version=1)
         saved = operation('/workflows/simpsons_execution/versions/1', 'save_workflow_version', {**ref, 'workflow': document, 'base_version': 0}, 'put')
         assert saved.status_code == 200, saved.text
-        validated = operation('/workflows/simpsons_execution/validate', 'validate_workflow', ref)
+        validated = operation('/workflows/simpsons_execution/submit-for-approval', 'submit_workflow_for_approval', ref)
         assert validated.status_code == 200, validated.text
         for action in ['approve', 'publish']:
             response = operation('/workflows/simpsons_execution/approve', 'approve_workflow', {**ref, 'action': action})
@@ -192,7 +192,7 @@ def test_chat_planning_jobs_and_saved_workflow_execute_under_client_identity(iso
             stored_run = json.loads(db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND run_id=?', (WORKSPACE, run['run_id'])).fetchone()[0])
             assert stored_run['subject_id'] == OWNER and stored_run['workspace_id'] == WORKSPACE
         # Supplying browser authority is rejected at the existing service boundary.
-        denied = operation('/workflows/simpsons_execution/validate', 'validate_workflow', {**ref, 'subject': {'workspace_id': 'foreign'}})
+        denied = operation('/workflows/simpsons_execution/submit-for-approval', 'submit_workflow_for_approval', {**ref, 'subject': {'workspace_id': 'foreign'}})
         assert denied.status_code == 400
 
 

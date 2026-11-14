@@ -376,13 +376,23 @@ class DataQueries:
             needed[did] = chosen
         return needed, joins, expressions
 
+    def _slot_identity(self, identity):
+        from .data_query_control import CURRENT
+        control=CURRENT.get()
+        if control is not None and control.jobs.queries is self:
+            return (*identity,control.job['job_id'])
+        return identity
+
     def _enter(self, auth):
         identity = GoogleConnections.identity(auth, True)
         GoogleConnections.identity(auth)
+        slot=self._slot_identity(identity)
+        from runtime.query_parallel import query_limit
+        limit=query_limit(self.manager.env) if len(slot)==3 else 1
         with self.lock:
-            if identity in self.active or len(self.active) >= 4:
+            if identity in self.active or sum(item[:2]==identity for item in self.active)>=limit or len(self.active)>=4 or slot in self.active:
                 fail('A data question is already running. Wait before retrying.', 'DATA_QUERY_BUSY', 429)
-            self.active.add(identity)
+            self.active.add(slot)
         return identity
 
     def plan(self, auth, body):
@@ -390,7 +400,7 @@ class DataQueries:
         try: return self._plan(auth, body, identity)
         finally:
             with self.slot_available:
-                self.active.discard(identity)
+                self.active.discard(self._slot_identity(identity))
                 self.slot_available.notify_all()
 
     def catalogue(self, auth, objective=None):
@@ -504,7 +514,7 @@ class DataQueries:
             return self._execute(auth, body, identity, saved_snapshot=saved_snapshot, deadline=deadline)
         finally:
             with self.slot_available:
-                self.active.discard(identity)
+                self.active.discard(self._slot_identity(identity))
                 self.slot_available.notify_all()
 
     def _execute(self, auth, body, identity, *, saved_snapshot=None, deadline=None):

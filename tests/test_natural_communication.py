@@ -27,6 +27,17 @@ def test_after_ready_times_are_future_stable_and_require_completed_report():
 @pytest.mark.parametrize('expire_review',[False,True])
 def test_direct_generation_then_two_reviewed_email_calendar_occurrences(automation,queries,expire_review):
  f=automation;f.connectors['extension_mail_send'].recipients=frozenset(['owner@example.com','engineer@example.com']);add_scopes(f.manager,f.connection,['gmail.send','calendar.events'])
+ # Match production: source metadata/query jobs and their parent runtime share a store.
+ import json
+ with queries.store.transaction(write=False) as source,f.general.store.transaction() as target:
+  for cid,raw in target.execute('SELECT connection_id,document FROM data_source_connections'):
+   doc=json.loads(raw);doc['profiling_status']='not_profiled'
+   target.execute('UPDATE data_source_connections SET document=? WHERE connection_id=?',(json.dumps(doc),cid))
+  for name,sql in source.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name LIKE 'data_%'"):
+   target.execute(sql.replace('CREATE TABLE ','CREATE TABLE IF NOT EXISTS ',1))
+   rows=source.execute('SELECT * FROM "'+name+'"').fetchall()
+   if rows:target.executemany('INSERT OR REPLACE INTO "'+name+'" VALUES ('+','.join('?'*len(rows[0]))+')',rows)
+ queries.store=queries.manager.store=queries.manager.relationships.store=f.general.store
  jobs,seen,inputs,body=setup_query(f,queries)
  body.pop('automatic_inputs',None);body.pop('google_connection_id',None);body['objective']=GOAL;body['user_values']={};body['request_key']='natural_initial'
  route=intent('recurring');route.update(side_effects=['calendar_write']);route['temporal']['period']='none';route['recurrence'].update(hour=22,minute=20)

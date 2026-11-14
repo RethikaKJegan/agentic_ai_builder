@@ -422,7 +422,7 @@ def test_http_session_origin_and_owner_boundaries(investigation):
     assert client.post(root+'/plan',json=body,headers={'origin':'https://foreign.example'}).status_code==403
     response=client.post(root+'/plan',json=body);assert response.status_code==200,response.text
     p=response.json()['data']
-    assert client.post(root+'/plans/'+p['workflow_id']+'/validate',json={}).json()['data']['validation']['valid']
+    assert client.post(root+'/plans/'+p['workflow_id']+'/validate',json={}).status_code==404
     r=client.post(root+'/plans/'+p['workflow_id']+'/runs',json={'request_key':'http_phase3_run_001'}).json()['data']
     executed=client.post(root+'/runs/'+r['run_id']+'/execute',json={})
     assert executed.status_code==200 and executed.json()['data']['status']=='completed'

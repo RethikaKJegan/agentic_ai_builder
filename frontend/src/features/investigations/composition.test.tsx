@@ -107,3 +107,37 @@ it('renders genuine web snippets and extracted text safely as separate evidence'
  render(<ToolReceipt value={{tool_id:'supplier_web_search',receipt:{web_sources:[{title:'Actual source',url:'https://example.com/path',snippet:'<script>not executable</script>'},{url:'https://example.com/page',text:'Actual extracted text'}]}}}/>);
  expect(screen.getByRole('link',{name:'https://example.com/path'})).toHaveAttribute('href','https://example.com/path');expect(screen.getByText('<script>not executable</script>')).toBeVisible();expect(document.querySelector('script')).toBeNull();expect(screen.getByText(/Search snippet only/)).toBeVisible();fireEvent.click(screen.getByText('Extracted page content'));expect(screen.getByText('Actual extracted text')).toBeVisible();
 });
+
+
+describe('backward compatible findings and independent status',()=>{
+ it('renders plain text findings from existing connected workflows',()=>{
+  const raw=dynamicView('completed');raw.tasks[2]!.result!.findings=['Plain saved finding'] as never;
+  const view=compositionViewSchema.parse(raw);render(<CompositionReport view={view}/>);
+  expect(screen.getByText('Plain saved finding')).toBeVisible();
+  expect(view.tasks[2]!.result!.findings![0]!.references).toEqual([]);
+ });
+ it.each([undefined,[]])('accepts missing or empty optional findings: %s',findings=>{
+  const raw=dynamicView('completed');raw.tasks[2]!.result!.findings=findings as never;
+  expect(compositionViewSchema.parse(raw).run?.status).toBe('completed');
+ });
+ it('isolates malformed optional details and retains the terminal run status',()=>{
+  const raw=dynamicView('completed');raw.tasks[2]!.result!.findings=[{statement:55}] as never;
+  const view=compositionViewSchema.parse(raw);
+  expect(view.run?.status).toBe('completed');expect(view.tasks[2]!.detail_error).toContain('unsupported format');
+  expect(view.tasks[0]!.result).not.toBeNull();
+  render(<CompositionInspector view={view} section={view.tasks[2]!.id} onClose={()=>{}}/>);
+  expect(screen.getByRole('alert')).toHaveTextContent('saved execution status');
+ });
+ it('continues rejecting invalid task identities outside optional details',()=>{
+  const raw=dynamicView('completed');raw.tasks[0]!.id=22 as never;
+  expect(compositionViewSchema.safeParse(raw).success).toBe(false);
+ });
+});
+
+it('never lets an older status response replace a newer revision of the same run',async()=>{
+ const {newerComposition}=await import('@/api/compositions');
+ const newest=compositionViewSchema.parse(dynamicView('completed'));newest.sequence=12;
+ const older=structuredClone(newest);older.run!.status='running';older.sequence=11;
+ expect(newerComposition(newest,older)).toBe(newest);
+ older.run!.run_id='new_run';expect(newerComposition(newest,older)).toBe(older);
+});

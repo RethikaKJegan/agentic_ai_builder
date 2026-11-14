@@ -72,8 +72,9 @@ class QueryExecutionControl:
                     except ApiFailure as error:
                         self.stop_with(error)
                         return
-                    except Exception:
-                        self.stop_with(ApiFailure('DATA_QUERY_LEASE_LOST', 'Query coordination became unavailable. No result was published.', 503))
+                    except Exception as error:
+                        code='DATA_QUERY_INTERRUPTED' if getattr(error,'code',None)=='DATABASE_BUSY' else 'DATA_QUERY_LEASE_LOST'
+                        self.stop_with(ApiFailure(code, 'Query coordination became unavailable. No result was published.', 503))
                         return
             self.thread = Thread(target=monitor, name='builder-query-heartbeat', daemon=True)
             self.thread.start()

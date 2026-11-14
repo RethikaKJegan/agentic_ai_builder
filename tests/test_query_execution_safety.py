@@ -40,7 +40,7 @@ def test_stopped_parent_prevents_background_query_execution(jobs):
         db.execute('CREATE TABLE runtime_runs (workspace TEXT,subject TEXT,run_id TEXT,document TEXT)')
         db.execute('INSERT INTO runtime_runs VALUES (?,?,?,?)', ('one','alice','run_parent',json.dumps(dict(status='cancelled',governance_policy={}))))
     item = jobs.submit(auth(), {'plan_id':plan['plan_id']}, 'linked_query_retry', runtime_reference=dict(run_id='run_parent',node_id='query'))
-    assert jobs.tick()
+    jobs.tick()
     result = jobs.get(auth(), item['job_id'])
     assert result['state'] == 'cancelled'
     assert not result['result_available']

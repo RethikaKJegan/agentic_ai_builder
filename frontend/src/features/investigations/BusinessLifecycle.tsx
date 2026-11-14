@@ -373,7 +373,7 @@ function LifecycleWorkspace({
     };
   }, [value, pane, agentStage]);
   async function approval(
-    operation: "validate_workflow" | "approve_workflow",
+    operation: "run" | "approve_workflow",
     decision?: {
       approval_id: string;
       decision: "approved" | "rejected";
@@ -387,8 +387,8 @@ function LifecycleWorkspace({
     setError(null);
     try {
       if (decision) await api.request("decide_approval", decision);
-      else if (operation === "validate_workflow")
-        await api.request(operation, {
+      else if (operation === "run")
+        await api.submitApproval({
           workflow_id: composition.workflow_id,
           workflow_version: composition.workflow_version!,
         });
@@ -744,9 +744,9 @@ function LifecycleWorkspace({
                       <button
                         className={button}
                         disabled={busy || !backend.can("workflow.validate")}
-                        onClick={() => void approval("validate_workflow")}
+                        onClick={() => void approval("run")}
                       >
-                        Validate workflow
+                        Run
                       </button>
                     )}
                     {composition.workflow_status === "validated" && (

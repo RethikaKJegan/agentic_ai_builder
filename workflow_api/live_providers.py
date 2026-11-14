@@ -422,6 +422,7 @@ def create_configured_app(env=None, database=None, client=None, model_factory=No
     # Configured combined processes already host RuntimeWorker. HTTP only
     # admits durable runs; model/tool work must not outlive the proxy request.
     service.background_execution=process_role in {'api','combined'}
+    service.durable_queries=True
     service.business_composition.model_id=model
     from .integration_checks import smtp_probe
     service.integration_probes={} if business_only else {'smtp':smtp_probe(env)}

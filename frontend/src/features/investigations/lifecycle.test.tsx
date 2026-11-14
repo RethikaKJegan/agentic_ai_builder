@@ -59,10 +59,10 @@ describe('persistent lifecycle presentation',()=>{
 it('retains the selected capability stage after validating its workflow',async()=>{
  const c=saved();vi.mocked(api.businessCase).mockImplementation(async()=>structuredClone(c));
  let status='draft';vi.spyOn(api,'compositionView').mockImplementation(async(id)=>compositionViewSchema.parse({...dynamicView(),composition_id:id,workflow_status:status}));
- vi.spyOn(api,'request').mockImplementation(async()=>{status='validated';return {} as never});
+ vi.spyOn(api,'submitApproval').mockImplementation(async()=>{status='validated';return {} as never});
  render(<BusinessLifecycle initialCaseId={c.case_id}/>);fireEvent.click(await screen.findByRole('button',{name:'Agents & tools'}));
  fireEvent.change(screen.getByLabelText('Agent stage'),{target:{value:'warranty_assessment'}});
- fireEvent.click(await screen.findByRole('button',{name:'Validate workflow'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Run'}));
  await screen.findByRole('button',{name:'Approve workflow'});expect(screen.getByLabelText('Agent stage')).toHaveValue('warranty_assessment');
 });
 it('submits reviewed late evidence with the saved event and expected revision',async()=>{

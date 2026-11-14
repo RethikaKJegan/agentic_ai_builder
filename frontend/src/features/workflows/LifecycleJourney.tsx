@@ -93,11 +93,11 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
         : "Revision is confirmed by the server.",
     },
     {
-      title: "Validate revision",
+      title: "Automatic Run checks",
       done: validated,
       reason: !saved
         ? "Save the draft first."
-        : "Use Prepare & Activate and resolve any validation or Registry errors.",
+        : "Run checks this revision automatically and reports any configuration or Registry issues.",
     },
     {
       title: "Simulate safely",
@@ -109,8 +109,8 @@ export function LifecycleJourney({ workflow }: { workflow: Workflow }) {
       title: "Obtain approval",
       done: approved,
       reason: !validated
-        ? "Validate first, then Submit for approval or ask an authorized approver."
-        : "Prepare & Activate submits this revision and continues when the current reviewer has approval authority.",
+        ? "Run checks the configuration and requests any required approval."
+        : "An authorized reviewer must explicitly approve the checked revision.",
     },
     {
       title: "Publish approved revision",

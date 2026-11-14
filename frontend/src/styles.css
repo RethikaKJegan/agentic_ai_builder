@@ -217,3 +217,15 @@
   --sidebar-accent-foreground: var(--foreground); --sidebar-border: var(--border);
 }
 .dark .bg-white { background-color: var(--background); }
+
+/* Workflow canvas widgets follow the selected dark appearance. */
+.dark [data-testid="workflow-workspace"] .react-flow {
+  --xy-controls-button-background-color: #09090b;
+  --xy-controls-button-background-color-hover: #1f2937;
+  --xy-controls-button-color: #e5e7eb;
+  --xy-controls-button-color-hover: #ffffff;
+  --xy-controls-button-border-color: #334155;
+  --xy-minimap-background-color: #09090b;
+  --xy-minimap-mask-background-color: rgba(255, 255, 255, 0.06);
+  --xy-minimap-node-background-color: #475569;
+}

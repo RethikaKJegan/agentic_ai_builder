@@ -15,6 +15,11 @@ def submit(service,request,auth):
             type(payload['workflow_version']) is not int or not isinstance(key,str) or not re.fullmatch(r'[a-zA-Z0-9_-]{8,128}',key) or
             not isinstance(reference,str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}',reference)):
         raise ApiFailure('INVALID_REQUEST','Use an exact workflow revision and a safe retry key.',400)
+    with service.store.transaction(write=False) as check_db:
+        candidate=service.store.get(check_db,auth['subject']['workspace_id'],payload['workflow_id'],payload['workflow_version'])
+    if candidate and candidate['status']=='draft':
+        from .run_entry import checked
+        checked(service,request,auth)
     workspace,subject=auth['subject']['workspace_id'],auth['subject']['subject_id']
     fingerprint=hashlib.sha256(json.dumps({'operation':request['operation'],'payload':payload},sort_keys=True).encode()).hexdigest()
     with service.store.transaction() as db:
@@ -24,7 +29,7 @@ def submit(service,request,auth):
             return json.loads(old[1])
         workflow=service.store.get(db,workspace,payload['workflow_id'])
         if not workflow or workflow['version']!=payload['workflow_version']:raise ApiFailure('REVISION_CONFLICT','Reload the current revision before submitting.',409)
-        if workflow['status']!='validated':raise ApiFailure('INVALID_TRANSITION','Validate this revision before submitting for approval.',409)
+        if workflow['status']!='validated':raise ApiFailure('INVALID_TRANSITION','Use Run to check this revision before submitting for approval.',409)
         from .readiness import enforce
         enforce(service,workflow,auth,db)
         review=service.registry_adapter.review(workflow,auth)

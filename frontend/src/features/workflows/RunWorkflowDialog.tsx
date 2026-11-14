@@ -16,7 +16,7 @@ export function RunWorkflowDialog({ workflow, onClose, onStarted, beforeRun, aut
   const executionKey = useRef<string | undefined>(undefined);
   const submitting = useRef(false); const submittedPayload = useRef<string | undefined>(undefined);
   const automatic = eventOnly(workflow);
-  const blocker = !backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : workflow.status !== "published" ? "A published revision is required." : automatic ? "This workflow waits for its configured event. Activate it, create an event in its source, then check Runs." : "";
+  const blocker = !backend.can("workflow.execute") ? "workflow.execute permission is required." : !backend.session?.runtime_available ? "The runtime is unavailable." : automatic ? "This workflow waits for its configured event. Activate it, create an event in its source, then check Runs." : "";
   const submit = async () => {
     if (submitting.current || blocker || run) return;
     try {
@@ -44,7 +44,7 @@ export function RunWorkflowDialog({ workflow, onClose, onStarted, beforeRun, aut
   }, []);
   return <Dialog open onOpenChange={open => { if (!open && !submitting.current) onClose(); }}>
     <DialogContent className="max-h-[85vh] w-[calc(100vw-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy) event.preventDefault(); }}>
-      <DialogHeader><DialogTitle>Run {displayText(workflow.name)}</DialogTitle><DialogDescription>Published revision v{workflow.version}. Submission starts real execution subject to its approval and budget policies.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Run {displayText(workflow.name)}</DialogTitle><DialogDescription>Revision v{workflow.version}. Run automatically checks configuration and permissions before execution.</DialogDescription></DialogHeader>
       {blocker && <p role="status" className="text-sm text-muted-foreground">{blocker}</p>}
       {!run && !automatic && <form onSubmit={event => { event.preventDefault(); void submit(); }} className="space-y-3" noValidate>
         {workflow.inputs.map(field => <label key={field.name} className="block text-sm">{displayText(field.name)}{field.required ? " (required)" : " (optional)"}<span className="block text-xs text-muted-foreground">{displayText(field.description)} · {field.type}</span>
@@ -56,6 +56,7 @@ export function RunWorkflowDialog({ workflow, onClose, onStarted, beforeRun, aut
         <button type="submit" disabled={busy || !!blocker} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-40">{busy ? "Submitting…" : "Start run"}</button>
       </form>}
       <ApiFeedback error={error} />
+      {error instanceof ApiError && error.error.error_code === "WORKFLOW_APPROVAL_REQUIRED" && <div role="status" className="space-y-3 text-sm"><p>Awaiting approval. An authorized reviewer must approve this workflow.</p>{backend.can("workflow.approve") && <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={() => { if(submitting.current)return; submitting.current=true;setBusy(true);void api.request("approve_workflow", {workflow_id:workflow.workflow_id,workflow_version:workflow.version,action:"approve"}).then(async()=>{submitting.current=false;await submit();}).catch(caught=>setError(caught instanceof Error?caught:new Error("Approval could not be confirmed."))).finally(()=>{submitting.current=false;setBusy(false);}); }}>Approve workflow</button>}</div>}
       {run && <p role="status" className="text-sm">Run {run.run_id} · {run.status}. <Link to="/app/runs" search={{ run: run.run_id }} className="text-primary underline">View run details</Link></p>}
       <button type="button" disabled={busy} onClick={onClose} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{run ? "Close" : "Cancel"}</button>
     </DialogContent>

@@ -87,3 +87,30 @@ def test_running_workflow_cannot_be_repaired(connected):
  with f.general.store.transaction() as db:
   with pytest.raises(ApiFailure,match='active run'):repair_draft(f.general,w,f.x.a,db)
  assert w==before
+
+from workflow_api.readiness import ground_model_finding,effective_content_schema
+
+
+def test_model_cannot_override_verified_private_binding(connected):
+ f=connected;doc=f.c.prepare_actions(f.x.a,f.request);w=f.c.workflow(f.x.a,doc['composition_id'])
+ entry=dict(category='Missing source mapping',task='send',task_ids=['send'],requirement='Email the report',problem='Recipient path omitted from the redacted projection',resource='recipient',blocking=True,correction='Supply the path',phase='configuration',check_type='input_binding',output_fields=[])
+ r=ground_model_finding(w,entry,True)
+ assert not r['blocking'] and r['method']=='deterministic_confirmation'
+ w['metadata']['action_binding_context']['user_values'].pop('recipient')
+ assert ground_model_finding(w,entry,True)['blocking']
+
+
+def test_effective_runtime_schema_confirms_required_content_fields(connected):
+ f=connected;doc=f.c.prepare_actions(f.x.a,f.request);w=f.c.workflow(f.x.a,doc['composition_id']);action=next(a for a in w['metadata']['connected_action_plan']['actions'] if a['action_id']=='email')
+ schema=effective_content_schema(w,action);assert {'subject','body'}<=set(schema['required'])
+ entry=dict(category='Missing capability',task='email',task_ids=['email'],requirement='Report content',problem='Content fields are optional',resource='body',blocking=True,correction='Require the body',phase='configuration',check_type='report_output',output_fields=['body','subject'])
+ assert not ground_model_finding(w,entry,True)['blocking']
+ entry['output_fields']=['invented_field'];assert ground_model_finding(w,entry,True)['blocking']
+
+@pytest.mark.parametrize('kind',['relationship','business_rule','query_contract','requirement_coverage'])
+def test_verified_bindings_never_downgrade_semantic_or_security_requirements(connected,kind):
+ f=connected;doc=f.c.prepare_actions(f.x.a,f.request);w=f.c.workflow(f.x.a,doc['composition_id'])
+ entry=dict(category='Missing relationship',task='send',task_ids=['send'],requirement='Mandatory exact attribution',problem='No authorized relationship exists',resource='relationship',blocking=True,correction='Use a reviewed relationship',phase='configuration',check_type=kind,output_fields=[])
+ assert ground_model_finding(w,entry,True)['blocking']
+ entry.update(check_type='input_binding');assert ground_model_finding(w,entry,False)['blocking']
+ entry['task_ids']=['unknown_task'];assert ground_model_finding(w,entry,True)['blocking']

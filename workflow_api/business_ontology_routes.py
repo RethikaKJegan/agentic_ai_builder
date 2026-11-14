@@ -361,7 +361,7 @@ def install(app, service, auth, reference, env=None):
     async def list_compositions():return await call(lambda current:dict(items=presentation.listing(current)))
 
     @app.get('/business-ontology/v1/compositions/{composition_id}/view')
-    async def composition_view(composition_id:str,run_id:str|None=None):return await call(presentation.view,composition_id,run_id)
+    async def composition_view(composition_id:str,run_id:str|None=None,detail:str='full',task_id:str|None=None):return await call(presentation.view,composition_id,run_id,detail,task_id)
 
     @app.put('/business-ontology/v1/compositions/{composition_id}/display-name')
     async def composition_rename(composition_id:str,request:Request):return await call(presentation.rename,composition_id,await body(request))
@@ -405,11 +405,6 @@ def install(app, service, auth, reference, env=None):
 
     @app.delete('/business-ontology/v1/investigations/plans/{workflow_id}')
     async def investigation_delete(workflow_id:str):return await call(investigations.manage,workflow_id,{},True)
-
-    @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/validate')
-    async def investigation_validate(workflow_id:str,request:Request):
-        if await body(request)!={}:return await call(investigations.plan,None)
-        return await call(investigations.validate,workflow_id)
 
     @app.post('/business-ontology/v1/investigations/plans/{workflow_id}/runs')
     async def investigation_run(workflow_id:str,request:Request):return await call(investigations.create_run,workflow_id,await body(request))

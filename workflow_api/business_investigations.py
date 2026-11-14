@@ -196,7 +196,9 @@ class BusinessInvestigations:
     def create_run(self,auth,workflow_id,body):
         auth,scope=self.authorize(auth,True)
         if not isinstance(body,dict) or set(body)!={'request_key'}:fail('Run creation accepts request_key only.')
-        key=self.key(body);p=self.get_plan(auth,workflow_id);fingerprint=digest([workflow_id,p['plan_sha256']])
+        key=self.key(body);p=self.get_plan(auth,workflow_id);checks=validate_graph(p['graph'],p['requirements'])
+        if not checks['valid']:fail('Repair the invalid investigation graph before Run.','INVESTIGATION_GRAPH_REJECTED')
+        fingerprint=digest([workflow_id,p['plan_sha256']])
         run=dict(run_id='investigation_run_'+secrets.token_hex(12),workflow_id=workflow_id,workflow_revision=p['revision'],plan_sha256=p['plan_sha256'],
                  version_id=p['version_id'],knowledge_sha256=p['knowledge_sha256'],status='queued',node_states={n['id']:'pending' for n in p['graph']['nodes']},
                  edge_states={},outputs={},attempts={},node_inputs={},node_errors={},node_times={},invocations={},branches={},inputs=deepcopy(p['inputs']),assertions={},

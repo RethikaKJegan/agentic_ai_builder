@@ -12,7 +12,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
@@ -93,14 +92,14 @@ export function GoogleAccountSelect({
           className="h-auto min-h-12 rounded-xl bg-background px-3 py-2"
         >
           <div className="flex min-w-0 items-center gap-3">
-            <GoogleMark />
+            <span aria-hidden="true" data-google-icon><GoogleMark /></span>
             {loading ? (
               <span className="inline-flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading accounts…
               </span>
             ) : (
-              <SelectValue placeholder="Choose a Google account" />
+              <span className="min-w-0 truncate text-sm">{selected?.account_email ?? (value ? "Selected connection unavailable" : "Choose a Google account")}</span>
             )}
           </div>
         </SelectTrigger>
@@ -118,7 +117,7 @@ export function GoogleAccountSelect({
               disabled={item.status !== "connected"}
             >
               <span className="inline-flex items-center gap-3">
-                <GoogleMark />
+                <span aria-hidden="true" data-google-icon><GoogleMark /></span>
                 <span className="text-sm">
                   {item.account_email}
                   <span className="ml-2 text-xs text-muted-foreground">
@@ -194,7 +193,7 @@ export function GoogleWorkflowConnection({ workflow }: { workflow: Workflow }) {
         disabled={busy || !backend.can("workflow.edit") || !backend.can("tools.assign")}
       />
       <p className="text-xs text-muted-foreground">
-        Saving creates a draft revision. Validate, review and publish it through the normal workflow
+        Saving creates a draft revision. Run, review and publish it through the normal workflow
         controls. Existing runs keep their original account.
       </p>
       <button

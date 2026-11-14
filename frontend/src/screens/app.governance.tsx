@@ -33,7 +33,7 @@ export default function Governance() {
   const [retrieved, setRetrieved] = useState("");
   const [revision, setRevision] = useState(0);
   const [cursor, setCursor] = useState<string>();
-  const [activeTab,setActiveTab]=useState("policies");
+  const [activeTab,setActiveTab]=useState("behaviour");
   const [section, setSection] = useState<Section>("approvals");
   const [search, setSearch] = useState("");
   const [eventType, setEventType] = useState("");
@@ -59,15 +59,17 @@ export default function Governance() {
       <div className="flex items-center gap-3"><Tag>Runtime evidence</Tag><button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">{loading ? "Loading…" : "Refresh evidence"}</button></div>
     </div>
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="mb-6 grid h-auto w-full grid-cols-1 gap-1 rounded-xl bg-muted/50 p-1 sm:grid-cols-3">
-        <TabsTrigger className="justify-start gap-2 whitespace-normal px-3 py-3 sm:justify-center" value="policies"><BookOpen className="h-4 w-4 shrink-0"/>Organization Policies</TabsTrigger>
-        <TabsTrigger className="justify-start gap-2 whitespace-normal px-3 py-3 sm:justify-center" value="limits"><SlidersHorizontal className="h-4 w-4 shrink-0"/>Usage &amp; Limits</TabsTrigger>
-        <TabsTrigger className="justify-start gap-2 whitespace-normal px-3 py-3 sm:justify-center" value="oversight"><ShieldCheck className="h-4 w-4 shrink-0"/>Oversight &amp; Accountability</TabsTrigger>
+      <TabsList className="mb-6 grid h-auto w-full grid-cols-1 gap-1 rounded-xl bg-muted/50 p-1 sm:grid-cols-4">
+        <TabsTrigger value="behaviour" className="gap-2 px-3 py-3"><SlidersHorizontal className="h-4 w-4"/>Agent Behaviour</TabsTrigger>
+        <TabsTrigger value="policies" className="gap-2 px-3 py-3"><ShieldCheck className="h-4 w-4"/>Approvals</TabsTrigger>
+        <TabsTrigger value="limits" className="gap-2 px-3 py-3"><BookOpen className="h-4 w-4"/>Execution Limits</TabsTrigger>
+        <TabsTrigger value="oversight" className="gap-2 px-3 py-3"><FileText className="h-4 w-4"/>Audit Activity</TabsTrigger>
       </TabsList>
       <ApiFeedback error={error}/>
       {loading && <p role="status" className="mb-4 text-sm text-muted-foreground">Loading reported policies and activity…</p>}
-      <TabsContent value="policies" className="mt-0"><ExecutionPolicyPanel/>
-        <AgentBehaviourPanel policies={policies} onViewLimits={()=>setActiveTab("limits")}/>
+      <TabsContent value="behaviour" className="mt-0"><AgentBehaviourPanel policies={policies} onViewLimits={()=>setActiveTab("limits")}/></TabsContent>
+      <TabsContent value="policies" className="mt-0"><ExecutionPolicyPanel mode="approvals"/>
+        <details className="mt-5 rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Workflow policies and reference</summary>
         <div className="grid gap-6 lg:grid-cols-[225px_minmax(0,1fr)]">
           <nav aria-label="Policy sections" className="space-y-1 lg:border-r lg:pr-5"><p className="mb-3 px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Policy reference</p>{sections.map(item => <button type="button" key={item.id} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)} className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors ${section === item.id ? "bg-primary/5 font-medium text-primary" : "text-muted-foreground hover:bg-muted"}`}>{item.label}<ChevronRight className="h-3.5 w-3.5"/></button>)}</nav>
           <section aria-label={selectedSection.label} className="min-w-0">
@@ -81,8 +83,9 @@ export default function Governance() {
 
           </section>
         </div>
+        </details>
       </TabsContent>
-      <TabsContent value="limits" className="mt-0"><UsageLimits data={data} loading={loading} failed={!!error} retrieved={retrieved} pagination={<div className="flex flex-wrap gap-2">{cursor && <button className="rounded-lg border px-3 py-2 text-xs" onClick={() => setCursor(undefined)}>First policy page</button>}{data?.policy_next_cursor && <button className="rounded-lg border px-3 py-2 text-xs" onClick={() => setCursor(data.policy_next_cursor ?? undefined)}>More policy records</button>}</div>}/></TabsContent>
+      <TabsContent value="limits" className="mt-0"><ExecutionPolicyPanel mode="limits"/><UsageLimits data={data} loading={loading} failed={!!error} retrieved={retrieved} pagination={<div className="flex flex-wrap gap-2">{cursor && <button className="rounded-lg border px-3 py-2 text-xs" onClick={() => setCursor(undefined)}>First policy page</button>}{data?.policy_next_cursor && <button className="rounded-lg border px-3 py-2 text-xs" onClick={() => setCursor(data.policy_next_cursor ?? undefined)}>More policy records</button>}</div>}/></TabsContent>
       <TabsContent value="oversight" className="mt-0 space-y-5">
         <div className="border-b pb-5"><h2 className="text-xl font-semibold">Oversight &amp; accountability</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Review the runtime events returned by the current service. Search applies to the loaded records; this is not an organization-wide audit archive.</p></div>
         <div className="flex flex-wrap gap-3"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><input aria-label="Search governance activity" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search event, run or identifier…" className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm"/></div><select aria-label="Filter activity type" value={eventType} onChange={event => setEventType(event.target.value)} className="h-10 max-w-full rounded-lg border bg-background px-3 text-sm"><option value="">All event types</option>{types.map(type => <option key={type} value={type}>{type}</option>)}</select></div>

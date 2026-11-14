@@ -40,6 +40,8 @@ def params(workflow,node,run,*,now=None):
         context['validated_context'].update(runtime_values(review,run,node['node_id'],time.time() if now is None else now,
             run.get('automation_reference',{}).get('scheduled_due')))
     result=resolve_inputs(action,context,actions,run)
+    from workflow_api.calendar_intent import check_runtime
+    check_runtime(workflow,action,result)
     if action['capability_id']=='tool.subway_query':
         from workflow_api.descriptive_measures import pin,check
         resolution=pin(context.get('validated_context',{}).get('subway_query_catalog',{}))

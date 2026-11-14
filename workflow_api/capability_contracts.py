@@ -98,3 +98,22 @@ def validate_tasks(tasks,contracts,*,max_tasks=16):
   if not ready:fail('Task dependencies contain a cycle.','CAPABILITY_TASK_GRAPH',422)
   done|=ready;pending-=ready
  return True
+
+
+# Fulfillment uses the existing registered operation semantics above.
+REQUIRED_OPERATIONS={
+ 'email_send':{'mail.send'}, 'email_draft':{'mail.draft'},
+ 'calendar_write':{'calendar.create','calendar.update','calendar.cancel'},
+ 'sheet_create':{'sheet.create','report.publish'},
+ 'sheet_update':{'sheet.update','sheet.upsert','sheet.tabs'},
+}
+
+def operation_of(capability):
+    operation=capability.get('supported_operation')
+    if operation:return operation
+    from connector_extension.catalog import CATALOG
+    definition=CATALOG.get(capability.get('capability_id','').removeprefix('tool.'),{})
+    return EXTERNAL.get(definition.get('capability'),(None,))[0]
+
+def fulfills(requirement,capability):
+    return operation_of(capability) in REQUIRED_OPERATIONS.get(requirement,set())

@@ -222,6 +222,9 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
                 result = await run_in_threadpool(workflow_service.handle, body, auth, read_cursor=request.query_params.get('cursor'))
             else:
                 result = await run_in_threadpool(workflow_service.handle, body, auth)
+            if operation=='approve_workflow' and result['status']==200 and body['payload'].get('action','approve')=='approve':
+                from .run_entry import resume_pending
+                await run_in_threadpool(resume_pending,workflow_service,body['payload']['workflow_id'],body['payload']['workflow_version'],auth)
             return JSONResponse(result, status_code=result['status'])
         except RuntimeFailure as exc:
             return error(exc.code, str(exc), exc.status)
@@ -275,10 +278,6 @@ def create_app(service=None, dev_auth=None, roles=None, database=None, planning_
     @app.put('/workflows/{workflow_id}/versions/{version}')
     async def save(workflow_id: str, version: int, request: Request):
         return await dispatch(request, 'save_workflow_version', {'workflow_id': workflow_id, 'workflow_version': version})
-
-    @app.post('/workflows/{workflow_id}/validate')
-    async def validate_route(workflow_id: str, request: Request):
-        return await dispatch(request, 'validate_workflow', {'workflow_id': workflow_id})
 
     @app.post('/workflows/{workflow_id}/approve')
     async def approve(workflow_id: str, request: Request):

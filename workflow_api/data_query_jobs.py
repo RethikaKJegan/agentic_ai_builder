@@ -46,6 +46,7 @@ class DataQueryJobs:
 
     def __init__(self, queries, authenticate, *, clock=time.time):
         self.queries, self.manager, self.store = queries, queries.manager, queries.store
+        self.engines = {}
         self.authenticate, self.clock = authenticate, clock
         result_contract=json.loads((Path(__file__).resolve().parents[1]/'shared/contracts/data-sources/queries-v1.schema.json').read_text())
         self.result_validator=Draft202012Validator({**result_contract,'oneOf':[{'$ref':'#/$defs/result'}]})
@@ -65,13 +66,13 @@ class DataQueryJobs:
     def decode(row):
         return dict(zip(COLUMNS, row)) if row else None
 
-    def owned(self, db, auth, job_id):
+    def owned(self, db, auth, job_id, *, _workflow=False):
         workspace, owner = identity(auth)
         if not isinstance(job_id, str) or not re.fullmatch(r'dqj_[a-f0-9]{32}', job_id):
             failure('DATA_QUERY_JOB_NOT_FOUND', 'Query job not found.', 404)
         row = self.decode(db.execute('SELECT '+SELECT+' FROM data_query_jobs WHERE job_id=? AND workspace=? AND owner=?',
                                     (job_id, workspace, owner)).fetchone())
-        if row is None:
+        if row is None or (json.loads(row['document']).get('engine') and not _workflow):
             failure('DATA_QUERY_JOB_NOT_FOUND', 'Query job not found.', 404)
         return row
 
@@ -125,6 +126,8 @@ class DataQueryJobs:
         if not stored:
             failure('DATA_QUERY_NOT_FOUND','Query plan not found.',404)
         saved=json.loads(stored[0])
+        if saved.get('engine') and not runtime_reference:
+            failure('DATA_QUERY_NOT_FOUND','Query plan not found.',404)
         self.valid_saved(auth,saved)
         current=self.clock()
         job_id='dqj_'+uuid4().hex
@@ -150,12 +153,14 @@ class DataQueryJobs:
             reference=runtime_reference or {}
             db.execute('INSERT INTO data_query_governance VALUES (?,?,?,?,?,?)', (job_id,workspace,owner,reference.get('run_id'),reference.get('node_id'),json.dumps(pin)))
         self.wake.set()
-        return self.get(auth,job_id)
+        return self.get(auth,job_id,_workflow=bool(saved.get('engine')))
 
     def valid_saved(self, auth, saved):
         identity(auth)
         if saved['expires_at']<=self.clock():
             failure('DATA_QUERY_STALE','Query plan expired. Create a fresh plan.')
+        if saved.get('engine'):
+            return self.engine(saved).validate(auth,saved)
         context=self.queries.context(auth)
         if fingerprint(context[0])!=saved['context_hash']:
             failure('DATA_QUERY_STALE','Metadata or relationship review changed. Create a fresh plan.')
@@ -163,16 +168,21 @@ class DataQueryJobs:
             failure('DATA_QUERY_INVALID','Resolve the clarification before execution.',400)
         self.queries.validate(saved['plan'],context)
 
-    def get(self, auth, job_id):
+    def engine(self, saved):
+        engine=self.engines.get(saved.get('engine'))
+        if engine is None:failure('DATA_QUERY_STALE','The reviewed query engine is unavailable.')
+        return engine
+
+    def get(self, auth, job_id, *, _workflow=False):
         with self.store.transaction() as db:
             self.maintenance(db)
-            return self.public(self.owned(db,auth,job_id))
+            return self.public(self.owned(db,auth,job_id,_workflow=_workflow))
 
     def list(self, auth):
         workspace,owner=identity(auth)
         with self.store.transaction() as db:
             self.maintenance(db)
-            rows=db.execute('SELECT '+SELECT+' FROM data_query_jobs WHERE workspace=? AND owner=? ORDER BY created DESC,job_id DESC LIMIT 20',(workspace,owner)).fetchall()
+            rows=db.execute('SELECT '+SELECT+" FROM data_query_jobs WHERE workspace=? AND owner=? AND json_extract(document,'$.engine') IS NULL ORDER BY created DESC,job_id DESC LIMIT 20",(workspace,owner)).fetchall()
         return dict(items=[self.public(self.decode(row)) for row in rows])
 
     def cancel(self, auth, job_id):
@@ -185,10 +195,10 @@ class DataQueryJobs:
                            (state,self.clock(),json.dumps(progress_value('Cancelled' if state=='cancelled' else 'Stopping query')),job_id))
         return self.get(auth,job_id)
 
-    def result(self, auth, job_id):
+    def result(self, auth, job_id, *, _workflow=False):
         with self.store.transaction() as db:
             self.maintenance(db)
-            row=self.owned(db,auth,job_id)
+            row=self.owned(db,auth,job_id,_workflow=_workflow)
         if row['state']!='succeeded':
             failure('DATA_QUERY_RESULT_UNAVAILABLE','This job has no completed result.',409)
         if not row['result_secret'] or row['result_expires']<=self.clock():
@@ -209,6 +219,8 @@ class DataQueryJobs:
         self.effective_policy(row, execution=False)
         saved=json.loads(row['document'])
         # Plan TTL limits execution, not retrieval of an already completed result.
+        if saved.get('engine'):
+            return self.engine(saved).validate(auth,saved)
         if fingerprint(self.queries.context(auth)[0])!=saved['context_hash']:
             failure('DATA_QUERY_STALE','Source access, metadata or relationship review changed. Create a fresh plan.')
 
@@ -226,7 +238,21 @@ class DataQueryJobs:
             waiting=db.execute('SELECT '+SELECT+" FROM data_query_jobs WHERE state='queued' ORDER BY created,job_id LIMIT 100").fetchall()
             for values in waiting:
                 row=self.decode(values)
-                if (row['workspace'],row['owner']) in active:continue
+                binding=db.execute('SELECT run_id FROM data_query_governance WHERE job_id=?',(row['job_id'],)).fetchone()
+                run_id=binding[0] if binding else None
+                from runtime.query_parallel import query_limit
+                limit=query_limit(self.manager.env) if run_id else 1
+                if sum(w==row['workspace'] for w,o in active)>=query_limit(self.manager.env):continue
+                if sum((w,o)==(row['workspace'],row['owner']) for w,o in active)>=limit:continue
+                if run_id:
+                    parent=db.execute('SELECT document FROM runtime_runs WHERE workspace=? AND subject=? AND run_id=?',(row['workspace'],row['owner'],run_id)).fetchone()
+                    parent=json.loads(parent[0]) if parent else None
+                    if not parent or parent['status'] not in ('queued','running'):
+                        db.execute("UPDATE data_query_jobs SET state='cancelled',updated=?,progress=?,result_secret=NULL WHERE job_id=? AND state='queued'", (self.clock(),json.dumps(progress_value('Cancelled')),row['job_id']))
+                        continue
+                    limit=min(limit,parent.get('query_concurrency',1))
+                    count=db.execute('SELECT COUNT(*) FROM data_query_jobs j JOIN data_query_governance g ON j.job_id=g.job_id WHERE g.workspace=? AND g.owner=? AND g.run_id=? AND j.state IN '+ACTIVE_SQL,(row['workspace'],row['owner'],run_id)).fetchone()[0]
+                    if count>=limit:continue
                 stamp=self.clock();token=uuid4().hex
                 db.execute("UPDATE data_query_jobs SET state='validating',token=?,lease_until=?,attempts=attempts+1,updated=?,progress=? WHERE job_id=? AND state='queued'",
                            (token,min(stamp+self.lease_seconds,row['deadline'],row['plan_expires']),stamp,json.dumps(progress_value('Rechecking plan and source access')),row['job_id']))
@@ -260,7 +286,7 @@ class DataQueryJobs:
             if self.clock()-row['created']>=policy['limits'].get('timeout_seconds',float('inf')):
                 failure('DATA_QUERY_TIMEOUT','The original query execution budget is exhausted.',504)
             saved=json.loads(row['document'])
-            selected={saved['plan']['base_dataset_id'],*[join['target_dataset_id'] for join in saved['plan']['joins']]}
+            selected=set(saved['source_ids']) if saved.get('engine') else {saved['plan']['base_dataset_id'],*[join['target_dataset_id'] for join in saved['plan']['joins']]}
             if selected & set(policy['restricted_sources']):
                 failure('SOURCE_RESTRICTED','The selected query source is restricted.',403)
             return policy
@@ -293,7 +319,9 @@ class DataQueryJobs:
         auth=self.authority(row)
         self.valid_saved(auth,json.loads(row['document']))
         # Bound the complete envelope too, including source/fragment metadata.
-        self.result_validator.validate(result)
+        saved=json.loads(row['document'])
+        validator=self.engine(saved).result_validator if saved.get('engine') else self.result_validator
+        validator.validate(result)
         payload=json.dumps(result,ensure_ascii=False).encode()
         if len(payload)>2_500_000:
             failure('DATA_QUERY_LIMIT','Complete query response exceeds the temporary result budget.',422)
@@ -302,9 +330,12 @@ class DataQueryJobs:
             current=self.decode(db.execute('SELECT '+SELECT+' FROM data_query_jobs WHERE job_id=?',(row['job_id'],)).fetchone())
             self.check_claim(row,current)
             self.authority(row)
-            view=self.manager.relationships.get_in_transaction(db,row['workspace'],row['owner'])
-            if not view['graph'] or view['stale'] or fingerprint(view['graph'])!=json.loads(row['document'])['context_hash']:
-                failure('DATA_QUERY_STALE','Metadata or relationship review changed before result publication.')
+            if saved.get('engine'):
+                self.engine(saved).validate(auth,saved,db=db)
+            else:
+                view=self.manager.relationships.get_in_transaction(db,row['workspace'],row['owner'])
+                if not view['graph'] or view['stale'] or fingerprint(view['graph'])!=saved['context_hash']:
+                    failure('DATA_QUERY_STALE','Metadata or relationship review changed before result publication.')
             live=db.execute('SELECT workspace,owner FROM data_query_jobs WHERE result_secret IS NOT NULL').fetchall()
             if len(live)>=100 or sum((w,o)==(row['workspace'],row['owner']) for w,o in live)>=20:
                 failure('DATA_QUERY_BUSY','Temporary result capacity reached. Wait for existing results to expire.',429)
@@ -336,7 +367,10 @@ class DataQueryJobs:
                 saved=json.loads(row['document']);self.valid_saved(auth,saved)
                 control.progress('Starting read-only query',None)
                 remaining=min(row['deadline'],row['plan_expires'])-self.clock()
-                result=self.queries.execute(auth,{'plan_id':row['plan_id']},saved_snapshot=saved,deadline=time.monotonic()+max(0,remaining))
+                if saved.get('engine'):
+                    result=self.engine(saved).execute(auth,saved)
+                else:
+                    result=self.queries.execute(auth,{'plan_id':row['plan_id']},saved_snapshot=saved,deadline=time.monotonic()+max(0,remaining))
                 control.check()
                 self.progress(row,'Validating complete result',finalizing=True)
                 self.publish(row,result)
@@ -344,9 +378,12 @@ class DataQueryJobs:
         except ApiFailure as error:
             self.finish_failure(row,error)
             self.health=dict(state='ready',last_error=error.code)
-        except Exception:
-            self.finish_failure(row,ApiFailure('DATA_QUERY_JOB_FAILED','Query execution failed. Check source access and create a fresh job.',503))
-            self.health=dict(state='ready',last_error='DATA_QUERY_JOB_FAILED')
+        except Exception as error:
+            busy=getattr(error,'code',None)=='DATABASE_BUSY'
+            code='DATA_QUERY_INTERRUPTED' if busy else 'DATA_QUERY_JOB_FAILED'
+            message='Query coordination was busy; retry with fresh source snapshots.' if busy else 'Query execution failed. Check source access and create a fresh job.'
+            self.finish_failure(row,ApiFailure(code,message,503))
+            self.health=dict(state='ready',last_error=code)
         finally:
             policy_resolver.reset(policy_marker)
         return True

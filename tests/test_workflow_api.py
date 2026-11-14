@@ -183,7 +183,7 @@ class WorkflowApiTests(unittest.TestCase):
         invalid = deepcopy(self.workflow)
         invalid['edges'][0]['target'] = 'missing_node'
         self.assertEqual(self.save(invalid).status_code, 200)
-        result = self.mutate(f"/workflows/{invalid['workflow_id']}/validate", 'validate_workflow', self.ref())
+        result = self.mutate(f"/workflows/{invalid['workflow_id']}/submit-for-approval", 'submit_workflow_for_approval', self.ref())
         self.assertEqual(result.status_code, 400)
         self.assertEqual(result.json()['data']['error']['field'], 'edges[0].target')
         saved = self.client.get(f"/workflows/{invalid['workflow_id']}").json()['data']['workflow']
@@ -195,7 +195,7 @@ class WorkflowApiTests(unittest.TestCase):
         self.assertEqual(self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'}).status_code, 403)
         admin = self.session(['admin'])
         self.assertEqual(self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'publish'}, client=admin).status_code, 409)
-        self.assertEqual(self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_key_12345678').status_code, 200)
+        self.assertEqual(self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', self.ref(), key='validate_key_12345678').status_code, 200)
         self.assertEqual(self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'}, key='approve_key_12345678', client=admin).status_code, 200)
         self.assertEqual(self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'publish'}, key='publish_key_12345678', client=admin).json()['data']['workflow']['status'], 'published')
         admin.close()
@@ -206,7 +206,7 @@ class WorkflowApiTests(unittest.TestCase):
         self.save(draft)
         ref = dict(workflow_id=draft['workflow_id'], workflow_version=1)
         endpoint = f"/workflows/{draft['workflow_id']}"
-        self.assertEqual(self.mutate(endpoint + '/validate', 'validate_workflow', ref).status_code, 200)
+        self.assertEqual(self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', ref).status_code, 409)
         admin = self.session(['admin'])
         denied = self.mutate(endpoint + '/approve', 'approve_workflow', {**ref, 'action': 'approve'}, key='approve_tool_key_12345678', client=admin)
         self.assertEqual(denied.json()['data']['error']['error_code'], 'TOOL_ASSIGNMENT_REQUIRED')
@@ -219,7 +219,7 @@ class WorkflowApiTests(unittest.TestCase):
             {'requirement': 'condition_mapping', 'reason': 'condition_mapping_required'}]
         self.save()
         endpoint = f"/workflows/{self.workflow['workflow_id']}"
-        self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_slack_setup')
+        self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', self.ref(), key='validate_slack_setup')
         admin = self.session(['admin'])
         response = self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'},
                                key='approve_slack_setup', client=admin)
@@ -265,7 +265,7 @@ class WorkflowApiTests(unittest.TestCase):
     def test_hierarchy_semantics_fail_validation_until_review(self):
         self.workflow['nodes'][0]['configuration'] = {'ui': {'role': 'master'}}
         self.save()
-        result = self.mutate(f"/workflows/{self.workflow['workflow_id']}/validate", 'validate_workflow', self.ref())
+        result = self.mutate(f"/workflows/{self.workflow['workflow_id']}/submit-for-approval", 'submit_workflow_for_approval', self.ref())
         self.assertEqual(result.status_code, 400)
         self.assertEqual(result.json()['data']['error']['error_code'], 'UNSUPPORTED_EXECUTION_CONFIGURATION')
 
@@ -278,7 +278,7 @@ class WorkflowApiTests(unittest.TestCase):
         self.workflow['agents'] = [standalone]
         self.save()
         endpoint = f"/workflows/{self.workflow['workflow_id']}"
-        self.assertEqual(self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_agent_12345678').status_code, 200)
+        self.assertEqual(self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', self.ref(), key='validate_agent_12345678').status_code, 409)
         admin = self.session(['admin'])
         response = self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'}, key='approve_agent_12345678', client=admin)
         self.assertEqual(response.json()['data']['error']['error_code'], 'AGENT_REGISTRATION_REQUIRED')
@@ -334,7 +334,7 @@ class WorkflowApiTests(unittest.TestCase):
         self.assertNotIn('cred_local_sheets', saved.text)
         self.assertNotIn('authorization_reference', saved.text)
         endpoint = f"/workflows/{self.workflow['workflow_id']}"
-        self.assertEqual(self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_registry_1234', client=admin).status_code, 200)
+        self.assertEqual(self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', self.ref(), key='validate_registry_1234', client=admin).status_code, 200)
         approved = self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'}, key='approve_registry_1234', client=admin)
         self.assertEqual(approved.status_code, 200, approved.json())
         self.assertEqual(approved.json()['data']['workflow']['agents'][0]['allowed_tool_ids'], ['google_sheets_read_rows'])
@@ -372,7 +372,7 @@ class WorkflowApiTests(unittest.TestCase):
                 if reason == 'APPROVAL_REQUIRED':
                     self.assertEqual(review['items'][0]['authorization_state'], 'pending_approval')
                 endpoint = f"/workflows/{self.workflow['workflow_id']}"
-                self.mutate(endpoint + '/validate', 'validate_workflow', self.ref(), key='validate_' + reason, client=client)
+                self.mutate(endpoint + '/submit-for-approval', 'submit_workflow_for_approval', self.ref(), key='validate_' + reason, client=client)
                 denied = self.mutate(endpoint + '/approve', 'approve_workflow', {**self.ref(), 'action': 'approve'}, key='approve_' + reason, client=client)
                 self.assertEqual(denied.status_code, 409, denied.json())
 

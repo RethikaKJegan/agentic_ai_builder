@@ -171,6 +171,10 @@ class CrewAdapter:
                 query_guidance = GUIDANCE
         elif capability_context(inputs) is not None and closed_payload(definition['output_schema']):
             llm.structured_format=dict(type='json_schema',name='scoped_capability_analysis',strict=True,schema=deepcopy(definition['output_schema']))
+        if self.execution_preferences.get('behaviours',{}).get('strictOutputFormat') and not (getattr(llm,'control_format',None) or getattr(llm,'structured_format',None)):
+            if not closed_payload(definition['output_schema']):
+                raise RuntimeFailure('STRICT_OUTPUT_CONTRACT_UNAVAILABLE','Strict formatting needs a closed registered output contract. Use a supported agent contract or turn off this optional preference.',422)
+            llm.structured_format=dict(type='json_schema',name='registered_agent_output',strict=True,schema=deepcopy(definition['output_schema']))
         from .preference_guards import guidance
         query_guidance += guidance(self.execution_preferences)
         agent = Agent(role=definition['role'], goal=definition['goal'], backstory=definition['instructions']+query_guidance,
@@ -230,7 +234,9 @@ class CrewAdapter:
         try:
             output = json.loads(result.raw)
             from .preference_guards import protect_output,validate_evidence
-            output=protect_output(output,self.execution_preferences)
+            if protocol is None:output=protect_output(output,self.execution_preferences)
+            elif output.get('action')=='finish' and isinstance(output.get('output'),dict):
+                output={**output,'output':protect_output(output['output'],self.execution_preferences)}
             validate_evidence(output,inputs,self.execution_preferences)
             reject_secrets(output)
             errors=list(Draft202012Validator(definition['output_schema']).iter_errors(output))
@@ -242,6 +248,9 @@ class CrewAdapter:
                 usage_callback(deepcopy(crew.agents[0].llm.actual_usage))
             return output
         except Exception as exc:
+            if isinstance(exc,RuntimeFailure) and exc.code in {'PROMPT_INJECTION_DETECTED','BEHAVIOUR_SAFETY_REJECTED'}:
+                exc.usage=deepcopy(crew.agents[0].llm.actual_usage)
+                raise
             error=RuntimeFailure('AGENT_OUTPUT_INVALID', 'The agent did not produce a safe schema-valid result.')
             error.invalid_model_output=True
             error.validation_field=validation_field

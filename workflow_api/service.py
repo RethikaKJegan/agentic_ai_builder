@@ -163,7 +163,8 @@ class WorkflowService:
                     raise ApiFailure('SERVICE_UNAVAILABLE', 'The runtime and approval service is not connected.', 503, retryable=True)
                 runtime = self.runtime_runner.runtime
                 if operation == 'execute_workflow':
-                    run = runtime.create_run(request, auth)
+                    from .run_entry import start
+                    run = start(self,request,auth)
                     if not getattr(self,'background_execution',False):
                         run = self.runtime_runner.advance(run['run_id'], auth)
                     data = {'run': run}
@@ -499,7 +500,7 @@ class WorkflowService:
                 report=assess(self,workflow,auth,db)
                 if prepared_validation:
                     if prepared_validation['workflow_fingerprint']!=readiness_fingerprint(workflow):
-                        raise ApiFailure('REVISION_CONFLICT','The workflow changed during validation. Validate the current revision.',409)
+                        raise ApiFailure('REVISION_CONFLICT','The workflow changed during Run checks. Run the current revision.',409)
                     report['model_assessment']=prepared_validation['model_assessment']
                     report['issues'].extend(i for i in prepared_validation['issues'] if i['method']=='model_assessment' or i['problem'].startswith('Original-request'))
                     report['ready']=not any(i['blocking'] for i in report['issues'])
@@ -560,9 +561,22 @@ class WorkflowService:
                     requirements.append('Load trusted agent/tool registrations with BUILDER_REGISTRY_CONFIG before publication.')
                 raise ApiFailure(code, 'Publication needs the setup requirements listed below.', 409,
                     details={'requirements': list(dict.fromkeys(requirements)), 'reason_codes': review['reason_codes']})
+            # Trusted Registry reconciliation can resolve stale draft requirements.
+            # Recheck the reconciled document, retaining semantic review blockers.
+            from .readiness import assess
+            current_report=assess(self,workflow,auth,db)
             if report:
-                gaps=[i for i in report['issues'] if i['blocking']]
-                if gaps:raise ApiFailure('WORKFLOW_READINESS_FAILED','Resolve the workflow readiness issues before approval.',409,details={'issues':gaps})
+                if report.get('model_assessment') is not None and report['workflow_fingerprint']!=current_report['workflow_fingerprint']:
+                    raise ApiFailure('WORKFLOW_READINESS_STALE','The reviewed configuration changed. Create a reviewed revision and use Run to check it again.',409)
+                current_report['issues'].extend(i for i in report['issues'] if
+                    i['method']=='model_assessment' or i['problem'].startswith('Original-request'))
+                current_report['model_assessment']=report.get('model_assessment',current_report.get('model_assessment'))
+            gaps=[i for i in current_report['issues'] if i['blocking']]
+            if gaps:raise ApiFailure('WORKFLOW_READINESS_FAILED','Resolve the workflow readiness issues before approval.',409,details={'issues':gaps})
+            # Approval records the current checks so resolved legacy drafts do
+            # not retain an obsolete blocking report at the runtime boundary.
+            current_report['ready']=True
+            workflow['metadata']['validation_report']=current_report
             workflow['status'] = 'approved' if action == 'approve' else 'published'
             assignments = self.registry_adapter.execution_assignments(workflow, auth)
             for agent in workflow['agents']:

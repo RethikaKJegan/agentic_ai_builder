@@ -142,15 +142,15 @@ class RuntimeService:
         self.governance.check_run(db, run, workflow)
         return workflow, grants
 
-    def create_run(self, request, auth, *, on_created=None):
+    def create_run(self, request, auth, *, on_created=None, expected_digest=None, coalesce=False):
         # Trusted in-process persistence hook; never accepted from an API payload.
-        return self._create_run(request, auth, allow_superseded=False, on_created=on_created)
+        return self._create_run(request, auth, allow_superseded=False, on_created=on_created, expected_digest=expected_digest,coalesce=coalesce)
 
     def create_automation_run(self, request, auth, *, on_created=None):
         """Trusted lifecycle entry point for a job pinned to an immutable release."""
         return self._create_run(request, auth, allow_superseded=True, on_created=on_created)
 
-    def _create_run(self, request, auth, allow_superseded, on_created=None):
+    def _create_run(self, request, auth, allow_superseded, on_created=None, expected_digest=None,coalesce=False):
         self.authorize(auth, 'workflow.execute', {'admin', 'builder'})
         key = request.get('idempotency_key')
         if not isinstance(key, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{8,128}', key):
@@ -164,6 +164,8 @@ class RuntimeService:
             # Authorize even retries; an idempotent result is not a fresh grant.
             workflow, _ = self.revision(db, payload.get('workflow_id'), payload.get('workflow_version'), auth, allow_superseded)
             self.validate_inputs(workflow, payload.get('inputs', {}))
+            if expected_digest is not None and digest(workflow)!=expected_digest:
+                raise RuntimeFailure('REVISION_CONFLICT','Workflow changed during Run checks. Refresh and run the current revision.',409)
             row = db.execute('SELECT fingerprint, document FROM runtime_runs WHERE workspace=? AND subject=? AND retry_key=?', (workspace, subject, digest(key))).fetchone()
             if row:
                 if row[0] != fingerprint:
@@ -171,6 +173,11 @@ class RuntimeService:
                 existing = json.loads(row[1])
                 if on_created is not None:on_created(db, deepcopy(existing))
                 return self.public(existing)
+            if coalesce:
+                active=db.execute("SELECT fingerprint,document FROM runtime_runs WHERE workspace=? AND subject=? AND workflow_id=? AND version=? AND json_extract(document,'$.status') IN ('queued','running','paused_for_approval') ORDER BY rowid DESC LIMIT 1",(workspace,subject,workflow['workflow_id'],workflow['version'])).fetchone()
+                if active:
+                    if active[0]!=fingerprint:raise RuntimeFailure('RUN_ALREADY_ACTIVE','A run with different inputs is already active.',409)
+                    return self.public(json.loads(active[1]))
             if controls:=getattr(self,'resource_controls',None):controls.admit(db,workspace)
             if validator := getattr(self, 'execution_validator', None):
                 validator(workflow, auth, db)
@@ -395,6 +402,9 @@ class RuntimeService:
             run['finished_at'] = self.clock()
         if run.get('adaptive',{}).get('kind')=='workflow-investigation' and target in {'failed','blocked','cancelled','rejected'}:
             run['adaptive']['status']=target
+        if target in {'failed','blocked','cancelled','rejected'}:
+            from .query_parallel import stop_queries
+            stop_queries(db,run)
         if target in {'completed','failed','blocked','cancelled','rejected'}:
             from .recovery import evaluate_run
             workflow = self.store.get(db, run['workspace_id'], run['workflow_id'], run['workflow_version']) or {'nodes': []}

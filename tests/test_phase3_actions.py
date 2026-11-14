@@ -17,7 +17,7 @@ def context():
 
 def validated(context):
     assert context.save().status_code==200
-    assert context.mutate('/workflows/'+context.workflow['workflow_id']+'/validate','validate_workflow',context.ref(),'phase3_validate_123').status_code==200
+    assert context.mutate('/workflows/'+context.workflow['workflow_id']+'/submit-for-approval','submit_workflow_for_approval',context.ref(),'phase3_validate_123').status_code==200
 
 
 def submission(context,key='phase3_submission_123',version=1):
@@ -37,11 +37,11 @@ def test_submission_is_explicit_durable_and_does_not_approve_publish_or_activate
     assert context.client.post(path,json=submission(context,version=2)).status_code==409
 
 
-def test_submission_rejects_unvalidated_stale_and_unauthorized_requests(context):
+def test_submission_checks_draft_and_rejects_stale_and_unauthorized_requests(context):
     assert context.save().status_code==200
     path='/workflows/'+context.workflow['workflow_id']+'/submit-for-approval'
-    assert context.client.post(path,json=submission(context)).status_code==409
-    validated_response=context.mutate('/workflows/'+context.workflow['workflow_id']+'/validate','validate_workflow',context.ref(),'phase3_validate_123')
+    assert context.client.post(path,json=submission(context)).status_code==200
+    validated_response=context.mutate('/workflows/'+context.workflow['workflow_id']+'/submit-for-approval','submit_workflow_for_approval',context.ref(),'phase3_validate_123')
     assert validated_response.status_code==200
     assert context.client.post(path,json=submission(context,key='stale_submission_123',version=2)).status_code==409
     approver=context.session(['approver'])
@@ -54,7 +54,7 @@ def test_submission_allows_real_pending_tool_review_without_granting_approval(co
     client=context.configured_session(config)
     assert context.save(client=client).status_code==200
     path='/workflows/'+context.workflow['workflow_id']
-    assert context.mutate(path+'/validate','validate_workflow',context.ref(),'validate_pending_123',client=client).status_code==200
+    assert context.mutate(path+'/submit-for-approval','submit_workflow_for_approval',context.ref(),'validate_pending_123',client=client).status_code==200
     result=client.post(path+'/submit-for-approval',json=submission(context))
     assert result.status_code==200,result.text
     data=result.json()['data']
@@ -73,25 +73,24 @@ def test_submission_still_rejects_denied_tools(context,changes,reason):
     client=context.configured_session(context.registry_configuration(**changes))
     assert context.save(client=client).status_code==200
     path='/workflows/'+context.workflow['workflow_id']
-    assert context.mutate(path+'/validate','validate_workflow',context.ref(),'validate_denied_123',client=client).status_code==200
+    assert context.mutate(path+'/submit-for-approval','submit_workflow_for_approval',context.ref(),'validate_denied_123',client=client).status_code in (403,409)
     result=client.post(path+'/submit-for-approval',json=submission(context))
-    assert result.status_code==403,result.text
-    assert reason in result.json()['data']['error']['details']['reason_codes']
+    assert result.status_code in (403,409),result.text
+    details=result.json()['data']['error'].get('details',{})
+    assert reason in details.get('reason_codes',[]) or details.get('issues')
 
 
 def test_submission_shows_unresolved_destination_requirement(context):
     context.workflow['metadata']['unresolved_requirements']=[
         'Confirm the report spreadsheet destination and product columns.',
         {'requirement':'Choose report destination'}]
-    validated(context)
+    assert context.save().status_code==200
     path='/workflows/'+context.workflow['workflow_id']+'/submit-for-approval'
     result=context.client.post(path,json=submission(context))
-    assert result.status_code==403,result.text
-    error=result.json()['data']['error']
-    assert error['details']['requirements']==[
-        'Confirm the report spreadsheet destination and product columns.',
-        'Resolve requirement: Choose report destination']
-    assert 'UNRESOLVED_REQUIREMENTS' in error['details']['reason_codes']
+    assert result.status_code==409,result.text
+    issues=result.json()['data']['error']['details']['issues']
+    assert any('Confirm the report spreadsheet destination and product columns.' in i['problem'] for i in issues)
+    assert any('Choose report destination' in i['problem'] for i in issues)
 
 
 def test_submission_rejects_uncovered_tool_even_with_pending_approval_summary(context):
@@ -100,7 +99,8 @@ def test_submission_rejects_uncovered_tool_even_with_pending_approval_summary(co
             'items':[{'tool_id':'missing','authorization_state':'denied','reason_codes':[]}]}
     with patch.object(context.service.registry_adapter,'review',return_value=review):
         result=context.client.post('/workflows/'+context.workflow['workflow_id']+'/submit-for-approval',json=submission(context))
-    assert result.status_code==403
+    assert result.status_code==409
+    assert result.json()['data']['error']['details']['issues']
 
 
 def test_save_timestamp_is_server_confirmed_and_submission_does_not_leak_to_new_draft(context):

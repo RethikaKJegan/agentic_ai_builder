@@ -360,6 +360,8 @@ export function CompositionInspector({
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
+          {task?.detail_error&&<p role="alert" className="text-sm text-destructive">{task.detail_error}</p>}
+          {task?.unparsed_result!==undefined&&<Details value={task.unparsed_result} label="Unparsed saved details"/>}
           <SheetDescription>
             {task?.result?.classification === "query_clarification"
               ? "Query blocked"

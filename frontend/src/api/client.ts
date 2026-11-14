@@ -31,7 +31,7 @@ import { assertWorkflowReferences } from "./control";
 import {
   ApiResponseSchema, ApiRequestSchema, AuthContextSchema, CanonicalWorkflowSchema, CanonicalToolSchema,
   SafeErrorSchema, RunEventSchema, RunStatusSchema, CollectionSchema,
-  type CanonicalWorkflow, type Operation, type SafeError,
+  type CanonicalWorkflow, type SafeError,
 } from "./contracts.generated";
 
 function queryString(filters:Record<string, unknown>) {
@@ -87,7 +87,6 @@ export type Payloads = {
   list_workflows: Record<string, never>;
   get_workflow: { workflow_id: string; workflow_version?: number };
   save_workflow_version: Ref & { workflow: CanonicalWorkflow; base_version: number };
-  validate_workflow: Ref;
   approve_workflow: Ref & { action: "approve" | "publish" };
   execute_workflow: Ref & { inputs: Record<string, unknown> };
   get_run: { run_id: string };
@@ -97,7 +96,7 @@ export type Payloads = {
   decide_approval: { approval_id: string; decision: "approved" | "rejected"; workflow_id: string; workflow_version: number };
 };
 const responseSchemas = { plan_workflow: workflowData, list_workflows: workflowsData, get_workflow: workflowData,
-  save_workflow_version: workflowData, validate_workflow: workflowData, approve_workflow: workflowData,
+  save_workflow_version: workflowData, approve_workflow: workflowData,
   execute_workflow: runData, get_run: runData, list_run_events: eventsData, list_tools: toolsData,
   list_capabilities: capabilitiesData, decide_approval: approvalData };
 const planningJobSchema = z.object({ job_id: z.string(), state: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]), result: ApiResponseSchema.nullable() });
@@ -126,6 +125,7 @@ export function containsSecret(value: unknown): boolean {
   return false;
 }
 
+type Operation = keyof Payloads;
 function route(operation: Operation, payload: Payloads[Operation]): [string, string] {
   const p = payload as Partial<Ref & { run_id: string; approval_id: string }>;
   const id = encodeURIComponent(p.workflow_id ?? "");
@@ -134,7 +134,6 @@ function route(operation: Operation, payload: Payloads[Operation]): [string, str
     case "list_workflows": return ["workflows", "GET"];
     case "get_workflow": return [`workflows/${id}${p.workflow_version ? `?version=${p.workflow_version}` : ""}`, "GET"];
     case "save_workflow_version": return [`workflows/${id}/versions/${p.workflow_version}`, "PUT"];
-    case "validate_workflow": return [`workflows/${id}/validate`, "POST"];
     case "approve_workflow": return [`workflows/${id}/approve`, "POST"];
     case "execute_workflow": return [`workflows/${id}/execute`, "POST"];
     case "list_tools": return ["tools", "GET"];
@@ -198,7 +197,7 @@ export class WorkflowClient {
   async runKnowledge(id:string) {return runKnowledgeSchema.parse(await this.read(`runs/${encodeURIComponent(id)}/knowledge`));}
   async recoveryInspection(id:string) {return recoveryInspectionSchema.parse(await this.read(`runs/${encodeURIComponent(id)}/recovery`));}
   async operationalAlerts() {return operationalAlertsSchema.parse(await this.read('operational-alerts'));}
-  async compositionView(id:string,runId?:string) {return compositionViewSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/view${runId?`?run_id=${encodeURIComponent(runId)}`:''}`));}
+  async compositionView(id:string,runId?:string,detail:'full'|'summary'|'task'='full',taskId?:string) {const query=new URLSearchParams({detail});if(runId)query.set('run_id',runId);if(taskId)query.set('task_id',taskId);return compositionViewSchema.parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/view?${query}`));}
   async compositions() {return compositionListSchema.parse(await this.read('business-ontology/v1/compositions'));}
   async duplicateComposition(id:string,request_key:string) {return z.object({workflow_id:z.string(),composition_id:z.string()}).parse(await this.read(`business-ontology/v1/compositions/${encodeURIComponent(id)}/duplicate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key})}));}
   async duplicateInvestigation(id:string,request_key:string) {return z.object({workflow_id:z.string()}).parse(await this.read(`business-ontology/v1/investigations/plans/${encodeURIComponent(id)}/duplicate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key})}));}

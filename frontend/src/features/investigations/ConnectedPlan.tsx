@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Info, Play, CheckCircle2, RefreshCw, Settings2, Network, Loader2 } from "lucide-react";
+import { Info, Play, RefreshCw, Settings2, Network, Loader2 } from "lucide-react";
 import { QueryClarification } from "./QueryClarification";
 import { QueryEvidence } from "./QueryEvidence";
 import { AdaptiveProgress } from "@/features/builder/AdaptiveProgress";
@@ -27,7 +27,7 @@ import { api } from "@/api/client";
 import { GoogleAccountSelect } from "@/features/workflows/GoogleWorkflowConnection";
 import { useBackend } from "@/api/state";
 import { type ActionDocument, receiptLinks } from "@/api/orchestration";
-import { type CompositionView } from "@/api/compositions";
+import { newerComposition, type CompositionView } from "@/api/compositions";
 import { ApiFeedback } from "@/features/workflows/ApiFeedback";
 import { SavedDetails, Outcome } from "./LifecyclePanels";
 import { CompositionCanvas } from "./CompositionCanvas";
@@ -69,6 +69,8 @@ function ScopedConnectedPlan({
   const command = useOrchestrationCommand();
   const [doc, setDoc] = useState<ActionDocument | null>(null);
   const [view, setView] = useState<CompositionView | null>(null);
+  const [detailView,setDetailView]=useState<CompositionView|null>(null);
+  const [detailError,setDetailError]=useState<Error|null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [stale, setStale] = useState(true);
@@ -76,13 +78,8 @@ function ScopedConnectedPlan({
     "workflow",
   );
   const [panel, setPanel] = useState<string | null>(null);
-  const [reviewRun, setReviewRun] = useState(false);
-  const [operation, setOperation] = useState<"validate" | "run" | null>(null);
+  const [operation, setOperation] = useState<"run" | "approve" | null>(null);
   const runAttempt = useRef<string | null>(null);
-  const openRunReview = () => {
-    runAttempt.current = crypto.randomUUID();
-    setReviewRun(true);
-  };
   const [details, setDetails] = useState(false);
   const scope = backend.session
     ? backend.session.auth.subject.workspace_id + ":" + backend.session.auth.subject.subject_id
@@ -91,9 +88,11 @@ function ScopedConnectedPlan({
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
     setStale(true);
+    let document:ActionDocument|null=null;
     async function read() {
       try {
-        const [d, v] = await Promise.all([api.actionPlan(id), api.compositionView(id, runId)]);
+        const [d, v] = await Promise.all([document?Promise.resolve(document):api.actionPlan(id), api.compositionView(id, runId,'summary')]);
+        document=d;
         if (!live) return;
         if (
           d.composition_id !== id ||
@@ -104,10 +103,10 @@ function ScopedConnectedPlan({
         )
           throw new Error("Plan is outside the selected workspace.");
         setDoc(v.run?.action_plan ? { ...d, action_plan: v.run.action_plan } : d);
-        setView(v);
+        setView(previous=>newerComposition(previous,v));
         setError(null);
         setStale(false);
-        timer = setTimeout(() => void read(), 3000);
+        if(!v.run||!['completed','failed','blocked','cancelled','rejected'].includes(v.run.status))timer = setTimeout(() => void read(), 3000);
       } catch (e) {
         if (live) {
           setError(e as Error);
@@ -122,73 +121,49 @@ function ScopedConnectedPlan({
       clearTimeout(timer);
     };
   }, [id, runId, refresh, scope]);
+  const detailSnapshot=useRef(view);detailSnapshot.current=view;
+  const selectedState=view?.tasks.find(t=>t.id===panel)?.state;
+  useEffect(()=>{
+    const current=detailSnapshot.current;
+    if(!current||(!panel&&!['report','knowledge','background','steps'].includes(tab)&&!details&&current.run?.status!=='paused_for_approval'))return;
+    let live=true;setDetailError(null);
+    const task=panel&&current.tasks.some(t=>t.id===panel)?panel:undefined;
+    void api.compositionView(id,current.run?.run_id,task?'task':'full',task).then(value=>{if(live)setDetailView(value);}).catch(e=>{if(live)setDetailError(e as Error);});
+    return ()=>{live=false;};
+  },[id,view?.run?.run_id,view?.run?.status,selectedState,panel,tab,details,refresh]);
+  const inspectedView=useMemo(()=>detailView&&view&&detailView.run?.run_id===view.run?.run_id?{...detailView,run:detailView.run&&view.run?{...detailView.run,status:view.run.status,approvals:detailView.run.approvals.filter(a=>view.run?.approvals.some(v=>v.approval_id===a.approval_id&&v.status===a.status))}:view.run,tasks:detailView.tasks.map(task=>({...task,state:view.tasks.find(t=>t.id===task.id)?.state??task.state}))}:view,[detailView,view]);
   const update = () => setRefresh((n) => n + 1);
-  async function prepareReview() {
-    setOperation("validate");
-    await command.act("prepare-review:" + id, { composition_id: id }, async (body) => {
+  async function startRun() {
+    if (!view) return;
+    runAttempt.current ??= crypto.randomUUID();
+    setOperation("run");
+    await command.act("run:" + id + ":" + runAttempt.current, { composition_id: id }, async (body) => {
       const key = String(body["request_key"]);
       const current = await api.compositionView(id);
-      let ref = {
-        workflow_id: current.workflow_id,
-        workflow_version: current.workflow_version ?? 1,
-      };
+      let ref = { workflow_id: current.workflow_id, workflow_version: current.workflow_version ?? 1 };
       if (!current.workflow_status) {
         const workflow = await api.compositionWorkflow(id);
         ref = { workflow_id: workflow.workflow_id, workflow_version: workflow.version };
-        await api.request(
-          "save_workflow_version",
-          { ...ref, base_version: 0, workflow },
-          key + "_save",
-        );
+        await api.request("save_workflow_version", { ...ref, base_version: 0, workflow }, key + "_save");
       }
-      if (!current.workflow_status || current.workflow_status === "draft")
-        await api.request("validate_workflow", ref, key + "_validate");
-      update();
+      try {
+        if (scheduled || adaptive) await api.submitApproval(ref);
+        else {
+          const result = await api.request("execute_workflow", { ...ref, inputs: {} }, key + "_execute");
+          onRun?.(result.run.run_id);
+          runAttempt.current = null;
+        }
+      } finally { update(); }
     });
     setOperation(null);
   }
-  async function startReviewed() {
-    if (!view) return;
-    setOperation("run");
-    await command.act(
-      "review-run:" + id + ":" + runAttempt.current,
-      { workflow_id: view.workflow_id, workflow_version: view.workflow_version ?? 1 },
-      async (body) => {
-        const current = await api.compositionView(id);
-        const ref = {
-          workflow_id: current.workflow_id,
-          workflow_version: current.workflow_version ?? 1,
-        };
-        if (
-          current.run &&
-          ["queued", "running", "paused_for_approval"].includes(current.run.status)
-        )
-          throw new Error("A run is already active. Inspect it before starting another.");
-        if (
-          ref.workflow_id !== view.workflow_id ||
-          ref.workflow_version !== (view.workflow_version ?? 1)
-        )
-          throw new Error("The workflow version changed. Refresh and review again.");
-        if (current.workflow_status === "validated")
-          await api.request(
-            "approve_workflow",
-            { ...ref, action: "approve" },
-            String(body["request_key"]) + "_approve",
-          );
-        else if (!["approved", "published"].includes(current.workflow_status ?? ""))
-          throw new Error("Validate this workflow before running it.");
-        if (!scheduled && !adaptive) {
-          const result = await api.request(
-            "execute_workflow",
-            { ...ref, inputs: {} },
-            String(body["request_key"]) + "_execute",
-          );
-          onRun?.(result.run.run_id);
-        }
-        setReviewRun(false);
-        update();
-      },
-    );
+  async function approveWorkflow() {
+    if (!view?.workflow_version) return;
+    setOperation("approve");
+    await command.act("approve-workflow:" + id, { workflow_id: view.workflow_id, workflow_version: view.workflow_version }, async body => {
+      await api.request("approve_workflow", { workflow_id: view.workflow_id, workflow_version: view.workflow_version!, action: "approve" }, String(body["request_key"]));
+      update();
+    });
     setOperation(null);
   }
   const displayDoc = useMemo(
@@ -196,8 +171,8 @@ function ScopedConnectedPlan({
     [doc, backend.session?.auth.subject.workspace_id],
   );
   const displayView = useMemo(
-    () => subwayDisplay(view, backend.session?.auth.subject.workspace_id),
-    [view, backend.session?.auth.subject.workspace_id],
+    () => subwayDisplay(inspectedView??view, backend.session?.auth.subject.workspace_id),
+    [inspectedView,view, backend.session?.auth.subject.workspace_id],
   );
   const demoData =
     backend.session?.auth.subject.workspace_id === "client-subway" &&
@@ -240,36 +215,16 @@ function ScopedConnectedPlan({
             Details
           </button>
           <button
-            className={actionButton}
-            disabled={
-              disabled ||
-              !displayView ||
-              !backend.can("workflow.edit") ||
-              !backend.can("workflow.validate") ||
-              (!!displayView.workflow_status && displayView.workflow_status !== "draft")
-            }
-            onClick={() => void prepareReview()}
-          >
-            {operation === "validate" ? (
-              <Loader2 size={14} className="mr-2 inline animate-spin" />
-            ) : (
-              <CheckCircle2 size={14} className="mr-2 inline" />
-            )}
-            {operation === "validate" ? "Validating…" : "Validate"}
-          </button>
-          <button
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-40"
             disabled={
               disabled ||
               !displayView ||
               (!!displayView.run &&
                 ["queued", "running", "paused_for_approval"].includes(displayView.run.status)) ||
-              !["validated", "approved", "published"].includes(displayView.workflow_status ?? "") ||
               !backend.can("workflow.execute") ||
-              !backend.session?.runtime_available ||
-              (displayView.workflow_status === "validated" && !backend.can("workflow.approve"))
+              !backend.session?.runtime_available
             }
-            onClick={openRunReview}
+            onClick={() => void startRun()}
           >
             {operation === "run" ? (
               <Loader2 size={14} className="animate-spin" />
@@ -289,6 +244,7 @@ function ScopedConnectedPlan({
         </div>
       </div>
       <ApiFeedback error={error ?? command.error} />
+      {displayView?.workflow_status === "validated" && <div role="status" className="flex flex-wrap items-center gap-3 text-sm"><span>Awaiting approval. Review the workflow and its configured actions.</span>{backend.can("workflow.approve") && <button className={actionButton} disabled={command.busy || stale} onClick={() => void approveWorkflow()}>Approve workflow</button>}</div>}
       {operation && (
         <div
           role="status"
@@ -296,7 +252,7 @@ function ScopedConnectedPlan({
           className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4 text-sm"
         >
           <Loader2 className="h-5 w-5 animate-spin" />
-          {operation === "validate" ? "Validating workflow…" : "Starting a new run…"}
+          {operation === "approve" ? "Submitting approval…" : "Checking and starting run…"}
         </div>
       )}
       {displayView?.run && (
@@ -428,7 +384,7 @@ function ScopedConnectedPlan({
               </button>
             ))}
           </div>
-          {tab === "knowledge" && <KnowledgeMap doc={displayDoc} view={displayView} />}
+          {tab === "knowledge" && <KnowledgeMap doc={displayDoc} view={inspectedView??displayView} />}
           {tab === "background" && (
             <section className="space-y-4" aria-label="Workflow background">
               <div>
@@ -510,48 +466,6 @@ function ScopedConnectedPlan({
               </div>
             </SheetContent>
           </Sheet>
-          <Dialog open={reviewRun} onOpenChange={setReviewRun}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {displayView.workflow_status === "validated"
-                    ? "Review and run workflow"
-                    : "Run workflow"}
-                </DialogTitle>
-                <DialogDescription>
-                  {scheduled
-                    ? "Approve this workflow for the separately reviewed schedule. Scheduling authorization remains below."
-                    : adaptive
-                      ? "Approve this workflow for the existing orchestration controller."
-                      : "Start the saved workflow using its connected account and configured actions. External writes still require their exact-payload approvals."}
-                </DialogDescription>
-              </DialogHeader>
-              <p className="text-sm">{displayDoc.action_plan.goal}</p>
-              {displayView.run && (
-                <p className="text-sm text-muted-foreground">
-                  Creates a separate run and may repeat configured actions. Previous runs stay in
-                  history; action approvals are checked again.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Workflow version {displayView.workflow_version ?? 1} ·{" "}
-                {displayDoc.action_plan.actions.length} steps
-              </p>
-              <button
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-                disabled={disabled}
-                onClick={() => void startReviewed()}
-              >
-                {operation === "run"
-                  ? "Starting run…"
-                  : scheduled || adaptive
-                    ? "Approve workflow"
-                    : displayView.run
-                      ? "Confirm new run"
-                      : "Confirm and run"}
-              </button>
-            </DialogContent>
-          </Dialog>
           <div className="flex flex-wrap gap-2">
             {!adaptive &&
               displayView.run &&
@@ -659,7 +573,7 @@ function ScopedConnectedPlan({
           )}
           {tab === "report" && (
             <div role="tabpanel" aria-label="Investigation report">
-              <CompositionReport view={displayView} />
+              <ApiFeedback error={detailError} /><CompositionReport view={inspectedView??displayView} />
               {Object.entries(displayView.run?.action_instances ?? {}).map(([id, instance]) => (
                 <QueryEvidence key={id} instance={instance} />
               ))}
@@ -749,7 +663,7 @@ function ScopedConnectedPlan({
               })}
             </ol>
           )}
-          <CompositionInspector view={displayView} section={panel} onClose={() => setPanel(null)} />
+          <ApiFeedback error={detailError} /><CompositionInspector view={inspectedView??displayView} section={panel} onClose={() => setPanel(null)} />
           {!demoData && (
             <p className="text-xs text-muted-foreground">
               ACTUAL source/provider reports, DERIVED values, INFERRED content and SYNTHETIC

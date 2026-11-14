@@ -207,11 +207,12 @@ def replace_binding(action,field,kind,key,satisfied):
     satisfied.add(field)
 
 
-def calendar_context(context,goal,selected,*,now=None):
+def calendar_context(context,goal,selected,*,now=None,timezone=None):
     """Interpret fully specified local scheduling facts; never guess missing times."""
     if not selected:return
     if re.search(r'\bprimary\s+(?:Google\s+)?calendar\b|\bmy\s+calendar\b(?=\s*(?:[,.!?]|$|today\b|tomorrow\b|on\b|at\b|with\b|for\b))',goal,re.I):
         context['validated_context']['primary_calendar_id']='primary'
+    if all(k in context['validated_context'] for k in ('calendar_event_start','calendar_event_end')):return
     original_goal=goal
     # Separate the event clause from an earlier requested workflow execution time.
     clause=re.search(r'\b(?:add|create|book|schedule)\b[^.!?\n]*?\b(?:review|meeting|event|appointment)\b',goal,re.I)
@@ -222,15 +223,19 @@ def calendar_context(context,goal,selected,*,now=None):
     interval=len(clocks)==2 and bool(re.fullmatch(r'\s*(?:to|until|[-–])\s*',goal[clocks[0].end():clocks[1].start()],re.I))
     clock=clocks[0] if len(clocks)==1 or interval else None
     zone=re.search(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',goal)
-    zone_name=zone[1] if zone else 'Asia/Kolkata' if re.search(r'\b(?:India(?:n)? (?:standard )?time)\b',goal,re.I) else None
+    zone_name=zone[1] if zone else 'UTC' if re.search(r'\b(?:UTC|GMT)\b',goal,re.I) else 'Asia/Kolkata' if re.search(r'\b(?:India(?:n)? (?:standard )?time)\b',goal,re.I) else None
     if not zone_name:
         # A single explicitly stated timezone also governs the later event clause.
         zones=set(re.findall(r'\b([A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\b',original_goal))
         if re.search(r'\bIndia(?:n)? (?:standard )?time\b',original_goal,re.I):zones.add('Asia/Kolkata')
         if len(zones)==1:zone_name=zones.pop()
-    duration=re.search(r'\b(\d{1,3})[- ]minute\b',goal,re.I)
+    if not zone_name and re.search(r'\b(?:EST|EDT|CST|CDT|MST|MDT|PST|PDT|IST)\b',goal):return
+    zone_name=zone_name or timezone
+    duration=re.search(r'\b(\d{1,3})[- ]minutes?\b',goal,re.I)
     words_duration=re.search(r'\b(one|five|ten|fifteen|twenty|thirty|forty-five|sixty|ninety)[- ]minute\b',goal,re.I)
-    duration_minutes=int(duration[1]) if duration else {'one':1,'five':5,'ten':10,'fifteen':15,'twenty':20,'thirty':30,'forty-five':45,'sixty':60,'ninety':90}.get(words_duration[1].lower()) if words_duration else None
+    duration_minutes=int(duration[1]) if duration else {'one':1,'five':5,'ten':10,'fifteen':15,'twenty':20,'thirty':30,'forty-five':45,'sixty':60,'ninety':90}.get(words_duration[1].lower()) if words_duration else (None if interval else 30)
+    hours_duration=re.search(r'\b(\d{1,2})[- ]hours?\b',goal,re.I)
+    if hours_duration:duration_minutes=int(hours_duration[1])*60
     relative=re.search(r'\b(today|tomorrow)\b',goal,re.I)
     if not (date_match or words or relative) or not clock or not zone_name or not (duration_minutes or interval):return
     from datetime import datetime,timedelta
@@ -261,6 +266,7 @@ def calendar_context(context,goal,selected,*,now=None):
             if not 1<=duration_minutes<=999:return
             end=start+timedelta(minutes=duration_minutes)
         if end.utcoffset()!=end.replace(fold=1).utcoffset():return
+        if any(datetime.fromtimestamp(v.timestamp(),timezone)!=v for v in (start,end)):return
         context['validated_context']['calendar_event_start']={'dateTime':start.isoformat(),'timeZone':zone_name}
         context['validated_context']['calendar_event_end']={'dateTime':end.isoformat(),'timeZone':zone_name}
     except (ValueError,ZoneInfoNotFoundError):return
@@ -272,6 +278,16 @@ def calendar_bindings(actions,contracts,context,satisfied):
         operation=contracts.get(action.get('capability_id'),{}).get('supported_operation','')
         if not operation.startswith('calendar.') or operation=='calendar.discover':continue
         bindings=action.setdefault('bindings',[])
+        original=values.get('calendar_original_timing')
+        if original and operation=='calendar.create' and not any(b.get('target')==['event'] for b in bindings):
+            for field in ('start','end'):
+                path=['event',field];key='calendar_event_'+field
+                canonical=dict(kind='context',key=key,path=[],target=path)
+                previous=[b for b in bindings if b.get('target',[])[:2]==path]
+                if previous and previous!=[canonical]:
+                    record=dict(repair_id=digest([action['action_id'],field,original[key]]),field=action['action_id']+'.event.'+field,applied=True,correction='Restored the unambiguous original requested Calendar '+field+' before approval.')
+                    if record not in values.setdefault('calendar_timing_corrections',[]):values['calendar_timing_corrections'].append(record)
+                bindings[:]=[b for b in bindings if b not in previous]+[canonical]
         for path,key in [(['calendar_id'],'primary_calendar_id'),(['event','start'],'calendar_event_start'),(['event','end'],'calendar_event_end')]:
             if path[0]=='event' and operation not in ('calendar.create','calendar.update'):continue
             if key not in values or any(b['target'][:len(path)]==path or path[:len(b['target'])]==b['target'] for b in bindings):continue

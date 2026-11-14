@@ -122,7 +122,11 @@ class PlanningJobs:
                             or overview.get('objective')!=request['payload']['objective']
                             or overview.get('request_key')!=request['idempotency_key']):
                         raise ApiFailure('OVERVIEW_ROUTING_UNAVAILABLE','Overview routing is unavailable or the queued request changed.',409)
-                    return self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
+                    from .calendar_intent import original_request
+                    with self.store.transaction(write=False) as db:
+                        received=db.execute('SELECT created FROM builder_planning_jobs WHERE job_id=?',(row[0],)).fetchone()[0]
+                    with original_request(received):
+                        return self.service.envelope(request['request_id'],200,adapter.handle(deepcopy(auth),overview))
                 else:
                     return self.service.handle(request, deepcopy(auth))
             def active():

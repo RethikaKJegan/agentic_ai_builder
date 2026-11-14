@@ -54,6 +54,9 @@ def result_view(result):
             if identity in seen:continue
             seen.add(identity)
             records.append({k:deepcopy(record[k]) for k in ('record_id','collection','source_reference','read_at','values') if k in record})
+    if isinstance(view.get('findings'),str):view['findings']=[view['findings']]
+    if isinstance(view.get('findings'),list):
+        view['findings']=[dict(kind='narrative',statement=f,references=[]) if isinstance(f,str) else f for f in view['findings']]
     view['records']=records;view['rule_results']=rules
     view['tool_receipts']=[dict(tool_id=r['tool_id'],receipt=tool_receipt(r.get('output',{}))) for r in result.get('tool_results',[])]
     return view
@@ -79,7 +82,8 @@ class CompositionPresentation:
             items.append(dict(workflow_id=wid,composition_id=doc['composition_id'],display_name=presentation_title(self.service,doc,meta.get('name') or display_title(doc)),objective=doc['objective'],created_at=doc['created_at'],node_count=len(doc['tasks']),run_id=run['run_id'] if run else None,status=run['status'] if run else doc['state'],kind='composition'))
         return items
 
-    def view(self,auth,cid,run_id=None):
+    def view(self,auth,cid,run_id=None,detail='full',task_id=None):
+        if detail not in ('full','summary','task'):fail('Unknown detail projection.')
         doc=self.composition.get(auth,cid,revalidate=False);wid='cw_'+cid.removeprefix('composition_');scope=(doc['scope']['workspace'],doc['scope']['owner'])
         with self.store.transaction(write=False) as db:
             if db.execute('SELECT 1 FROM lifecycle_tombstones WHERE workspace=? AND workflow_id=?',(scope[0],wid)).fetchone():fail('Workflow was deleted.','WORKFLOW_DELETED',410)
@@ -99,6 +103,9 @@ class CompositionPresentation:
                     from .workflow_adaptive import effective, presentation_document
                     workflow=effective(run,workflow)
                     doc=presentation_document(doc,workflow)
+            if detail=='summary':
+                sequence=db.execute('SELECT COALESCE(MAX(sequence),0) FROM runtime_events WHERE workspace=? AND run_id=?',(scope[0],run_id)).fetchone()[0] if run else 0
+                return self.summary(doc,workflow,run,sequence,auth,meta[0] if meta and meta[0] else None)
             events=[]
             if run:
                 events=[json.loads(r[0]) for r in db.execute('SELECT document FROM runtime_events WHERE workspace=? AND run_id=? ORDER BY sequence DESC LIMIT 1000',(scope[0],run_id)).fetchall()][::-1]
@@ -116,6 +123,8 @@ class CompositionPresentation:
         for task in doc['tasks']:
             config=next((c for c in doc['configurations'] if c['assigned_task']==task['task_id']),None)
             checkpoint=checkpoints.get(task['task_id']);state=task['state'] if task['state']!='ready' else 'pending';output=None
+            if detail=='task' and task['task_id']!=task_id:
+                checkpoint=None
             if checkpoint:
                 output=result_view(checkpoint['result']);state='needs_input' if output.get('state') in ('needs_input','insufficient_evidence','conflicting_evidence') else 'completed'
             elif run and config:
@@ -128,9 +137,10 @@ class CompositionPresentation:
             gate=next((n for n in (workflow or {}).get('nodes',[]) if n['node_id']=='approve_'+task['task_id']),None)
             if run and action_node:
                 state=run['node_states'].get(action_node['node_id'],'pending')
-                receipt=run['outputs'].get(action_node['node_id'])
+                receipt=run['outputs'].get(action_node['node_id']) if detail!='task' or task['task_id']==task_id else None
                 if receipt is not None and task['capability_id']=='content.prepare':
-                    output=dict(summary=receipt.get('summary') or receipt.get('body') or '',findings=[],missing_information=deepcopy(receipt.get('questions',[])),records=[],rule_results=[],tool_receipts=[])
+                    output=result_view(receipt)
+                    output.update(summary=receipt.get('summary') or receipt.get('body') or '',missing_information=deepcopy(receipt.get('questions',[])))
                     if run.get('adaptive'):
                         output['summary']='Generated interpretation; consult the evidence assessment for verified findings and completion. '+output['summary']
                         output['classification']='agent_interpretation'
@@ -151,11 +161,11 @@ class CompositionPresentation:
                     missing_information=[clarifications[task['task_id']]],records=[],rule_results=[],tool_receipts=[])
             tasks.append(dict(id=task['task_id'],label=contract['business_purpose'],kind='action' if contract['side_effect'] in ('write','draft') else 'retrieval' if contract['kind']=='tool' else 'agent',state=state,depends_on=task['depends_on'],capability_id=task['capability_id'],agent_id=config['configuration_id'] if config else None,tools=[doc['selected_tools'][task['task_id']]['tool_id']] if task['task_id'] in doc['selected_tools'] else [],condition=task['condition'],result=output,errors=[f for f in failures if f.get('affected_task')==task['task_id']],required_evidence=config.get('required_evidence_facts',[]) if config else contract['required_evidence'],completion_criteria=contract['completion_criteria'],approval_gate=dict(id=gate['node_id'],label=gate['label'],state=(run or {}).get('node_states',{}).get(gate['node_id'],'pending')) if gate else None))
         knowledge={}
-        if doc.get('preparation_id'):
+        if detail=='full' and doc.get('preparation_id'):
             prepared=self.composition.preparation.get(auth,doc['preparation_id'])
             knowledge=dict(pins=prepared['pins'],tasks=prepared['tasks'],coverage=prepared['coverage'],provenance=prepared['provenance'])
-        elif doc.get('client_package_context'):knowledge=deepcopy(doc['client_package_context'])
-        memory=runtime.working_memory.view(run,workflow) if run and workflow else None
+        elif detail=='full' and doc.get('client_package_context'):knowledge=deepcopy(doc['client_package_context'])
+        memory=runtime.working_memory.view(run,workflow) if detail=='full' and run and workflow else None
         recovery=self.recovery_view(run,workflow,runtime.clock() if runtime else 0)
         public_run=None
         if run:
@@ -165,21 +175,40 @@ class CompositionPresentation:
                 public_run['action_plan']=deepcopy(workflow['metadata']['connected_action_plan'])
             if doc.get('action_plan'):
                 public_run['action_plan_reference']=deepcopy(run.get('action_plan_reference'))
-                public_run['action_instances']=deepcopy(run.get('action_instances',{}))
+                public_run['action_instances']=deepcopy(run.get('action_instances',{})) if detail=='full' else {}
             public_run['error_code']=run.get('error_code');public_run['failures']=deepcopy(failures)
             public_run['diagnostic_reference']=run.get('trace_reference')
             public_run['previous_failure_feedback']=deepcopy(run.get('previous_failure_feedback',[]))
             public_run['recovery_history']=[{k:deepcopy(h[k]) for k in ('attempt','timestamp','category','strategy','affected_tasks','verified_success','source_revalidations') if k in h} for h in run.get('recovery_history',[])]
             public_run['outcome']=deepcopy(run.get('outcome_evaluation'))
             public_run['approvals']=runtime.get_run(run_id,auth)['approvals']
-            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(run.get('action_instances',{}).get(n['node_id'],{}).get('resolved_inputs',n.get('configuration',{}).get('input',{}))),receipt=tool_receipt(run['outputs'][n['node_id']]) if n['node_id'] in run.get('outputs',{}) else {}) for n in workflow['nodes'] if n['kind']=='tool']
+            public_run['actions']=[dict(node_id=n['node_id'],label=n.get('label',n['node_id']),state=run['node_states'].get(n['node_id'],'pending'),inputs=deepcopy(run.get('action_instances',{}).get(n['node_id'],{}).get('resolved_inputs',n.get('configuration',{}).get('input',{}))),receipt=tool_receipt(run['outputs'][n['node_id']]) if n['node_id'] in run.get('outputs',{}) else {}) for n in workflow['nodes'] if n['kind']=='tool' and (detail=='full' or n['node_id']==task_id)]
         request_context=dict(google_connection_id=doc.get('google_connection_id'),resources=deepcopy(doc['resources']))
-        if doc.get('preparation_id'):
+        if detail=='full' and doc.get('preparation_id'):
             request_context['business_request']=dict(inputs=deepcopy(prepared['inputs']))
             if prepared.get('evidence_context'):request_context['business_request']['evidence_context']={k:prepared['evidence_context'][k] for k in ('dataset_id','case_id')}
         if doc.get('client_package_context'):
             package=doc['client_package_context']['package'];request_context.update(client_package_id=package['package_id'],client_package_revision=package['revision'])
         return dict(composition_id=cid,workflow_id=wid,display_name=presentation_title(self.service,doc,meta[0] if meta and meta[0] else display_title(doc)),objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=doc['master'],workflow_status=workflow['status'] if workflow else None,workflow_version=workflow['version'] if workflow else None,run=public_run,knowledge=knowledge,memory=memory,recovery=recovery,planning=doc['planning'],resources=doc['resources'],request_context=request_context)
+
+    def summary(self,doc,workflow,run,sequence,auth,title=None):
+        tasks=[]
+        for task in doc['tasks']:
+            contract=doc['contracts'][task['capability_id']]
+            nid=task['task_id'] if doc.get('action_plan') else 'action_'+task['task_id']
+            state=(run or {}).get('node_states',{}).get(nid,'pending')
+            if task['task_id'] in (run or {}).get('task_checkpoints',{}):state='completed'
+            if state=='executing':state='running'
+            if nid in (run or {}).get('query_waits',{}):state='running' if run['status'] in ('queued','running') else 'cancelled' if run['status']=='cancelled' else 'interrupted'
+            gate=next((n for n in (workflow or {}).get('nodes',[]) if n['node_id']=='approve_'+task['task_id']),None)
+            tasks.append(dict(id=task['task_id'],label=contract['business_purpose'],kind='action' if contract['side_effect'] in ('write','draft') else 'retrieval' if contract['kind']=='tool' else 'agent',state=state,depends_on=task['depends_on'],capability_id=task['capability_id'],agent_id=None,tools=[],condition=task['condition'],result=None,errors=[],required_evidence=[],completion_criteria=contract['completion_criteria'],approval_gate=dict(id=gate['node_id'],label=gate['label'],state=(run or {}).get('node_states',{}).get(gate['node_id'],'pending')) if gate else None))
+        public=None
+        if run:
+            runtime=self.service.runtime_runner.runtime
+            public=dict(run_id=run['run_id'],status=run['status'],created_at=run['created_at'],usage=run['usage'],error_code=run.get('error_code'),approvals=[],failures=run.get('classified_failures',[]),recovery_history=[],outcome=None,actions=[],action_instances={k:{f:v[f] for f in ('state','external_effect_status','verified_receipt') if f in v} for k,v in run.get('action_instances',{}).items()})
+            # Approval payloads and adaptive evidence are loaded only on demand.
+            public['approvals']=[{k:a[k] for k in ('approval_id','workflow_id','workflow_version','status','allowed_decisions') if k in a} for a in runtime.get_run(run['run_id'],auth)['approvals']]
+        return dict(composition_id=doc['composition_id'],workflow_id='cw_'+doc['composition_id'].removeprefix('composition_'),display_name=presentation_title(self.service,doc,title or display_title(doc)),objective=doc['objective'],state=doc['state'],gaps=doc['gaps'],created_at=doc['created_at'],tasks=tasks,master=None,workflow_status=(workflow or {}).get('status'),workflow_version=(workflow or {}).get('version'),run=public,knowledge={},memory=None,recovery=dict(eligible=False,reason='Load execution details for recovery.'),planning=doc['planning'],resources={},request_context=dict(google_connection_id=doc.get('google_connection_id'),resources=deepcopy(doc['resources']),**({k:v for k,v in dict(client_package_id=doc['client_package_context']['package']['package_id'],client_package_revision=doc['client_package_context']['package']['revision']).items()} if doc.get('client_package_context') else {})),sequence=sequence,finished_at=(run or {}).get('finished_at'),query_concurrency=(run or {}).get('query_concurrency'))
 
     @staticmethod
     def recovery_view(run,workflow,clock):

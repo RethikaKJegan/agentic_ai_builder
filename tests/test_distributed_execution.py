@@ -19,6 +19,7 @@ from workflow_api.auxiliary_database import scoped_dsn
 def f():
     x=fixtures.ToolGraphTests();x.setUp();x.configure();x.put()
     x.now=time.time();x.runtime.clock=lambda:x.now
+    x.authenticate=lambda workspace,subject: x.approver() if subject==x.approver()['subject']['subject_id'] else x.auth
     try:yield x
     finally:x.doCleanups()
 
@@ -46,7 +47,7 @@ def test_parallel_consumers_preserve_singleton_coordination(f):
 
 def test_four_active_consumers_never_duplicate_the_same_tool(f):
     rid=approved(f)
-    workers=[RuntimeWorker(f.graph,lambda *_:f.auth) for _ in range(4)]
+    workers=[RuntimeWorker(f.graph,f.authenticate) for _ in range(4)]
     with ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(lambda w:w.drain(),workers))
     assert f.runtime.get_run(rid,f.auth)['status']=='completed'
     assert len(f.invocations)==1
@@ -99,6 +100,8 @@ def test_fair_polling_does_not_let_simpson_backlog_hide_subway(f):
             run={'run_id':'fair_'+str(i),'workspace_id':'simpson' if i<19 else 'subway',
                  'subject_id':'operator','status':'queued'}
             db.execute('INSERT INTO runtime_runs(workspace,run_id,document) VALUES (?,?,?)',(run['workspace_id'],run['run_id'],json.dumps(run)))
+    # Minimal queue records exercise scheduling only, not deadline expiry.
+    f.runtime.expire_runs=lambda:None
     seen=[]
     class Runner:
         runtime=f.runtime
@@ -123,7 +126,7 @@ def test_waiting_approvals_cannot_fill_a_fair_account_batch(f):
         rid=f.runtime.create_run(req,f.auth)['run_id']
         assert f.graph.advance(rid,f.auth)['status']=='paused_for_approval'
     ready=approved(f,99)
-    RuntimeWorker(f.graph,lambda *_:f.auth,batch_size=1,fair=True).drain()
+    RuntimeWorker(f.graph,f.authenticate,batch_size=1,fair=True).drain()
     assert f.runtime.get_run(ready,f.auth)['status']=='completed'
 
 
